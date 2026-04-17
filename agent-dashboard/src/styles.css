@@ -538,7 +538,7 @@ body {
 .v4-navigation-stack {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
   padding: 20px 10px;
   overflow-y: auto;
 }
