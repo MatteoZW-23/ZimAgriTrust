@@ -18,8 +18,15 @@ class OrderResponse(BaseModel):
     platform_fee: float
     seller_payout: float
     currency: str
+    product: str
     status: OrderStatus
+    
+    # Conditional Contact Reveal (Masked until Escrow)
+    seller_contact_reveal: str
+    buyer_contact_reveal: str
+    
     created_at: datetime
+
 
     model_config = ConfigDict(from_attributes=True)
 

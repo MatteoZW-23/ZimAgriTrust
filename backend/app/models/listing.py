@@ -17,6 +17,28 @@ class Sector(str, enum.Enum):
     DAIRY = "dairy"
     FISHERIES = "fisheries"
     VALUE_ADDED = "value_added"
+    
+    # Advanced Agricultural Domains
+    HORTICULTURE = "horticulture"
+    AQUACULTURE = "aquaculture"
+    APICULTURE = "apiculture"
+    SERICULTURE = "sericulture"
+    FLORICULTURE = "floriculture"
+    VITICULTURE = "viticulture"
+    OLERICULTURE = "olericulture"
+    POMOLOGY = "pomology"
+    PISCICULTURE = "pisciculture"
+    MARICULTURE = "mariculture"
+    INPUTS = "inputs" # Seed, Fertilizer, Feed
+    MIXED_FARMING = "mixed_farming"
+    ARABLE_FARMING = "arable_farming"
+    PASTORAL_FARMING = "pastoral_farming"
+
+
+class LogisticsType(str, enum.Enum):
+    PLATFORM = "platform"       # Third-party transporter
+    SELF_COLLECT = "self_collect" # Buyer picks up from farm
+    SELF_DELIVER = "self_deliver" # Farmer delivers to buyer
 
 
 class ListingStatus(str, enum.Enum):
@@ -61,6 +83,19 @@ class Listing(Base):
     
     # Status & Visibility
     status: Mapped[ListingStatus] = mapped_column(Enum(ListingStatus), default=ListingStatus.ACTIVE)
+
+    @property
+    def seller_name(self) -> str:
+        return self.seller.full_name if self.seller else "Anonymous"
+
+    @property
+    def seller_trust_score(self) -> int:
+        return self.seller.trust_score if self.seller else 0
+
+    @property
+    def seller_phone_masked(self) -> str:
+        return self.seller.masked_phone if self.seller else "****"
+
     verification_status: Mapped[str] = mapped_column(String(20), default="pending") # pending, verified, rejected
     is_boosted: Mapped[bool] = mapped_column(Boolean, default=False)
     boost_fee: Mapped[float] = mapped_column(Float, default=0.0)
@@ -115,6 +150,7 @@ class Offer(Base):
     currency: Mapped[str] = mapped_column(String(5), default="USD")
     
     status: Mapped[OfferStatus] = mapped_column(Enum(OfferStatus), default=OfferStatus.PENDING)
+    logistics_type: Mapped[LogisticsType] = mapped_column(Enum(LogisticsType), default=LogisticsType.PLATFORM)
     buyer_message: Mapped[Optional[str]] = mapped_column(Text)
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

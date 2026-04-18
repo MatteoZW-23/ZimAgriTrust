@@ -9,7 +9,9 @@ RUN apt-get update && apt-get install -y \
 
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --default-timeout=1000 -r requirements.txt
+    pip install --default-timeout=2000 --retries=10 -r requirements.txt || \
+    pip install --default-timeout=2000 --retries=10 -r requirements.txt || \
+    pip install --default-timeout=2000 --retries=10 -r requirements.txt
 
 COPY . .
 

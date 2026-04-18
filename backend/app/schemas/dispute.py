@@ -29,6 +29,15 @@ class DisputeResponse(BaseModel):
     status: DisputeStatus
     resolution: Optional[str] = None
     
+    product: str
+    amount: float
+    buyer_name: str
+    buyer_trust: int
+    seller_name: str
+    seller_trust: int
+    ai_risk: int
+    ai_recommendation: str
+    
     # Financials
     proposed_discount: float
     proposed_refund_amount: float

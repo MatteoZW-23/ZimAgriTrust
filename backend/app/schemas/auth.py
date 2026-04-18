@@ -56,8 +56,10 @@ class UserLogin(BaseModel):
 class UserResponse(BaseModel):
     id: uuid.UUID
     full_name: str
-    phone_number: str
+    phone_number: str # Full number for authorized lookups
+    masked_phone: str # Hidden number for public marketplace
     role: UserRole
+
     trust_score: int
     id_verified: bool
     national_id: Optional[str] = None

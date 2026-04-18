@@ -518,7 +518,8 @@ body {
 
 /* Sidebar Styling */
 .sidebar-v4 {
-  width: 260px;
+  width: 280px;
+  padding-bottom: 32px;
   background: var(--v4-sidebar);
   color: var(--v4-sidebar-text);
   display: flex;
@@ -657,7 +658,7 @@ body {
 }
 
 .v4-sidebar-footer {
-  padding: 16px;
+  padding: 16px 16px 40px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   margin-top: auto;
   display: flex;
@@ -869,7 +870,7 @@ body {
 }
 
 .sidebar-v4 {
-  width: 240px;
+  width: 280px;
   height: 100%;
   background: var(--v4-primary);
   color: #fff;
@@ -883,7 +884,7 @@ body {
 }
 
 .sidebar-v4.collapsed {
-  width: 68px;
+  width: 80px;
 }
 
 .logo-icon-v4 {

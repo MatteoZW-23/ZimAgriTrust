@@ -2,7 +2,7 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 
 export async function request(path, options = {}) {
   const headers = {
-    "Content-Type": "application/json",
+    ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
     ...(options.headers || {}),
   };
 
@@ -86,6 +86,14 @@ export function fetchRiskWatch(token) {
   });
 }
 
+export function proposeAdjustment(token, disputeId, payload) {
+  return request(`/disputes/${disputeId}/propose-settlement`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
 export function fetchDisputes(token) {
   return request("/disputes", {
     headers: { Authorization: `Bearer ${token}` },
@@ -118,7 +126,14 @@ export function createDispute(token, orderId, type, reason) {
   return request("/disputes", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ order_id: orderId, type, reason }),
+    body: JSON.stringify({ order_id: orderId, type, description: reason }),
+  });
+}
+
+export function approveTerms(token, disputeId) {
+  return request(`/disputes/${disputeId}/accept-settlement`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
   });
 }
 
@@ -192,8 +207,8 @@ export function fetchMarketSummary(token) {
   });
 }
 
-export function fetchMarketForecast(token, crop = 'Maize') {
-  return request(`/market/forecast?crop=${crop}`, {
+export function fetchMarketForecast(token, crop = 'Maize', region = "Harare") {
+  return request(`/ai/forecast/market-intelligence?commodity=${crop}&region=${region}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
@@ -240,6 +255,13 @@ export function fetchNationalPulse(token) {
   });
 }
 
+export function fetchMarketNews(token) {
+  return request("/market/news", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+
 // ESCROW GOVERNANCE
 export const forceEscrowRelease = async (orderId, reason, token) => {
   return request(`/admin/escrow/${orderId}/force-release`, {
@@ -258,6 +280,12 @@ export const forceEscrowRefund = async (orderId, reason, token) => {
 };
 
 // USER MGMT
+export const fetchUsers = async (token) => {
+  return request("/admin/users", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+};
+
 export const updateUserStatus = async (userId, targetStatus, reason, token) => {
   return request(`/admin/users/${userId}/status?target_status=${targetStatus}&reason=${encodeURIComponent(reason)}`, {
     method: "POST",
@@ -356,4 +384,22 @@ export function fetchAgentStats(token) {
   return request("/admin/agents/stats", {
     headers: { Authorization: `Bearer ${token}` }
   }).catch(() => []);
+}
+
+// AI & DATA SCIENCE
+export function analyzeCrop(token, file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  return request("/ai/vision/analyze-crop", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData
+  });
+}
+
+export function fetchAIProof(token) {
+  return request("/ai/research/proof-of-concept", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 }

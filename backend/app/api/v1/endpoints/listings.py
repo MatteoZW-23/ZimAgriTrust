@@ -17,8 +17,9 @@ router = APIRouter()
 def create_market_listing(
     payload: ListingCreate,
     db: Session = Depends(get_db),
-    seller: User = Depends(require_roles(UserRole.FARMER)),
+    seller: User = Depends(require_roles(UserRole.FARMER, UserRole.BUYER)),
 ) -> Listing:
+
     return create_listing(db, seller, payload)
 
 

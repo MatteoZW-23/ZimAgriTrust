@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import { resolveDispute, proposeAdjustment, approveTerms } from '../api';
+import { exportToCSV, handleImport } from '../utils/dataTransfer';
+
 
 export default function DisputeResolutionPanel({ disputes, onResolve }) {
   const [selectedDispute, setSelectedDispute] = useState(null);
@@ -23,9 +25,19 @@ export default function DisputeResolutionPanel({ disputes, onResolve }) {
              <p>Neutral financial arbitration for the AgriTrust marketplace. Review cross-party evidence and execute institutional settlement overrides.</p>
              
              <div className="hero-actions" style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-                <button className="q-btn primary-btn small" style={{ background: '#fff', color: '#1e293b', padding: '10px 20px', fontSize: '12px' }}>
+                 <button className="q-btn primary-btn small" style={{ background: '#fff', color: '#1e293b', padding: '10px 20px', fontSize: '12px' }}>
                     <i className="fas fa-gavel"></i> Arbitration Guidelines
-                </button>
+                 </button>
+                 <button className="q-btn ghost small" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', padding: '10px 20px', fontSize: '12px' }} onClick={() => exportToCSV(disputes, `disputes_log_${new Date().toISOString().split('T')[0]}.csv`)}>
+                    <i className="fas fa-file-export"></i> Export Cases
+                 </button>
+                 <label className="q-btn ghost small" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', padding: '10px 20px', fontSize: '12px', cursor: 'pointer' }}>
+                    <i className="fas fa-file-import"></i> Import Evidence
+                    <input type="file" style={{ display: 'none' }} accept=".csv,.json" onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) handleImport(file, (data) => alert(`DISPUTE_SYNC: Successfully ingested ${data.length} case files.`));
+                    }} />
+                 </label>
              </div>
           </div>
           
@@ -227,27 +239,45 @@ function DisputeDetail({ dispute, onBack, onResolve }) {
               <div className="v4-glass-card-premium">
                   <div className="v4-card-header"><h3>Agent Adjudication</h3></div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '24px' }}>
-                      {['Full Refund', 'Release Sum', 'Partial Settlement'].map(opt => (
-                          <button key={opt} onClick={() => setDecision(opt === 'Partial Settlement' ? 'partial' : opt.toLowerCase().replace(' ', '_'))} style={{ padding: '16px', borderRadius: '14px', border: '1.5px solid var(--v4-border)', background: decision === (opt === 'Partial Settlement' ? 'partial' : opt.toLowerCase().replace(' ', '_')) ? 'var(--v4-accent)' : 'var(--v4-bg)', color: decision === (opt === 'Partial Settlement' ? 'partial' : opt.toLowerCase().replace(' ', '_')) ? '#fff' : 'var(--v4-text-main)', fontSize: '13px', fontWeight: 900, cursor: 'pointer', textAlign: 'left' }}>
+                      {['Full Refund', 'Release Sum', 'Propose Settlement'].map(opt => (
+                          <button key={opt} onClick={() => setDecision(opt === 'Propose Settlement' ? 'proposal' : opt.toLowerCase().replace(' ', '_'))} style={{ padding: '16px', borderRadius: '14px', border: '1.5px solid var(--v4-border)', background: decision === (opt === 'Propose Settlement' ? 'proposal' : opt.toLowerCase().replace(' ', '_')) ? 'var(--v4-accent)' : 'var(--v4-bg)', color: decision === (opt === 'Propose Settlement' ? 'proposal' : opt.toLowerCase().replace(' ', '_')) ? '#fff' : 'var(--v4-text-main)', fontSize: '13px', fontWeight: 900, cursor: 'pointer', textAlign: 'left' }}>
                               {opt}
                           </button>
                       ))}
 
-                      {decision === 'partial' && (
+                      {decision === 'proposal' && (
                           <div style={{ padding: '16px', background: 'var(--v4-surface)', borderRadius: '16px', marginTop: '12px' }}>
                               <input type="range" style={{ width: '100%' }} value={split} onChange={(e) => setSplit(e.target.value)} />
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '11px', fontWeight: 900 }}>
-                                  <span>FARMER: {100-split}%</span>
-                                  <span>BUYER: {split}%</span>
+                                  <span>FARMER LOSS: {split}%</span>
+                                  <span>BUYER REFUND: {split}%</span>
                               </div>
+                              <p style={{ fontSize: '9px', color: 'var(--v4-text-dim)', marginTop: '8px' }}>Proposing a partial refund/discount requires acceptance from both parties.</p>
                           </div>
                       )}
 
                       <textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="Final Adjudication Justification..." style={{ width: '100%', height: '100px', background: 'var(--v4-bg)', border: '1.5px solid var(--v4-border)', borderRadius: '16px', padding: '16px', fontSize: '13px', fontWeight: 600, color: 'var(--v4-text-main)', marginTop: '12px' }}></textarea>
                       
-                      <button className="q-btn primary-btn full-w" onClick={() => onResolve(dispute.id, { decision, split, reason })} style={{ background: 'var(--v4-accent)', marginTop: '12px' }}>Execute Settlement</button>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+                        <div style={{ padding: '12px', borderRadius: '12px', background: dispute.buyer_accepted ? '#20963D22' : 'var(--v4-bg)', border: `1px solid ${dispute.buyer_accepted ? '#20963D' : 'var(--v4-border)'}`, textAlign: 'center' }}>
+                            <span style={{ fontSize: '9px', fontWeight: 900, color: dispute.buyer_accepted ? '#20963D' : 'var(--v4-text-dim)' }}>{dispute.buyer_accepted ? 'BUYER_ACCEPTED' : 'BUYER_PENDING'}</span>
+                        </div>
+                        <div style={{ padding: '12px', borderRadius: '12px', background: dispute.seller_accepted ? '#20963D22' : 'var(--v4-bg)', border: `1px solid ${dispute.seller_accepted ? '#20963D' : 'var(--v4-border)'}`, textAlign: 'center' }}>
+                            <span style={{ fontSize: '9px', fontWeight: 900, color: dispute.seller_accepted ? '#20963D' : 'var(--v4-text-dim)' }}>{dispute.seller_accepted ? 'SELLER_ACCEPTED' : 'SELLER_PENDING'}</span>
+                        </div>
+                      </div>
+
+                      <button 
+                        className="q-btn primary-btn full-w" 
+                        onClick={() => onResolve(dispute.id, { decision, split, reason })} 
+                        style={{ background: 'var(--v4-accent)', marginTop: '12px' }}
+                        disabled={decision === 'proposal' && (dispute.status === 'PROPOSED_OFFER')}
+                      >
+                        {decision === 'proposal' ? 'Broadcast Settlement Terms' : 'Execute Final Adjudication'}
+                      </button>
                   </div>
               </div>
+
           </aside>
       </div>
 

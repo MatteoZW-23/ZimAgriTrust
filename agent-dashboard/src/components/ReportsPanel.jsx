@@ -1,4 +1,5 @@
 import React from 'react';
+import { exportToJSON, handleImport } from '../utils/dataTransfer';
 
 export function ReportsPanel() {
   const reportTypes = [
@@ -51,7 +52,21 @@ export function ReportsPanel() {
               <div className="v4-glass-card-premium">
                   <div className="v4-card-header">
                       <h3>Transactional Parity Summary</h3>
-                      <button className="q-btn ghost small"><i className="fas fa-download"></i> EXPORT DATA</button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button 
+                            className="q-btn ghost small" 
+                            onClick={() => exportToJSON({ flow: '$1.4M', escrow: '89.4%', avg: '$640.22' }, 'parity_report.json')}
+                        >
+                            <i className="fas fa-download"></i> EXPORT JSON
+                        </button>
+                        <label className="q-btn ghost small" style={{ cursor: 'pointer' }}>
+                            <i className="fas fa-upload"></i> IMPORT
+                            <input type="file" style={{ display: 'none' }} accept=".json,.csv" onChange={(e) => {
+                                const file = e.target.files[0];
+                                if(file) handleImport(file, (data) => alert(`PARITY_SYNC: Ingested external ledger cache: ${JSON.stringify(data).slice(0, 50)}...`));
+                            }} />
+                        </label>
+                    </div>
                   </div>
                   
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', margin: '32px 0' }}>

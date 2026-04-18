@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ZIMBABWE_AGRI_CATALOG, CATEGORY_METRICS } from '../ZimbabweDatabase';
+import { exportToCSV, handleImport } from '../utils/dataTransfer';
 
 export default function MarketplacePanel({ activities, loading }) {
   const [activeTab, setActiveTab] = useState('MONITOR'); // MONITOR | CATALOG
@@ -42,6 +43,18 @@ export default function MarketplacePanel({ activities, loading }) {
               />
            </div>
          )}
+         <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="q-btn ghost small" style={{ border: '1.5px solid var(--v4-border)' }} onClick={() => exportToCSV([...listings, ...offers, ...deals], `market_monitor_${new Date().toISOString().split('T')[0]}.csv`)}>
+                <i className="fas fa-file-export"></i> EXPORT MONITOR
+            </button>
+            <label className="q-btn ghost small" style={{ border: '1.5px solid var(--v4-border)', cursor: 'pointer' }}>
+                <i className="fas fa-file-import"></i> IMPORT
+                <input type="file" style={{ display: 'none' }} accept=".csv,.json" onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) handleImport(file, (data) => alert(`MARKET_SYNC: Ingested ${data.length} telemetry entries.`));
+                }} />
+            </label>
+         </div>
       </div>
 
       {activeTab === 'MONITOR' ? (

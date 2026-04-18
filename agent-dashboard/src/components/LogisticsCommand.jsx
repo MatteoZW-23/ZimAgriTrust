@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fetchLogisticsTrips, createLogisticsTrip, fetchManifest } from '../api';
+import { exportToCSV, handleImport } from '../utils/dataTransfer';
 
 export default function LogisticsCommand({ token, role }) {
   const [trips, setTrips] = useState([
@@ -26,11 +27,11 @@ export default function LogisticsCommand({ token, role }) {
   };
 
   const viewManifest = (tripId) => {
-    fetchManifest(token, tripId).then(setManifest).catch(() => setManifest([
-        { farmer: 'Tendai Moyo', district: 'Binga', pickup_point: 'Regional Hub A', quantity: '500 KG', confirmed: true },
-        { farmer: 'Sarah Banda', district: 'Binga', pickup_point: 'Market Hub B', quantity: '1200 KG', confirmed: false }
-    ]));
+    fetchManifest(token, tripId)
+        .then(data => setManifest(data?.items || []))
+        .catch(() => setManifest([]));
   };
+
 
   return (
     <div className="v4-dashboard-container animate-fade-in">
@@ -48,11 +49,12 @@ export default function LogisticsCommand({ token, role }) {
              <p style={{ fontSize: '16px', opacity: 0.7, maxWidth: '500px', margin: 0, lineHeight: 1.6, fontWeight: 600 }}>Connecting Zimbabwe's rural-to-urban agricultural corridors through smart capacity aggregation and real-time transit telemetry.</p>
              
              <div className="hero-actions" style={{ display: 'flex', gap: '16px', marginTop: '12px' }}>
-                {role === 'TRANSPORTER' && (
+                {(role === 'AGENT' || role === 'ADMIN') && (
                   <button className="q-btn primary-btn" style={{ background: '#fff', color: '#450a0a' }} onClick={() => setShowAddTrip(true)}>
                       <i className="fas fa-tower-broadcast"></i> Broadcast Route
                   </button>
                 )}
+
                 <button className="q-btn ghost" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff' }}>
                     <i className="fas fa-map-location-dot"></i> Regional Matrix
                 </button>
@@ -179,9 +181,18 @@ export default function LogisticsCommand({ token, role }) {
                           ))}
                       </div>
                       
-                      <button className="q-btn primary-btn full-w" style={{ marginTop: '32px', background: '#fff', color: '#450a0a' }}>
-                          <i className="fas fa-download"></i> Institutional Export
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '32px' }}>
+                        <button className="q-btn primary-btn" style={{ flex: 1, background: '#fff', color: '#450a0a' }} onClick={() => exportToCSV(manifest, `manifest_${new Date().toISOString()}.csv`)}>
+                            <i className="fas fa-download"></i> EXPORT CSV
+                        </button>
+                        <label className="q-btn ghost" style={{ flex: 1, background: 'rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <i className="fas fa-upload"></i> IMPORT
+                            <input type="file" style={{ display: 'none' }} accept=".csv" onChange={(e) => {
+                                const file = e.target.files[0];
+                                if(file) handleImport(file, (data) => alert(`MANIFEST_INGEST: Successfully loaded ${data.length} external cargo entries.`));
+                            }} />
+                        </label>
+                      </div>
                   </div>
               ) : (
                   <div className="v4-glass-card-premium" style={{ textAlign: 'center', padding: '60px 40px' }}>
@@ -223,6 +234,11 @@ export default function LogisticsCommand({ token, role }) {
                                   <label style={{ display: 'block', fontSize: '10px', fontWeight: 950, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '10px' }}>Institutional Rate ($/KG)</label>
                                   <input type="number" step="0.01" value={newTrip.price_per_kg} onChange={e => setNewTrip({...newTrip, price_per_kg: e.target.value})} style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '16px', color: '#fff', fontSize: '15px' }} required />
                               </div>
+                              <div className="v4-input-group">
+                                  <label style={{ display: 'block', fontSize: '10px', fontWeight: 950, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '10px' }}>Departure Date</label>
+                                  <input type="date" value={newTrip.departure_date} onChange={e => setNewTrip({...newTrip, departure_date: e.target.value})} style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '16px', color: '#fff', fontSize: '15px' }} required />
+                              </div>
+
                           </div>
                           
                           <div style={{ display: 'flex', gap: '20px' }}>

@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { fetchTransactions, fetchListingOffers, acceptOffer, fetchMyListings, confirmDelivery } from '../api';
+import { fetchListingOffers, acceptOffer, fetchMyListings, confirmDelivery, createDispute } from '../api';
 
-export default function ActiveOrdersPanel({ profile, token }) {
+export default function ActiveOrdersPanel({ profile, token, transactions = [], onRefresh }) {
   const [orders, setOrders] = useState([]);
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   
+  // Sync orders from props
+  useEffect(() => {
+    setOrders(transactions);
+  }, [transactions]);
+
   const [showEcoCashModal, setShowEcoCashModal] = useState(false);
   const [showSettlementModal, setShowSettlementModal] = useState(false);
   const [showDisputeModal, setShowDisputeModal] = useState(false);
@@ -24,25 +29,21 @@ export default function ActiveOrdersPanel({ profile, token }) {
       if (!reason) return alert("Strategic evidence is required to lock escrow.");
 
       try {
-          const { createDispute } = await import('../api');
           await createDispute(token, activeOrder.id, type, reason);
           alert("TACTICAL DISPUTE RAISED. Regional agent has been notified and escrow is LOCKED.");
           setShowDisputeModal(false);
-          loadData();
+          if (onRefresh) onRefresh(); else loadData();
       } catch (err) {
           setErrorMsg("Backend Dispute Sync Failure: " + err.message);
       }
   };
 
   const loadData = async () => {
+    if (!isFarmer) return; // Only farmers have extra data to fetch here (listing offers)
+    
     setLoading(true);
     setErrorMsg('');
     try {
-        const transData = await fetchTransactions(token);
-        
-        // Strict Backend Sync - No Fallbacks
-        setOrders(Array.isArray(transData) ? transData : []);
-
         if (isFarmer) {
             const myLists = await fetchMyListings(token);
             let allOffers = [];
@@ -54,8 +55,7 @@ export default function ActiveOrdersPanel({ profile, token }) {
             setOffers(allOffers);
         }
     } catch (err) {
-        console.error("Backend pipeline sync failed:", err);
-        setOrders([]);
+        console.error("Farmer data sync failed:", err);
     } finally {
         setLoading(false);
     }
@@ -68,7 +68,7 @@ export default function ActiveOrdersPanel({ profile, token }) {
   const handleAcceptOffer = async (offer) => {
       try {
           await acceptOffer(token, offer.listing_id, offer.id);
-          loadData(); // Re-sync to move to Escrow locked orders
+          if (onRefresh) onRefresh(); else loadData();
       } catch (err) {
           setErrorMsg(err.message || 'Error accepting offer');
       }
@@ -149,6 +149,17 @@ export default function ActiveOrdersPanel({ profile, token }) {
                                 <i className="fas fa-arrow-right"></i>
                                 <span>{o.destination || 'Urban Depot'}</span>
                              </div>
+                             {(o.status === 'ESCROW_HELD' || o.status === 'DELIVERED') && (
+                                <div className="v4-contact-reveal-box" style={{ marginTop: '12px', background: '#f0f9ff', padding: '8px 12px', borderRadius: '10px', display: 'flex', gap: '16px', border: '1px solid #bae6fd' }}>
+                                    <div style={{ fontSize: '11px', fontWeight: 900, color: '#0369a1' }}>
+                                        <i className="fas fa-phone-volume"></i> {isBuyer ? `SELLER: ${o.seller_contact_reveal}` : `BUYER: ${o.buyer_contact_reveal}`}
+                                    </div>
+                                    <div style={{ fontSize: '10px', fontWeight: 700, color: '#0369a1', opacity: 0.8 }}>
+                                        <i className="fas fa-lock"></i> SECURE_LINE_OPEN
+                                    </div>
+                                </div>
+                             )}
+
                          </div>
 
                          <div className="r-financial">

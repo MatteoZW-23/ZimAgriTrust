@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
 import { register } from '../api';
+import { exportToCSV, handleImport } from '../utils/dataTransfer';
 
 export default function UserDirectoryPanel({ users = [], token, onGovernance, profile }) {
   const [showEnrollModal, setShowEnrollModal] = useState(false);
@@ -30,6 +30,20 @@ export default function UserDirectoryPanel({ users = [], token, onGovernance, pr
      is_verified: u.is_verified || false,
      location: 'National Grid'
   }));
+
+  const handleExport = () => {
+      exportToCSV(displayUsers, `agritrust_stakeholders_${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
+  const onImportFile = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      handleImport(file, (data) => {
+          alert(`NETWORK_SYNC: Successfully ingested ${data.length} external identities. Processing batch validation...`);
+          console.log("Imported Data:", data);
+          // In a real app, you would then call an API to bulk-upload
+      });
+  };
 
   const handleEnroll = async () => {
       try {
@@ -65,9 +79,13 @@ export default function UserDirectoryPanel({ users = [], token, onGovernance, pr
                       <i className="fas fa-user-plus"></i> Enroll Agent
                   </button>
                 )}
-                <button className="q-btn ghost small" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', padding: '10px 20px', fontSize: '12px' }}>
-                    <i className="fas fa-file-export"></i> Global Audit
+                <button className="q-btn ghost small" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', padding: '10px 20px', fontSize: '12px' }} onClick={handleExport}>
+                    <i className="fas fa-file-export"></i> Global Audit (CSV)
                 </button>
+                <label className="q-btn ghost small" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', padding: '10px 20px', fontSize: '12px', cursor: 'pointer' }}>
+                    <i className="fas fa-file-import"></i> Ingest Registry
+                    <input type="file" style={{ display: 'none' }} accept=".csv,.json" onChange={onImportFile} />
+                </label>
              </div>
           </div>
           

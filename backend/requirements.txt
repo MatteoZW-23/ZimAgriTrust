@@ -15,3 +15,8 @@ statsmodels
 joblib
 requests
 beautifulsoup4
+tensorflow
+opencv-python-headless
+pillow
+matplotlib
+seaborn

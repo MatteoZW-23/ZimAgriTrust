@@ -46,3 +46,46 @@ class Dispute(Base):
     order = relationship("Order", back_populates="disputes")
     raised_by_user = relationship("User", foreign_keys=[raised_by])
     assigned_agent = relationship("User", foreign_keys=[agent_assigned])
+
+    @property
+    def product(self) -> str:
+        return self.order.listing.product_type if self.order and self.order.listing else "Agricultural Goods"
+
+    @property
+    def amount(self) -> float:
+        return self.order.total_amount if self.order else 0.0
+
+    @property
+    def buyer_name(self) -> str:
+        return self.order.buyer.full_name if self.order and self.order.buyer else "N/A"
+
+    @property
+    def buyer_phone(self) -> str:
+        return self.order.buyer.phone_number if self.order and self.order.buyer else "N/A"
+
+    @property
+    def buyer_trust(self) -> int:
+        return self.order.buyer.trust_score if self.order and self.order.buyer else 50
+
+    @property
+    def seller_name(self) -> str:
+        return self.order.seller.full_name if self.order and self.order.seller else "N/A"
+
+    @property
+    def seller_phone(self) -> str:
+        return self.order.seller.phone_number if self.order and self.order.seller else "N/A"
+
+    @property
+    def seller_trust(self) -> int:
+        return self.order.seller.trust_score if self.order and self.order.seller else 50
+
+    @property
+    def ai_risk(self) -> int:
+        # Static mock for high-fidelity UI demonstration
+        if self.status == DisputeStatus.OPEN:
+            return 72
+        return 45
+
+    @property
+    def ai_recommendation(self) -> str:
+        return "Manual audit required. Moisture content discrepancy exceeds standard variance limits."

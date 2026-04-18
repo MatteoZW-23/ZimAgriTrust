@@ -20,6 +20,7 @@ services:
   redis:
     image: redis:7
     ports:
+    
       - "6380:6379"
 
   backend:
@@ -37,6 +38,7 @@ services:
       MASTER_TEST_PASSWORD: "master"
     volumes:
       - ./backend:/app
+      - ./backend/ml_weights:/app/ml_weights
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,6 +74,23 @@ services:
       - ./ussd-simulator:/app
     depends_on:
       - backend
+
+  notebook-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.scheduler
+    volumes:
+      - ./research:/research
+      - ./backend/ml_weights:/backend/ml_weights
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - BACKEND_API_URL=http://backend:8000/api/v1
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - backend
+      - redis
+    restart: always
+    command: python scheduler/auto_scheduler.py --start
 
 volumes:
   postgres_data:

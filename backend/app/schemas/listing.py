@@ -3,7 +3,7 @@ from datetime import datetime, date
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 
-from app.models.listing import ListingStatus, OfferStatus, Sector
+from app.models.listing import ListingStatus, OfferStatus, Sector, LogisticsType
 
 
 class ListingCreate(BaseModel):
@@ -30,6 +30,7 @@ class OfferCreate(BaseModel):
     quantity: float = Field(gt=0)
     offered_price: float = Field(gt=0)
     currency: str = Field(default="USD")
+    logistics_type: LogisticsType = Field(default=LogisticsType.PLATFORM)
     buyer_message: Optional[str] = Field(default=None, max_length=500)
 
 
@@ -41,6 +42,7 @@ class OfferResponse(BaseModel):
     quantity: float
     offered_price: float
     currency: str
+    logistics_type: LogisticsType
     status: OfferStatus
     buyer_message: Optional[str]
     created_at: datetime
@@ -63,7 +65,14 @@ class ListingResponse(BaseModel):
     location_district: Optional[str]
     status: ListingStatus
     verification_status: str
+    
+    # Masked Seller Intelligence
+    seller_name: str
+    seller_trust_score: int
+    seller_phone_masked: str
+    
     created_at: datetime
+
     
     # New Quality Fields
     is_perishable: bool

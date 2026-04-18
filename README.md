@@ -24,7 +24,34 @@ This platform functions exclusively on the principles of accessibility and absol
 *   ⚖️ **Agent Dispute Arbitration**: If a logistical discrepancy occurs, funds remain frozen. Designated regional support agents can intervene, reviewing evidence and programmatically forcing a refund or releasing the capital.
 *   🛡️ **Security & Validation**: The core backend enforces strict identity verification and transaction monitoring to halt recurring fraud immediately and maintain market stability.
 
-## 🏗️ 3. System Architecture
+---
+
+## 📂 3. Project Structure: Sovereign Lab & Production
+
+The AgriTrust ecosystem is organized to separate interactive research from mission-critical production services.
+
+```text
+AgriTrust/
+├── backend/                # Sovereign API & Logic Core
+│   ├── app/                # Application logic (FastAPI)
+│   │   ├── ml/             # ML Implementation (Price, Risk, Vision)
+│   │   ├── services/       # Business Logic & AI Integration
+│   │   └── models/         # Database Schemas
+│   └── ml_weights/         # Production Model Weights (Docker Mounted)
+├── research/               # Sovereign Intelligence Laboratory
+│   ├── labs/               # Isolated Jupyter Research Environment
+│   ├── proofs/             # Fundamental AI Mathematical Proofs
+│   ├── agritrust_ai_lab.ipynb # Main Research Notebook
+│   └── *_proof.py          # Standalone DS Concept Validations
+├── agent-dashboard/        # Administrative Control Center (React)
+├── ussd-simulator/         # Telecom Gateway Testing Environment
+├── docker-compose.yml      # Infrastructure Orchestration
+└── launch_lab.py           # Entry point for Research & DS Proofs
+```
+
+---
+
+## 🏗️ 4. System Architecture
 
 AgriTrust operates on a highly scalable, decoupled microservices architecture. The entire ecosystem is containerized for seamless, enterprise-grade deployment.
 
@@ -69,7 +96,23 @@ graph TD
     D <--> RD
 ```
 
-### 3.2 Escrow Commerce Flow (DFD)
+### 4.2 Science-to-Production Pipeline (Intelligence Flow)
+This diagram illustrates the "Real Thing" pipeline implemented for deployment.
+```mermaid
+graph LR
+    subgraph Research Lab
+    R1[Raw Data] --> R2[Sovereign Cleaner]
+    R2 --> R3[Model Training]
+    end
+
+    subgraph Production Deployment
+    R3 -->|Weights Export| P1[backend/ml_weights]
+    P1 -->|Volume Mount| P2[Docker Container]
+    P2 -->|Live Inference| P3[USSD/Web Clients]
+    end
+```
+
+### 4.3 Escrow Commerce Flow (DFD)
 This sequence ensures neither party inherits risk during a transaction execution.
 ```mermaid
 sequenceDiagram
@@ -122,7 +165,7 @@ Unlike generic marketplace templates, AgriTrust is engineered for high-fidelity 
 *   **Secure Access Protocols**: Transitioned to secure, banking-standard **Numeric PIN-based Authentication** for rapid field access.
 *   **Private Negotiation Hubs**: Trade commitments are securely sealed, keeping direct negotiations between farmers and commercial buyers isolated and recorded.
 *   **Live Metrics Engine**: The dashboard features real-time telemetry demonstrating network latency and institutional build identifiers.
-*   **Zero-AI Determinism**: The platform operates on fixed, auditable protocols. There is no non-deterministic AI behavior—only precise, automated trade execution governed by professional copy.
+*   **Sovereign AI Tier**: The platform utilizes high-fidelity, deterministic Deep Learning and Computer Vision cores for price discovery and grade verification, moving beyond simple rule-bases while maintaining mathematical auditability.
 
 ---
 
@@ -136,6 +179,28 @@ Unlike generic marketplace templates, AgriTrust is engineered for high-fidelity 
 *   **Typography**: `Noto Sans` (Body Data) & `Jost` (UI Components)
 *   **Localization**: Professional Business English with localized regional references (Zero vernacular slang).
 *   **Infrastructure**: Fully containerized Docker environment with automated node orchestration.
+
+---
+
+## 🔬 5. Advanced Data Science & AI Proofs
+
+AgriTrust is built on a foundation of rigorous mathematical "Sovereign Proofs" to ensure market efficiency and product quality.
+
+### 5.1 Deep Learning (MLP)
+We employ a **Multi-Layer Perceptron** for non-linear price discovery. This captures seasonal trends and supply-demand elasticities that traditional models miss.
+- **Proof location**: `research/proofs/backprop_proof.py`
+- **Concept**: Gradient Descent optimization of market vectors.
+
+### 5.2 Computer Vision (Tensor Convolution)
+Our CV core isolates product defects by analyzing spatial gradients and chromatic entropy directly in pixel matrices.
+- **Proof location**: `research/proofs/convolution_proof.py`
+- **Concept**: Edge detection via Sobel-kernel tensor operations.
+
+### 5.3 Bayesian Risk Scoring
+The platform uses a specialized **Random Forest + Bayesian Reliability** model to calculate risk scores for every market participant, ensuring the escrow system is protected from systemic fraud.
+- **Proof location**: `research/market_intelligence_rd.py`
+- **Concept**: Right-skewed distribution modeling for high-trust network resilience.
+
 
 ---
 
@@ -185,6 +250,24 @@ The system employs extremely rigid Role-Based Access Controls (RBAC).
 5. The **Buyer** confirms the delivery on their end. The system fully releases the Escrow funds into the Farmer's simulated Mobile Wallet and records System Revenue identically matching 1.5%.
 
 ---
+---
+
+## 🎯 6. Core Objectives Implementation Mapping
+
+The platform architecture is explicitly mapped to the **Core Objectives** to ensure mission success:
+
+| Objective | Implementation Proof |
+| :--- | :--- |
+| **1. Democratize Access** | Native USSD Gateway (*123#) enabled in `ussd_service.py`. No smartphone required. |
+| **2. Secure Escrow** | Programmatic fund locking and release logic in `escrow_service.py` and `transaction.py`. |
+| **3. Hybrid Verification** | **AI Layer**: `RiskScorer` (Random Forest) flags anomalies. **Human Layer**: `AgentAssignmentService` dispatches physical inspectors for high-value/high-risk lots. |
+| **4. Price Intelligence** | Real-time Deep Learning forecasts provided directly to USSD users via `DeepForecaster`. |
+| **5. Financial Credibility** | Persistent **Trust Scores** and **Credit Ratings** generated in `trust_service.py` and visible in `USSD My Profile`. |
+| **6. Reduce Waste** | `DemandForecaster` alerts farmers to regional buyer interest to accelerate matching. |
+| **7. Fair Disputes** | Regional agent mediation hub implemented in `dispute_service.py` and accessible via USSD Selection 5. |
+
+---
+
 ⭐ *Engineered to empower modern agriculture through incorruptible code and operational excellence.*
 
 🔗 [Connect with Mathew Mabira on LinkedIn](https://www.linkedin.com/in/mathew-mabira-24861632b)

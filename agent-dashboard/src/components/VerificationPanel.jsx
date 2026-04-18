@@ -117,7 +117,7 @@ export function VerificationPanel({ listings = [], onVerify }) {
                                     </td>
                                     <td style={{ padding: '24px', borderTop: '1.5px solid var(--v4-border)', borderBottom: '1.5px solid var(--v4-border)' }}>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                            <strong style={{ fontSize: '16px', fontWeight: 900 }}>{l.crop}</strong>
+                                            <strong style={{ fontSize: '16px', fontWeight: 900 }}>{l.product_type}</strong>
                                             <span style={{ fontSize: '12px', color: 'var(--v4-text-dim)', fontWeight: 700 }}>{l.quantity} units @ ${l.price_per_unit || '0.00'}</span>
                                         </div>
                                     </td>

@@ -14,8 +14,13 @@ import {
   fetchEscrowStats,
   fetchAgentStats,
   fetchRiskWatch,
-  fetchNationalPulse
+  fetchNationalPulse,
+  fetchMarketNews,
+  proposeAdjustment,
+  approveTerms,
+  fetchUsers
 } from './api';
+
 import './styles.css';
 
 // Component Imports
@@ -39,16 +44,11 @@ import AgentOperationsHub from './components/AgentOperationsHub';
 import LogisticsCommand from './components/LogisticsCommand';
 import MessagingPanel from './components/MessagingPanel';
 import SupportConcierge from './components/SupportConcierge';
+import { DataIntelligenceHub } from './components/DataIntelligenceHub';
 
-// Wiring real backend APIs for users and escrow ledgers
-const fetchUsers = fetchRiskWatch;
+// System Configuration
 
-const RegionalLiquidityLog = React.memo(({ token }) => {
-  const [pulse, setPulse] = useState(null);
-  useEffect(() => {
-    fetchNationalPulse(token).then(data => setPulse(data)).catch(() => {});
-  }, [token]);
-  
+const RegionalLiquidityLog = React.memo(({ pulse }) => {
   return (
     <div className="v4-liquidity-banner-hardened">
         <div className="banner-context">
@@ -185,6 +185,7 @@ function App() {
   const [transactions, setTransactions] = useState([]);
   const [escrowStats, setEscrowStats] = useState(null);
   const [disputes, setDisputes] = useState([]);
+  const [pulse, setPulse] = useState(null);
 
   useEffect(() => {
     if (token) {
@@ -196,7 +197,7 @@ function App() {
     if (!token) return;
     setLoading(true);
     try {
-      const [statsRes, listingRes, userRes, transRes, escrowRes, disputeRes, agentRes, marketRes] = await Promise.all([
+      const [statsRes, listingRes, userRes, transRes, escrowRes, disputeRes, agentRes, marketRes, newsRes, pulseRes] = await Promise.all([
         fetchOverview(token).catch(() => ({ stats: {} })),
         fetchReviewQueue(token).catch(() => []),
         fetchUsers(token).catch(() => []),
@@ -204,7 +205,9 @@ function App() {
         fetchEscrowStats(token).catch(() => ({})),
         fetchDisputes(token).catch(() => []),
         fetchAgentStats(token).catch(() => []),
-        fetchMarketActivities(token).catch(() => ({ listings: [], offers: [], deals: [] }))
+        fetchMarketActivities(token).catch(() => ({ listings: [], offers: [], deals: [] })),
+        fetchMarketNews(token).catch(() => []),
+        fetchNationalPulse(token).catch(() => (null))
       ]);
 
       setOverview(statsRes || { stats: {} });
@@ -215,6 +218,22 @@ function App() {
       setDisputes(Array.isArray(disputeRes) ? disputeRes : []);
       setAgents(Array.isArray(agentRes) ? agentRes : []);
       setMarketActivities(marketRes || { listings: [], offers: [], deals: [] });
+      setPulse(pulseRes);
+      
+      // Transform news into notifications
+      if (Array.isArray(newsRes) && newsRes.length > 0) {
+        const liveNotifs = newsRes.map((item, idx) => ({
+           id: 200 + idx,
+           type: 'info',
+           title: item.title,
+           desc: `Source: ${item.source} - ${item.url || 'Live Feed'}`,
+           channel: 'Live',
+           time: item.time,
+           read: false
+        }));
+        setNotifications(prev => [...liveNotifs, ...prev].slice(0, 10));
+      }
+
     } catch (err) {
       console.error("Critical Platform Sync Failure:", err);
       if (err.status === 401 || err.message?.includes("401")) {
@@ -259,15 +278,29 @@ function App() {
   const handleResolveDispute = async (disputeId, payload) => {
     setLoading(true);
     try {
-      await resolveDispute(token, disputeId, payload);
+      if (payload.decision === 'proposal') {
+        const proposalData = {
+          discount_percent: parseFloat(payload.split),
+          memo: payload.reason
+        };
+        await proposeAdjustment(token, disputeId, proposalData);
+        alert("Settlement Proposal Broadcast to both parties.");
+      } else {
+        const resolveData = {
+          resolution: payload.reason,
+          release_to_farmer: payload.decision === 'release_sum'
+        };
+        await resolveDispute(token, disputeId, resolveData);
+        alert("Dispute Resolution Finalized. Escrow Adjustment Synchronized.");
+      }
       await loadAllData();
-      alert("Dispute Resolution Finalized. Escrow Adjustment Synchronized.");
     } catch (err) {
       alert(`Resolution Failure: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleGovernance = async (userId, type, value, reason) => {
     setLoading(true);
@@ -428,9 +461,15 @@ function App() {
                         <i className="fas fa-list-check"></i> {!isSidebarCollapsed && <span>My Orders</span>}
                     </div>
                     <div className={`nav-link-v4 ${currentView === 'messages' ? 'active' : ''}`} onClick={() => setCurrentView('messages')} title={isSidebarCollapsed ? 'Negotiation Hub' : ''}>
-                        <i className="fas fa-handshake-angle"></i> {!isSidebarCollapsed && <span>Negotiation Hub</span>}
+                        <i className="fas fa-handshake-angle"></i> {!isSidebarCollapsed && <span>{t('negotiation')}</span>}
+                    </div>
+                    
+                    <div className="nav-group-label">{isSidebarCollapsed ? '---' : 'PROCUREMENT'}</div>
+                    <div className={`nav-link-v4 ${currentView === 'marketplace-buyer' ? 'active' : ''}`} onClick={() => setCurrentView('marketplace-buyer')} title={isSidebarCollapsed ? t('market') : ''}>
+                        <i className="fas fa-basket-shopping"></i> {!isSidebarCollapsed && <span>{t('market')}</span>}
                     </div>
                 </>
+
             )}
 
             {(role === 'BUYER' || isGuestMode) && (
@@ -440,11 +479,18 @@ function App() {
                         <i className="fas fa-basket-shopping"></i> {!isSidebarCollapsed && <span>{isGuestMode ? 'Public Market' : 'Buy Products'}</span>}
                     </div>
                     {!isGuestMode && (
-                        <div className={`nav-link-v4 ${currentView === 'messages' ? 'active' : ''}`} onClick={() => setCurrentView('messages')} title={isSidebarCollapsed ? 'Negotiation Hub' : ''}>
-                            <i className="fas fa-handshake-angle"></i> {!isSidebarCollapsed && <span>Negotiation Hub</span>}
-                        </div>
+                        <>
+                            <div className="nav-group-label">{isSidebarCollapsed ? '---' : 'SUPPLY'}</div>
+                            <div className={`nav-link-v4 ${currentView === 'my-products' ? 'active' : ''}`} onClick={() => setCurrentView('my-products')} title={isSidebarCollapsed ? 'Input Inventory' : ''}>
+                                <i className="fas fa-warehouse"></i> {!isSidebarCollapsed && <span>My Input Inventory</span>}
+                            </div>
+                            <div className={`nav-link-v4 ${currentView === 'messages' ? 'active' : ''}`} onClick={() => setCurrentView('messages')} title={isSidebarCollapsed ? 'Negotiation Hub' : ''}>
+                                <i className="fas fa-handshake-angle"></i> {!isSidebarCollapsed && <span>Negotiation Hub</span>}
+                            </div>
+                        </>
                     )}
                 </>
+
             )}
 
             <div className="nav-group-label">{isSidebarCollapsed ? '---' : 'MY ACCOUNT'}</div>
@@ -570,7 +616,7 @@ function App() {
             {/* AUDIT LOGS & SYSTEM VITAL SIGNS */}
             {currentView === 'overview' && (
                 <div className="reality-stack-v4 animate-fade-in">
-                    <RegionalLiquidityLog token={token} />
+                    <RegionalLiquidityLog pulse={pulse} />
                     <OverviewPanel 
                         overview={overview} 
                         profile={profile} 
@@ -602,17 +648,18 @@ function App() {
             {currentView === "transactions-admin" && <EscrowRevenuePanel token={token} onEscrowAction={handleGovernance} />}
             {currentView === "disputes" && <DisputeResolutionPanel disputes={disputes} onResolve={handleResolveDispute} />}
             {currentView === "network" && <AgentPerformancePanel agents={agents} onRefresh={handleSync} profile={profile} />}
-            {currentView === "reports" && <ReportsPanel />}
+            {currentView === "reports" && <DataIntelligenceHub token={token} />}
 
             {/* FARMER VIEWS */}
-            {currentView === "my-products" && <FarmerProductsPanel token={token} onRefresh={handleSync} />}
-            {currentView === "active-orders" && <ActiveOrdersPanel profile={profile} token={token} />}
+            {currentView === "my-products" && <FarmerProductsPanel token={token} onRefresh={handleSync} profile={profile} />}
+
+            {currentView === "active-orders" && <ActiveOrdersPanel profile={profile} token={token} transactions={transactions} onRefresh={handleSync} />}
 
             {/* BUYER VIEWS */}
             {currentView === "marketplace-buyer" && <BuyerMarketplacePanel profile={profile} token={token} onPurchase={handleSync} />}
             
             {/* AGENT & LOGISTICS VIEWS */}
-            {currentView === "agent-ops" && <AgentOperationsHub profile={profile} token={token} users={users} onSync={handleSync} />}
+            {currentView === "agent-ops" && <AgentOperationsHub profile={profile} token={token} users={users} onSync={handleSync} reviewQueue={reviewQueue} disputes={disputes} />}
             {currentView === "logistics" && <LogisticsCommand token={token} role={role} />}
             
             {/* UNIVERSAL VIEWS */}
@@ -657,8 +704,8 @@ function App() {
           <div className="modal-overlay" onClick={() => setShowSysInfo(false)}>
               <div className="v4-glass-card-premium animate-fade-in" style={{ maxWidth: '600px', background: '#020617', color: '#fff', border: '1.5px solid #1e293b', padding: '0', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
                   <div style={{ background: '#000E2B', padding: '24px', borderBottom: '1.5px solid #1e293b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 950, color: '#fff' }}><i className="fas fa-heartbeat" style={{ color: '#3b82f6', marginRight: '10px' }}></i> Platform Health & Network Status</h3>
-                      <button onClick={() => setShowSysInfo(false)} style={{ background: 'none', border: 'none', color: '#64748b' }}><i className="fas fa-times"></i></button>
+                       <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 950, color: '#fff' }}><i className="fas fa-heartbeat" style={{ color: '#3b82f6', marginRight: '10px' }}></i> Platform Health & Network Status</h3>
+                       <button onClick={() => setShowSysInfo(false)} style={{ background: 'none', border: 'none', color: '#64748b' }}><i className="fas fa-times"></i></button>
                   </div>
                   <div style={{ padding: '24px', maxHeight: '400px', overflowY: 'auto', fontFamily: 'monospace', fontSize: '12px' }}>
                       {[

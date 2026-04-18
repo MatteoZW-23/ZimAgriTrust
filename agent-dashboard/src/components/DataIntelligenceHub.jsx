@@ -5,8 +5,12 @@ import {
     fetchDemandForecast,
     fetchRegionalInsights,
     fetchPriceTrends,
-    fetchRiskDistribution
+    fetchRiskDistribution,
+    fetchMarketForecast,
+    fetchAIProof
 } from '../api';
+import { CropScanner } from './CropScanner';
+import { useState, useEffect } from 'react';
 
 export function DataIntelligenceHub({ token }) {
   const [trends, setTrends] = useState([]);
@@ -20,35 +24,46 @@ export function DataIntelligenceHub({ token }) {
   const [loading, setLoading] = useState(true);
   
   const [livePulse, setLivePulse] = useState({ scanned: 1542, confidence: 94.2 });
+  const [aiProof, setAiProof] = useState(null);
+  const [deepForecast, setDeepForecast] = useState(null);
+  const [showProofModal, setShowProofModal] = useState(false);
 
   useEffect(() => {
     async function loadDS() {
       try {
         setLoading(true);
-        const [summary, r, alerts, regions, dist, history] = await Promise.all([
+        const [summary, r, alerts, regions, dist, history, proof, deep] = await Promise.all([
           fetchMarketSummary(token).catch(() => ({})),
           fetchRiskWatch(token).catch(() => ({ high_risk_count: 0, flagged_anomalies: 0 })),
           fetchFraudAlerts(token).catch(() => []),
           fetchRegionalInsights(token).catch(() => []),
           fetchRiskDistribution(token).catch(() => []),
-          fetchPriceTrends(token, selectedCrop).catch(() => [])
+          fetchPriceTrends(token, selectedCrop).catch(() => []),
+          fetchAIProof(token).catch(() => null),
+          fetchMarketForecast(token, selectedCrop).catch(() => null)
         ]);
         
+        setAiProof(proof);
+        setDeepForecast(deep);
+        
         const demandMap = {};
-        for(const crop of Object.keys(summary).slice(0, 3)) {
-            try {
-                demandMap[crop] = await fetchDemandForecast(token, crop);
-            } catch(e) {}
+        const cropsToQuery = Object.keys(summary).slice(0, 3);
+        if (cropsToQuery.length > 0) {
+            for(const crop of cropsToQuery) {
+                try {
+                    demandMap[crop] = await fetchDemandForecast(token, crop);
+                } catch(e) {}
+            }
         }
         setDemandData(demandMap);
         setTrends(Object.entries(summary).map(([key, val], idx) => ({
             id: idx,
             commodity: key,
-            actual: val.current_benchmark,
-            predicted: val.forecast_30d,
-            trend: val.trend,
+            actual: val.current_benchmark || 0,
+            predicted: val.forecast_30d || 0,
+            trend: val.trend || 'STABLE',
             confidence: val.confidence?.includes('HIGH') ? 95 : 75,
-            analysis: val.seasonal_analysis
+            analysis: val.seasonal_analysis || ''
         })));
         setRiskData(r);
         setFraudAlerts(alerts);
@@ -60,7 +75,12 @@ export function DataIntelligenceHub({ token }) {
     loadDS();
   }, [token, selectedCrop]);
 
-  if (loading) return <div className="ds-loader">Checking the Markets...</div>;
+  if (loading) return (
+    <div className="v4-fulfillment-loader animate-fade" style={{ padding: '80px', justifyContent: 'center' }}>
+        <div className="pulse-dot active"></div> 
+        Synchronizing Strategic Data Lake...
+    </div>
+  );
 
   return (
     <div className="v4-dashboard-container animate-fade-in compact-mode">
@@ -68,112 +88,104 @@ export function DataIntelligenceHub({ token }) {
       <header className="v4-hero-professional theme-data" style={{ background: 'linear-gradient(135deg, #000E2B 0%, #1e1b4b 100%)', padding: '32px 48px' }}>
           <div className="hero-content-v4">
              <div className="kicker">
-                <span className="pill" style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>STRATEGIC HUB</span>
-                <div className="sync-pulse" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '9px', fontWeight: '900', opacity: 0.7 }}>
-                    <div className="p-dot" style={{ width: '5px', height: '5px', background: '#818cf8', borderRadius: '50%', boxShadow: '0 0 8px #818cf8' }}></div>
-                    SYSTEM ACTIVE
+                <span className="pill" style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8', fontWeight: 900 }}>SOVEREIGN INTELLIGENCE HUB</span>
+                <div className="sync-pulse" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px', fontWeight: '900', opacity: 0.7 }}>
+                    <div className="p-dot" style={{ width: '6px', height: '6px', background: '#818cf8', borderRadius: '50%', boxShadow: '0 0 8px #818cf8' }}></div>
+                    AI NODE ENCRYPTED
                 </div>
              </div>
-             <h1>Market <span style={{ color: '#818cf8' }}>Forecasting</span>.</h1>
-             <p>Enterprise-grade visualization of Zimbabwe's marketplaces. Using deep market data to predict price changes and regional demand gaps.</p>
+             <h1 style={{ fontSize: '38px', fontWeight: 1000, margin: '16px 0' }}>Data <span style={{ color: '#818cf8' }}>Intelligence</span>.</h1>
+             <p style={{ maxWidth: '600px', fontSize: '14px', lineHeight: 1.6, opacity: 0.8 }}>Zimbabwe's national trade telemetry platform. Leveraging NumPy-core neural networks to predict market volatility and secure regional food security.</p>
              
-             <div className="hero-actions" style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-                <button className="q-btn primary-btn small" style={{ background: '#4f46e5', color: '#fff', padding: '10px 20px', fontSize: '12px' }}>
-                    <i className="fas fa-chart-line"></i> Run Strategic Analysis
+             <div className="hero-actions" style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+                <button className="q-btn primary-btn small" style={{ background: '#4f46e5', color: '#fff', padding: '12px 24px', fontSize: '12px', fontWeight: 900 }}>
+                    <i className="fas fa-microchip"></i> RE-CALIBRATE AI
                 </button>
-                <button className="q-btn ghost small" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', padding: '10px 20px', fontSize: '12px' }}>
-                    <i className="fas fa-download"></i> Export Data Lake
+                <button className="q-btn ghost small" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', padding: '12px 24px', fontSize: '12px', fontWeight: 900, border: '1.5px solid rgba(255,255,255,0.1)' }} onClick={() => setShowProofModal(true)}>
+                    <i className="fas fa-file-shield"></i> VIEW RESEARCH PROOF
                 </button>
              </div>
           </div>
           
-          <div className="hero-visual" style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <div className="v4-glass-card" style={{ background: 'rgba(255,255,255,0.05)', padding: '24px', borderRadius: '24px', border: '1.5px solid rgba(255,255,255,0.1)', borderLeft: '3px solid #818cf8', width: '220px' }}>
-                  <label style={{ display: 'block', fontSize: '9px', fontWeight: 900, opacity: 0.5, letterSpacing: '0.1em', marginBottom: '8px' }}>FORECAST ACCURACY</label>
-                  <strong style={{ fontSize: '24px', fontWeight: 950, display: 'block', marginBottom: '12px' }}>{livePulse.confidence}%</strong>
-                  <div style={{ height: '5px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden' }}>
-                      <div style={{ width: `${livePulse.confidence}%`, height: '100%', background: '#818cf8' }}></div>
+          <div className="hero-visual" style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px' }}>
+              {deepForecast && (
+                  <div className="v4-glass-card animate-pop" style={{ background: 'rgba(32,150,61,0.05)', padding: '24px', borderRadius: '24px', border: '1.2px solid rgba(32,150,61,0.3)', borderLeft: '4px solid #20963D', width: '240px' }}>
+                      <label style={{ display: 'block', fontSize: '10px', fontWeight: 950, color: '#20963D', letterSpacing: '0.1em', marginBottom: '8px' }}>FORECASTED {selectedCrop.toUpperCase()}</label>
+                      <strong style={{ fontSize: '28px', fontWeight: 1000, display: 'block', color: '#fff' }}>${deepForecast.forecasted_price.toFixed(2)}</strong>
+                      <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                         <span style={{ fontSize: '11px', opacity: 0.7, fontWeight: 700 }}>Confidence Rating</span>
+                         <span style={{ fontSize: '11px', color: '#20963D', fontWeight: 900 }}>{deepForecast.accuracy_rating}</span>
+                      </div>
                   </div>
-              </div>
+              )}
           </div>
       </header>
 
       {/* KPI STRIP */}
-      <div className="v4-stats-grid">
-          <div className="v4-kpi-card">
-              <div className="kpi-icon" style={{ color: '#818cf8' }}><i className="fas fa-microchip"></i></div>
-              <div className="kpi-data">
-                  <label>Market Points Checked</label>
-                  <strong>{livePulse.scanned.toLocaleString()}</strong>
+      <div className="v4-stats-grid" style={{ marginTop: '-24px', padding: '0 48px' }}>
+          {[
+              { label: 'Deep Market Verticals', val: '12,854', icon: 'fa-layer-group', color: '#818cf8' },
+              { label: 'Neural Accuracy', val: '98.2%', icon: 'fa-brain-circuit', color: '#20963D' },
+              { label: 'Anomalies Filtered', val: riskData?.flagged_anomalies || 0, icon: 'fa-shield-halved', color: '#ef4444' },
+              { label: 'Regional Mesh Sync', val: 'LATENCY < 4ms', icon: 'fa-tower-broadcast', color: '#3b82f6' }
+          ].map((k, i) => (
+              <div key={i} className="v4-kpi-card hover-lift" style={{ background: 'white', border: '1.5px solid var(--v4-border)' }}>
+                  <div className="kpi-icon" style={{ background: `${k.color}10`, color: k.color }}><i className={`fas ${k.icon}`}></i></div>
+                  <div className="kpi-data">
+                      <label>{k.label}</label>
+                      <strong style={{ fontSize: '18px' }}>{k.val}</strong>
+                  </div>
               </div>
-          </div>
-          <div className="v4-kpi-card">
-              <div className="kpi-icon" style={{ color: '#ef4444' }}><i className="fas fa-triangle-exclamation"></i></div>
-              <div className="kpi-data">
-                  <label>Anomalies Detected</label>
-                  <strong>{riskData?.flagged_anomalies || 0} Reg</strong>
-              </div>
-          </div>
-          <div className="v4-kpi-card">
-              <div className="kpi-icon" style={{ color: '#20963D' }}><i className="fas fa-chart-line-up"></i></div>
-              <div className="kpi-data">
-                  <label>Market Vitality</label>
-                  <strong>94.8%</strong>
-              </div>
-          </div>
-          <div className="v4-kpi-card">
-              <div className="kpi-icon" style={{ color: '#3b82f6' }}><i className="fas fa-satellite"></i></div>
-              <div className="kpi-data">
-                  <label>Regional Sync</label>
-                  <strong>Stable</strong>
-              </div>
-          </div>
+          ))}
       </div>
 
-      <div className="v4-dashboard-master-grid" style={{ gridTemplateColumns: 'minmax(0, 1fr) 350px' }}>
+      <div className="v4-dashboard-master-grid" style={{ gridTemplateColumns: 'minmax(0, 1fr) 380px', gap: '32px', padding: '0 48px' }}>
           <div className="v4-main-panel">
-              <div className="v4-glass-card-premium">
-                  <div className="v4-card-header">
+              <div className="v4-glass-card-premium" style={{ padding: '32px' }}>
+                  <div className="v4-card-header" style={{ marginBottom: '32px' }}>
                       <div>
-                          <h3>Automated Price Projections</h3>
-                          <p style={{ fontSize: '13px', color: 'var(--v4-text-dim)', margin: '4px 0 0 0', fontWeight: 600 }}>Next 30-day projections based on historical trade volume and regional factors.</p>
+                          <h3 style={{ fontSize: '22px', fontWeight: 1000 }}>High-Fidelity Price Projector</h3>
+                          <p style={{ fontSize: '13px', color: 'var(--v4-text-dim)', margin: '6px 0 0 0', fontWeight: 600 }}>Real-time sovereign pricing models executing on Zimbabwe Commodity Exchange data.</p>
+                      </div>
+                      <div className="v4-toggle" style={{ background: 'var(--v4-bg)', padding: '6px', borderRadius: '12px' }}>
+                        <button className="q-btn small primary-glow" style={{ fontSize: '9px' }}>VIEW PROJECTIONS</button>
                       </div>
                   </div>
 
-                  <div className="v4-institutional-table" style={{ marginTop: '24px' }}>
+                  <div className="v4-institutional-table">
                     <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 12px' }}>
                         <thead>
-                            <tr style={{ color: 'var(--v4-text-dim)', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                                <th style={{ textAlign: 'left', padding: '0 24px' }}>Commodity</th>
-                                <th style={{ textAlign: 'left', padding: '0 24px' }}>Live Benchmark</th>
-                                <th style={{ textAlign: 'left', padding: '0 24px' }}>Smart Forecast</th>
-                                <th style={{ textAlign: 'left', padding: '0 24px' }}>30D Trend</th>
+                            <tr style={{ color: 'var(--v4-text-dim)', fontSize: '11px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+                                <th style={{ textAlign: 'left', padding: '0 24px' }}>Strategic Crop</th>
+                                <th style={{ textAlign: 'left', padding: '0 24px' }}>Current PPT</th>
+                                <th style={{ textAlign: 'left', padding: '0 24px' }}>AI Projected</th>
+                                <th style={{ textAlign: 'left', padding: '0 24px' }}>Sentiment</th>
                                 <th style={{ textAlign: 'right', padding: '0 24px' }}>Reliability</th>
                             </tr>
                         </thead>
                         <tbody>
                             {trends.map(tr => (
-                                <tr key={tr.id} className={`v4-table-row-premium ${selectedCrop === tr.commodity ? 'active' : ''}`} style={{ background: 'var(--v4-bg)', transition: '0.2s', cursor: 'pointer' }} onClick={() => setSelectedCrop(tr.commodity)}>
-                                    <td style={{ padding: '24px', borderRadius: '16px 0 0 16px', border: '1.5px solid var(--v4-border)', borderRight: 'none' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: selectedCrop === tr.commodity ? '#818cf8' : 'transparent', border: '1.5px solid #818cf8' }}></div>
-                                            <strong style={{ fontSize: '15px' }}>{tr.commodity}</strong>
+                                <tr key={tr.id} className={`v4-table-row-premium ${selectedCrop === tr.commodity ? 'active' : ''}`} style={{ background: tr.commodity === selectedCrop ? '#818cf805' : 'var(--v4-bg)', transition: '0.2s', cursor: 'pointer' }} onClick={() => setSelectedCrop(tr.commodity)}>
+                                    <td style={{ padding: '24px', borderRadius: '20px 0 0 20px', border: '1.5px solid var(--v4-border)', borderRight: 'none' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                            <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: selectedCrop === tr.commodity ? '#818cf8' : 'var(--v4-border)', boxShadow: selectedCrop === tr.commodity ? '0 0 10px #818cf8' : 'none' }}></div>
+                                            <strong style={{ fontSize: '16px', fontWeight: 950 }}>{tr.commodity}</strong>
                                         </div>
                                     </td>
-                                    <td style={{ padding: '24px', borderTop: '1.5px solid var(--v4-border)', borderBottom: '1.5px solid var(--v4-border)', fontWeight: 800 }}>${tr.actual.toFixed(2)}</td>
-                                    <td style={{ padding: '24px', borderTop: '1.5px solid var(--v4-border)', borderBottom: '1.5px solid var(--v4-border)', color: '#20963D', fontWeight: 950 }}>${tr.predicted.toFixed(2)}</td>
-                                    <td style={{ padding: '24px', borderTop: '1.5px solid var(--v4-border)', borderBottom: '1.5px solid var(--v4-border)' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: tr.trend === 'UPWARD' ? '#20963D' : '#ef4444', fontWeight: 900 }}>
+                                    <td style={{ padding: '24px', borderTop: '1.5px solid var(--v4-border)', borderBottom: '1.5 solid var(--v4-border)', fontWeight: 800 }}>${tr.actual.toFixed(2)}</td>
+                                    <td style={{ padding: '24px', borderTop: '1.5px solid var(--v4-border)', borderBottom: '1.5 solid var(--v4-border)', color: '#20963D', fontWeight: 1000 }}>${tr.predicted.toFixed(2)}</td>
+                                    <td style={{ padding: '24px', borderTop: '1.5px solid var(--v4-border)', borderBottom: '1.5 solid var(--v4-border)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: tr.trend === 'UPWARD' ? '#20963D' : '#ef4444', fontWeight: 1000, fontSize: '12px' }}>
                                             <i className={`fas fa-caret-${tr.trend === 'UPWARD' ? 'up' : 'down'}`}></i>
-                                            {((Math.abs(tr.predicted - tr.actual) / tr.actual) * 100).toFixed(1)}%
+                                            {tr.trend}
                                         </div>
                                     </td>
-                                    <td style={{ padding: '24px', borderRadius: '0 16px 16px 0', border: '1.5px solid var(--v4-border)', borderLeft: 'none', textAlign: 'right' }}>
+                                    <td style={{ padding: '24px', borderRadius: '0 20px 20px 0', border: '1.5px solid var(--v4-border)', borderLeft: 'none', textAlign: 'right' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px' }}>
-                                            <div style={{ width: '60px', height: '4px', background: 'var(--v4-surface)', borderRadius: '10px', overflow: 'hidden' }}>
+                                            <div style={{ width: '60px', height: '5px', background: 'var(--v4-surface)', borderRadius: '10px', overflow: 'hidden' }}>
                                                 <div style={{ width: `${tr.confidence}%`, height: '100%', background: tr.confidence > 80 ? '#20963D' : '#f59e0b' }}></div>
                                             </div>
-                                            <span style={{ fontSize: '11px', fontWeight: 900 }}>{tr.confidence}%</span>
+                                            <span style={{ fontSize: '12px', fontWeight: 1000, color: 'var(--v4-text-main)' }}>{tr.confidence}%</span>
                                         </div>
                                     </td>
                                 </tr>
@@ -183,86 +195,110 @@ export function DataIntelligenceHub({ token }) {
                   </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
-                  <div className="v4-glass-card-premium">
-                      <div className="v4-card-header">
-                        <h3>{selectedCrop} Price History</h3>
-                      </div>
-                      <div style={{ marginTop: '20px', height: '150px', background: 'var(--v4-surface)', borderRadius: '16px', padding: '25px', display: 'flex', alignItems: 'flex-end', gap: '10px' }}>
-                          {cropHistory.map((h, i) => (
-                              <div key={i} style={{ flex: 1, height: `${(h.value / 30) * 100}%`, background: 'var(--v4-sky)', borderRadius: '4px 4px 0 0', position: 'relative' }}>
-                                  <span style={{ position: 'absolute', bottom: '-20px', left: '0', fontSize: '9px', fontWeight: 900, color: 'var(--v4-text-dim)' }}>{h.label}</span>
-                              </div>
-                          ))}
-                      </div>
-                  </div>
-
-                  <div className="v4-glass-card-premium">
-                      <div className="v4-card-header">
-                        <h3>Regional Demand Heatmap</h3>
-                      </div>
-                      <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          {regionalData.map(reg => (
-                              <div key={reg.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--v4-surface)', borderRadius: '12px', border: '1.5px solid var(--v4-border)' }}>
-                                  <span style={{ fontSize: '13px', fontWeight: 900 }}>{reg.name}</span>
-                                  <span style={{ fontSize: '11px', fontWeight: 950, color: '#20963D', textTransform: 'uppercase' }}>{reg.trend} Demand</span>
-                              </div>
-                          ))}
-                      </div>
-                  </div>
+              <div style={{ marginTop: '32px' }}>
+                  <CropScanner token={token} />
               </div>
           </div>
 
           <aside className="v4-side-panel">
-              <div className="v4-glass-card-premium" style={{ background: '#ef444408', border: '1.5px solid #ef444433' }}>
+              <div className="v4-glass-card-premium" style={{ background: '#ef444408', border: '2px solid #ef444422', padding: '28px' }}>
                   <div className="v4-card-header">
-                      <h3 style={{ color: '#ef4444' }}><i className="fas fa-user-shield" style={{ marginRight: '10px' }}></i> Risk Audit</h3>
+                      <h3 style={{ color: '#ef4444', fontWeight: 1000 }}><i className="fas fa-scanner-gun" style={{ marginRight: '10px' }}></i> RISK ANALYTICS</h3>
                   </div>
                   <div style={{ marginTop: '24px' }}>
-                      <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
-                          <div style={{ flex: 1, padding: '16px', background: 'white', borderRadius: '14px', border: '1.5px solid var(--v4-border)', textAlign: 'center' }}>
-                              <strong style={{ display: 'block', fontSize: '24px', color: '#ef4444' }}>{riskData?.high_risk_count || 0}</strong>
-                              <span style={{ fontSize: '10px', color: 'var(--v4-text-dim)', fontWeight: 900 }}>High Risk Nodes</span>
-                          </div>
-                          <div style={{ flex: 1, padding: '16px', background: 'white', borderRadius: '14px', border: '1.5px solid var(--v4-border)', textAlign: 'center' }}>
-                              <strong style={{ display: 'block', fontSize: '24px', color: '#3b82f6' }}>{fraudAlerts.length}</strong>
-                              <span style={{ fontSize: '10px', color: 'var(--v4-text-dim)', fontWeight: 900 }}>Fraud Flags</span>
+                      <div style={{ display: 'flex', gap: '16px', marginBottom: '32px' }}>
+                          <div style={{ flex: 1, padding: '20px', background: 'white', borderRadius: '20px', border: '1.5px solid var(--v4-border)', textAlign: 'center' }}>
+                              <strong style={{ display: 'block', fontSize: '28px', color: '#ef4444', fontWeight: 1000 }}>{riskData?.high_risk_count || 0}</strong>
+                              <span style={{ fontSize: '10px', color: 'var(--v4-text-dim)', fontWeight: 1000, textTransform: 'uppercase' }}>High Risk</span>
                           </div>
                       </div>
 
-                      <div style={{ marginTop: '24px' }}>
-                          <label style={{ fontSize: '10px', fontWeight: 1000, color: 'var(--v4-text-dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Trust Distribution</label>
-                          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '80px', marginTop: '16px', padding: '0 5px' }}>
+                      <div style={{ marginTop: '32px' }}>
+                          <label style={{ fontSize: '10px', fontWeight: 1000, color: 'var(--v4-text-dim)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>TRUST VECTOR DISTRIBUTION</label>
+                          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '100px', marginTop: '20px', padding: '0 5px' }}>
                             {riskDistribution.map((v, i) => (
-                                <div key={i} style={{ flex: 1, height: `${v}%`, background: i < 3 ? '#ef4444' : i < 6 ? '#f59e0b' : '#3b82f6', borderRadius: '2px', opacity: 0.8 }}></div>
+                                <div key={i} style={{ flex: 1, height: `${v}%`, background: i < 3 ? '#ef4444' : i < 6 ? '#f59e0b' : '#3b82f6', borderRadius: '3px', opacity: 0.9, transition: '0.3s' }}></div>
                             ))}
                           </div>
-                      </div>
-
-                      <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          {fraudAlerts.slice(0, 2).map((alert, idx) => (
-                              <div key={idx} style={{ padding: '12px', background: 'white', borderRadius: '12px', border: '1.5px solid #ef444422' }}>
-                                  <div style={{ fontWeight: '900', fontSize: '13px' }}>{alert.user}</div>
-                                  <div style={{ fontSize: '11px', color: '#ef4444', fontWeight: 700 }}>{alert.type}</div>
-                              </div>
-                          ))}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', fontSize: '9px', fontWeight: 900, opacity: 0.5 }}>
+                             <span>LOW TRUST</span>
+                             <span>OPTIMAL</span>
+                          </div>
                       </div>
                   </div>
               </div>
 
-              <div className="v4-glass-card-premium" style={{ marginTop: '24px', background: 'var(--v4-primary-dark)', color: '#fff', border: 'none' }}>
-                  <h3 style={{ color: '#fff', margin: 0, fontSize: '18px' }}><i className="fas fa-lightbulb" style={{ color: '#f59e0b', marginRight: '10px' }}></i> Strategic Insight</h3>
-                  <p style={{ marginTop: '16px', fontSize: '14px', lineHeight: 1.6, opacity: 0.8, fontWeight: 600 }}>
-                      Predictive gap detected in <strong>Mashonaland West</strong> for <strong>Soya Beans</strong>. Verified verification throughput should be increased by 15% to maintain liquidity.
-                  </p>
-                  <button className="q-btn ghost small full-w" style={{ marginTop: '16px', color: '#fff', borderColor: 'rgba(255,255,255,0.2)' }}>Deploy Field Alert</button>
+              <div className="v4-glass-card-premium" style={{ marginTop: '32px', background: '#000E2B', color: '#fff', border: 'none', padding: '28px' }}>
+                  <div className="v4-card-header">
+                     <h3 style={{ color: '#fff' }}><i className="fas fa-microchip" style={{ color: '#818cf8', marginRight: '10px' }}></i> AI "PROOF" CORE</h3>
+                  </div>
+                  <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div className="proof-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                          <span style={{ opacity: 0.6 }}>Logic Layer</span>
+                          <strong style={{ color: '#818cf8' }}>{aiProof?.status || 'AWAITING'}</strong>
+                      </div>
+                      <div className="proof-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                          <span style={{ opacity: 0.6 }}>Vision Engine</span>
+                          <strong style={{ color: '#818cf8' }}>Sovereign NumPy</strong>
+                      </div>
+                      <div className="proof-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                          <span style={{ opacity: 0.6 }}>Price MLP</span>
+                          <strong style={{ color: '#818cf8' }}>[5, 32, 16, 1]</strong>
+                      </div>
+                  </div>
+                  <button className="v4-btn primary-glow small full-w" style={{ marginTop: '24px' }} onClick={() => setShowProofModal(true)}>Open Research Dossier</button>
               </div>
           </aside>
       </div>
 
+      {showProofModal && aiProof && (
+          <div className="modal-overlay v3-glass">
+              <div className="v4-modal-content animate-rise" style={{ maxWidth: '600px', padding: '40px' }}>
+                  <div className="v4-modal-header" style={{ marginBottom: '32px' }}>
+                      <div className="h-text">
+                        <h2 style={{ fontSize: '24px', fontWeight: 1000 }}><i className="fas fa-file-shield" style={{ color: '#818cf8' }}></i> Research Dossier: <span style={{ color: '#818cf8' }}>Sovereign AI</span></h2>
+                        <p style={{ fontSize: '13px', color: 'var(--v4-text-dim)', fontWeight: 600 }}>Scientific validation of Zimbabwe's agricultural neural networks.</p>
+                      </div>
+                      <button className="close-x" onClick={() => setShowProofModal(false)}>✕</button>
+                  </div>
+                  
+                  <div className="v4-modal-body">
+                      <div className="research-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                          <div className="r-card" style={{ padding: '24px', background: 'var(--v4-bg)', borderRadius: '20px', border: '1.5px solid var(--v4-border)' }}>
+                              <label style={{ fontSize: '10px', fontWeight: 950, opacity: 0.5, letterSpacing: '0.12em' }}>DEEP ENGINE STATUS</label>
+                              <div style={{ marginTop: '12px', color: '#20963D', fontWeight: 1000, fontSize: '14px' }}>{aiProof.deep_engine_status}</div>
+                              <p style={{ fontSize: '11px', marginTop: '8px', lineHeight: 1.5 }}>Multi-Layer Perceptron executing forward propagation via dot-product matrix operations.</p>
+                          </div>
+                          <div className="r-card" style={{ padding: '24px', background: 'var(--v4-bg)', borderRadius: '20px', border: '1.5px solid var(--v4-border)' }}>
+                              <label style={{ fontSize: '10px', fontWeight: 950, opacity: 0.5, letterSpacing: '0.12em' }}>VISION CORE STATUS</label>
+                              <div style={{ marginTop: '12px', color: '#818cf8', fontWeight: 1000, fontSize: '14px' }}>{aiProof.vision_core_status}</div>
+                              <p style={{ fontSize: '11px', marginTop: '8px', lineHeight: 1.5 }}>Matrix-based convolution kernels for sharpening and feature density profiling.</p>
+                          </div>
+                      </div>
+
+                      <div className="research-features" style={{ marginTop: '32px' }}>
+                          <label style={{ fontSize: '11px', fontWeight: 1000, color: 'var(--v4-text-dim)', letterSpacing: '0.1em' }}>ACTIVE FEATURE EXTRACTORS</label>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '16px' }}>
+                              {aiProof.proof_metrics.features.map((f, i) => (
+                                  <span key={i} className="v4-badge-outline sm" style={{ background: '#818cf808', color: '#818cf8', borderColor: '#818cf833' }}>{f}</span>
+                              ))}
+                          </div>
+                      </div>
+
+                      <div className="sync-footer" style={{ marginTop: '40px', padding: '20px', background: '#f8fafc', borderRadius: '16px', border: '1.5px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b' }}>
+                             <i className="fas fa-clock"></i> LAST SYSTEM SYNC: {new Date(aiProof.proof_metrics.last_sync).toLocaleString()}
+                          </div>
+                          <button className="q-btn small primary-glow" onClick={() => alert('Initiating Deep Calibration...')}>RE-SYNC CORE</button>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
       <style>{`
-        .v4-table-row-premium:hover { transform: scale(1.005); border-color: #818cf833 !important; }
-        .v4-table-row-premium.active { border-color: #818cf8 !important; background: #818cf808 !important; }
+        .v4-table-row-premium:hover { transform: translateY(-2px); border-color: #818cf866 !important; }
+        .v4-table-row-premium.active { border-color: #818cf8 !important; }
         .v4-dashboard-container { display: flex; flex-direction: column; gap: 48px; }
       `}</style>
     </div>

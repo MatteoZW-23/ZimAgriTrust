@@ -1,25 +1,55 @@
 import React, { useState, useEffect } from 'react';
 import LineChart from './LineChart';
+import { exportToCSV, handleImport } from '../utils/dataTransfer';
 
-export default function AgentOperationsHub({ profile, token, onSync, users = [] }) {
+export default function AgentOperationsHub({ profile, token, onSync, users = [], reviewQueue = [], disputes = [] }) {
   const agentRegion = profile?.region || "Zimbabwe District 1";
   
-  const [tasks, setTasks] = useState([
-    { id: 'TSK-092', title: 'Ground Truth: 20t Maize Batch', location: 'Bindura South', type: 'VERIFICATION', fee: 45.00, status: 'PENDING' },
-    { id: 'TSK-104', title: 'Onboarding: 5x Smallholders', location: 'Marondera', type: 'ONBOARDING', fee: 25.00, status: 'PENDING' },
-    { id: 'TSK-118', title: 'Dispute Resolution: Grade Discrepancy', location: 'Harare Depot', type: 'DISPUTE', fee: 120.00, status: 'PENDING' },
-  ]);
+  const [tasks, setTasks] = useState([]);
+
+  useEffect(() => {
+    const derivedTasks = [
+      ...reviewQueue.map(l => ({
+        id: `VER-${l.id.slice(0,4)}`,
+        title: `Ground Truth: ${l.product} verification`,
+        location: l.location || 'Local District',
+        type: 'VERIFICATION',
+        fee: 15.00,
+        status: 'PENDING'
+      })),
+      ...disputes.filter(d => d.status === 'PENDING').map(d => ({
+        id: `DIS-${d.id.slice(0,4)}`,
+        title: `Arbitration: ${d.product} Discrepancy`,
+        location: d.location || 'System-Wide',
+        type: 'DISPUTE',
+        fee: 50.00,
+        status: 'PENDING'
+      }))
+    ];
+    setTasks(derivedTasks);
+  }, [reviewQueue, disputes]);
 
   const stats = {
-    verifiedToday: 4,
-    totalEarnings: 840.50,
-    trustScore: 99.8,
-    regionalCoverage: '84%'
+    verifiedToday: tasks.filter(t => t.status === 'COMPLETED').length,
+    totalEarnings: tasks.filter(t => t.status === 'COMPLETED').reduce((acc, t) => acc + t.fee, 0),
+    trustScore: profile?.trust_score || 99.8,
+    regionalCoverage: 'Active'
   };
 
   const [activeTask, setActiveTask] = useState(null);
   const [resolutionType, setResolutionType] = useState('DISCOUNT');
   const [discountPercent, setDiscountPercent] = useState(15);
+
+  const handleExport = () => {
+    exportToCSV(tasks, `agent_tasks_${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
+  const onImportFile = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      handleImport(file, (data) => alert(`TASK_SYNC: Successfully ingested ${data.length} mission taskings.`));
+    }
+  };
 
   const calculateSettlement = (originalVal, percent) => {
      const refund = (originalVal * (percent / 100)).toFixed(2);
@@ -53,9 +83,13 @@ export default function AgentOperationsHub({ profile, token, onSync, users = [] 
                 <button className="q-btn primary-btn small" style={{ background: '#f59e0b', color: '#020617', padding: '10px 20px', fontSize: '12px' }}>
                     <i className="fas fa-tower-broadcast"></i> Sync Field Data
                 </button>
-                <button className="q-btn ghost small" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', padding: '10px 20px', fontSize: '12px' }}>
-                    <i className="fas fa-map-location-dot"></i> Network Pulse
-                </button>
+                 <button className="q-btn ghost small" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', padding: '10px 20px', fontSize: '12px' }} onClick={handleExport}>
+                    <i className="fas fa-file-export"></i> Export Log
+                 </button>
+                 <label className="q-btn ghost small" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', padding: '10px 20px', fontSize: '12px', cursor: 'pointer' }}>
+                    <i className="fas fa-file-import"></i> Import Tasks
+                    <input type="file" style={{ display: 'none' }} accept=".csv" onChange={onImportFile} />
+                 </label>
              </div>
           </div>
           

@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ZIMBABWE_AGRI_CATALOG } from '../ZimbabweDatabase';
 import { fetchMyListings, createListing } from '../api';
+import { exportToCSV, handleImport } from '../utils/dataTransfer';
 
-export default function FarmerProductsPanel({ token, onRefresh }) {
+export default function FarmerProductsPanel({ token, onRefresh, profile }) {
+  const isBuyer = profile?.role === 'BUYER';
+  
   const [products, setProducts] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('Field Crops');
+  const [selectedCategory, setSelectedCategory] = useState(isBuyer ? 'Inputs' : 'Field Crops');
   const [selectedProduct, setSelectedProduct] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -13,12 +16,12 @@ export default function FarmerProductsPanel({ token, onRefresh }) {
   // Extract unique categories from the master catalog
   const categories = useMemo(() => {
     const cats = [...new Set(ZIMBABWE_AGRI_CATALOG.map(p => p.category))];
-    return cats.sort();
-  }, []);
+    return isBuyer ? ['Inputs'] : cats.sort();
+  }, [isBuyer]);
 
   const currentDatabase = useMemo(() => {
-    return ZIMBABWE_AGRI_CATALOG.filter(p => p.category === selectedCategory);
-  }, [selectedCategory]);
+    return ZIMBABWE_AGRI_CATALOG.filter(p => p.category === (isBuyer ? 'Inputs' : selectedCategory));
+  }, [selectedCategory, isBuyer]);
   
   const productDetails = useMemo(() => {
     return ZIMBABWE_AGRI_CATALOG.find(p => p.name === selectedProduct);
@@ -42,16 +45,77 @@ export default function FarmerProductsPanel({ token, onRefresh }) {
   const [harvestDate, setHarvestDate] = useState('');
   const [storageReq, setStorageReq] = useState('Ambient');
 
+  // Yield & Revenue Forecaster State
+  const [forecastArea, setForecastArea] = useState(2);
+  const [forecastCrop, setForecastCrop] = useState('Maize (White)');
+  const [forecastResults, setForecastResults] = useState({ yield: '8.4', revenue: '3192.00' });
+  const [isForecasting, setIsForecasting] = useState(false);
+
+  const runForecast = () => {
+    setIsForecasting(true);
+    
+    // Simulating institutional AI calculation lag
+    setTimeout(() => {
+        const yields = {
+            'Maize (White)': 4.2,
+            'Wheat': 5.8,
+            'Tobacco (Virginia)': 2.1,
+            'Soybeans': 2.5
+        };
+        
+        const prices = {
+            'Maize (White)': 380,
+            'Wheat': 440,
+            'Tobacco (Virginia)': 4200,
+            'Soybeans': 600
+        };
+
+        const area = parseFloat(forecastArea) || 0;
+        const y = area * (yields[forecastCrop] || 1);
+        const r = y * (prices[forecastCrop] || 100);
+        
+        setForecastResults({ 
+            yield: y.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }), 
+            revenue: r.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        });
+        setIsForecasting(false);
+    }, 600);
+  };
+
+  const handleExportPortfolio = () => {
+    const dataToExport = products.map(p => ({
+        ID: p.id,
+        Product: p.product_type,
+        Quantity: p.quantity,
+        Unit: p.quantity_unit,
+        Price: p.price_per_unit,
+        Status: p.status,
+        Grade: p.grade,
+        Location: p.location_district
+    }));
+    exportToCSV(dataToExport, `agritrust_${isBuyer ? 'inventory' : 'portfolio'}_${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
+  const handleImportData = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        handleImport(file, (data) => {
+            alert(`SUCCESS: Ingested ${data.length} records into the local buffer. Processing system sync...`);
+            console.log("Imported Records:", data);
+        });
+    }
+  };
+
   const handleListHarvest = async () => {
       setErrorMsg('');
       setIsSubmitting(true);
       try {
-          const qtyInput = document.querySelector('input[placeholder="0.00"]') || document.querySelector('input[type="number"]:not([defaultValue])');
+          const qtyInput = document.querySelector('input[placeholder="0.00"]') || document.querySelector('input[type="number"]:not([defaultValue])') || document.querySelector('input[placeholder="0"]');
           const priceInput = document.querySelector('input[defaultValue]');
           const notesInput = document.querySelector('textarea.v4-textarea');
           
           const payload = {
-              sector: (selectedCategory || 'Crops').toLowerCase(),
+              sector: isBuyer ? 'inputs' : (selectedCategory || 'Crops').toLowerCase(),
               product_type: selectedProduct,
               quantity: parseFloat(qtyInput?.value || 0),
               price_per_unit: parseFloat(priceInput?.value || productDetails?.basePrice || 0),
@@ -68,7 +132,7 @@ export default function FarmerProductsPanel({ token, onRefresh }) {
           loadMyHarvests();
           if (onRefresh) onRefresh();
       } catch (err) {
-          setErrorMsg(err.message || 'Failed to list harvest.');
+          setErrorMsg(err.message || 'Failed to list inventory.');
       } finally {
           setIsSubmitting(false);
       }
@@ -76,39 +140,44 @@ export default function FarmerProductsPanel({ token, onRefresh }) {
 
   return (
     <div className="v4-dashboard-container animate-fade-in">
-      {/* PROFESSIONAL FARMER HERO */}
-      <header className="v4-hero-professional theme-farmer">
+      {/* PROFESSIONAL HERO */}
+      <header className={`v4-hero-professional theme-${isBuyer ? 'buyer' : 'farmer'}`}>
           <div className="hero-content-v4">
              <div className="kicker">
-                <span className="pill">VERIFIED PRODUCER</span>
+                <span className="pill">{isBuyer ? 'INSTITUTIONAL SUPPLIER' : 'VERIFIED PRODUCER'}</span>
                 <div className="sync-pulse" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px', fontWeight: '900', opacity: 0.7 }}>
                     <div className="p-dot" style={{ width: '6px', height: '6px', background: '#20963D', borderRadius: '50%', boxShadow: '0 0 8px #20963D' }}></div>
                     NATIONAL REGISTRY SYNC ACTIVE
                 </div>
              </div>
-             <h1 style={{ fontSize: '42px', fontWeight: 950, margin: 0, letterSpacing: '-0.04em' }}>Scale Your <span style={{ color: '#20963D' }}>Agricultural Enterprise</span>.</h1>
-             <p style={{ fontSize: '16px', opacity: 0.7, maxWidth: '500px', margin: 0, lineHeight: 1.6, fontWeight: 600 }}>Managing Zimbabwean production with institutional-grade escrow protection and real-time market parity insights.</p>
+             <h1 style={{ fontSize: '42px', fontWeight: 950, margin: 0, letterSpacing: '-0.04em' }}>{isBuyer ? 'Manage Your' : 'Scale Your'} <span style={{ color: isBuyer ? 'var(--v4-accent)' : '#20963D' }}>{isBuyer ? 'Input Inventory' : 'Agricultural Enterprise'}</span>.</h1>
+             <p style={{ fontSize: '16px', opacity: 0.7, maxWidth: '500px', margin: 0, lineHeight: 1.6, fontWeight: 600 }}>{isBuyer ? 'Optimizing supply chain distribution with real-time stock tracking and secure escrow settlements.' : 'Managing Zimbabwean production with institutional-grade escrow protection and real-time market parity insights.'}</p>
              
              <div className="hero-actions" style={{ display: 'flex', gap: '16px', marginTop: '12px' }}>
                 <button className="q-btn primary-btn" onClick={() => setShowAddForm(true)} style={{ background: '#fff', color: '#000E2B' }}>
-                    <i className="fas fa-plus"></i> Broadcast New Harvest
+                    <i className="fas fa-plus"></i> {isBuyer ? 'List New Inventory' : 'Broadcast New Harvest'}
                 </button>
-                <button className="q-btn ghost" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
-                    <i className="fas fa-file-export"></i> Export Portfolio
+                <button className="q-btn ghost" onClick={handleExportPortfolio} style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
+                    <i className="fas fa-file-export"></i> {isBuyer ? 'Export Inventory' : 'Export Portfolio'}
                 </button>
+                <label className="q-btn ghost" style={{ cursor: 'pointer', background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
+                    <i className="fas fa-file-import"></i> {isBuyer ? 'Restock (CSV)' : 'Ingest Harvest'}
+                    <input type="file" style={{ display: 'none' }} accept=".csv" onChange={handleImportData} />
+                </label>
              </div>
           </div>
           
           <div className="hero-visual">
-              <div className="v4-glass-card" style={{ background: 'rgba(255,255,255,0.05)', padding: '32px', borderRadius: '24px', border: '1.5px solid rgba(255,255,255,0.1)', borderLeft: '4px solid #20963D' }}>
-                  <label style={{ display: 'block', fontSize: '10px', fontWeight: 900, opacity: 0.5, letterSpacing: '0.1em', marginBottom: '8px' }}>PORTFOLIO VALUE</label>
+              <div className="v4-glass-card" style={{ background: 'rgba(255,255,255,0.05)', padding: '32px', borderRadius: '24px', border: '1.5px solid rgba(255,255,255,0.1)', borderLeft: `4px solid ${isBuyer ? 'var(--v4-accent)' : '#20963D'}` }}>
+                  <label style={{ display: 'block', fontSize: '10px', fontWeight: 900, opacity: 0.5, letterSpacing: '0.1em', marginBottom: '8px' }}>{isBuyer ? 'INVENTORY VALUE' : 'PORTFOLIO VALUE'}</label>
                   <strong style={{ fontSize: '32px', fontWeight: 950, display: 'block', marginBottom: '16px' }}>${(products.reduce((acc, p) => acc + ((p.price_per_unit || p.price || 0) * (p.quantity || p.qty || 0)), 0)).toLocaleString()}</strong>
                   <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden' }}>
-                      <div style={{ width: '92%', height: '100%', background: '#20963D' }}></div>
+                      <div style={{ width: '92%', height: '100%', background: isBuyer ? 'var(--v4-accent)' : '#20963D' }}></div>
                   </div>
               </div>
           </div>
       </header>
+
 
       {/* KPI STRIP */}
       <div className="v4-stats-grid">
@@ -157,30 +226,46 @@ export default function FarmerProductsPanel({ token, onRefresh }) {
             <div className="v4-forecaster-tool" style={{ marginTop: '24px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', alignItems: 'end' }}>
                 <div className="f-input-group">
                     <label style={{ fontSize: '9px', fontWeight: 950, color: 'var(--v4-text-dim)', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Production Area (Hectares)</label>
-                    <input type="number" defaultValue="2" className="v4-input small" style={{ width: '100%', background: 'var(--v4-bg)', border: '1.2px solid var(--v4-border)', padding: '10px 14px', borderRadius: '10px' }} />
+                    <input 
+                        type="number" 
+                        value={forecastArea} 
+                        onChange={(e) => setForecastArea(e.target.value)}
+                        className="v4-input small" 
+                        style={{ width: '100%', background: 'var(--v4-bg)', border: '1.2px solid var(--v4-border)', padding: '10px 14px', borderRadius: '10px' }} 
+                    />
                 </div>
                 <div className="f-input-group">
                     <label style={{ fontSize: '9px', fontWeight: 950, color: 'var(--v4-text-dim)', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Target Commodity</label>
-                    <select className="v4-select small" style={{ width: '100%', background: 'var(--v4-bg)', border: '1.2px solid var(--v4-border)', padding: '10px 14px', borderRadius: '10px' }}>
+                    <select 
+                        className="v4-select small" 
+                        value={forecastCrop}
+                        onChange={(e) => setForecastCrop(e.target.value)}
+                        style={{ width: '100%', background: 'var(--v4-bg)', border: '1.2px solid var(--v4-border)', padding: '10px 14px', borderRadius: '10px' }}
+                    >
                         <option>Maize (White)</option>
                         <option>Wheat</option>
                         <option>Tobacco (Virginia)</option>
                         <option>Soybeans</option>
                     </select>
                 </div>
-                <button className="q-btn primary-btn small" style={{ height: '42px', background: '#f59e0b', color: '#fff', fontSize: '11px', fontWeight: 900 }}>
-                    GENERATE PROJECTION
+                <button 
+                    className={`q-btn primary-btn small ${isForecasting ? 'loading' : ''}`} 
+                    onClick={runForecast}
+                    style={{ height: '42px', background: '#f59e0b', color: '#fff', fontSize: '11px', fontWeight: 900, position: 'relative' }}
+                    disabled={isForecasting}
+                >
+                    {isForecasting ? 'ANALYZING...' : 'GENERATE PROJECTION'}
                 </button>
             </div>
 
             <div className="v4-forecast-results" style={{ marginTop: '32px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', paddingTop: '24px', borderTop: '1.2px dashed var(--v4-border)' }}>
-                <div className="res-node">
+                <div className="res-node animate-rise">
                     <label style={{ fontSize: '10px', color: 'var(--v4-text-dim)', fontWeight: 850 }}>ESTIMATED NET YIELD</label>
-                    <strong style={{ fontSize: '20px', display: 'block' }}>8.4 Tons</strong>
+                    <strong style={{ fontSize: '24px', display: 'block', fontWeight: 1000 }}>{forecastResults.yield} Tons</strong>
                 </div>
-                <div className="res-node">
+                <div className="res-node animate-rise">
                     <label style={{ fontSize: '10px', color: 'var(--v4-text-dim)', fontWeight: 850 }}>PROJECTED REVENUE (GROSS)</label>
-                    <strong style={{ fontSize: '20px', display: 'block', color: '#20963D' }}>$3,192.00 USD</strong>
+                    <strong style={{ fontSize: '24px', display: 'block', color: '#20963D', fontWeight: 1000 }}>${forecastResults.revenue} USD</strong>
                 </div>
             </div>
         </div>

@@ -96,27 +96,37 @@ class USSDService:
             return USSDResponse(message="CON [SELL] Step 1/4\nEnter product name (e.g. Maize)")
         
         if selection == "2":
-            # Real-time Price Index for Zimbabwe (Deterministic)
-            prices = (
-                "CON National Price Index (USD/t)\n"
-                "1. Maize: $340-$360\n"
-                "2. Soya: $610-$640\n"
-                "3. Tobacco: $3.80-$4.50/kg\n"
-                "4. Wheat: $410-$430\n\n"
-                "0. Back"
-            )
-            return USSDResponse(message=prices)
+            # POWERED BY SOVEREIGN AI: Price Intelligence Discovery
+            crops = ["Maize", "Soya", "Wheat"]
+            prices_msg = "CON AI Price Intel (USD/t)\n"
+            for c in crops:
+                pred = get_price_prediction(db, c)
+                # Show bench and forecast
+                prices_msg += f"- {c}: ${pred['forecast_30d']} (30d FC)\n"
+            
+            prices_msg += "\n0. Back"
+            return USSDResponse(message=prices_msg)
 
         if selection == "3":
             user = db.query(User).filter(User.phone_number == phone_number).first()
             if not user:
                 await delete_key(session_key)
-                return USSDResponse(message="END Unregistered device. Visit an Agent.", end_session=True)
-            
-            listings = db.query(Listing).filter(Listing.seller_id == user.id).order_by(Listing.created_at.desc()).limit(3).all()
+                return USSDResponse(message="END Device verification failed.", end_session=True)
+
+            listings = db.query(Listing).filter(Listing.seller_id == user.id).order_by(Listing.created_at.desc()).limit(2).all()
             rendered = "\n".join([f"{l.product_type}: {l.status.value}" for l in listings]) or "No active trade lots."
+            
+            # PROOF OF FINANCIAL CREDIBILITY: Credit Rating Display
+            credit_rating = "CLASS A" if user.trust_score > 80 else "CLASS B" if user.trust_score > 50 else "CLASS C"
+            
+            msg = (
+                f"END SOVEREIGN PROFILE:\n"
+                f"Trust Score: {user.trust_score:.1f}/100\n"
+                f"Credit Rating: {credit_rating}\n"
+                f"Recent Trade:\n{rendered}"
+            )
             await delete_key(session_key)
-            return USSDResponse(message=f"END TRADE STATUS:\n{rendered}", end_session=True)
+            return USSDResponse(message=msg, end_session=True)
 
         if selection == "4":
             user = db.query(User).filter(User.phone_number == phone_number).first()
@@ -137,6 +147,11 @@ class USSDService:
 
             await delete_key(session_key)
             return USSDResponse(message=msg, end_session=True)
+
+        if selection == "5":
+            # DISPUTE RESOLUTION ENTRY POINT
+            await delete_key(session_key)
+            return USSDResponse(message="END Assistance Requested. A regional Agent will call you shortly to mediate.", end_session=True)
 
         if selection == "0":
             return USSDResponse(message=self.root_menu())

@@ -52,8 +52,9 @@ function MarketHero({ onBroadcast }) {
 
 export default function BuyerMarketplacePanel({ token, onPurchase, profile }) {
   const [listings, setListings] = useState([]);
-  const [filter, setFilter] = useState('All');
+  const [filter, setFilter] = useState(profile?.role === 'FARMER' ? 'Inputs' : 'All');
   const [provinceFilter, setProvinceFilter] = useState('All');
+
   const [search, setSearch] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showRequestForm, setShowRequestForm] = useState(false);
@@ -129,7 +130,9 @@ export default function BuyerMarketplacePanel({ token, onPurchase, profile }) {
   const filters = [
     { label: 'All', icon: 'fa-globe' },
     { label: 'Crops', icon: 'fa-wheat-awn' },
+    { label: 'Inputs', icon: 'fa-seedling' },
     { label: 'Livestock', icon: 'fa-cow' },
+
     { label: 'Poultry', icon: 'fa-feather-pointed' },
     { label: 'Dairy', icon: 'fa-glass-water' },
   ];
@@ -250,6 +253,15 @@ export default function BuyerMarketplacePanel({ token, onPurchase, profile }) {
                     const matchesProvince = provinceFilter === 'All' || (item.location_province === provinceFilter);
                     return matchesSearch && matchesCategory && matchesProvince;
                   })
+                  .sort((a, b) => {
+                    // Farmer-specific prioritization: Inputs always move to the top
+                    if (profile?.role === 'FARMER') {
+                      if (a.sector === 'inputs' && b.sector !== 'inputs') return -1;
+                      if (a.sector !== 'inputs' && b.sector === 'inputs') return 1;
+                    }
+                    return 0; // Default order
+                  })
+
                   .map((item) => {
                     const parity = getMarketParity(item.crop || item.product, item.price_per_unit || item.price);
                     return (
@@ -270,6 +282,12 @@ export default function BuyerMarketplacePanel({ token, onPurchase, profile }) {
                                     <i className="fas fa-location-crosshairs" style={{ marginRight: '6px' }}></i>
                                     {isGuest ? (item.location_district || 'ZIMBABWE') : `${item.location_province || 'ZW'} • ${item.location_district || 'REG'}`}
                                 </span>
+                                {profile?.role === 'FARMER' && (
+                                    <span style={{ fontSize: '9px', fontWeight: 1000, color: '#1a237e', background: 'rgba(26, 35, 126, 0.1)', padding: '6px 12px', borderRadius: '100px', border: '1px solid rgba(26, 35, 126, 0.2)', letterSpacing: '0.05em' }}>
+                                        <i className="fas fa-handshake-angle" style={{ marginRight: '6px' }}></i> F2F_SUPPORT_ACTIVE
+                                    </span>
+                                )}
+
                                 {parity && (
                                     <div style={{ fontSize: '10px', fontWeight: 900, color: parity.isFair ? '#20963D' : (parity.isHigher ? '#ef4444' : '#f59e0b'), display: 'flex', alignItems: 'center', gap: '4px' }}>
                                         <i className={`fas ${parity.isFair ? 'fa-check-circle' : 'fa-chart-line'}`}></i>
@@ -300,10 +318,16 @@ export default function BuyerMarketplacePanel({ token, onPurchase, profile }) {
 
                             <div style={{ padding: '0 32px 32px', position: 'relative', zIndex: 2 }}>
                                 <div className="producer-line" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                                    <div style={{ width: '24px', height: '24px', background: '#e0e7ff', color: '#1a237e', borderRadius: '8px', display: 'grid', placeItems: 'center', fontSize: '11px', fontWeight: 1000 }}>{(item.farmer_name || item.seller || 'P').charAt(0)}</div>
-                                    <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--v4-text-dim)' }}>{item.farmer_name || 'Verified Producer'}</span>
-                                    <div style={{ marginLeft: 'auto', fontSize: '10px', color: '#20963D', fontWeight: 900 }}><i className="fas fa-shield-check"></i> AGENT VERIFIED</div>
+                                    <div style={{ width: '24px', height: '24px', background: '#e0e7ff', color: '#1a237e', borderRadius: '8px', display: 'grid', placeItems: 'center', fontSize: '11px', fontWeight: 1000 }}>{(item.seller_name || 'P').charAt(0)}</div>
+                                    <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--v4-text-dim)' }}>{item.seller_name || 'Verified Producer'}</span>
+                                    <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+                                        <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 950, background: '#f1f5f9', padding: '2px 8px', borderRadius: '6px' }}>
+                                            <i className="fas fa-eye-slash"></i> {item.seller_phone_masked}
+                                        </div>
+                                        <div style={{ fontSize: '10px', color: '#20963D', fontWeight: 900 }}><i className="fas fa-shield-check"></i> {item.seller_trust_score}% TRUST</div>
+                                    </div>
                                 </div>
+
                                 
                                 <h4 style={{ fontSize: '26px', fontWeight: 950, margin: '0 0 24px 0', color: 'var(--v4-text-main)', minHeight: '64px', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{item.crop || item.product}</h4>
                                 

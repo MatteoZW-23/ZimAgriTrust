@@ -1,15 +1,15 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
 from app.api.deps import get_db, require_roles
 from app.models.dispute import Dispute, DisputeStatus
-from app.models.listing import Listing, ListingStatus
+from app.models.listing import Listing, ListingStatus, Offer
 from app.models.user import User, UserRole
 from app.models.transaction import Transaction, TransactionType, Order
 from app.schemas.admin import AdminOverviewResponse, ListingReviewResponse, RiskWatchResponse
-from app.schemas.auth import UserResponse
+from app.schemas.auth import UserResponse, UserRegister
 from app.schemas.listing import ListingResponse
 from app.models.system_audit import SystemAudit
 
@@ -53,6 +53,7 @@ def review_queue(
 ) -> list[ListingReviewResponse]:
     listings = (
         db.query(Listing)
+        .options(joinedload(Listing.seller), joinedload(Listing.offers))
         .filter(Listing.verification_status.in_(["pending", "PENDING"]))
         .order_by(Listing.created_at.desc())
         .all()
@@ -298,9 +299,9 @@ def get_all_activities(
     """
     Returns a unified set of listings, offers, and deals для the Command Center HUB.
     """
-    listings = db.query(Listing).order_by(Listing.created_at.desc()).limit(20).all()
-    offers = db.query(Offer).order_by(Offer.created_at.desc()).limit(20).all()
-    orders = db.query(Order).order_by(Order.created_at.desc()).limit(20).all()
+    listings = db.query(Listing).options(joinedload(Listing.seller)).order_by(Listing.created_at.desc()).limit(20).all()
+    offers = db.query(Offer).options(joinedload(Offer.buyer), joinedload(Offer.listing)).order_by(Offer.created_at.desc()).limit(20).all()
+    orders = db.query(Order).options(joinedload(Order.buyer), joinedload(Order.seller), joinedload(Order.listing)).order_by(Order.created_at.desc()).limit(20).all()
 
     return {
         "listings": [
@@ -322,6 +323,106 @@ def get_all_activities(
             } for d in orders
         ]
     }
+
+@router.get("/users", response_model=list[UserResponse])
+def list_users(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(UserRole.AGENT, UserRole.ADMIN)),
+):
+    """List all users for the operational directory."""
+    return db.query(User).all()
+
+@router.post("/enroll-user", response_model=UserResponse)
+def enroll_user(
+    payload: UserRegister,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(UserRole.ADMIN)),
+):
+    """Manually enroll a user into the platform governor."""
+    from app.services.auth_service import register_user
+    # Double check if exists
+    existing = db.query(User).filter(User.phone_number == payload.phone_number).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Identity already registered")
+    return register_user(db, payload)
+
+@router.delete("/users/{user_id}")
+def delete_user(
+    user_id: uuid.UUID,
+    reason: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles(UserRole.ADMIN)),
+):
+    """Purge a user record for security or compliance protocols."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Audit before delete
+    audit = SystemAudit(
+        admin_id=admin.id,
+        action="USER_PURGE",
+        target_type="USER",
+        target_id=user_id,
+        note=reason
+    )
+    db.add(audit)
+    db.delete(user)
+    db.commit()
+    return {"status": "User wiped from national database"}
+
+@router.post("/users/{user_id}/verify")
+def verify_user_identity(
+    user_id: uuid.UUID,
+    reason: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles(UserRole.ADMIN, UserRole.AGENT)),
+):
+    """Authenticate and verify a user's national identity credentials."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user.id_verified = True
+    audit = SystemAudit(
+        admin_id=admin.id,
+        action="USER_VERIFY",
+        target_type="USER",
+        target_id=user.id,
+        note=reason
+    )
+    db.add(audit)
+    db.commit()
+    return {"message": "Identity Verified"}
+
+@router.get("/agents/stats")
+def agent_stats(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(UserRole.ADMIN, UserRole.AGENT)),
+):
+    """Returns granular performance metrics for field agents."""
+    from app.models.agent import Agent
+    agents = db.query(Agent).all()
+    # If no extended agent profiles exist, return basic user agent data
+    if not agents:
+        basic_agents = db.query(User).filter(User.role == UserRole.AGENT).all()
+        return [
+            {
+                "id": str(u.id), "full_name": u.full_name, "region": u.province or "Central",
+                "resolved": 0, "rating": 5.0
+            } for u in basic_agents
+        ]
+
+    return [
+        {
+            "id": str(a.user_id),
+            "full_name": a.user.full_name if a.user else "Anonymous Agent",
+            "region": a.user.province if a.user else "Verified Zone",
+            "resolved": len(a.assignments) if a.assignments else 0,
+            "rating": 4.9 # Demo value
+        }
+        for a in agents
+    ]
 
 from app.services.sync_service import sync_system_data
 

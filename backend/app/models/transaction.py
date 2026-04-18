@@ -39,7 +39,7 @@ class Order(Base):
     status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), default=OrderStatus.PENDING)
     
     # Logistics Tracking
-    from app.models.logistics import LogisticsType
+    from app.models.listing import LogisticsType
     logistics_type: Mapped[LogisticsType] = mapped_column(Enum(LogisticsType), default=LogisticsType.PLATFORM)
     handover_code: Mapped[Optional[str]] = mapped_column(String(10)) # For Self-Logistics verification
     
@@ -55,6 +55,26 @@ class Order(Base):
     buyer = relationship("User", back_populates="orders_as_buyer", foreign_keys=[buyer_id])
     seller = relationship("User", back_populates="orders_as_seller", foreign_keys=[seller_id])
     disputes = relationship("Dispute", back_populates="order")
+    
+    @property
+    def product(self) -> str:
+        """Helper for frontend UI consistency"""
+        return self.listing.product_type if self.listing else "Agricultural Goods"
+
+    @property
+    def seller_contact_reveal(self) -> str:
+        """Reveals full seller phone only if escrow is funded."""
+        if self.status in [OrderStatus.ESCROW_HELD, OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.SETTLED]:
+            return self.seller.phone_number if self.seller else "Not Available"
+        return self.seller.masked_phone if self.seller else "****"
+
+    @property
+    def buyer_contact_reveal(self) -> str:
+        """Reveals full buyer phone only if escrow is funded."""
+        if self.status in [OrderStatus.ESCROW_HELD, OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.SETTLED]:
+            return self.buyer.phone_number if self.buyer else "Not Available"
+        return self.buyer.masked_phone if self.buyer else "****"
+
 
 
 class TransactionType(str, enum.Enum):

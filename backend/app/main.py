@@ -68,38 +68,16 @@ async def lifespan(app: FastAPI):
         print(f"SYSLOG | Tables Confirmed: {list(Base.metadata.tables.keys())}")
         
         with SessionLocal() as db:
-            print("SYSLOG | Executing Institutional Seeding...")
-            # Inline seeding to avoid circularity
-            from app.models.user import User, UserRole, UserStatus, FarmerProfile, BuyerProfile, AgentProfile
-            from app.core.security import get_password_hash
-            from app.services.auth_service import build_phone_lookup_candidates, normalize_phone_identifier
-            
-            # Reset Master
+            print("SYSLOG | Transitioning to Real-Time Data Ecosystem...")
+            # Ensure only the master system user exists for initial setup
             get_or_create_master_user(db)
             
-            institutional_users = [
-                {"phone": "772222222", "pin": "2222", "role": UserRole.FARMER, "name": "Farmer T. Miller"},
-                {"phone": "773333333", "pin": "3333", "role": UserRole.BUYER, "name": "Institutional Buyer (GMB)"},
-                {"phone": "778888888", "pin": "8888", "role": UserRole.AGENT, "name": "Field Agent S. Richards"},
-                {"phone": "771234567", "pin": "1111", "role": UserRole.ADMIN, "name": "HQ Ops Officer"},
-            ]
-            
-            for u_data in institutional_users:
-                canonical = normalize_phone_identifier(u_data["phone"])
-                candidates = build_phone_lookup_candidates(canonical)
-                if not db.query(User).filter(User.phone_number.in_(candidates)).first():
-                    u = User(full_name=u_data["name"], phone_number=canonical, password_hash=get_password_hash(u_data["pin"]), 
-                             role=u_data["role"], status=UserStatus.ACTIVE, is_active=True, id_verified=True, trust_score=90)
-                    db.add(u)
-                    db.commit()
-                    db.refresh(u)
-                    if u_data["role"] == UserRole.FARMER: db.add(FarmerProfile(user_id=u.id, farm_name="AgriTrust Pilot Farm"))
-                    elif u_data["role"] == UserRole.BUYER: db.add(BuyerProfile(user_id=u.id, company_name="National Commodity Board"))
-                    elif u_data["role"] == UserRole.AGENT: db.add(AgentProfile(user_id=u.id, assigned_zone="Harare North"))
-                    db.commit()
+            # The platform is now empty of demo data.
+            # Real users and real-time market data will populate the system.
             
             settlement_worker.run_settlement_sweep(db)
-            print("SYSLOG | Initialized.")
+            print("SYSLOG | System Live in Real-Time Mode.")
+
     except Exception as e:
         print(f"BOOT_ERROR | Managed startup failure: {str(e)}")
         

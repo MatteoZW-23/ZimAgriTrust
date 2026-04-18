@@ -1,12 +1,14 @@
 import math
 import uuid
+import secrets
+import string
 from datetime import datetime
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models.listing import Listing, ListingStatus, Offer, OfferStatus
+from app.models.listing import Listing, ListingStatus, Offer, OfferStatus, Sector
 from app.models.transaction import Order, OrderStatus, Transaction, TransactionType
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.listing import ListingCreate, OfferCreate
 from app.core.policy import calculate_seller_settlement
 from app.services.intelligence_service import intelligence_service
@@ -49,10 +51,18 @@ def create_listing(db: Session, seller: User, payload: ListingCreate) -> Listing
         # Require ID verification for new listings to ensure trust
         raise HTTPException(status_code=403, detail="Identity Verification Required. Please upload National ID.")
 
+    # INSTITUTIONAL CONSTRAINT: Buyers can ONLY list in the INPUTS sector
+    if seller.role == UserRole.BUYER and payload.sector != Sector.INPUTS:
+        raise HTTPException(
+            status_code=403, 
+            detail="Institutional Buyers are restricted to listing in the 'INPUTS' sector only."
+        )
+
     listing = Listing(
         seller_id=seller.id,
         **payload.model_dump()
     )
+
     db.add(listing)
     db.commit()
     db.refresh(listing)
@@ -69,7 +79,8 @@ def create_offer(db: Session, buyer: User, listing: Listing, payload: OfferCreat
         listing_id=listing.id,
         buyer_id=buyer.id,
         seller_id=listing.seller_id,
-        **payload.model_dump()
+        logistics_type=payload.logistics_type,
+        **payload.model_dump(exclude={"logistics_type"})
     )
     db.add(offer)
     db.commit()
@@ -117,6 +128,12 @@ def accept_offer(db: Session, listing: Listing, offer: Offer) -> Order:
         currency=offer.currency
     )
 
+    # GENERATE SECURE HANDOVER CODE FOR SELF-LOGISTICS
+    from app.models.listing import LogisticsType
+    handover_code = None
+    if offer.logistics_type in {LogisticsType.SELF_COLLECT, LogisticsType.SELF_DELIVER}:
+        handover_code = "".join(secrets.choice(string.digits) for _ in range(6))
+
     order = Order(
         offer_id=offer.id,
         listing_id=listing.id,
@@ -128,9 +145,21 @@ def accept_offer(db: Session, listing: Listing, offer: Offer) -> Order:
         platform_fee=platform_fee,
         seller_payout=seller_payout,
         currency=offer.currency,
-        status=OrderStatus.PENDING
+        status=OrderStatus.PENDING,
+        logistics_type=offer.logistics_type,
+        handover_code=handover_code
     )
     db.add(order)
+    
+    # F2F TELEMETRY: Identify circular rural economy activity
+    if seller and offer.buyer.role == 'FARMER':
+        intelligence_service.log_audit_event(db, {
+            "type": "F2F_TRANSACTION_DETECTED",
+            "user_id": str(offer.buyer_id),
+            "severity": "LOW",
+            "details": f"Farmer-to-Farmer trade detected for {offer.product_type if hasattr(offer, 'product_type') else 'Agri Product'}. Platform fee subsidized."
+        })
+
     
     # Simulate immediate escrow hold (Escrow Service logic)
     order.status = OrderStatus.ESCROW_HELD

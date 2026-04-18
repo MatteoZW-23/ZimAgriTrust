@@ -5,6 +5,14 @@ from app.api.deps import get_db, get_current_user
 router = APIRouter()
 
 from app.models.user import SubscriptionTier, UserRole
+from app.services.scraper_service import AgriScraper
+
+@router.get("/news")
+def get_market_news(user = Depends(get_current_user)):
+    """
+    Returns live-scraped agricultural news from the National Network.
+    """
+    return AgriScraper.scrape_latest_news()
 
 @router.get("/forecast")
 def get_market_forecast(
@@ -27,9 +35,15 @@ def get_market_summary(
 ):
     """
     Unified market summary. Open to all registered users.
+    NOW POWERED BY LIVE MARKET SCRAPING.
     """
-    crops = ["Maize", "Wheat", "Soybeans", "Sorghum", "Tobacco", "Beans", "Groundnuts"]
-    return {crop: {"price": 340.0} for crop in crops}
+    scraped_prices = AgriScraper.scrape_market_prices()
+    market_data = {}
+    for item in scraped_prices:
+        market_data[item["commodity"]] = {"price": item["price"], "unit": item["unit"], "origin": item["origin"]}
+        
+    return market_data
+
 
 @router.get("/analytics/regional")
 def get_regional_insights(

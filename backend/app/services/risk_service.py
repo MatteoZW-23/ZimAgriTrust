@@ -1,12 +1,22 @@
-from app.ml.risk_model import predict_user_risk
+from app.ml.risk_scorer import RiskScorer
 from app.models.user import User
+from sqlalchemy.orm import Session
 
-
-def evaluate_user_risk(user: User) -> dict[str, float | str]:
-    prediction = predict_user_risk(
-        successful_transactions=max((user.trust_score - 30) / 10, 0),
-        disputes=max((user.risk_score - 20) / 15, 0),
-        failed_deliveries=max((user.risk_score - 20) / 10, 0),
-    )
-    user.risk_score = float(prediction["risk_score"])
-    return prediction
+def evaluate_user_risk(db: Session, user: User) -> dict:
+    """
+    Evaluates user risk using the Advanced Random Forest Risk Scorer.
+    Eliminates basic linear mocks.
+    """
+    scorer = RiskScorer(db)
+    result = scorer.calculate_risk_score(user.id)
+    
+    # Sync core model
+    user.risk_score = float(result["risk_score"])
+    
+    return {
+        "user_id": user.id,
+        "risk_score": result["risk_score"],
+        "risk_label": result["risk_level"],
+        "recommendation": result["recommendation"],
+        "analysis_mode": "Sovereign Random Forest (v4)"
+    }

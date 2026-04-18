@@ -8,16 +8,13 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
+from app.models.listing import LogisticsType
+
 class TripStatus(str, enum.Enum):
     PLANNED = "planned"
     IN_TRANSIT = "in_transit"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
-
-class LogisticsType(str, enum.Enum):
-    PLATFORM = "platform"       # Third-party transporter
-    SELF_COLLECT = "self_collect" # Buyer picks up from farm
-    SELF_DELIVER = "self_deliver" # Farmer delivers to buyer
 
 class LogisticsTrip(Base):
     """

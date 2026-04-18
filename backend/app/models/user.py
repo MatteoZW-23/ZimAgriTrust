@@ -91,6 +91,16 @@ class User(Base):
     orders_as_buyer = relationship("Order", back_populates="buyer", foreign_keys="Order.buyer_id")
     orders_as_seller = relationship("Order", back_populates="seller", foreign_keys="Order.seller_id")
 
+    @property
+    def masked_phone(self) -> str:
+        """Returns a partially hidden phone number (e.g. +26377****003)"""
+        if not self.phone_number:
+            return ""
+        if len(self.phone_number) <= 7:
+            return "*" * len(self.phone_number)
+        return f"{self.phone_number[:6]}****{self.phone_number[-3:]}"
+
+
 
 class FarmerProfile(Base):
     __tablename__ = "farmer_profiles"

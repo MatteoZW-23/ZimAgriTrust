@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fetchTransactions, fetchAuditLogs, request } from '../api';
+import { exportToCSV, handleImport } from '../utils/dataTransfer';
 
 export default function EscrowRevenuePanel({ token, onEscrowAction }) {
   const [isExporting, setIsExporting] = useState(false);
@@ -32,26 +33,12 @@ export default function EscrowRevenuePanel({ token, onEscrowAction }) {
      loadData();
   }, [token]);
 
-  const downloadCSV = (filename, rows) => {
-      const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", filename);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-  };
 
   const handleExportCSV = async () => {
       setIsExporting(true);
       try {
           const data = await fetchTransactions(token);
-          const rows = [["ID", "Amount", "Type", "Status", "Date"]];
-          if (Array.isArray(data)) {
-              data.forEach(t => rows.push([t.id, t.amount, t.type, t.status, new Date(t.created_at).toLocaleDateString()]));
-          }
-          downloadCSV(`AgriTrust_Escrow_Ledger_${new Date().getTime()}.csv`, rows);
+          exportToCSV(data, `AgriTrust_Escrow_Ledger_${new Date().getTime()}.csv`);
       } catch (err) {
           alert('Export System Error: ' + err.message);
       } finally {
@@ -63,11 +50,7 @@ export default function EscrowRevenuePanel({ token, onEscrowAction }) {
       setIsExporting(true);
       try {
           const data = await fetchAuditLogs(token);
-          const rows = [["Log_ID", "Action_Type", "Target_Entity", "Status", "Timestamp"]];
-          if (Array.isArray(data)) {
-              data.forEach(a => rows.push([a.id, a.action, a.entity, a.status, a.timestamp]));
-          }
-          downloadCSV(`AgriTrust_Security_Audit_${new Date().getTime()}.csv`, rows);
+          exportToCSV(data, `AgriTrust_Security_Audit_${new Date().getTime()}.csv`);
       } catch (err) {
           alert('Audit Error: ' + err.message);
       } finally {
@@ -134,12 +117,21 @@ export default function EscrowRevenuePanel({ token, onEscrowAction }) {
           <div className="section-header-v4">
                <h3><i className="fas fa-server"></i> Payment List</h3>
               <div className="header-actions">
-                  <button className="q-btn ghost small" onClick={handleExportCSV} disabled={isExporting}>
-                      {isExporting ? 'Syncing...' : 'Export CSV'}
-                  </button>
-                  <button className="q-btn primary-btn small" onClick={handleGlobalAudit} disabled={isExporting}>
-                      Global Audit
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                      <button className="q-btn ghost small" onClick={handleExportCSV} disabled={isExporting}>
+                          {isExporting ? 'Syncing...' : 'Export CSV'}
+                      </button>
+                      <label className="q-btn ghost small" style={{ cursor: 'pointer' }}>
+                          Import Ledger
+                          <input type="file" style={{ display: 'none' }} accept=".csv" onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (file) handleImport(file, (data) => alert(`LEDGER_SYNC: Successfully ingested ${data.length} records.`));
+                          }} />
+                      </label>
+                      <button className="q-btn primary-btn small" onClick={handleGlobalAudit} disabled={isExporting}>
+                          Global Audit
+                      </button>
+                  </div>
               </div>
           </div>
           

@@ -1,0 +1,23 @@
+FROM python:3.11-slim
+
+WORKDIR /research
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.scheduler.txt .
+RUN pip install --no-cache-dir -r requirements.scheduler.txt
+
+# Copy scheduler code
+COPY research/scheduler/ ./scheduler/
+COPY research/notebooks/ ./notebooks/
+
+# Create directories
+RUN mkdir -p logs outputs
+
+# Run scheduler
+CMD ["python", "scheduler/auto_scheduler.py", "--start"]

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchMarketSummary } from '../api';
+import { fetchMarketSummary, fetchPriceTrends } from '../api';
 import LineChart from './LineChart';
 
 const HERO_CONTENT = {
@@ -9,32 +9,55 @@ const HERO_CONTENT = {
     ADMIN: { title: "AgriTrust Community Overview", sub: "Helping Zimbabwe's agricultural network grow stronger every day." }
 };
 
-function TickerTape() {
+function TickerTape({ pulse }) {
+    const rawItems = pulse || [
+        { name: 'MAIZE', price: 340, change: '+4.2%' },
+        { name: 'WHEAT', price: 420, change: '-1.5%' },
+        { name: 'SOYBEANS', price: 610, change: '+2.1%' },
+        { name: 'TOBACCO', price: 4.10, change: '+0.8%' },
+    ];
+    
     return (
         <div className="v4-market-ticker-v4" style={{ marginBottom: '16px' }}>
             <div className="ticker-wrapper">
                 <div className="ticker-track">
-                    <span>MAIZE: $340/t <i className="fas fa-caret-up text-green"></i></span>
-                    <span>WHEAT: $420/t <i className="fas fa-caret-down text-red"></i></span>
-                    <span>SOYBEANS: $610/t <i className="fas fa-caret-up text-green"></i></span>
-                    <span>TOBACCO: $4.10/kg <i className="fas fa-caret-up text-green"></i></span>
-                    <span>COTTON: $0.72/kg <i className="fas fa-minus text-blue"></i></span>
-                    <span>MAIZE: $340/t <i className="fas fa-caret-up text-green"></i></span>
+                    {rawItems.concat(rawItems).map((item, i) => (
+                        <span key={i}>
+                            {item.name}: ${item.price}/{item.unit || 't'}
+                            <i className={`fas ${item.change?.startsWith('+') ? 'fa-caret-up text-green' : 'fa-caret-down text-red'}`}></i>
+                        </span>
+                    ))}
                 </div>
             </div>
         </div>
     );
 }
 
-export function OverviewPanel({ overview, profile, onSync, onViewChange, token, activities }) {
+export function OverviewPanel({ overview, pulse, profile, onSync, onViewChange, token, activities }) {
     const role = profile?.role || "ADMIN";
     const [isExtended, setIsExtended] = useState(true);
-    const [marketActivities_local, setMarketActivities_local] = useState(null);
-    const [trendData] = useState([
-        { label: 'Jan', value: 340 }, { label: 'Feb', value: 355 },
-        { label: 'Mar', value: 310 }, { label: 'Apr', value: 420 },
-        { label: 'May', value: 390 }, { label: 'Jun', value: 480 }
-    ]);
+    const [trendData, setTrendData] = useState([]);
+
+    useEffect(() => {
+        const loadTrends = async () => {
+            try {
+                // Default to Maize for general overview
+                const data = await fetchPriceTrends(token, 'Maize');
+                if (Array.isArray(data)) {
+                    setTrendData(data.map(d => ({ label: d.label || d.date, value: d.value || d.price })));
+                }
+            } catch (err) {
+                console.warn("Trend sync deferred:", err.message);
+                // Fallback to minimal data if API fails or returns nothing
+                setTrendData([
+                    { label: 'Jan', value: 340 }, { label: 'Feb', value: 355 },
+                    { label: 'Mar', value: 310 }, { label: 'Apr', value: 420 },
+                    { label: 'May', value: 390 }, { label: 'Jun', value: 480 }
+                ]);
+            }
+        };
+        loadTrends();
+    }, [token]);
 
     const mergedActivities = React.useMemo(() => {
         return [
@@ -43,12 +66,6 @@ export function OverviewPanel({ overview, profile, onSync, onViewChange, token, 
             ...(activities?.deals || []).map(d => ({ ...d, actType: 'DEAL', time: 'Finalized' }))
         ].sort((a,b) => b.id - a.id).slice(0, 10);
     }, [activities]);
-
-    useEffect(() => {
-        if (token) {
-            fetchMarketSummary(token).then(summary => setMarketActivities_local({ summary })).catch(err => console.error("Summary error:", err));
-        }
-    }, [token]);
 
     const hero = HERO_CONTENT[role] || HERO_CONTENT.ADMIN;
 
@@ -65,7 +82,7 @@ export function OverviewPanel({ overview, profile, onSync, onViewChange, token, 
                 </div>
             )}
 
-            <TickerTape />
+            <TickerTape pulse={pulse} />
 
             <header className={`v4-hero-professional theme-${role.toLowerCase()}`} style={{ padding: '32px 48px' }}>
                 <div className="hero-content-v4">
