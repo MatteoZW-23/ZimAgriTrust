@@ -22,6 +22,61 @@ The AgriTrust ecosystem is built as a series of integrated micro-services:
 *   **`Telecom_USSD_Simulator/`**: A developer environment to test GSM-based USSD menus and session flows.
 *   **`IoT_Sensor_Gateway/`**: Integration points for regional soil sensors and storage humidity monitors.
 
+## 📊 System Visualizations
+
+### 1. High-Level Architecture
+```mermaid
+graph TD
+    User((Users: Farmer/Buyer)) -->|USSD/Web| API[FastAPI Backend]
+    Staff((Admin/Agent)) -->|Secure Web| API
+    API -->|Auth/Token| Redis[(Redis Cache)]
+    API -->|Persistence| DB[(PostgreSQL)]
+    API -->|Control| WA[WhatsApp Bridge]
+    API -->|Notify| SMS[SMS Gateway]
+    WA -->|Events| API
+```
+
+### 2. Secure Transaction & Escrow Flow
+```mermaid
+sequenceDiagram
+    participant F as Farmer
+    participant E as Escrow Logic
+    participant B as Buyer
+    participant A as Field Agent
+
+    B->>E: Lock Funds (USD/ZiG)
+    E-->>F: Alert: Order Secured
+    F->>A: Physical Handover
+    A->>A: Quality Verification (AI)
+    A->>E: Signal: Delivery Confirmed
+    E->>F: Release Payment
+    E->>B: Transfer Ownership
+```
+
+### 3. Authentication & 2FA Protocol
+```mermaid
+graph LR
+    Start(Input Phone/PIN) --> Master{Master?}
+    Master -->|Yes| Done(Access HQ)
+    Master -->|No| Verify[Standard Auth]
+    Verify --> Role{Staff Role?}
+    Role -->|Yes| TwoFA[2FA Verification]
+    Role -->|No| UserDashboard(User Access)
+    TwoFA -->|Success| Done
+```
+
+### 4. Agent Recruitment Pipeline
+```mermaid
+stateDiagram-v2
+    [*] --> Applied: Public Registration
+    Applied --> Documentation: HQ Review
+    Documentation --> Training: Modules 1-5
+    Training --> Equipment: Issuance
+    Equipment --> Shadowing: Field Sign-off
+    Shadowing --> Certified: ID Verified
+    Certified --> Active: Global Agent List
+```
+
 ## ⚙️ Technical Specifications
 
 *   **Core**: Python 3.12 (Pydantic v2), FastAPI, Node.js 20.
