@@ -77,6 +77,42 @@ stateDiagram-v2
     Certified --> Active: Global Agent List
 ```
 
+### 5. End-to-End Transaction Lifecycle
+```mermaid
+flowchart TD
+    subgraph Discovery
+        A[Farmer: List Product] -->|Backend Check| B{Approved?}
+        B -->|Yes| C[Public Marketplace]
+        B -->|No| D[Revision Needed]
+    end
+
+    subgraph Negotiation
+        C --> E[Buyer: View & Offer]
+        E --> F[Negotiation Hub: Chat]
+        F --> G{Agreement?}
+    end
+
+    subgraph Securing
+        G -->|Yes| H[Buyer: Lock Payment]
+        H --> I[Escrow: Funds Held]
+        I --> J[Regional Agent Assigned]
+    end
+
+    subgraph Execution
+        J --> K[Physical Logistics & Handover]
+        K --> L[Agent: Digital Verification]
+        L --> M{Quality Match?}
+        M -->|Yes| N[Final Release]
+        M -->|No| O[Arbitration Queue]
+    end
+
+    subgraph Settlement
+        N --> P[Farmer: Wallet Credit]
+        N --> Q[Buyer: Transfer Complete]
+        P --> R[USSD Cash-out]
+    end
+```
+
 ## ⚙️ Technical Specifications
 
 *   **Core**: Python 3.12 (Pydantic v2), FastAPI, Node.js 20.
