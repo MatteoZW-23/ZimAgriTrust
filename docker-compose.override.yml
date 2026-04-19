@@ -12,11 +12,11 @@ services:
 
   agent-dashboard:
     volumes:
-      - ./agent-dashboard:/app
+      - ./Admin_Dashboard_Web_App:/app
       - /app/node_modules
     environment:
       - NODE_ENV=development
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=http://localhost:8080/api/v1
     command: npm run dev -- --host 0.0.0.0
 
   postgres:
@@ -24,7 +24,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/scripts/init_db.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./backend/scripts:/docker-entrypoint-initdb.d:ro
 
   redis:
     ports:

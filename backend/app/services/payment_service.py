@@ -38,20 +38,29 @@ def process_ecocash_callback(db: Session, request_id: str, status: str, merchant
             # 1. Move to Escrow
             order.status = OrderStatus.ESCROW_HELD
             
-            # 2. Add transaction log
+            # 2. Update Buyer Wallet (AgriTrust Spec: Funds enter escrow immediately)
+            # Since the money came from an external source, we conceptually "deposit and hold"
+            buyer = db.query(User).filter(User.id == order.buyer_id).first()
+            if order.currency == "USD":
+                buyer.pending_usd += order.total_amount
+            else:
+                buyer.pending_zig += order.total_amount
+
+            # 3. Add transaction log
             tx = Transaction(
                 order_id=order.id,
                 user_id=order.buyer_id,
                 type=TransactionType.PAYMENT,
                 amount=order.total_amount,
+                currency=order.currency,
                 status="completed"
             )
             db.add(tx)
             
-            # 3. Update Listing status
+            # 4. Update Listing status
             if order.listing:
                 from app.models.listing import ListingStatus
-                order.listing.status = ListingStatus.RESERVED
+                order.listing.status = ListingStatus.SOLD
             
             db.commit()
             logger.info(f"✅ ESCROW SECURED: Order {order_id} | Ref {merchant_ref}")

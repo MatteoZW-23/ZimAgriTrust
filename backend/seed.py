@@ -29,8 +29,8 @@ def run_seed():
         result = sync_system_data(db)
         print("--- System Initialization Successful ---")
         print(f"Results: {result}")
-        print("Verified accounts: Farmer (+263771000001), Buyer (+263771000002)")
-        print("Access PIN: 1234")
+        print("Platform initialized in Real-Time Mode (Clean Slate).")
+
     except Exception as e:
         print("Seed failed:", e)
     finally:

@@ -9,7 +9,7 @@ from typing import Dict, Any, List
 from datetime import datetime
 import json
 
-from app.db.session import get_db
+from app.api.deps import get_db
 from app.models.ml_metadata import MLJobLog, MLPrediction, MLInsight
 from app.services.prediction_cache import PredictionCache
 

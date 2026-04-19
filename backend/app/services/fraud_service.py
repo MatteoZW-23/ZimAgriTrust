@@ -19,3 +19,19 @@ def apply_listing_controls(_: Session, user: User) -> User:
 
 def fake_seller_detected(user: User) -> bool:
     return user.risk_score >= 80 or user.trust_score <= 20
+
+
+def check_transaction_risk(amount: float, currency: str, user: User) -> bool:
+    """
+    AgriTrust Spec: Fraud Detection & Security
+    Flag suspicious transactions for manual review.
+    """
+    # 1. High-Value Transaction Threshold
+    if currency == "USD" and amount > 500:
+        return True # Requires 2FA/Manual Review
+        
+    # 2. Account Risk State
+    if user.is_suspended or user.risk_score > 70:
+        return True
+        
+    return False

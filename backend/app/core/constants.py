@@ -2,8 +2,8 @@
 # --------------------------------------------------
 
 # Transaction & Escrow Fees
-DEFAULT_PLATFORM_FEE_RATE = 0.015  # 1.5% Standard
-PREMIUM_FEE_RATE = 0.01           # 1.0% for Verified High Trust Farmers
+DEFAULT_PLATFORM_FEE_RATE = 0.01  # 1.0% Standard (AgriTrust Spec)
+PREMIUM_FEE_RATE = 0.005          # 0.5% for High Trust Farmers
 
 # Risk & Governance Thresholds
 RISK_THRESHOLD_SUSPEND = 85.0

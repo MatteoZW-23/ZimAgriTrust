@@ -8,25 +8,48 @@ class SettlementService:
     @staticmethod
     def run_settlement_sweep(db: Session):
         """
-        Scans for DELIVERED orders that have remained unchallenged for >48 hours 
-        and automatically releases funds to the seller.
+        Scans for DELIVERED orders and handles the 7-day notification/auto-release lifecycle
+        as per Diagram 9: TIMING DIAGRAM - AUTO ESCROW RELEASE.
         """
-        logging.info("[SETTLEMENT] INITIATING AUTOMATED ESCROW SWEEP...")
+        logging.info("[SETTLEMENT] INITIATING AGRI-TRUST ESCROW SWEEP...")
         
-        # In a real production environment, we filter by updated_at
-        # threshold = datetime.now() - timedelta(hours=48)
-        # For this stage, we sweep all DELIVERED orders to demonstrate the safety-net
+        now = datetime.now()
         
+        # 1. IDENTIFY DELIVERED ORDERS
         orders = db.query(Order).filter(Order.status == OrderStatus.DELIVERED).all()
         
-        count = 0
-        for order in orders:
-            try:
-                if process_auto_settlement(db, order):
-                    count += 1
-            except Exception as e:
-                logging.error(f"Failed to auto-settle order {order.id}: {e}")
+        settled_count = 0
+        reminded_count = 0
         
-        logging.info(f"[SUCCESS] [SETTLEMENT] SWEEP COMPLETE. {count} ORDERS AUTO-SETTLED.")
+        for order in orders:
+            # Calculate days elapsed since delivery
+            delivery_time = order.updated_at # Assuming status change to DELIVERED is last update
+            days_elapsed = (now - delivery_time).days
+            
+            try:
+                if days_elapsed >= 7:
+                    # DAY 7: AUTO-RELEASE
+                    logging.info(f"[SETTLEMENT] DAY 7 EXPIRED for Order {order.order_number}. Executing Auto-Release.")
+                    if process_auto_settlement(db, order):
+                        settled_count += 1
+                        # Note: In production, trigger "Failure to confirm" penalty to trust score here
+                
+                elif days_elapsed in [1, 2, 3, 4, 5, 6]:
+                    # DAYS 1-6: SEND REMINDERS
+                    reminded_count += 1
+                    days_remaining = 7 - days_elapsed
+                    msg = f"Reminder: Please confirm delivery for Order {order.order_number}. "
+                    if days_remaining == 1:
+                        msg += "Final Warning: Auto-release will trigger TOMORROW."
+                    else:
+                        msg += f"Auto-release will trigger in {days_remaining} days."
+                    
+                    # LOGGING AS SIMULATED SMS
+                    logging.info(f"[SETTLEMENT] SMS TO BUYER {order.buyer_id}: {msg}")
+                    
+            except Exception as e:
+                logging.error(f"Failed to process settlement logic for order {order.id}: {e}")
+        
+        logging.info(f"[SWEEP COMPLETE] Settled: {settled_count} | Reminded: {reminded_count}")
 
 settlement_worker = SettlementService()

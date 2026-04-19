@@ -29,5 +29,31 @@ class AgentAssignmentResponse(BaseModel):
     dispute_id: Optional[uuid.UUID] = None
     status: str
     assigned_at: datetime
+    deadline: Optional[datetime] = None
+    bounty_amount: float = 0.0
     
     model_config = ConfigDict(from_attributes=True)
+
+class VerificationReportCreate(BaseModel):
+    assignment_id: uuid.UUID
+    listing_id: uuid.UUID
+    exists: bool = True
+    verified_quantity: float
+    matching_grade: str
+    photos: List[str]
+    latitude: float
+    longitude: float
+    geo_timestamp: datetime
+    notes: Optional[str] = None
+    is_approved: bool = True
+
+class DeliveryReportCreate(BaseModel):
+    assignment_id: uuid.UUID
+    order_id: uuid.UUID
+    delivered_quantity: float
+    quality_confirmed: bool = True
+    handover_photos: List[str]
+    buyer_signature: Optional[str] = None
+    farmer_signature: Optional[str] = None
+    is_complete: bool = True
+    discrepancy_notes: Optional[str] = None

@@ -6,182 +6,226 @@ from datetime import datetime
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models.listing import Listing, ListingStatus, Offer, OfferStatus, Sector
+from app.models.listing import Listing, ListingStatus, Offer, OfferStatus, Sector, BuyerRequest, FarmerResponse
 from app.models.transaction import Order, OrderStatus, Transaction, TransactionType
 from app.models.user import User, UserRole
-from app.schemas.listing import ListingCreate, OfferCreate
-from app.core.policy import calculate_seller_settlement
-from app.services.intelligence_service import intelligence_service
+from app.schemas.listing import ListingCreate, OfferCreate, BuyerRequestCreate, FarmerResponseCreate
+from app.services.wallet_service import wallet_service
 
+def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    # Haversine formula
+    R = 6371 # Earth radius
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
 
-# ALGORITHM: Geospatial Proximity Matching (Euclidean Approximation)
-def calculate_distance(lat1, lon1, lat2, lon2):
-    """Simple distance algorithm for rural logistics matching."""
-    if not all([lat1, lon1, lat2, lon2]): return 999.0
-    return math.sqrt((lat1 - lat2)**2 + (lon1 - lon2)**2)
-
-
-def suggest_best_matches(db: Session, buyer: User, product: str, limit: int = 5):
+def calculate_seller_settlement(amount: float, trust_score: float, currency: str = "USD"):
     """
-    MATCHMAKING ALGORITHM: Multi-objective Optimization.
-    Ranks sellers based on: (1) Distance, (2) Price, (3) Producer Trust Score.
+    AgriTrust Fee Structure:
+    - Standardfee: 1.0% (0.01)
+    - High Trust Discount: 0.5% if trust_score > 90
     """
-    listings = db.query(Listing).filter(
-        Listing.status == ListingStatus.ACTIVE,
-        Listing.product_type == product
-    ).all()
-    
-    ranked = []
-    for l in listings:
-        dist = calculate_distance(buyer.latitude, buyer.longitude, l.latitude, l.longitude)
+    fee_rate = 0.01
+    if trust_score > 90:
+        fee_rate = 0.005
         
-        # Scoring Optimization Algorithm: lower is better
-        # Normalizes Price, Distance, and Trust into a single feasibility score
-        score = (l.price_per_unit * 0.5) + (dist * 10.0) - (l.seller.trust_score * 0.1)
-        ranked.append({"listing": l, "feasibility_score": score, "km_est": round(dist * 111, 1)})
-        
-    return sorted(ranked, key=lambda x: x["feasibility_score"])[:limit]
-
+    fee = amount * fee_rate
+    payout = amount - fee
+    return fee, payout
 
 def create_listing(db: Session, seller: User, payload: ListingCreate) -> Listing:
-    if not seller.is_active or seller.is_suspended:
-        raise HTTPException(status_code=403, detail="Account restricted")
-    
-    if not seller.id_verified:
-        # Require ID verification for new listings to ensure trust
-        raise HTTPException(status_code=403, detail="Identity Verification Required. Please upload National ID.")
-
-    # INSTITUTIONAL CONSTRAINT: Buyers can ONLY list in the INPUTS sector
-    if seller.role == UserRole.BUYER and payload.sector != Sector.INPUTS:
-        raise HTTPException(
-            status_code=403, 
-            detail="Institutional Buyers are restricted to listing in the 'INPUTS' sector only."
-        )
-
     listing = Listing(
         seller_id=seller.id,
         **payload.model_dump()
     )
-
     db.add(listing)
     db.commit()
     db.refresh(listing)
     return listing
 
-
 def create_offer(db: Session, buyer: User, listing: Listing, payload: OfferCreate) -> Offer:
-    if listing.status != ListingStatus.ACTIVE:
-        raise HTTPException(status_code=400, detail="Listing not active")
     if listing.seller_id == buyer.id:
         raise HTTPException(status_code=400, detail="Cannot bid on own listing")
-
+        
     offer = Offer(
         listing_id=listing.id,
         buyer_id=buyer.id,
-        seller_id=listing.seller_id,
-        logistics_type=payload.logistics_type,
-        **payload.model_dump(exclude={"logistics_type"})
+        **payload.model_dump(),
+        status=OfferStatus.PENDING
     )
     db.add(offer)
     db.commit()
     db.refresh(offer)
     return offer
 
-
 def accept_offer(db: Session, listing: Listing, offer: Offer) -> Order:
     if offer.status != OfferStatus.PENDING:
-        raise HTTPException(status_code=400, detail="Offer already processed")
+        raise HTTPException(status_code=400, detail="Offer not pending")
 
-    # Update states
+    # Update state
     offer.status = OfferStatus.ACCEPTED
     listing.status = ListingStatus.SOLD
     
-    # Reject other offers
+    # Reject competing offers
     db.query(Offer).filter(
-        Offer.listing_id == listing.id,
+        Offer.listing_id == listing.id, 
         Offer.id != offer.id
-    ).update({"status": OfferStatus.DECLINED})
-
-    # Determine Rural Remoteness for Fee Offsets (Enforced via GPS)
-    REMOTE_RURAL_DISTRICTS = ["Binga", "Mudzi", "Mwenezi", "Chiredzi Rural", "Kariba Rural", "Lupane", "Nkayi"]
-    is_rural = False
-    seller = db.query(User).filter(User.id == offer.seller_id).first()
+    ).update({"status": OfferStatus.REJECTED})
     
-    # DISCOUNT ELIGIBILITY: Must be in a remote district AND be GPS-verified
-    if seller and seller.district in REMOTE_RURAL_DISTRICTS:
-        if listing.is_location_verified:
-            is_rural = True
-        else:
-            # Audit Point: Potential 'Subsidy Fraud'
-            intelligence_service.log_audit_event(db, {
-                "type": "LOCATION_INTEGRITY_MISMATCH",
-                "user_id": str(seller.id),
-                "severity": "MEDIUM",
-                "details": f"User claimed rural district '{seller.district}' but listing was not GPS-verified."
-            })
-        
-    total_amount = offer.quantity * offer.offered_price
-    platform_fee, seller_payout = calculate_seller_settlement(
-        total_amount, 
-        seller.trust_score if seller else 0,
-        is_rural=is_rural,
-        currency=offer.currency
-    )
-
-    # GENERATE SECURE HANDOVER CODE FOR SELF-LOGISTICS
-    from app.models.listing import LogisticsType
-    handover_code = None
-    if offer.logistics_type in {LogisticsType.SELF_COLLECT, LogisticsType.SELF_DELIVER}:
-        handover_code = "".join(secrets.choice(string.digits) for _ in range(6))
-
+    total_amount = offer.quantity * offer.price_per_unit
+    fee, payout = calculate_seller_settlement(total_amount, listing.seller.trust_score, offer.currency)
+    
     order = Order(
-        offer_id=offer.id,
         listing_id=listing.id,
+        offer_id=offer.id,
         buyer_id=offer.buyer_id,
-        seller_id=offer.seller_id,
+        seller_id=listing.seller_id,
         order_number=f"ORD-{uuid.uuid4().hex[:8].upper()}",
         quantity=offer.quantity,
         total_amount=total_amount,
-        platform_fee=platform_fee,
-        seller_payout=seller_payout,
+        platform_fee=fee,
+        seller_payout=payout,
         currency=offer.currency,
         status=OrderStatus.PENDING,
-        logistics_type=offer.logistics_type,
-        handover_code=handover_code
+        handover_code=secrets.token_hex(3).upper() # 6-char code
     )
     db.add(order)
+    db.flush()
     
-    # F2F TELEMETRY: Identify circular rural economy activity
-    if seller and offer.buyer.role == 'FARMER':
-        intelligence_service.log_audit_event(db, {
-            "type": "F2F_TRANSACTION_DETECTED",
-            "user_id": str(offer.buyer_id),
-            "severity": "LOW",
-            "details": f"Farmer-to-Farmer trade detected for {offer.product_type if hasattr(offer, 'product_type') else 'Agri Product'}. Platform fee subsidized."
-        })
-
-    
-    # Simulate immediate escrow hold (Escrow Service logic)
-    order.status = OrderStatus.ESCROW_HELD
-    
-    # Create transaction record for buyer
-    txn = Transaction(
-        order_id=order.id,
-        user_id=order.buyer_id,
-        type=TransactionType.ESCROW_HOLD,
-        amount=total_amount,
-        currency=order.currency,
-        status="completed"
-    )
-    db.add(txn)
+    # Trigger Escrow Hold (Moves buyer balance to pending)
+    success = wallet_service.hold_escrow(db, order.buyer_id, order.total_amount, order.currency)
+    if success:
+        order.status = OrderStatus.ESCROW_HELD
+        db.add(Transaction(
+            order_id=order.id, user_id=order.buyer_id, type=TransactionType.ESCROW_HOLD,
+            amount=order.total_amount, currency=order.currency
+        ))
     
     db.commit()
     db.refresh(order)
     return order
 
-
 def reject_offer(db: Session, offer: Offer) -> Offer:
-    offer.status = OfferStatus.DECLINED
+    offer.status = OfferStatus.REJECTED
     db.commit()
     db.refresh(offer)
     return offer
+
+def counter_offer(db: Session, offer: Offer, counter_price: float, actor: User) -> Offer:
+    """
+    AgriTrust Spec (Diagram 5): Negotiation Flow.
+    Allows a party to suggest a new price.
+    """
+    if offer.status not in {OfferStatus.PENDING, OfferStatus.COUNTERED}:
+        raise HTTPException(status_code=400, detail="Offer not in negotiable state")
+
+    # Update logic: Flip the initiator
+    offer.status = OfferStatus.COUNTERED
+    offer.price_per_unit = counter_price
+    
+    # In a real system, we might track 'last_actor_id' to know who needs to respond next.
+    db.commit()
+    db.refresh(offer)
+    return offer
+
+def create_buyer_request(db: Session, buyer: User, payload: BuyerRequestCreate) -> BuyerRequest:
+    request = BuyerRequest(
+        buyer_id=buyer.id,
+        **payload.model_dump()
+    )
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+    return request
+
+def farmer_respond_to_request(db: Session, farmer: User, request: BuyerRequest, payload: FarmerResponseCreate) -> FarmerResponse:
+    if farmer.role != UserRole.FARMER:
+        raise HTTPException(status_code=403, detail="Only farmers can respond")
+    response = FarmerResponse(
+        request_id=request.id,
+        farmer_id=farmer.id,
+        **payload.model_dump()
+    )
+    db.add(response)
+    db.commit()
+    db.refresh(response)
+    return response
+
+def accept_farmer_response(db: Session, response: FarmerResponse) -> Order:
+    response.status = "accepted"
+    response.request.status = "filled"
+    
+    # Create Virtual Listing
+    virtual_listing = Listing(
+        seller_id=response.farmer_id,
+        sector=Sector.MIXED_FARMING,
+        product_type=response.request.product_type,
+        quantity=response.supply_quantity,
+        price_per_unit=response.bid_price,
+        currency=response.currency,
+        status=ListingStatus.SOLD,
+        notes=f"Buyer Request {response.request_id} Fulfillment"
+    )
+    db.add(virtual_listing)
+    db.flush()
+
+    total_amount = response.supply_quantity * response.bid_price
+    fee, payout = calculate_seller_settlement(total_amount, response.farmer.trust_score, response.currency)
+
+    order = Order(
+        listing_id=virtual_listing.id,
+        buyer_id=response.request.buyer_id,
+        seller_id=response.farmer_id,
+        order_number=f"ORD-REQ-{uuid.uuid4().hex[:8].upper()}",
+        quantity=response.supply_quantity,
+        total_amount=total_amount,
+        platform_fee=fee,
+        seller_payout=payout,
+        currency=response.currency,
+        status=OrderStatus.PENDING,
+        handover_code=secrets.token_hex(3).upper()
+    )
+    db.add(order)
+    db.flush()
+
+    success = wallet_service.hold_escrow(db, order.buyer_id, order.total_amount, order.currency)
+    if success:
+        order.status = OrderStatus.ESCROW_HELD
+        db.add(Transaction(
+            order_id=order.id, user_id=order.buyer_id, type=TransactionType.ESCROW_HOLD,
+            amount=order.total_amount, currency=order.currency
+        ))
+
+    db.commit()
+    db.refresh(order)
+    return order
+
+class MarketplaceService:
+    @staticmethod
+    def create_listing(db: Session, seller: User, payload: ListingCreate) -> Listing:
+        return create_listing(db, seller, payload)
+    @staticmethod
+    def create_offer(db: Session, buyer: User, listing: Listing, payload: OfferCreate) -> Offer:
+        return create_offer(db, buyer, listing, payload)
+    @staticmethod
+    def accept_offer(db: Session, listing: Listing, offer: Offer) -> Order:
+        return accept_offer(db, listing, offer)
+    @staticmethod
+    def reject_offer(db: Session, offer: Offer) -> Offer:
+        return reject_offer(db, offer)
+    @staticmethod
+    def counter_offer(db: Session, offer: Offer, counter_price: float, actor: User) -> Offer:
+        return counter_offer(db, offer, counter_price, actor)
+    @staticmethod
+    def create_buyer_request(db: Session, buyer: User, payload: BuyerRequestCreate) -> BuyerRequest:
+        return create_buyer_request(db, buyer, payload)
+    @staticmethod
+    def farmer_respond_to_request(db: Session, farmer: User, request: BuyerRequest, payload: FarmerResponseCreate) -> FarmerResponse:
+        return farmer_respond_to_request(db, farmer, request, payload)
+    @staticmethod
+    def accept_farmer_response(db: Session, response: FarmerResponse) -> Order:
+        return accept_farmer_response(db, response)
+
+marketplace_core = MarketplaceService()

@@ -18,5 +18,5 @@ def evaluate_user_risk(db: Session, user: User) -> dict:
         "risk_score": result["risk_score"],
         "risk_label": result["risk_level"],
         "recommendation": result["recommendation"],
-        "analysis_mode": "Sovereign Random Forest (v4)"
+        "analysis_mode": "System Analysis (v4)"
     }

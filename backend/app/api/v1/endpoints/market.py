@@ -14,19 +14,6 @@ def get_market_news(user = Depends(get_current_user)):
     """
     return AgriScraper.scrape_latest_news()
 
-@router.get("/forecast")
-def get_market_forecast(
-    crop: str = "Maize", 
-    db: Session = Depends(get_db),
-    user = Depends(get_current_user)
-):
-    """
-    Returns standard market price data. Restricted to PREMIUM.
-    """
-    if user.role not in [UserRole.ADMIN, UserRole.AGENT] and user.subscription_tier == SubscriptionTier.BASIC:
-        return {"error": "SUBSCRIPTION_REQUIRED", "message": "Upgrade to PREMIUM for price forecasting."}
-        
-    return {"crop": crop, "current_price": 340.0, "suggested_price": 345.0, "status": "STABLE"}
 
 @router.get("/summary")
 def get_market_summary(
@@ -47,6 +34,7 @@ def get_market_summary(
 
 @router.get("/analytics/regional")
 def get_regional_insights(
+    db: Session = Depends(get_db),
     user = Depends(get_current_user)
 ):
     """
@@ -55,17 +43,25 @@ def get_regional_insights(
     if user.role not in [UserRole.ADMIN, UserRole.AGENT] and user.subscription_tier == SubscriptionTier.BASIC:
         return {"error": "SUBSCRIPTION_REQUIRED", "message": "Regional analytics require a PREMIUM subscription."}
 
+    from sqlalchemy import func
+    from app.models.listing import Listing
+    
+    stats = db.query(
+        Listing.location_province,
+        func.count(Listing.id).label("count"),
+        func.avg(Listing.price_per_unit).label("avg_price")
+    ).filter(Listing.status == "active").group_by(Listing.location_province).all()
+    
     return [
-        {"name": "Harare", "trend": "+12%", "crop": "Leafy Greens", "price": 0.85, "demand": "HIGH"},
-        {"name": "Mash West", "trend": "+5%", "crop": "Maize", "price": 0.32, "demand": "CRITICAL"},
-        {"name": "Midlands", "trend": "-2%", "crop": "Soya", "price": 0.58, "demand": "STABLE"},
-        {"name": "Bulawayo", "trend": "+15%", "crop": "Poultry", "price": 4.50, "demand": "HIGH"},
-        {"name": "Manicaland", "trend": "+8%", "crop": "Fruit", "price": 1.20, "demand": "MEDIUM"},
+        {"province": s.location_province or "Other", "listings": s.count, "avg_price": round(s.avg_price, 2)}
+        for s in stats
     ]
+
 
 @router.get("/analytics/trends/{crop}")
 def get_price_trends(
     crop: str,
+    db: Session = Depends(get_db),
     user = Depends(get_current_user)
 ):
     """
@@ -74,9 +70,16 @@ def get_price_trends(
     if user.role not in [UserRole.ADMIN, UserRole.AGENT] and user.subscription_tier == SubscriptionTier.BASIC:
         return {"error": "SUBSCRIPTION_REQUIRED", "message": "Historical trends are reserved for PREMIUM members."}
 
-    history = [10, 10.5, 11, 10.8, 11.2, 11.8]
-    labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
-    return [{"label": l, "value": v} for l, v in zip(labels, history)]
+    from app.models.price_history import PriceHistory
+    history = db.query(PriceHistory).filter(
+        PriceHistory.product_type.ilike(f"%{crop}%")
+    ).order_by(PriceHistory.date.desc()).limit(30).all()
+    
+    return [
+        {"date": h.date.isoformat(), "price": h.price_per_unit, "source": h.source}
+        for h in history
+    ]
+
 
 @router.get("/demand/{crop}")
 def get_crop_demand(
@@ -84,22 +87,63 @@ def get_crop_demand(
     db: Session = Depends(get_db),
     user = Depends(get_current_user)
 ):
-    return {"crop": crop, "demand_index": 85.0, "status": "HIGH"}
+    """
+    Calculates the Buy-to-Sell Ratio (Demand Index) for a specific crop.
+    """
+    from app.models.listing import Listing, Offer, ListingStatus
+    from sqlalchemy import func
+    
+    supply = db.query(func.sum(Listing.quantity)).filter(
+        Listing.product_type.ilike(f"%{crop}%"),
+        Listing.status == ListingStatus.ACTIVE
+    ).scalar() or 0
+    
+    demand = db.query(func.sum(Offer.quantity)).join(Listing).filter(
+        Listing.product_type.ilike(f"%{crop}%")
+    ).scalar() or 0
+    
+    index = (demand / supply * 10) if supply > 0 else 0.0
+    status = "HIGH" if index > 7 else "MODERATE" if index > 3 else "LOW"
+    
+    return {"crop": crop, "demand_index": round(index, 1), "status": status, "total_supply": supply, "total_demand": demand}
 
-@router.get("/risk/{user_id}")
+
+@router.get("/risk/{target_user_id}")
 def get_user_risk(
-    user_id: int,
+    target_user_id: str,
     db: Session = Depends(get_db),
     user = Depends(get_current_user)
 ):
-    return {"user_id": user_id, "risk_score": 0.05, "status": "LOW_RISK"}
+    """
+    Security Engine: Evaluates a target user's risk profile.
+    """
+    from app.models.user import User
+    from app.services.risk_service import evaluate_user_risk
+    
+    target = db.query(User).filter(User.id == target_user_id).first()
+    if not target:
+        return {"error": "USER_NOT_FOUND"}
+        
+    return evaluate_user_risk(db, target)
+
 
 @router.get("/fraud-alerts")
 def get_fraud_alerts(
     db: Session = Depends(get_db),
     user = Depends(get_current_user)
 ):
-    return []
+    """
+    Lists recent security and fraud alerts from the system audit log.
+    """
+    from app.models.system_audit import SystemAudit
+    alerts = db.query(SystemAudit).filter(
+        SystemAudit.action.in_(["SUSPICIOUS_TRANSACTION", "LEAKAGE_DETECTED", "RISK_LOCKDOWN"])
+    ).order_by(SystemAudit.created_at.desc()).limit(10).all()
+    
+    return [
+        {"id": str(a.id), "action": a.action, "note": a.note, "ts": a.created_at.isoformat()}
+        for a in alerts
+    ]
 
 @router.get("/pulse")
 def get_national_pulse(
@@ -112,4 +156,34 @@ def get_national_pulse(
     if user.role not in [UserRole.ADMIN, UserRole.AGENT] and user.subscription_tier == SubscriptionTier.BASIC:
         return {"error": "SUBSCRIPTION_REQUIRED", "message": "The National Pulse is a PREMIUM feature."}
 
-    return {"index": 98.4, "status": "OPTIMAL"}
+    from app.services.revenue_service import AdminRevenueService
+    stats = AdminRevenueService.get_national_revenue_summary(db)
+    
+    # Simple index calculation: Log10 of GMV + some vitality factor
+    import math
+    gmv = stats.get("gross_volume", 0)
+    index = math.log10(gmv + 1) * 10
+    
+    status = "STABLE"
+    if index > 50: status = "HIGH_LIQUIDITY"
+    if index < 10: status = "EMERGING"
+
+    return {
+        "index": round(index, 1),
+        "status": status,
+        "gmv": gmv,
+        "vitality": f"{min(100, index * 2):.1f}%"
+    }
+
+
+@router.get("/catalog")
+def get_agri_catalog(
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user)
+):
+    """
+    Returns the National Agricultural Database/Catalog.
+    """
+    from app.services.national_commodity_service import NationalCommodityService
+    return NationalCommodityService.SECTOR_GRADING_REGISTRY
+

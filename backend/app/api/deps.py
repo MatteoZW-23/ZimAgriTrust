@@ -64,3 +64,19 @@ def require_roles(*roles: UserRole):
         return user
 
     return dependency
+
+
+def check_lockdown(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """
+    Enforces 'Read-Only' mode during an Emergency Lockdown.
+    Admins are exempted from the lockdown to allow for resolution.
+    """
+    from app.models.system_config import SystemConfig
+    lockdown = db.query(SystemConfig).filter(SystemConfig.key == "SYSTEM_LOCKDOWN").first()
+    
+    if lockdown and lockdown.value == "true" and current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="PLATFORM_LOCKDOWN: The system is currently in emergency read-only mode."
+        )
+    return True

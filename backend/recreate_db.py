@@ -18,69 +18,39 @@ def recreate():
     print("Creating all tables from new models...")
     Base.metadata.create_all(bind=engine)   
     
+    print("Success! Database reset. All tables created. No seed data injected.")
+
+def bootstrap_admin():
+    from app.services.auth_service import register_user
+    from app.schemas.auth import UserRegister
+    import os
+
     db = SessionLocal()
-    print("Seeding new UUID data...")
-    
-    # MJ Admin
-    admin_id = uuid.uuid4()
-    admin = User(
-        id=admin_id,
-        full_name="MJ Admin",
-        phone_number="+263771234567",
-        password_hash=get_password_hash("1111"),
-        role=UserRole.ADMIN,
-        is_active=True,
-        trust_score=100
-    )
-    db.add(admin)
+    try:
+        # Check if admin already exists
+        admin_phone = "0888888888"
+        existing = db.query(User).filter(User.phone_number == admin_phone).first()
+        if existing:
+            print(f"Admin {admin_phone} already exists. Skipping bootstrap.")
+            return
 
-    # Demo Farmer
-    farmer_id = uuid.uuid4()
-    farmer = User(
-        id=farmer_id,
-        full_name="Seed Farmer",
-        phone_number="+263781234567",
-        password_hash=get_password_hash("2222"),
-        role=UserRole.FARMER,
-        province="Mashonaland Central",
-        district="Mazowe",
-        trust_score=85
-    )
-    db.add(farmer)
-    
-    # Demo Buyer
-    buyer_id = uuid.uuid4()
-    buyer = User(
-        id=buyer_id,
-        full_name="Bulk Buyer",
-        phone_number="+263791234567",
-        password_hash=get_password_hash("3333"),
-        role=UserRole.BUYER,
-        province="Harare",
-        trust_score=90
-    )
-    db.add(buyer)
-
-    # Demo Agent
-    agent_id = uuid.uuid4()
-    agent = User(
-        id=agent_id,
-        full_name="Mash West Agent",
-        phone_number="+263711234567",
-        password_hash=get_password_hash("4444"),
-        role=UserRole.AGENT,
-        province="Mashonaland West",
-        trust_score=95
-    )
-    db.add(agent)
-    
-    db.commit()
-    
-    # Removed Demo Listing block to allow pure 'zero-data' functional testing 
-    # of the pipeline (listings, escrow, delivery).
-    
-    print(f"Success! Database reset. Admin: {admin_id}, Farmer: {farmer_id}, Buyer: {buyer_id}, Agent: {agent_id}")
-    db.close()
+        print(f"Bootstrapping first admin user ({admin_phone})...")
+        payload = UserRegister(
+            full_name="System Administrator",
+            phone_number=admin_phone,
+            password="admin-secure-pin-2026",
+            role=UserRole.ADMIN,
+            admin_secret=settings.ADMIN_BOOTSTRAP_TOKEN
+        )
+        register_user(db, payload)
+        print("Admin user created successfully. Use phone '0888888888' and password 'admin-secure-pin-2026' for first login.")
+    except Exception as e:
+        print(f"Bootstrap failed: {e}")
+    finally:
+        db.close()
 
 if __name__ == "__main__":
     recreate()
+    if os.getenv("BOOTSTRAP_ADMIN", "false").lower() == "true":
+        bootstrap_admin()
+

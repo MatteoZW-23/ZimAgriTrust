@@ -34,7 +34,7 @@ class MLPrediction(Base):
     predicted_value = Column(Float, nullable=False)
     confidence = Column(Float, default=0.85)
     valid_until = Column(DateTime(timezone=True), nullable=False)
-    metadata = Column(JSON, default={})
+    extended_metadata = Column(JSON, default={})
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

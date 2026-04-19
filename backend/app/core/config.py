@@ -17,11 +17,14 @@ class Settings(BaseSettings):
     # The platform has transitioned to numeric PINs for all roles (Farmer, Buyer, Agent, Admin)
     # to maintain consistency with regional USSD/Banking standards.
     
-    MASTER_TEST_LOGIN_ENABLED: bool = True
+    MASTER_TEST_LOGIN_ENABLED: bool = False
+
     MASTER_TEST_PHONE: str = "777777777"
     MASTER_TEST_PASSWORD: str = "7777"  # Numeric PIN for System Override
     MASTER_TEST_ALIAS: str = "master"
     MASTER_TEST_NAME: str = "AgriTrust Master System"
+    ADMIN_BOOTSTRAP_TOKEN: str = "agritrust-init-secret-2026"
+
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod

@@ -46,34 +46,48 @@ services:
         condition: service_started
 
   node-gateway:
-    build: ./node-gateway
+    build: ./IoT_Sensor_Gateway
     ports:
       - "3005:3005"
     depends_on:
       - backend
 
   agent-dashboard:
-    build: ./agent-dashboard
+    build: ./Admin_Dashboard_Web_App
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       - VITE_API_URL=http://localhost:8080/api/v1
     volumes:
-      - ./agent-dashboard:/app
+      - ./Admin_Dashboard_Web_App:/app
       - /app/node_modules
     depends_on:
       - backend
 
   ussd-simulator:
-    build: ./ussd-simulator
+    build: ./Telecom_USSD_Simulator
     ports:
       - "5000:5000"
     environment:
       - BACKEND_URL=http://backend:8000
     volumes:
-      - ./ussd-simulator:/app
+      - ./Telecom_USSD_Simulator:/app
     depends_on:
       - backend
+
+  whatsapp-bridge:
+    build: ./Whatsapp_Bridge
+    ports:
+      - "3006:3006"
+    environment:
+      - BACKEND_URL=http://backend:8000/api/v1/whatsapp/webhook
+      - PORT=3006
+    volumes:
+      - ./Whatsapp_Bridge:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: always
 
   notebook-scheduler:
     build:

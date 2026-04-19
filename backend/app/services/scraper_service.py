@@ -84,13 +84,10 @@ class AgriScraper:
 
 
         if not news_items:
-            # Fallback
-            cls._last_scraped_news = [
-                {"title": "GMB increases maize intake at regional depots", "source": "National Auth", "time": "2h ago"},
-                {"title": "Tobacco auction season reaches peak throughput", "source": "Auction Pulse", "time": "5h ago"}
-            ]
+            cls._last_scraped_news = []
             cls._last_scraped_time = current_time
             return cls._last_scraped_news
+
 
         cls._last_scraped_news = news_items[:10]
         cls._last_scraped_time = current_time
@@ -103,14 +100,8 @@ class AgriScraper:
         Attempts to scrape current market pricing for major commodities.
         Priority: GMB (Official), AMA (Institutional), Informal (Mbare Musika), Social (FB/WhatsApp Units).
         """
-        market_pulse = [
-            {"commodity": "White Maize", "price": 335.0, "unit": "Tonne", "origin": "GMB (Official)"},
-            {"commodity": "Sugar Beans", "price": 1250.0, "unit": "Tonne", "origin": "AMA / Mbare"},
-            {"commodity": "Tobacco (Flue-Cured)", "price": 4.15, "unit": "kg", "origin": "TIMB Auction"},
-            {"commodity": "Bananas", "price": 0.45, "unit": "kg", "origin": "AMA Market"},
-            {"commodity": "Tomatoes (Jam)", "price": 12.0, "unit": "Crate", "origin": "Mbare (Informal)"},
-            {"commodity": "Cattle (Brahman)", "price": 1100.0, "unit": "Head", "origin": "Social/Private Sale"}
-        ]
+        market_pulse = []
+
         
         try:
             headers = {'User-Agent': 'Mozilla/5.0'}

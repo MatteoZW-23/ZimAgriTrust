@@ -31,3 +31,18 @@ def get_price_prediction(db: Session, crop: str) -> dict:
         "seasonal_analysis": "Harvest Season Compression Index: High",
         "recommendation": "Maintain Inventory - Seasonal Uplift Expected"
     }
+
+
+class PriceService:
+    @staticmethod
+    def get_price_prediction(db: Session, crop: str) -> dict:
+        return get_price_prediction(db, crop)
+
+    @staticmethod
+    def get_current_prices(db: Session) -> dict:
+        """Helper for rapid discovery across crop categories."""
+        crops = ["maize", "soybeans", "wheat", "sorghum"]
+        return {c: NationalCommodityService.get_seasonal_market_price(c) for c in crops}
+
+price_core = PriceService()
+price_service = PriceService()

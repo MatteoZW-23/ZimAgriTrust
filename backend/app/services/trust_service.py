@@ -104,3 +104,27 @@ def update_scores_after_dispute(
         order.seller.trust_score = clamp_score(order.seller.trust_score - 10)
 
     db.commit()
+
+
+class TrustService:
+    @staticmethod
+    def detect_leakage_risk(db: Session, user: User) -> float:
+        return detect_leakage_risk(db, user)
+
+    @staticmethod
+    def recompute_user_scores(db: Session, user: User) -> User:
+        return recompute_user_scores(db, user)
+
+    @staticmethod
+    def update_farmer_scores(db: Session, farmer: User) -> User:
+        return update_farmer_scores(db, farmer)
+
+    @staticmethod
+    def update_scores_after_success(db: Session, order: Order) -> None:
+        return update_scores_after_success(db, order)
+
+    @staticmethod
+    def update_scores_after_dispute(db: Session, order: Order, release_to_farmer: bool) -> None:
+        return update_scores_after_dispute(db, order, release_to_farmer)
+
+trust_core = TrustService()

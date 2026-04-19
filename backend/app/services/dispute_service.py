@@ -63,17 +63,18 @@ def resolve_dispute(db: Session, dispute: Dispute, payload: DisputeResolve) -> D
     if dispute.status == DisputeStatus.RESOLVED:
         raise HTTPException(status_code=400, detail="Already resolved")
 
-    dispute.status = DisputeStatus.RESOLVED
-    dispute.resolution = payload.resolution
-
+    from app.services.escrow_service import release_payment, refund_payment
+    
     order = dispute.order
     if payload.release_to_farmer:
-        order.status = OrderStatus.COMPLETED
-        # Enterprise: Realize the platform commission to Admin Dashboard
-        _record_platform_commission(db, order)
+        # Full Pay to Seller (Diagram 3: FULL PAY)
+        release_payment(db, order)
     else:
-        order.status = OrderStatus.REFUNDED
+        # Full Refund to Buyer (Diagram 3: FULL REFUND)
+        refund_payment(db, order)
 
+    dispute.status = DisputeStatus.RESOLVED
+    dispute.resolution = payload.resolution
     db.commit()
     db.refresh(dispute)
     return dispute
@@ -122,14 +123,45 @@ def accept_settlement(db: Session, dispute: Dispute, user: User) -> Dispute:
     else:
         raise HTTPException(status_code=403, detail="Only parties to the order can accept settlements")
 
-    # If both parties accept, finalize the order adjustment
+    # If both parties accept, finalize the order adjustment (Diagram 3: PARTIAL / SPLIT)
     if dispute.buyer_accepted and dispute.seller_accepted:
-        order = dispute.order
-        order.status = OrderStatus.SETTLED
-        order.refunded_amount = dispute.proposed_refund_amount
-        order.total_amount -= dispute.proposed_refund_amount # New base total
+        from app.services.escrow_service import resolve_dispute as escrow_resolve
+        
+        # Calculate split logic based on proposal
+        buyer_refund = dispute.proposed_refund_amount
+        seller_payout = dispute.order.total_amount - buyer_refund
+        
+        # AgriTrust standard: Platform fee is taken from the total escrow if released, 
+        # but in partial disputes, we often adjust it proportionally.
+        # For simplicity, we use the original platform fee capped by seller payout.
+        fee = min(dispute.order.platform_fee, seller_payout * 0.05) 
+        seller_net = seller_payout - fee
+        
+        escrow_resolve(db, dispute.order, buyer_refund, seller_net, fee)
+        
         dispute.status = DisputeStatus.RESOLVED
+        dispute.resolution = f"MUTUAL SETTLEMENT: {dispute.agent_resolution_memo}"
         
     db.commit()
     db.refresh(dispute)
     return dispute
+
+
+class DisputeService:
+    @staticmethod
+    def create_dispute(db: Session, payload: DisputeCreate, actor: User) -> Dispute:
+        return create_dispute(db, payload, actor)
+
+    @staticmethod
+    def resolve_dispute(db: Session, dispute: Dispute, payload: DisputeResolve) -> Dispute:
+        return resolve_dispute(db, dispute, payload)
+
+    @staticmethod
+    def propose_settlement(db: Session, dispute: Dispute, discount_percent: float, memo: str, agent: User) -> Dispute:
+        return propose_settlement(db, dispute, discount_percent, memo, agent)
+
+    @staticmethod
+    def accept_settlement(db: Session, dispute: Dispute, user: User) -> Dispute:
+        return accept_settlement(db, dispute, user)
+
+dispute_core = DisputeService()

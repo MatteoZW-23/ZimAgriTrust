@@ -66,10 +66,11 @@ class User(Base):
     is_suspended: Mapped[bool] = mapped_column(Boolean, default=False)
     status_notes: Mapped[Optional[str]] = mapped_column(Text)
     
-    # Balance & Wallet
+    # Balance & Wallet (Agri-Telecom Marketplace Specs)
     balance_usd: Mapped[float] = mapped_column(Float, default=0.0)
-    wallet_balance: Mapped[float] = mapped_column(Float, default=0.0) # Real-time wallet for agents/transporters
-    pending_earnings: Mapped[float] = mapped_column(Float, default=0.0)
+    balance_zig: Mapped[float] = mapped_column(Float, default=0.0)
+    pending_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    pending_zig: Mapped[float] = mapped_column(Float, default=0.0)
     
     # Monetization Tiers
     subscription_tier: Mapped[SubscriptionTier] = mapped_column(Enum(SubscriptionTier), default=SubscriptionTier.BASIC)

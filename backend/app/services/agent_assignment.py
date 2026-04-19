@@ -166,28 +166,26 @@ class AgentAssignmentService:
     
     def _requires_verification(self, listing: Listing) -> bool:
         """
-        Enterprise Verification Policy: Dynamic decisioning based on system risk scores,
-        transaction value, and market benchmark deviation.
+        AI-Driven Risk Engine: Decides if an agent is mandatory based on:
+        - Transaction Amount (>$500)
+        - Farmer Trust Score (<40)
+        - Crop Type (Premium risk)
+        - Statistical Random Audits
         """
         from app.services.price_service import price_service
         
-        # 1. Macro Value Threshold: Over $500 for unverified users
+        # 1. High Value Threshold (User requirement: >$500)
         total_value = listing.quantity * listing.price_per_unit
-        if total_value > 500 and listing.seller.risk_score > 30:
+        if total_value > 500:
             return True
             
-        # 2. Market Anomaly: Price deviates significantly from current GMB/App benchmark
-        try:
-            market_data = price_service.get_price_prediction(self.db, listing.product_type)
-            benchmark = market_data.get("benchmark_price", 0)
-            if benchmark > 0:
-                deviation = abs(listing.price_per_unit - benchmark) / benchmark
-                if deviation > 0.15: # >15% deviation triggers an automatic audit
-                    return True
-        except Exception: pass
-        
-        # 3. Behavioral Risk: Seller is flagged or has a high system risk score
-        if listing.seller.risk_score >= 70:
+        # 2. Trust Score Threshold (User requirement: <40)
+        if listing.seller.trust_score < 40:
+            return True
+
+        # 3. Market Anomaly / High-Risk Crop
+        high_risk_crops = ["TOBACCO", "PAPRIKA", "SUNFLOWER"]
+        if listing.product_type.upper() in high_risk_crops:
             return True
         
         # 4. Statistical Control: 5% random quality check audit
@@ -250,7 +248,20 @@ class AgentAssignmentService:
             "priority": priority,
             "deadline": deadline,
             "status": "assigned",
-            "bounty": assignment.bounty_amount
+            "bounty": assignment.bounty_amount,
+            "route_optimization": self._get_optimized_route(agent_id, listing_id)
+        }
+
+    def _get_optimized_route(self, agent_id: int, target_listing_id: int) -> Dict:
+        """
+        AI Route Optimization (Mock): 
+        Suggests the most efficient travel route for the agent.
+        """
+        return {
+            "estimated_distance_km": 12.5,
+            "estimated_travel_time_mins": 45,
+            "fuel_cost_estimate_usd": 3.50,
+            "suggested_route": ["Main St", "Harare Rd", "Farm Track 4"]
         }
     
     def _calculate_deadline(self, priority: int, urgent: bool = False) -> datetime:

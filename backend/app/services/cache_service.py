@@ -90,3 +90,20 @@ async def increment_counter(key: str, ttl_seconds: int) -> int:
     if count == 1:
         await client.expire(key, ttl_seconds)
     return count
+
+
+class CacheService:
+    """Convenience wrapper for cache operations."""
+    async def get(self, key: str) -> str | None:
+        client = await get_cache_client()
+        return await client.get(key)
+
+    async def set(self, key: str, value: str, expire: int | None = None) -> None:
+        client = await get_cache_client()
+        await client.set(key, value, ex=expire)
+
+    async def delete(self, key: str) -> None:
+        client = await get_cache_client()
+        await client.delete(key)
+
+cache_service = CacheService()

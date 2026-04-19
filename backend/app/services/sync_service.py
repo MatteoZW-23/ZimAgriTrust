@@ -28,24 +28,13 @@ def sync_system_data(db: Session):
     pin_hash = get_password_hash("1234")
 
     try:
-        # 1. UPSERT Administrator (MJ) - Essential System Access
-        admin = db.query(User).filter(User.phone_number == admin_phone).first()
-        if not admin:
-            admin = User(
-                full_name="MJ", phone_number=admin_phone, role=UserRole.ADMIN,
-                password_hash=hashed_password, ussd_pin_hash=pin_hash,
-                trust_score=100, province="Mashonaland Central", district="Harare", ward="Central",
-                balance_usd=100000.0, national_id="REG-CORE-001"
-            )
-            db.add(admin)
-            db.flush()
-
         logger.info("REAL-TIME MODE: Purging legacy demo data and initializing live sync...")
         
         # In real-time mode, we no longer pre-populate farmers or listings.
         # The system waits for real user registration and scrapes live market intelligence.
         
         db.commit()
+
         logger.info("Platform Live Sync Successful (Empty State initialized).")
         
         return {

@@ -126,6 +126,7 @@ class Listing(Base):
     seller = relationship("User", back_populates="listings")
     offers = relationship("Offer", back_populates="listing", cascade="all, delete-orphan")
     orders = relationship("Order", back_populates="listing")
+    trade_sessions = relationship("TradeSession", back_populates="listing")
 
 
 class OfferStatus(str, enum.Enum):
@@ -160,3 +161,79 @@ class Offer(Base):
     buyer = relationship("User", back_populates="offers_made", foreign_keys=[buyer_id])
     seller = relationship("User", back_populates="offers_received", foreign_keys=[seller_id])
     order = relationship("Order", back_populates="offer", uselist=False)
+
+
+class TradeSession(Base):
+    __tablename__ = "trade_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    listing_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("listings.id"), nullable=False, index=True)
+    buyer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    seller_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    
+    status: Mapped[str] = mapped_column(String(20), default="negotiating") # discovery, negotiating, committed, closed
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    listing = relationship("Listing", back_populates="trade_sessions")
+    messages = relationship("TradeMessage", back_populates="session", cascade="all, delete-orphan")
+
+
+class TradeMessage(Base):
+    __tablename__ = "trade_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("trade_sessions.id"), nullable=False, index=True)
+    sender_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    is_formal_offer: Mapped[bool] = mapped_column(Boolean, default=False)
+    offer_payload: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True) # {price, qty, currency}
+    
+    signature: Mapped[Optional[str]] = mapped_column(String(100)) # SHA-256 integrity hash
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    session = relationship("TradeSession", back_populates="messages")
+
+
+class BuyerRequest(Base):
+    __tablename__ = "buyer_requests"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    buyer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    
+    product_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    quantity_required: Mapped[float] = mapped_column(Float, nullable=False)
+    quantity_unit: Mapped[str] = mapped_column(String(20), default="kg")
+    target_price: Mapped[float] = mapped_column(Float, nullable=False)
+    currency: Mapped[str] = mapped_column(String(5), default="USD")
+    
+    delivery_location: Mapped[Optional[str]] = mapped_column(String(100))
+    deadline: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    
+    status: Mapped[str] = mapped_column(String(20), default="open") # open, filled, expired, cancelled
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    buyer = relationship("User", foreign_keys=[buyer_id])
+    responses = relationship("FarmerResponse", back_populates="request", cascade="all, delete-orphan")
+
+
+class FarmerResponse(Base):
+    __tablename__ = "farmer_responses"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    request_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("buyer_requests.id"), nullable=False, index=True)
+    farmer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    
+    supply_quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    bid_price: Mapped[float] = mapped_column(Float, nullable=False)
+    currency: Mapped[str] = mapped_column(String(5), default="USD")
+    
+    status: Mapped[str] = mapped_column(String(20), default="pending") # pending, accepted, declined
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    request = relationship("BuyerRequest", back_populates="responses")
+    farmer = relationship("User", foreign_keys=[farmer_id])

@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from typing import Optional, List
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Text, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -45,11 +45,20 @@ class Agent(Base):
     specialization: Mapped[AgentSpecialization] = mapped_column(SQLEnum(AgentSpecialization), default=AgentSpecialization.ALL)
     status: Mapped[AgentStatus] = mapped_column(SQLEnum(AgentStatus), default=AgentStatus.ACTIVE)
     
+    # Coverage & Performance
+    province: Mapped[Optional[str]] = mapped_column(String(50))
+    district: Mapped[Optional[str]] = mapped_column(String(50))
+    rating: Mapped[float] = mapped_column(Float, default=5.0)
+    current_load: Mapped[int] = mapped_column(Integer, default=0)
+    is_available: Mapped[bool] = mapped_column(Boolean, default=True)
+    avg_response_time: Mapped[float] = mapped_column(Float, default=24.0) # hours
+    
     # Financial Tracking
     wallet_balance: Mapped[float] = mapped_column(Float, default=0.0) # Realized earnings
     pending_earnings: Mapped[float] = mapped_column(Float, default=0.0) # Escrowed for completion
     
     created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at = mapped_column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships
     user = relationship("User", foreign_keys=[user_id])
@@ -69,8 +78,18 @@ class AgentAssignment(Base):
     dispute_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("disputes.id"), nullable=True)
     
     status: Mapped[str] = mapped_column(String(20), default="assigned") 
-    assigned_at = mapped_column(DateTime(timezone=True), server_default=func.now())
+    priority: Mapped[int] = mapped_column(Integer, default=1)
     
+    # Timestamps
+    assigned_at = mapped_column(DateTime(timezone=True), server_default=func.now())
+    accepted_at = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at = mapped_column(DateTime(timezone=True), nullable=True)
+    deadline = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    # Notes & Results
+    agent_notes: Mapped[Optional[str]] = mapped_column(Text)
+    resolution: Mapped[Optional[str]] = mapped_column(Text)
+
     # Bounty tracking
     bounty_amount: Mapped[float] = mapped_column(Float, default=0.0)
     bonus_amount: Mapped[float] = mapped_column(Float, default=0.0)

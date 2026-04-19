@@ -88,4 +88,9 @@ class Dispute(Base):
 
     @property
     def ai_recommendation(self) -> str:
-        return "Manual audit required. Moisture content discrepancy exceeds standard variance limits."
+        """AI resolution suggestions based on case analysis"""
+        if "quality" in self.description.lower() or "grade" in self.type.lower():
+            return "Quality dispute detected. Recommend 15% discount or agent-led re-grading."
+        if "quantity" in self.description.lower() or "shortage" in self.type.lower():
+            return "Quantity discrepancy found. Suggest partial refund for missing weight."
+        return "Manual audit required. Complex behavioral pattern detected."

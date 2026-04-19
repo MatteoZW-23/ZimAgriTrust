@@ -19,8 +19,10 @@ class TokenRefresh(BaseModel):
 class UserRegister(BaseModel):
     full_name: str = Field(min_length=2, max_length=100)
     phone_number: str = Field(min_length=7, max_length=15)
-    password: str = Field(min_length=6, max_length=64)
+    password: str = Field(min_length=4, max_length=64)
+    admin_secret: Optional[str] = None
     role: UserRole
+
 
     @field_validator("full_name")
     @classmethod
@@ -38,9 +40,18 @@ class UserRegister(BaseModel):
 
     @field_validator("role")
     @classmethod
-    def validate_public_registration_role(cls, value: UserRole) -> UserRole:
-        # All roles are available for selection in the demo registration form
+    def validate_public_registration_role(cls, value: UserRole, info) -> UserRole:
+        from app.core.config import settings
+        
+        # Admin and Agent roles require a bootstrap secret
+        if value in [UserRole.ADMIN, UserRole.AGENT]:
+            # Pydantic v2 ValidationInfo contains 'data'
+            admin_secret = info.data.get("admin_secret")
+            if admin_secret != settings.ADMIN_BOOTSTRAP_TOKEN:
+                raise ValueError("Unauthorized role selection. Secure token required for privileged roles.")
+        
         return value
+
 
 
 class UserLogin(BaseModel):
@@ -83,4 +94,4 @@ class PasswordResetRequest(BaseModel):
 class PasswordResetConfirm(BaseModel):
     phone_number: str
     otp: str
-    new_password: str = Field(min_length=6, max_length=64)
+    new_password: str = Field(min_length=4, max_length=64)

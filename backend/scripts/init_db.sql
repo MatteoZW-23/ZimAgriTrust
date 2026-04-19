@@ -1,0 +1,3 @@
+-- AgriTrust Database Initialization Script
+-- Schema creation is handled by the backend SQLAlchemy models.
+-- Add custom PostgreSQL extensions or pre-initialization SQL here.

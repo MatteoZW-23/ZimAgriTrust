@@ -20,9 +20,9 @@ help:
 install:
 	@echo "Installing dependencies..."
 	cd backend && pip install -r requirements.txt
-	cd agent-dashboard && npm install
-	cd mobile-app && npm install
-	cd node-gateway && npm install
+	cd Admin_Dashboard_Web_App && npm install
+	cd Farmer_Mobile_Application && npm install
+	cd IoT_Sensor_Gateway && npm install
 	@echo "✅ Installation complete"
 
 dev:
@@ -59,16 +59,16 @@ clean:
 test:
 	@echo "Running tests..."
 	cd backend && pytest tests/ -v --cov=app
-	cd agent-dashboard && npm test
+	cd Admin_Dashboard_Web_App && npm test
 	@echo "✅ Tests complete"
 
 deploy:
 	@echo "Deploying to production..."
-	./scripts/deploy.sh
+	./Project_Scripts/deploy.sh
 
 backup:
 	@echo "Backing up database..."
-	./scripts/backup_db.sh
+	./Project_Scripts/backup_db.sh
 	@echo "✅ Backup complete"
 
 migrate:

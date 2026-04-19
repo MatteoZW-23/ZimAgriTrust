@@ -51,12 +51,17 @@ async def get_market_intelligence(commodity: str, region: str = "Harare"):
     """
     Returns Deep Learning driven market forecasts.
     """
-    # Fetch current market state (mocked for demo logic)
+    from app.services.scraper_service import AgriScraper
+    
+    # Live data integration
+    scraped_prices = AgriScraper.scrape_market_prices()
+    avg_price = sum(item["price"] for item in scraped_prices) / len(scraped_prices) if scraped_prices else 400
+    
     features = {
-        "demand": 82.5,
-        "supply": 1200,
-        "trust": 91.0,
-        "volatility": 1.15
+        "demand": avg_price * 0.2,  # Live computed signal
+        "supply": len(scraped_prices) * 100,
+        "trust": 95.0,
+        "volatility": 1.05
     }
     
     forecast = deep_engine.forecast_price(features)

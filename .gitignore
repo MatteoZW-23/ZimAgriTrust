@@ -29,3 +29,11 @@ coverage.xml
 *,cover
 .hypothesis/
 .pytest_cache/
+.wwebjs_auth/
+*.db
+*.sqlite3
+postgres_data/
+ml_weights/model_*.pt
+logs/
+outputs/
+.ipynb_checkpoints/

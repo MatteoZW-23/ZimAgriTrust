@@ -90,24 +90,8 @@ class NationalCommodityService:
                 return item["price"]
                 
         # Comprehensive fallback database for all requested sectors
-        sector_benchmarks = {
-            # Apiculture (Honey)
-            Sector.APICULTURE: {"HONEY": 4.50, "BEESWAX": 8.00},
-            # Horticulture
-            Sector.HORTICULTURE: {"TOMATOES": 0.85, "ONIONS": 1.10, "CABBAGE": 0.50},
-            # Aquaculture / Fisheries
-            Sector.AQUACULTURE: {"TILAPIA": 3.20, "TREADFIN": 4.50},
-            Sector.PISCICULTURE: {"TILAPIA": 3.20},
-            # Livestock / Dairy
-            Sector.LIVESTOCK: {"BEEF": 1200.00, "GOAT": 85.00},
-            Sector.DAIRY: {"MILK": 0.75},
-            # Crops (including specialized ones)
-            Sector.VITICULTURE: {"WINE_GRAPES": 2.50},
-            Sector.FLORICULTURE: {"ROSES": 0.25},
-            Sector.SERICULTURE: {"SILK": 15.00},
-            # General fallbacks
-            Sector.CROPS: {"MAIZE": 335.00, "TOBACCO": 4.15, "SOYA": 580.00}
-        }
+        sector_benchmarks = {}
+
         
         sector_data = sector_benchmarks.get(sector, sector_benchmarks[Sector.CROPS])
         

@@ -45,5 +45,25 @@ class TransactionResponse(BaseModel):
 
 
 class DeliveryConfirmRequest(BaseModel):
-    order_number: str
-    confirmation_code: Optional[str] = None
+    handover_code: Optional[str] = None
+
+
+class WalletDepositRequest(BaseModel):
+    amount: float
+    currency: str = "USD"
+    payment_method: str = "ecocash" # ecocash, bank, card
+    phone_number: Optional[str] = None
+
+
+class WalletWithdrawRequest(BaseModel):
+    amount: float
+    currency: str = "USD"
+    payment_method: str = "ecocash"
+    phone_number: Optional[str] = None
+
+
+class WalletBalanceResponse(BaseModel):
+    balance_usd: float
+    balance_zig: float
+    pending_usd: float
+    pending_zig: float
