@@ -4,6 +4,8 @@ Mobile App Vision API - REST endpoints for mobile app
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends
 from typing import Optional
+from sqlalchemy.orm import Session
+from app.db.session import get_db
 from app.ml.vision.core.vision_engine import vision_engine
 from app.api.deps import get_current_user
 from app.models.user import User
@@ -43,6 +45,7 @@ async def analyze_crop(
 async def verify_listing_image(
     image: UploadFile = File(...),
     listing_id: str = Form(...),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -52,14 +55,23 @@ async def verify_listing_image(
     
     # Get listing from database
     from app.models.listing import Listing
-    from app.db.session import get_db
-    from sqlalchemy.orm import Session
-    from fastapi import Depends
     
-    # We need a db session here. Usually passed via depends.
-    # For now, we'll assume the caller has access or we get it.
-    # But since this is a route, let's fix the dependency.
-    return {"status": "needs_session_implementation"}
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        return {"success": False, "error": "Listing not found"}
+    
+    # Verify image matches listing product
+    result = await vision_engine.verify_crop_match(image_data, listing.product_type)
+    
+    if result["verified"]:
+        # Update listing verification status
+        listing.verification_status = "verified"
+        listing.verified_by_ai = True  # Note: ensure this field exists or use ai_verified
+        listing.ai_verified = True
+        listing.ai_confidence = result["confidence"]
+        db.commit()
+    
+    return result
 
 
 @router.post("/detect-disease")
