@@ -4,8 +4,10 @@ import { theme } from "../styles";
 
 export function HomeScreen({ route }) {
   const { profile = {}, role = 'farmer' } = route.params || {};
-  const name = profile.name || "Tendai Moyo";
-  const trustScore = profile.trust_score || 92;
+  const name = profile.name || "User";
+  const trustScore = profile.trust_score || 0;
+  const balance = profile.balance || 0;
+  const zigBalance = profile.zig_balance || 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -13,16 +15,15 @@ export function HomeScreen({ route }) {
         {/* Header */}
         <View style={styles.header}>
             <View>
-                <Text style={styles.greetingText}>Good Morning,</Text>
-                <Text style={styles.nameText}>{name.split(' ')[0]}!</Text>
+                <Text style={styles.greetingText}>Good Day,</Text>
+                <Text style={styles.nameText}>{name.split(' ')[0]}</Text>
             </View>
             <View style={styles.headerIcons}>
                 <TouchableOpacity style={styles.iconBtn}>
                     <Text style={{ fontSize: 20 }}>🔔</Text>
-                    <View style={styles.redDot} />
                 </TouchableOpacity>
                 <View style={styles.walletBox}>
-                    <Text style={styles.walletText}>$1,250 | ZiG 45k</Text>
+                    <Text style={styles.walletText}>${balance.toLocaleString()} | ZiG {zigBalance.toLocaleString()}</Text>
                 </View>
             </View>
         </View>
@@ -31,13 +32,13 @@ export function HomeScreen({ route }) {
         <TouchableOpacity style={styles.trustCard}>
             <View style={styles.row}>
                 <View style={styles.trustInfo}>
-                    <Text style={styles.trustLabel}>Trust Score</Text>
+                    <Text style={styles.trustLabel}>Network Trust</Text>
                     <View style={styles.rowCenter}>
                         <Text style={styles.trustValue}>{trustScore}</Text>
-                        <Text style={styles.trustStatus}>Highly Trusted</Text>
+                        <Text style={styles.trustStatus}>{trustScore > 80 ? 'Elite Tier' : 'Standard'}</Text>
                     </View>
                 </View>
-                <Text style={{ fontSize: 40 }}>⭐</Text>
+                <Text style={{ fontSize: 40 }}>🏆</Text>
             </View>
             <View style={styles.progressBar}>
                 <View style={[styles.progressFill, { width: `${trustScore}%` }]} />
@@ -47,42 +48,31 @@ export function HomeScreen({ route }) {
         {/* Metric Grid */}
         <View style={styles.grid}>
             <View style={styles.gridRow}>
-                <MetricCard icon="🌾" label="Active Listings" value="12" />
-                <MetricCard icon="💰" label="Total Earnings" value="$1,250" />
+                <MetricCard icon="🌾" label="My Listings" value={profile.listing_count || "0"} />
+                <MetricCard icon="💰" label="Total Sales" value={`$${profile.total_sales || "0"}`} />
             </View>
             <View style={styles.gridRow}>
-                <MetricCard icon="📦" label="Active Orders" value="3" />
-                <MetricCard icon="⭐" label="Avg Rating" value="4.8" />
+                <MetricCard icon="📦" label="Pending Handover" value={profile.pending_orders || "0"} />
+                <MetricCard icon="⭐" label="Reliability" value={profile.rating || "---"} />
             </View>
         </View>
 
         {/* Quick Actions */}
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <Text style={styles.sectionTitle}>Operational Hub</Text>
         <View style={styles.row}>
             <TouchableOpacity style={styles.actionBtn}>
-                <Text style={styles.actionText}>➕ Add New Listing</Text>
+                <Text style={styles.actionText}>➕ New Listing</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#F0F0F0' }]}>
-                <Text style={[styles.actionText, { color: '#333' }]}>📊 View Analytics</Text>
+                <Text style={[styles.actionText, { color: '#333' }]}>📊 Analytics</Text>
             </TouchableOpacity>
         </View>
 
         {/* Recent Activity */}
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
-        <ActivityItem 
-            title="Tobacco (500kg)" 
-            buyer="Harare Grain Millers" 
-            status="IN ESCROW" 
-            amount="$2,075" 
-            color={theme.colors.gold} 
-        />
-        <ActivityItem 
-            title="Maize (100kg)" 
-            buyer="Individual Consumer" 
-            status="DELIVERED" 
-            amount="$35" 
-            color={theme.colors.green} 
-        />
+        <Text style={styles.sectionTitle}>Transactional Ledger</Text>
+        <View style={{ paddingHorizontal: 24, paddingVertical: 12, alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>Real-time activities will appear as the market moves.</Text>
+        </View>
 
         <View style={{ height: 120 }} />
       </ScrollView>

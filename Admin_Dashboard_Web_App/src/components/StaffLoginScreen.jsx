@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { login, register, getProfile } from "../api";
+import React, { useState, useEffect } from 'react';
+import { login, register, getProfile, verifyLogin2FA } from "../api";
 
 export default function StaffLoginScreen({ onLogin }) {
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -44,8 +44,15 @@ export default function StaffLoginScreen({ onLogin }) {
       if (cleaned.startsWith("0")) cleaned = cleaned.substring(1);
       const fullPhone = "+263" + cleaned;
       const data = await login(fullPhone, password);
-      setPendingSession(data);
-      setStep(2);
+      
+      if (data.status === "2FA_REQUIRED") {
+        setPendingSession({ phone: fullPhone });
+        setStep(2);
+      } else {
+        // Fallback for unexpected immediate login (e.g. if 2FA was disabled)
+        const user = await getProfile(data.access_token);
+        onLogin({ ...data, user: { ...user, is_staff: true } });
+      }
     } catch (err) {
       setError(err.message || "Credential validation failed.");
     } finally {
@@ -56,29 +63,30 @@ export default function StaffLoginScreen({ onLogin }) {
 
   async function handleVerify2FA(e) {
     if (e) e.preventDefault();
+    setError("");
     setLoading(true);
     
-    setTimeout(async () => {
-      try {
-        if (!pendingSession?.access_token) {
-          throw new Error("Staff session expired.");
-        }
-        const user = await getProfile(pendingSession.access_token);
-        
-        if (user.role?.toUpperCase() !== "ADMIN" && user.role?.toUpperCase() !== "AGENT") {
-          throw new Error("ACCESS_DENIED: Central Command Enclave. Authorized Personnel Only.");
-        }
-
-        onLogin({
-          ...pendingSession,
-          user: { ...user, is_staff: true },
-        });
-      } catch (err) {
-        setError(err.message || "2FA verification failed.");
-      } finally {
-        setLoading(false);
+    try {
+      if (!pendingSession?.phone) {
+        throw new Error("Handshake expired. Please re-authenticate.");
       }
-    }, 800);
+      
+      const authData = await verifyLogin2FA(pendingSession.phone, verificationCode);
+      const user = await getProfile(authData.access_token);
+      
+      if (user.role?.toUpperCase() !== "ADMIN" && user.role?.toUpperCase() !== "AGENT") {
+        throw new Error("ACCESS_DENIED: Central Command Enclave. Authorized Personnel Only.");
+      }
+
+      onLogin({
+        ...authData,
+        user: { ...user, is_staff: true },
+      });
+    } catch (err) {
+      setError(err.message || "Handshake synchronization failed. Code invalid.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

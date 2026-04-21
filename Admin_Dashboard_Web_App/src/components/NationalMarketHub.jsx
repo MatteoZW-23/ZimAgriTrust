@@ -23,7 +23,7 @@ export function NationalMarketHub({ token }) {
   const [riskDistribution, setRiskDistribution] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  const [livePulse, setLivePulse] = useState({ scanned: 1542, confidence: 94.2 });
+  const [livePulse, setLivePulse] = useState({ scanned: 0, confidence: 0 });
   const [systemAudit, setSystemAudit] = useState(null);
   const [deepForecast, setDeepForecast] = useState(null);
   const [showAuditModal, setShowAuditModal] = useState(false);
@@ -264,35 +264,37 @@ export function NationalMarketHub({ token }) {
                   </div>
                   
                   <div className="v4-modal-body">
-                      <div className="research-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                          <div className="r-card" style={{ padding: '24px', background: 'var(--v4-bg)', borderRadius: '20px', border: '1.5px solid var(--v4-border)' }}>
-                              <label style={{ fontSize: '10px', fontWeight: 950, opacity: 0.5, letterSpacing: '0.12em' }}>ANALYTICS STATUS</label>
-                              <div style={{ marginTop: '12px', color: '#20963D', fontWeight: 1000, fontSize: '14px' }}>{systemAudit.deep_engine_status}</div>
-                              <p style={{ fontSize: '11px', marginTop: '8px', lineHeight: 1.5 }}>Multi-layered regression engines executing data processing via optimized matrix operations.</p>
-                          </div>
-                          <div className="r-card" style={{ padding: '24px', background: 'var(--v4-bg)', borderRadius: '20px', border: '1.5px solid var(--v4-border)' }}>
-                              <label style={{ fontSize: '10px', fontWeight: 950, opacity: 0.5, letterSpacing: '0.12em' }}>IMAGE PROCESSING STATUS</label>
-                              <div style={{ marginTop: '12px', color: '#818cf8', fontWeight: 1000, fontSize: '14px' }}>{systemAudit.vision_core_status}</div>
-                              <p style={{ fontSize: '11px', marginTop: '8px', lineHeight: 1.5 }}>High-fidelity analysis kernels for gradient and feature density profiling.</p>
-                          </div>
-                      </div>
+                       <div className="research-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                           <div className="r-card" style={{ padding: '24px', background: 'var(--v4-bg)', borderRadius: '20px', border: '1.5px solid var(--v4-border)' }}>
+                               <label style={{ fontSize: '10px', fontWeight: 950, opacity: 0.5, letterSpacing: '0.12em' }}>ANALYTICS STATUS</label>
+                               <div style={{ marginTop: '12px', color: '#20963D', fontWeight: 1000, fontSize: '14px' }}>{systemAudit?.status || 'Active'}</div>
+                               <p style={{ fontSize: '11px', marginTop: '8px', lineHeight: 1.5 }}>Multi-layered regression engines executing data processing via optimized matrix operations.</p>
+                           </div>
+                           <div className="r-card" style={{ padding: '24px', background: 'var(--v4-bg)', borderRadius: '20px', border: '1.5px solid var(--v4-border)' }}>
+                               <label style={{ fontSize: '10px', fontWeight: 950, opacity: 0.5, letterSpacing: '0.12em' }}>INTELLIGENCE LAYER</label>
+                               <div style={{ marginTop: '12px', color: '#818cf8', fontWeight: 1000, fontSize: '14px' }}>{systemAudit?.intelligence_landscape || 'Full Coverage'}</div>
+                               <p style={{ fontSize: '11px', marginTop: '8px', lineHeight: 1.5 }}>High-fidelity analysis kernels for gradient and feature density profiling.</p>
+                           </div>
+                       </div>
 
-                      <div className="research-features" style={{ marginTop: '32px' }}>
-                          <label style={{ fontSize: '11px', fontWeight: 1000, color: 'var(--v4-text-dim)', letterSpacing: '0.1em' }}>ACTIVE DATA EXTRACTORS</label>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '16px' }}>
-                              {systemAudit.proof_metrics.features.map((f, i) => (
-                                  <span key={i} className="v4-badge-outline sm" style={{ background: '#818cf808', color: '#818cf8', borderColor: '#818cf833' }}>{f}</span>
-                              ))}
-                          </div>
-                      </div>
+                       <div className="research-features" style={{ marginTop: '32px' }}>
+                           <label style={{ fontSize: '11px', fontWeight: 1000, color: 'var(--v4-text-dim)', letterSpacing: '0.1em' }}>ACTIVE AI ENGINES</label>
+                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '16px' }}>
+                               {systemAudit?.engines && Object.entries(systemAudit.engines).map(([key, val], i) => (
+                                   <span key={i} className="v4-badge-outline sm" style={{ background: '#818cf808', color: '#818cf8', borderColor: '#818cf833' }}>
+                                       <strong>{key.toUpperCase()}:</strong> {val}
+                                   </span>
+                               ))}
+                           </div>
+                       </div>
 
-                      <div className="sync-footer" style={{ marginTop: '40px', padding: '20px', background: '#f8fafc', borderRadius: '16px', border: '1.5px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b' }}>
-                             <i className="fas fa-clock"></i> LAST SYSTEM AUDIT: {new Date(systemAudit.proof_metrics.last_sync).toLocaleString()}
-                          </div>
-                          <button className="q-btn small primary-glow" onClick={() => alert('Initiating System Calibration...')}>RE-SYNC AUDIT</button>
-                      </div>
-                  </div>
+                       <div className="sync-footer" style={{ marginTop: '40px', padding: '20px', background: '#f8fafc', borderRadius: '16px', border: '1.5px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                           <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b' }}>
+                              <i className="fas fa-clock"></i> LAST SYSTEM AUDIT: {new Date().toLocaleString()}
+                           </div>
+                           <button className="q-btn small primary-glow" onClick={() => alert('Initiating System Calibration...')}>RE-SYNC AUDIT</button>
+                       </div>
+                   </div>
               </div>
           </div>
       )}

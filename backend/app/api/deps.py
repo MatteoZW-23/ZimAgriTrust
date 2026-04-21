@@ -8,8 +8,10 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.user import User, UserRole
+from app.models.agent import Agent
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -66,7 +68,29 @@ def require_roles(*roles: UserRole):
     return dependency
 
 
+def get_current_agent(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> Agent:
+    """Dependency to get the agent profile for the current user"""
+    agent = db.query(Agent).filter(Agent.user_id == current_user.id).first()
+    if not agent:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Current user does not have an associated agent profile"
+        )
+    
+    if agent.status == "failed":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="ACADEMY_DISMISSAL: Access denied. Your certification candidacy has been terminated."
+        )
+        
+    return agent
+
+
 def check_lockdown(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+
     """
     Enforces 'Read-Only' mode during an Emergency Lockdown.
     Admins are exempted from the lockdown to allow for resolution.

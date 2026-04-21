@@ -21,3 +21,6 @@ pillow
 matplotlib
 seaborn
 httpx
+reportlab
+qrcode
+

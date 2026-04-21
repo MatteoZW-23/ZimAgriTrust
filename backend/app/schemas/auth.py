@@ -1,3 +1,4 @@
+from __future__ import annotations
 import re
 import uuid
 from typing import Optional
@@ -6,10 +7,39 @@ from pydantic import BaseModel, Field, field_validator, ConfigDict
 from app.models.user import UserRole
 
 
+class UserResponse(BaseModel):
+    id: uuid.UUID
+    full_name: str
+    phone_number: str # Full number for authorized lookups
+    masked_phone: str # Hidden number for public marketplace
+    role: UserRole
+
+    trust_score: int
+    id_verified: bool
+    national_id: Optional[str] = None
+    email: Optional[str] = None
+    is_active: bool
+    is_suspended: bool
+    
+    # Location
+    province: Optional[str] = None
+    district: Optional[str] = None
+    ward: Optional[str] = None
+
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class Login2FA(BaseModel):
+    phone_number: str
+    otp: str
+
+
 class Token(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    user: Optional[UserResponse] = None
 
 
 class TokenRefresh(BaseModel):
@@ -64,27 +94,6 @@ class UserLogin(BaseModel):
         return value.replace(" ", "").strip()
 
 
-class UserResponse(BaseModel):
-    id: uuid.UUID
-    full_name: str
-    phone_number: str # Full number for authorized lookups
-    masked_phone: str # Hidden number for public marketplace
-    role: UserRole
-
-    trust_score: int
-    id_verified: bool
-    national_id: Optional[str] = None
-    email: Optional[str] = None
-    is_active: bool
-    is_suspended: bool
-    
-    # Location
-    province: Optional[str] = None
-    district: Optional[str] = None
-    ward: Optional[str] = None
-
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 class PasswordResetRequest(BaseModel):
@@ -95,3 +104,5 @@ class PasswordResetConfirm(BaseModel):
     phone_number: str
     otp: str
     new_password: str = Field(min_length=4, max_length=64)
+
+

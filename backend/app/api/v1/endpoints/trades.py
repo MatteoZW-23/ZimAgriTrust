@@ -102,7 +102,25 @@ def get_session_messages(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    if current_user.id not in [session.buyer_id, session.seller_id] and current_user.role not in [UserRole.ADMIN, UserRole.AGENT]:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    if current_user.id in [session.buyer_id, session.seller_id]:
+        return session.messages
+        
+    if current_user.role == UserRole.ADMIN:
+        return session.messages
 
-    return session.messages
+    if current_user.role == UserRole.AGENT:
+        # AGENT ACCESS PROTOCOL (Module 4):
+        # Access is only granted if there is an active dispute for the listing
+        # and the agent is assigned to investigate it.
+        from app.models.dispute import Dispute, DisputeStatus
+        from app.models.transaction import Order
+        dispute = db.query(Dispute).join(Order).filter(
+            Order.listing_id == session.listing_id,
+            Dispute.agent_assigned == current_user.id,
+            Dispute.status != DisputeStatus.RESOLVED
+        ).first()
+        
+        if dispute:
+            return session.messages
+            
+    raise HTTPException(status_code=403, detail="Negotiation Hub Privacy: Access restricted to parties or assigned dispute mediators.")

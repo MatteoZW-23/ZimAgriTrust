@@ -35,7 +35,7 @@ export default function USSDSimulator({ profile }) {
 
         const payload = {
             session_id: currentSessionId,
-            phone_number: profile?.phone_number || "+263771234567",
+            phone_number: profile?.phone_number || "",
             text: payloadText
         };
         
@@ -152,12 +152,12 @@ export default function USSDSimulator({ profile }) {
                           </div>
                           <pre className="log-json">
 {JSON.stringify({
-   msisdn: "+263771234567",
-   sessionId: sessionId,
-   serviceCode: "*123#",
-   text: h.input || "INIT",
-   network: "ECONET_ZWE",
-   timestamp: new Date().getTime()
+    msisdn: profile?.phone_number || "AWAITING_NODE",
+    sessionId: sessionId,
+    serviceCode: "*123#",
+    text: h.input || "INIT",
+    network: "ECONET_ZWE",
+    timestamp: new Date().getTime()
 }, null, 2)}
                           </pre>
                        </div>

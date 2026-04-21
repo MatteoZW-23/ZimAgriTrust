@@ -68,3 +68,26 @@ class NotificationService:
     def notify_certification_ready(phone, name):
         message = f"Congratulations {name}! You are now a Certified AgriTrust Agent. Your credentials have been activated. Welcome to the field!"
         return NotificationService._send_sms(phone, message)
+
+    @staticmethod
+    async def send_verification_code(phone: str, code: str):
+        """Sends a 2FA verification code via both SMS and WhatsApp for maximum reliability."""
+        message = f"AgriTrust: Your verification code is {code}. This code expires in 10 minutes."
+        
+        # 1. Send SMS (Synchronous)
+        sms_sent = NotificationService._send_sms(phone, message)
+        
+        # 2. Send WhatsApp (Asynchronous)
+        try:
+            from app.services.whatsapp_service import whatsapp_service
+            import asyncio
+            # We don't want to block the thread if this is called from a sync context,
+            # but if it's called from an async endpoint (like auth.py), we should await it.
+            # For now, we'll assume it's called from an async context as per user request for 2FA flow.
+            await whatsapp_service.send_whatsapp_message(phone, f"🔐 *AgriTrust Security Code*\n\nYour 2-step verification code is: *{code}*\n\nThis code expires in 10 minutes. If you did not request this, please contact support.")
+            wa_sent = True
+        except Exception as e:
+            logger.error(f"Failed to send 2FA via WhatsApp: {e}")
+            wa_sent = False
+            
+        return sms_sent or wa_sent

@@ -27,9 +27,11 @@ class AgentSpecialization(str, enum.Enum):
 
 
 class AgentStatus(str, enum.Enum):
+    TRAINEE = "trainee"
     ACTIVE = "active"
     BUSY = "busy"
     OFFLINE = "offline"
+
     SUSPENDED = "suspended"
 
 

@@ -66,7 +66,7 @@ export default function DisputeResolutionPanel({ disputes, onResolve }) {
               <div className="kpi-icon"><i className="fas fa-hand-holding-dollar"></i></div>
               <div className="kpi-data">
                   <label>Frozen Escrow</label>
-                  <strong>$42,800</strong>
+                  <strong>${disputes.reduce((sum, d) => sum + (d.amount || 0), 0).toLocaleString()}</strong>
               </div>
           </div>
           <div className="v4-kpi-card">
@@ -79,8 +79,8 @@ export default function DisputeResolutionPanel({ disputes, onResolve }) {
           <div className="v4-kpi-card">
               <div className="kpi-icon" style={{ background: 'rgba(32, 150, 61, 0.1)', color: '#20963D' }}><i className="fas fa-key"></i></div>
               <div className="kpi-data">
-                  <label>Audit Requests</label>
-                  <strong>14 Pending</strong>
+                  <label>Evidence Access</label>
+                  <strong>{disputes.filter(d => d.ai_risk > 50).length} Requests</strong>
               </div>
           </div>
           <div className="v4-kpi-card">

@@ -52,6 +52,13 @@ export function login(phone_number, password) {
   });
 }
 
+export function verifyLogin2FA(phone_number, otp) {
+  return request("/auth/verify-login-2fa", {
+    method: "POST",
+    body: JSON.stringify({ phone_number, otp }),
+  });
+}
+
 export function forgotPassword(phone_number) {
   return request("/auth/forgot-password", {
     method: "POST",

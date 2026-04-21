@@ -1,0 +1,233 @@
+2.1 Clarified Transaction Flow and Escrow Storage
+-------------------------------------------------
+
+# 💰 ESCROW & PAYMENT HOLDING - PHYSICALLY & LEGALLY
+
+The platform holds money from the BUYER on behalf of the transaction. Funds are held in ESCROW until both parties confirm delivery.
+
+### 🏛️ WHERE IS THE MONEY PHYSICALLY HELD?
+
+The escrow money is NOT stored in the company's operating bank account. It is held in separate, dedicated **Trust Accounts** at licensed financial institutions in Zimbabwe.
+
+*   **USD Transactions**: Held in a dedicated **USD Trust Account** at partner banks (NMB, Agribank, or CBZ).
+*   **ZiG Transactions**: Held in a dedicated **ZiG Trust Account** at the same partner banks.
+*   **EcoCash Transactions**: Held in a **segregated EcoCash Merchant Escrow Wallet**.
+
+**LEGAL PRINCIPLE:** The platform never "touches" the money for business operations. The money moves directly from buyer to escrow to seller, never passing through our personal or corporate operational accounts.
+
+### ⏱️ THE 4-STAGE MONEY MOVEMENT
+
+| Stage | Activity | Money Location |
+|-------|----------|----------------|
+| **1. Payment** | Buyer pays for a product offer. | Moves from Buyer Wallet to **Escrow Trust Account**. |
+| **2. Holding** | Seller prepares and ships the product. | **FROZEN** in the Trust Account (Platform acts as Trustee). |
+| **3. Delivery** | Product arrives and is inspected. | Still in **Escrow Holding**. (Protects buyer from loss). |
+| **4. Release** | Buyer clicks "Confirm Delivery". | Moves from Trust Account to **Seller Virtual Wallet**. |
+
+### 🏦 THE TRUST ACCOUNT ADVANTAGE
+In Zimbabwe, holding money for third parties (escrow) requires specific legal arrangements. 
+1. **Bankruptcy Protection**: If the company fails, your money in the Trust Account is legally protected and cannot be touched by creditors.
+2. **RBZ Compliance**: We report to the Reserve Bank of Zimbabwe to prevent fraud and money laundering.
+3. **No Commingling**: We never mix escrow funds with operating funds. Fees for agents are paid from the 1% platform commission, not from the trade principal.
+
+---
+
+### 💵 PART 2: THE WITHDRAWAL PROCESS
+When a seller or agent "withdraws" money from their virtual wallet:
+1. The system checks the virtual ledger balance.
+2. The system instructs the bank or EcoCash to transfer REAL money from the pooled Trust Account to the user's personal account.
+3. The money officially leaves the AgriTrust ecosystem.
+
+---
+
+---
+
+2.2 Payment Methods
+------------------
+AgriTrust supports nationwide mobile money networks (EcoCash, OneMoney, Innbucks) and traditional bank transfers for urban settlements. All payments are strictly digital.
+
+---
+
+2.3-2.5 System Policies
+-----------------------
+* **Fee Structure**: 2.5% platform fee.
+* **Dispute Resolution**: If a dispute is raised, funds are FROZEN (usually 3-7 days) while an Agent investigates.
+* **Fraud Prevention**: Requires GPS verification and Sovereign Identity (KYC) for all users.
+
+---
+
+2.6 How Agents Get Paid - Complete Structure
+-------------------------------------------
+
+# 💰 HOW AGENTS GET PAID – Complete Payment Structure
+
+Here is the **complete breakdown** of how agents earn money on the AgriTrust platform.
+
+---
+
+## 📊 PART 1: PAYMENT MODEL OVERVIEW
+
+| Payment Component | Type | Frequency | Priority |
+|------------------|------|-----------|----------|
+| Per-task commission | Variable | Per completed task | 🔴 HIGH |
+| Performance bonus | Variable | Monthly | 🟡 MEDIUM |
+| Travel reimbursement | Fixed | Per task | 🟡 MEDIUM |
+| Sign-up bonus | Fixed | One-time | 🟢 LOW |
+| Referral bonus | Fixed | Per referral | 🟢 LOW |
+| Certification bonus | Fixed | One-time | 🟢 LOW |
+
+---
+
+## 💵 PART 2: PER-TASK PAYMENT STRUCTURE
+
+### Task-Based Earnings (Primary Income)
+
+| Task Type | Base Payment (USD) | Bonus Eligibility | Average Time |
+|-----------|-------------------|-------------------|--------------|
+| Basic listing verification (small farm, <$500) | $3 - $5 | ✅ | 30-45 min |
+| Large listing verification (>$500 value) | $8 - $12 | ✅ | 1-2 hours |
+| Premium crop verification (tobacco, paprika) | $10 - $15 | ✅ | 1-2 hours |
+| Delivery confirmation | $2 - $4 | ❌ | 15-30 min |
+| Dispute resolution (basic) | $10 - $15 | ✅ | 1-2 hours |
+| Dispute resolution (complex) | $15 - $25 | ✅ | 2-3 hours |
+| Farmer onboarding (new user training) | $2 - $3 | ❌ | 30 min |
+| Loan application verification | $5 - $8 | ✅ | 45 min |
+| Quality audit (random check) | $4 - $6 | ❌ | 30 min |
+
+### Sample Daily Earnings Calculation
+
+Morning (4 hours):
+- Large listing verification (maize, 2000kg) → $10
+- Basic listing verification (soybeans) → $4
+- Delivery confirmation → $3
+
+Afternoon (4 hours):
+- Dispute resolution (quality issue) → $12
+- Basic listing verification (wheat) → $4
+- Farmer onboarding (new user) → $3
+- Delivery confirmation → $3
+
+Daily Total = $39
+Weekly Total (6 days) = $234
+Monthly Total (4 weeks) = $936
+
+---
+
+## 🏆 PART 3: PERFORMANCE BONUSES
+
+### Monthly Bonus Tiers
+
+| Tier | Requirements | Bonus Amount |
+|------|--------------|--------------|
+| Platinum | Top 5% performers, >98% accuracy, >4.8 rating, >150 tasks | $150 |
+| Gold | Top 20% performers, >95% accuracy, >4.5 rating, >120 tasks | $75 |
+| Silver | Above average, >90% accuracy, >4.0 rating, >80 tasks | $35 |
+| Bronze | Met minimum requirements, >85% accuracy, >50 tasks | $15 |
+
+### Task Volume Bonuses
+
+| Tasks Completed (Monthly) | Bonus |
+|--------------------------|-------|
+| 50-74 tasks | $10 |
+| 75-99 tasks | $25 |
+| 100-149 tasks | $50 |
+| 150+ tasks | $100 |
+
+### Quality Bonuses
+
+| Metric | Target | Bonus |
+|--------|--------|-------|
+| Verification accuracy | 100% correct for month | $20 |
+| No disputed verifications | Zero disputes raised | $15 |
+| Perfect user ratings | 5.0 average (min 10 ratings) | $10 |
+| Fastest response time | Top 3 in region | $15 |
+
+---
+
+## 🚗 PART 4: TRAVEL & EXPENSE REIMBURSEMENT
+
+### Mileage/Travel Compensation
+
+| Distance | Reimbursement (USD) |
+|----------|---------------------|
+| 0-5 km | $0.50 |
+| 6-10 km | $1.00 |
+| 11-20 km | $2.00 |
+| 21-30 km | $3.00 |
+| 31-50 km | $5.00 |
+| 50+ km | $0.20 per additional km |
+
+### Other Expenses
+
+| Expense Type | Reimbursement | Documentation Required |
+|--------------|---------------|----------------------|
+| Data/airtime for app use | $5-10/month | Receipt or screenshot |
+| Phone maintenance | $5/month | Quarterly claim |
+| Equipment replacement | Cost price | Receipt + approval |
+
+---
+
+## 🎁 PART 5: ONE-TIME BONUSES
+
+| Bonus Type | Amount | Requirements |
+|------------|--------|--------------|
+| Academy completion bonus | $25 | Pass final exam (80%+) |
+| First 10 tasks bonus | $15 | Complete 10 tasks with >90% accuracy |
+| Refer a new agent | $30 | Referred agent completes 50 tasks |
+| Refer a farmer | $2 | Farmer completes first transaction |
+| Refer a buyer | $5 | Buyer completes first purchase |
+
+### Certification Levels
+
+| Level | Bonus | Requirements |
+|-------|-------|--------------|
+| Certified Agent (Level 1) | $25 | Pass final exam + 10 supervised tasks |
+| Senior Agent (Level 2) | $50 | 6 months active + 200 tasks + pass exam |
+| Master Agent (Level 3) | $100 | 12 months active + 500 tasks + approval |
+
+---
+
+## 📅 PART 6: PAYMENT SCHEDULE & METHODS
+
+### Payment Schedule
+
+| Payment Type | Frequency | Processing Day | Payout Delay |
+|--------------|-----------|----------------|--------------|
+| Per-task commissions | Weekly | Every Friday | 7 days (quality check) |
+| Monthly bonuses | Monthly | 5th of next month | 5-10 days |
+| Travel reimbursement | Weekly | Every Friday | 3 days |
+| Referral bonuses | Monthly | 5th of next month | 30 days |
+
+### Payment Methods
+
+| Method | Processing Time | Fees | Availability |
+|--------|-----------------|------|--------------|
+| EcoCash | Instant | None | Nationwide |
+| OneMoney | Instant | None | Nationwide |
+| Innbucks | Instant | None | Limited areas |
+| Bank Transfer | 1-2 business days | $1-2 | Urban areas |
+
+
+---
+
+## 📊 PART 7: SAMPLE EARNINGS SCENARIOS
+
+(Refer to main documentation for detailed Part-Time vs Full-Time vs Senior Agent scenarios)
+
+---
+
+## 📈 PART 8: PAYMENT PROCESSING WORKFLOW
+
+1. Task Completed by Agent
+2. Quality Check (3-7 days): Photos reviewed, GPS verified, Accuracy assessed.
+3. Approved → Payment queued | Rejected → Agent notified (no payment, appeal possible).
+4. Payment Processing (Friday): Weekly totals, bonuses, and reimbursements calculated.
+5. Payment Disbursement: Transfer via method of choice, SMS notification sent.
+
+---
+
+## 🏁 FINAL SUMMARY
+
+Agents get paid through a combination of per-task commissions ($2-$25), performance bonuses ($15-$150), travel reimbursement, and one-time bonuses. Payments are processed weekly for tasks and monthly for bonuses, primarily via EcoCash and OneMoney.
+
+Copyright 2026 AgriTrust Sovereign Ledger Group. All Rights Reserved.

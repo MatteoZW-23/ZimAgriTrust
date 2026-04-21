@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
@@ -6,7 +7,7 @@ from app.core.security import create_access_token, create_refresh_token, decode_
 from app.models.user import User, UserRole
 from app.schemas.auth import (
     Token, TokenRefresh, UserLogin, UserRegister, UserResponse,
-    PasswordResetRequest, PasswordResetConfirm
+    PasswordResetRequest, PasswordResetConfirm, Login2FA
 )
 
 from app.services.rate_limit_service import (
@@ -15,7 +16,8 @@ from app.services.rate_limit_service import (
     ensure_login_not_locked,
     record_login_failure,
 )
-from app.services.auth_service import authenticate_user, authenticate_with_master_credential, register_user
+from app.services.notification_service import NotificationService
+from app.services.auth_service import authenticate_user, register_user
 
 router = APIRouter()
 
@@ -27,20 +29,19 @@ OTP_CACHE = {}
 @router.post("/forgot-password")
 async def forgot_password(payload: PasswordResetRequest, db: Session = Depends(get_db)):
     """
-    Initiates password reset by sending a random OTP (Logged to console).
+    Initiates password reset by sending a verification code via SMS and WhatsApp.
     """
     user = db.query(User).filter(User.phone_number == payload.phone_number).first()
     if not user:
         return {"message": "Process initiated. If an account matches this number, a verification code will be sent."}
     
-    otp = str(random.randint(1000, 9999))
+    otp = str(random.randint(100000, 999999))
     OTP_CACHE[payload.phone_number] = otp
     
-    print(f"\n[SECURITY] OTP for {payload.phone_number}: {otp}\n")
+    await NotificationService.send_verification_code(payload.phone_number, otp)
     
     return {
-        "message": "Verification code sent to your registered phone number.",
-        "debug_note": "In this environment, check backend logs for the code."
+        "message": "Verification code sent to your registered phone number via SMS and WhatsApp.",
     }
 
 
@@ -51,8 +52,7 @@ async def reset_password(payload: PasswordResetConfirm, db: Session = Depends(ge
     """
     cached_otp = OTP_CACHE.get(payload.phone_number)
     
-    # Allow 9999 only if in debug/test mode
-    if payload.otp != cached_otp and payload.otp != "9999":
+    if not cached_otp or payload.otp != cached_otp:
         raise HTTPException(status_code=400, detail="Invalid or expired verification code.")
     
     user = db.query(User).filter(User.phone_number == payload.phone_number).first()
@@ -89,10 +89,13 @@ async def register(
     return register_user(db, payload)
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login")
 async def login(
     payload: UserLogin, request: Request, db: Session = Depends(get_db)
-) -> Token:
+):
+    """
+    Step 1 of Login: Verify credentials and send 2FA code.
+    """
     client_host = request.client.host if request.client else "unknown"
     await enforce_rate_limit(
         f"auth:login:ip:{client_host}",
@@ -100,19 +103,10 @@ async def login(
         window_seconds=300,
         detail="Too many login attempts from this origin",
     )
-    master_user = authenticate_with_master_credential(db, payload.phone_number, payload.password)
-    if master_user:
-        if not master_user.is_active:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
-        if master_user.is_suspended:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account suspended")
-        await clear_login_failures(payload.phone_number)
-        access_token = create_access_token(str(master_user.id), master_user.role.value)
-        refresh_token = create_refresh_token(str(master_user.id))
-        return Token(access_token=access_token, refresh_token=refresh_token)
-
+    
     await ensure_login_not_locked(payload.phone_number)
     user = authenticate_user(db, payload.phone_number, payload.password)
+    
     if not user:
         failures = await record_login_failure(payload.phone_number)
         if failures >= 5:
@@ -123,15 +117,49 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect phone or password"
         )
+        
     if not user.is_active:
          raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
     if user.is_suspended:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account suspended")
         
+    # Credentials OK -> Send 2FA Code
+    otp = str(random.randint(100000, 999999))
+    OTP_CACHE[f"login_2fa:{payload.phone_number}"] = otp
+    
+    await NotificationService.send_verification_code(payload.phone_number, otp)
+    
+    return {
+        "status": "2FA_REQUIRED",
+        "message": "Verification code sent via SMS and WhatsApp.",
+        "phone": payload.phone_number
+    }
+
+
+@router.post("/verify-login-2fa", response_model=Token)
+async def verify_login_2fa(payload: "Login2FA", db: Session = Depends(get_db)):
+    """
+    Step 2 of Login: Verify 2FA code and return session tokens.
+    """
+    cached_otp = OTP_CACHE.get(f"login_2fa:{payload.phone_number}")
+    
+    if not cached_otp or payload.otp != cached_otp:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code.")
+    
+    user = db.query(User).filter(User.phone_number == payload.phone_number).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+        
     await clear_login_failures(payload.phone_number)
+    OTP_CACHE.pop(f"login_2fa:{payload.phone_number}", None)
+    
     access_token = create_access_token(str(user.id), user.role.value)
     refresh_token = create_refresh_token(str(user.id))
-    return Token(access_token=access_token, refresh_token=refresh_token)
+    return Token(
+        access_token=access_token, 
+        refresh_token=refresh_token,
+        user=UserResponse.model_validate(user)
+    )
 
 
 @router.post("/refresh", response_model=Token)

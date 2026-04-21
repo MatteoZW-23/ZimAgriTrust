@@ -161,4 +161,9 @@ class WalletService:
         db.commit()
         return True
 
+    @staticmethod
+    def get_balance(db: Session, user_id: uuid.UUID) -> float:
+        user = db.query(User).filter(User.id == user_id).first()
+        return user.balance_usd if user else 0.0
+
 wallet_service = WalletService()

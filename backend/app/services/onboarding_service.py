@@ -12,7 +12,7 @@ from app.models.user import User
 
 class OnboardingService:
     @staticmethod
-    def sign_contract(db: Session, application_id: uuid.UUID, signee_name: str, signature_data: str, ip: str):
+    async def sign_contract(db: Session, application_id: uuid.UUID, signee_name: str, signature_data: str, ip: str):
         application = db.query(AgentApplication).filter(AgentApplication.id == application_id).first()
         if not application:
             raise HTTPException(status_code=404, detail="Application not found")
@@ -30,8 +30,18 @@ class OnboardingService:
         )
         db.add(contract)
         
-        # Advance phase
-        application.status = ApplicationStatus.TRAINING
+        # Advance phase to Phase 3: Curriculum (Master Plan)
+        application.status = ApplicationStatus.TRAINING_PHASE_1
+        
+        # Notify Applicant
+        from app.services.whatsapp_service import WhatsAppService
+        msg = (
+            f"✍️ *Contract Signed Successfully*\n\n"
+            f"Your Agent SLA has been digitally signed and archived.\n\n"
+            f"You are now enrolled in the Academy. Please log in to the Training Portal using your ID: *{application_id}*"
+        )
+        await WhatsAppService.send_whatsapp_message(application.phone_number, msg)
+        
         db.commit()
         return contract
 
@@ -89,7 +99,7 @@ class OnboardingService:
         db.add(log)
         
         if log.recommendation == "ready":
-             application.status = ApplicationStatus.INDEPENDENT_SUPERVISED
+             application.status = ApplicationStatus.SUPERVISED_INDEPENDENT
         
         db.commit()
         return log

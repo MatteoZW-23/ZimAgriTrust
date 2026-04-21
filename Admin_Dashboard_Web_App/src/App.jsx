@@ -475,7 +475,7 @@ function App() {
             )}
 
             <div className="nav-group-label">{isSidebarCollapsed ? '---' : 'MY ACCOUNT'}</div>
-            {(role === 'ADMIN' || role === 'AGENT') && (
+            {role === 'ADMIN' && (
                 <div className={`nav-link-v4 ${currentView === 'ussd' ? 'active' : ''}`} onClick={() => setCurrentView('ussd')} title={isSidebarCollapsed ? 'Phone System Test' : ''}>
                     <i className="fas fa-mobile"></i> {!isSidebarCollapsed && <span>Phone System Test</span>}
                 </div>

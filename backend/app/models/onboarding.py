@@ -11,12 +11,16 @@ from app.db.base import Base
 
 
 class OnboardingPhase(str, enum.Enum):
-    DOCUMENTATION = "documentation"
-    TRAINING = "training"
-    EQUIPMENT = "equipment"
+    APPLICATION = "application"
+    DOCUMENTS = "documents"
+    CURRICULUM_PART_1 = "curriculum_part_1"
+    CURRICULUM_PART_2 = "curriculum_part_2"
+    FINAL_EXAM = "final_exam"
+    PRACTICAL_ASSESSMENT = "practical_assessment"
     SHADOWING = "shadowing"
-    INDEPENDENT = "independent"
-    CERTIFIED = "certified"
+    SUPERVISED_INDEPENDENT = "supervised_independent"
+    FINAL_EVALUATION = "final_evaluation"
+    ACTIVE = "active"
 
 
 class TrainingModule(Base):

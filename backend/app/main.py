@@ -16,48 +16,9 @@ from app.db.session import engine, SessionLocal
 import app.models # noqa: F401
 
 from app.services.settlement_service import settlement_worker
-from app.services.auth_service import get_or_create_master_user, build_phone_lookup_candidates, normalize_phone_identifier
+from app.services.auth_service import build_phone_lookup_candidates, normalize_phone_identifier
 from app.models.user import User, UserRole, UserStatus, FarmerProfile, BuyerProfile, AgentProfile
 from app.core.security import get_password_hash
-
-def seed_db(db: SessionLocal):
-    # Ensure master test user exists
-    get_or_create_master_user(db)
-    
-    # Define Institutional Default Users
-    institutional_users = [
-        {"phone": "772222222", "pin": "2222", "role": UserRole.FARMER, "name": "Farmer T. Miller"},
-        {"phone": "773333333", "pin": "3333", "role": UserRole.BUYER, "name": "Institutional Buyer (GMB)"},
-        {"phone": "778888888", "pin": "8888", "role": UserRole.AGENT, "name": "Field Agent S. Richards"},
-        {"phone": "771234567", "pin": "1111", "role": UserRole.ADMIN, "name": "HQ Ops Officer"},
-    ]
-    
-    for u_data in institutional_users:
-        canonical = normalize_phone_identifier(u_data["phone"])
-        candidates = build_phone_lookup_candidates(canonical)
-        
-        user = db.query(User).filter(User.phone_number.in_(candidates)).first()
-        if not user:
-            print(f"SEEDING: Creating Institutional Role [{u_data['role']}] - {u_data['phone']}")
-            user = User(
-                full_name=u_data["name"],
-                phone_number=canonical,
-                password_hash=get_password_hash(u_data["pin"]),
-                role=u_data["role"],
-                status=UserStatus.ACTIVE,
-                is_active=True,
-                id_verified=True,
-                trust_score=80
-            )
-            db.add(user)
-            db.flush() # Get user ID
-            
-            # Create sub-profiles
-            if u_data["role"] == UserRole.FARMER:
-                db.add(FarmerProfile(user_id=user.id, farm_name="Green Valley Estate", farm_size_hectares=25.5))
-            elif u_data["role"] == UserRole.BUYER:
-                db.add(BuyerProfile(user_id=user.id, company_name="Zimbabwe Grain Board", procurement_focus="Maize, Soya"))
-from app.services.auth_service import get_or_create_master_user
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -68,15 +29,13 @@ async def lifespan(app: FastAPI):
         print(f"SYSLOG | Tables Confirmed: {list(Base.metadata.tables.keys())}")
         
         with SessionLocal() as db:
-            print("SYSLOG | Transitioning to Real-Time Data Ecosystem...")
-            # Ensure only the master system user exists for initial setup
-            get_or_create_master_user(db)
+            print("SYSLOG | Finalizing Production Environment...")
+            # Ensure the master system administrator exists via the init_db script
+            pass
             
-            # The platform is now empty of demo data.
-            # Real users and real-time market data will populate the system.
-            
+            # Flush settlement queues for initial deployment
             settlement_worker.run_settlement_sweep(db)
-            print("SYSLOG | System Live in Real-Time Mode.")
+            print("SYSLOG | Platform Live and Ready for Market Deployment.")
 
     except Exception as e:
         print(f"BOOT_ERROR | Managed startup failure: {str(e)}")
@@ -127,18 +86,10 @@ async def audit_and_performance_middleware(request: Request, call_next):
         return response
         
     except Exception as e:
-        # Capture critical system failures
+        # Capture and log critical system failures, then re-raise so CORSMiddleware catches it
         logging.error(f"SYSTEM FAILURE | ID: {request_id} | ERROR: {str(e)}")
         logging.error(traceback.format_exc())
-        
-        return JSONResponse(
-            status_code=500,
-            content={
-                "detail": "Internal Governance Failure",
-                "request_id": request_id,
-                "error_type": type(e).__name__
-            }
-        )
+        raise e
 
 # --- GLOBAL EXCEPTION HANDLING ---
 

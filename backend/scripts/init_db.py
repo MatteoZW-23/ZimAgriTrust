@@ -25,50 +25,22 @@ def init_database():
     
     try:
         # Create admin user
-        admin = db.query(User).filter(User.phone == "admin").first()
+        admin = db.query(User).filter(User.phone_number == "+2630000000").first()
         if not admin:
             admin = User(
-                phone="admin",
-                name="System Administrator",
+                phone_number="+2630000000",
+                full_name="System Administrator",
+                password_hash=get_password_hash("AgriTrust@2026!"),
                 role=UserRole.ADMIN,
-                is_verified=True,
+                is_active=True,
                 trust_score=100
             )
             db.add(admin)
-            print("✅ Admin user created")
+            print("✅ Admin user created (Phone: +2630000000, Pass: AgriTrust@2026!)")
         
-        # Create sample agents
-        agents_data = [
-            {"phone": "0771000001", "name": "John Doe", "province": "Harare", "district": "Harare East"},
-            {"phone": "0771000002", "name": "Jane Smith", "province": "Bulawayo", "district": "Bulawayo Central"},
-            {"phone": "0771000003", "name": "Tendai Moyo", "province": "Manicaland", "district": "Mutare"},
-        ]
-        
-        for agent_data in agents_data:
-            user = db.query(User).filter(User.phone == agent_data["phone"]).first()
-            if not user:
-                user = User(
-                    phone=agent_data["phone"],
-                    name=agent_data["name"],
-                    role=UserRole.AGENT,
-                    is_verified=True,
-                    trust_score=75
-                )
-                db.add(user)
-                db.flush()
-                
-                agent = Agent(
-                    user_id=user.id,
-                    agent_code=f"AGT{user.id:04d}",
-                    specialization=AgentSpecialization.ALL,
-                    province=agent_data["province"],
-                    district=agent_data["district"],
-                    is_available=True
-                )
-                db.add(agent)
-        
+        # Database is now initialized with only the System Administrator.
+        # Field agents will be onboarded via the recruitment pipeline.
         db.commit()
-        print(f"✅ {len(agents_data)} agents created")
         
     except Exception as e:
         print(f"❌ Error: {e}")

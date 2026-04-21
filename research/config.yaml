@@ -1,43 +1,16 @@
-# AgriTrust ML Orchestration Config
-version: "1.0"
+project: AgriTrust Research
+version: 1.0.0
+ml_settings:
+  train_split: 0.8
+  random_state: 42
+  contamination_rate: 0.01
 
-data:
-  raw_dir: "data/"
-  processed_dir: "data/processed/"
-  exports_dir: "exports/"
+paths:
+  raw_data: ./data/raw
+  processed_data: ./data/processed
+  models: ../ml_weights
+  reports: ./reports
 
-models:
-  risk:
-    algorithm: "RandomForestClassifier"
-    version: "v4"
-    target_accuracy: 0.80
-  fraud:
-    algorithm: "IsolationForest"
-    version: "v1"
-    contamination: 0.05
-  price:
-    algorithm: "LSTM"
-    version: "v2"
-    lookback_days: 30
-  demand:
-    algorithm: "RandomForestRegressor"
-    version: "v1"
-
-pipeline:
-  sequence:
-    - 01_data_collection
-    - 02_data_cleaning
-    - 03_exploratory_analysis
-    - 04_feature_engineering
-    - 01_risk_scoring_model
-    - 02_price_prediction_model
-    - 03_fraud_detection_model
-    - 04_demand_forecasting
-    - 05_user_segmentation
-    - 06_deep_learning_experiments
-    - 01_model_comparison
-    - 02_hyperparameter_tuning
-    - 04_production_readiness
-  artifacts:
-    weights_dest: "backend/ml_weights/"
-    code_dest: "backend/app/ml/"
+scheduler:
+  interval_hours: 24
+  automated_retraining: true

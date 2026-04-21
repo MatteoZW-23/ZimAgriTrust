@@ -20,8 +20,9 @@ class AgentApplicationResponse(BaseModel):
     id: uuid.UUID
     full_name: str
     phone_number: str
+    province: str
     status: ApplicationStatus
-    training_progress: float
+    training_modules_completed: List[str]
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)

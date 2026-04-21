@@ -35,7 +35,7 @@ async def receive_job_log(
         duration_seconds=job_data.get('duration_seconds'),
         accuracy=job_data.get('accuracy'),
         metrics=job_data.get('metrics', {}),
-        completed_at=datetime.fromisoformat(job_data.get('completed_at'))
+        completed_at=datetime.fromisoformat(job_data.get('completed_at')) if job_data.get('completed_at') else datetime.now()
     )
     
     db.add(job_log)
@@ -66,8 +66,8 @@ async def receive_price_predictions(
             location=price_data.get('location'),
             predicted_value=price_data.get('price'),
             confidence=price_data.get('confidence', 0.85),
-            valid_until=datetime.fromisoformat(predictions.get('valid_until')),
-            metadata={'trend': price_data.get('trend')}
+            valid_until=datetime.fromisoformat(predictions.get('valid_until')) if predictions.get('valid_until') else datetime.now(),
+            prediction_metadata={'trend': price_data.get('trend')}
         )
         db.add(pred_record)
     
@@ -138,7 +138,7 @@ async def receive_job_alert(
         job_name=alert.get('job_name'),
         status='failed',
         metrics={'error': alert.get('error')},
-        completed_at=datetime.fromisoformat(alert.get('timestamp'))
+        completed_at=datetime.fromisoformat(alert.get('timestamp')) if alert.get('timestamp') else datetime.now()
     )
     db.add(job_log)
     db.commit()
@@ -170,7 +170,7 @@ async def get_price_prediction(crop: str, location: str):
 
 
 @router.get("/predictions/risk/{user_id}")
-async def get_risk_score(user_id: int):
+async def get_risk_score(user_id: str):
     """
     Get user risk score for app
     """

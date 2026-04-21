@@ -33,7 +33,14 @@ async function jsonFetch(path, options = {}) {
 export async function login(phone, password) {
   return jsonFetch("/auth/login", {
     method: "POST",
-    body: JSON.stringify({ phone, password }),
+    body: JSON.stringify({ phone_number: phone, password }), // Fixed phone -> phone_number
+  });
+}
+
+export async function verifyTwoStep(phone, code) {
+  return jsonFetch("/auth/verify-login-2fa", {
+    method: "POST",
+    body: JSON.stringify({ phone_number: phone, otp: code }),
   });
 }
 

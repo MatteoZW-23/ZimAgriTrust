@@ -206,11 +206,11 @@ export function OverviewPanel({ overview, pulse, profile, onSync, onViewChange, 
                                 <div className="v4-advisory-stack" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                     <div className="adv-item" style={{ padding: '20px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                         <strong style={{ display: 'block', fontSize: '13px', marginBottom: '4px', color: '#3b82f6' }}>Supply Status</strong>
-                                        <p style={{ fontSize: '12px', opacity: 0.6, margin: 0, lineHeight: 1.5 }}>Moderate wheat volumes reported in Midlands. Monitoring price parity.</p>
+                                        <p style={{ fontSize: '12px', opacity: 0.6, margin: 0, lineHeight: 1.5 }}>Synchronizing regional supply signals. No anomalies detected in current trade lot flow.</p>
                                     </div>
                                     <div className="adv-item" style={{ padding: '20px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                         <strong style={{ display: 'block', fontSize: '13px', marginBottom: '4px', color: '#f59e0b' }}>Logistics Notice</strong>
-                                        <p style={{ fontSize: '12px', opacity: 0.6, margin: 0, lineHeight: 1.5 }}>Seasonal rains in Mashonaland. Evaluating impact on grain transport schedules.</p>
+                                        <p style={{ fontSize: '12px', opacity: 0.6, margin: 0, lineHeight: 1.5 }}>Awaiting logistics synchronization. Regional transport schedules are currently stable.</p>
                                     </div>
                                 </div>
                             </div>

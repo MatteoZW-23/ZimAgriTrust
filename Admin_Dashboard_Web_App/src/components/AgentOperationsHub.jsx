@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import LineChart from './LineChart';
 import { exportToCSV, handleImport } from '../utils/dataTransfer';
+import { 
+  fetchOverview, 
+  fetchReviewQueue, 
+  fetchTransactions, 
+  verifyListing, 
+  fetchDisputes,
+  fetchMarketActivities,
+} from '../api';
 
 export default function AgentOperationsHub({ profile, token, onSync, users = [], reviewQueue = [], disputes = [] }) {
   const agentRegion = profile?.region || "Zimbabwe District 1";
@@ -11,7 +19,8 @@ export default function AgentOperationsHub({ profile, token, onSync, users = [],
     const derivedTasks = [
       ...reviewQueue.map(l => ({
         id: `VER-${l.id.slice(0,4)}`,
-        title: `Ground Truth: ${l.product} verification`,
+        rawId: l.id,
+        title: `Ground Truth: ${l.product_type} verification`,
         location: l.location || 'Local District',
         type: 'VERIFICATION',
         fee: 15.00,
@@ -19,7 +28,8 @@ export default function AgentOperationsHub({ profile, token, onSync, users = [],
       })),
       ...disputes.filter(d => d.status === 'PENDING').map(d => ({
         id: `DIS-${d.id.slice(0,4)}`,
-        title: `Arbitration: ${d.product} Discrepancy`,
+        rawId: d.id,
+        title: `Arbitration: ${d.product_name || 'Commodity'} Discrepancy`,
         location: d.location || 'System-Wide',
         type: 'DISPUTE',
         fee: 50.00,
@@ -37,6 +47,7 @@ export default function AgentOperationsHub({ profile, token, onSync, users = [],
   };
 
   const [activeTask, setActiveTask] = useState(null);
+  const [showID, setShowID] = useState(false);
 
   const handleExport = () => {
     exportToCSV(tasks, `agent_tasks_${new Date().toISOString().split('T')[0]}.csv`);
@@ -49,9 +60,19 @@ export default function AgentOperationsHub({ profile, token, onSync, users = [],
     }
   };
 
-  const handleVerify = (taskId) => {
-      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'COMPLETED' } : t));
-      setActiveTask(null);
+  const handleVerify = async (task) => {
+      try {
+          if (task.type === 'VERIFICATION') {
+              await verifyListing(token, task.rawId, true);
+              alert("FIELD SUCCESS: Asset verification committed to the national database.");
+          } else {
+              alert("ARBITRATION SUCCESS: Displacement resolution filed.");
+          }
+          await onSync();
+          setActiveTask(null);
+      } catch (err) {
+          alert(`VERIFICATION_FAILURE: ${err.message}`);
+      }
   };
 
   const regionalMembers = (users || []).filter(u => u.location === agentRegion || !u.location);
@@ -173,25 +194,21 @@ export default function AgentOperationsHub({ profile, token, onSync, users = [],
                       <span style={{ fontSize: '10px', padding: '6px 14px', borderRadius: '8px', background: '#ecfdf5', color: '#059669', fontWeight: 950 }}>STATUS: OPEN</span>
                   </div>
 
-                  <div className="v4-settlement-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginTop: '24px' }}>
-                      <div style={{ padding: '20px', borderRadius: '16px', background: 'var(--v4-surface)', border: '1.5px solid var(--v4-border)' }}>
-                          <label style={{ fontSize: '10px', fontWeight: 900, color: 'var(--v4-text-dim)', textTransform: 'uppercase' }}>CASH ON HAND (ZiG)</label>
-                          <div style={{ fontSize: '20px', fontWeight: 950, color: 'var(--v4-text-main)', marginTop: '4px' }}>4,250.00</div>
-                      </div>
+                  <div className="v4-settlement-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginTop: '24px' }}>
                       <div style={{ padding: '20px', borderRadius: '16px', background: 'var(--v4-surface)', border: '1.5px solid var(--v4-border)' }}>
                           <label style={{ fontSize: '10px', fontWeight: 900, color: 'var(--v4-text-dim)', textTransform: 'uppercase' }}>WALLET BALANCE (USD)</label>
-                          <div style={{ fontSize: '20px', fontWeight: 950, color: 'var(--v4-text-main)', marginTop: '4px' }}>840.50</div>
+                          <div style={{ fontSize: '20px', fontWeight: 950, color: 'var(--v4-text-main)', marginTop: '4px' }}>0.00</div>
                       </div>
                       <div style={{ padding: '20px', borderRadius: '16px', background: 'var(--v4-surface)', border: '1.5px solid var(--v4-border)' }}>
                           <label style={{ fontSize: '10px', fontWeight: 900, color: 'var(--v4-text-dim)', textTransform: 'uppercase' }}>COMMISSION (USD)</label>
-                          <div style={{ fontSize: '20px', fontWeight: 950, color: '#20963D', marginTop: '4px' }}>+ 124.00</div>
+                          <div style={{ fontSize: '20px', fontWeight: 950, color: '#20963D', marginTop: '4px' }}>+ 0.00</div>
                       </div>
                   </div>
 
                   <div className="v4-closure-auth" style={{ marginTop: '24px', padding: '24px', borderRadius: '24px', background: 'var(--v4-bg)', border: '1.5px solid var(--v4-border)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                           <span style={{ fontSize: '12px', fontWeight: 900 }}>Balance Verification String</span>
-                          <strong style={{ fontSize: '12px', color: '#3b82f6', letterSpacing: '0.1em' }}>[ AT-2026-X89-ZIG ]</strong>
+                          <strong style={{ fontSize: '12px', color: '#3b82f6', letterSpacing: '0.1em' }}>[ AT-2026-X89-AUTH ]</strong>
                       </div>
                       <div style={{ display: 'flex', gap: '12px' }}>
                           <input type="password" placeholder="Enter Security Pin" style={{ flex: 1, padding: '14px 20px', borderRadius: '12px', background: 'var(--v4-surface)', border: '1.5px solid var(--v4-border)', color: '#fff', fontSize: '14px', fontWeight: 700 }} />
@@ -205,21 +222,34 @@ export default function AgentOperationsHub({ profile, token, onSync, users = [],
           <aside className="v4-side-panel">
               <div className="v4-glass-card-premium" style={{ background: 'var(--v4-primary-dark)', color: '#fff', border: 'none' }}>
                   <div className="v4-card-header">
-                      <h3 style={{ color: '#fff' }}><i className="fas fa-chart-line" style={{ marginRight: '10px', color: '#f59e0b' }}></i> Performance Metrics</h3>
+                      <h3 style={{ color: '#fff' }}><i className="fas fa-id-badge" style={{ marginRight: '10px', color: '#5eead4' }}></i> Workforce Identity</h3>
                   </div>
                   <div style={{ marginTop: '24px' }}>
-                      <div style={{ height: '150px', background: 'rgba(255,255,255,0.05)', borderRadius: '16px', padding: '20px' }}>
-                        <LineChart 
-                                data={[]}
-                                xKey="day"
-                                yKey="revenue"
-                                color="#f59e0b"
-                                height={110}
-                            />
+                      <button className="q-btn primary-btn full-w" style={{ background: '#5eead4', color: '#020617', fontWeight: 950 }} onClick={() => setShowID(true)}>
+                          VIEW DIGITAL CREDENTIAL
+                      </button>
+                      <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginTop: '12px', textAlign: 'center', fontWeight: 700 }}>REQUIRED FOR ALL FIELD ONBOARDING</p>
+                  </div>
+              </div>
+
+              <div className="v4-glass-card-premium" style={{ marginTop: '24px' }}>
+                  <div className="v4-card-header">
+                      <h3><i className="fas fa-toolbox" style={{ marginRight: '10px', color: '#f59e0b' }}></i> Equipment Registry</h3>
+                  </div>
+                  <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div className="kit-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                              <strong style={{ display: 'block', fontSize: '12px' }}>Moisture Probe v3</strong>
+                              <span style={{ fontSize: '10px', color: 'var(--v4-text-dim)' }}>S/N: {profile?.probe_sn || 'AT-PRB-9923'}</span>
+                          </div>
+                          <i className="fas fa-circle-check" style={{ color: '#20963D' }}></i>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px' }}>
-                          <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>Regional Reach</span>
-                          <strong style={{ fontSize: '13px', fontWeight: 900 }}>84% Coverage</strong>
+                      <div className="kit-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                              <strong style={{ display: 'block', fontSize: '12px' }}>Field Tablet 10"</strong>
+                              <span style={{ fontSize: '10px', color: 'var(--v4-text-dim)' }}>S/N: {profile?.tablet_sn || 'AT-TAB-4401'}</span>
+                          </div>
+                          <i className="fas fa-circle-check" style={{ color: '#20963D' }}></i>
                       </div>
                   </div>
               </div>
@@ -304,7 +334,7 @@ export default function AgentOperationsHub({ profile, token, onSync, users = [],
                       
                       <div style={{ display: 'flex', gap: '20px' }}>
                           <button onClick={() => setActiveTask(null)} style={{ flex: 1, padding: '20px', borderRadius: '16px', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)', border: '1.5px solid rgba(255,255,255,0.1)', fontWeight: 900, cursor: 'pointer' }}>Cancel Task</button>
-                          <button onClick={() => handleVerify(activeTask.id)} style={{ flex: 2, padding: '20px', borderRadius: '16px', background: '#f59e0b', color: '#020617', border: 'none', fontWeight: 1000, cursor: 'pointer', boxShadow: '0 8px 30px rgba(245,158,11,0.3)' }}>
+                          <button onClick={() => handleVerify(activeTask)} style={{ flex: 2, padding: '20px', borderRadius: '16px', background: '#f59e0b', color: '#020617', border: 'none', fontWeight: 1000, cursor: 'pointer', boxShadow: '0 8px 30px rgba(245,158,11,0.3)' }}>
                               <i className="fas fa-check-double" style={{ marginRight: '10px' }}></i> SUBMIT VERIFICATION
                           </button>
                       </div>
@@ -313,7 +343,58 @@ export default function AgentOperationsHub({ profile, token, onSync, users = [],
           </div>
       )}
 
+      {showID && (
+          <div className="v4-modal-overlay" onClick={() => setShowID(false)}>
+              <div className="v4-digital-id-card animate-pop" onClick={e => e.stopPropagation()} style={{ background: 'linear-gradient(135deg, #000E2B 0%, #1e1b4b 100%)', width: '360px', borderRadius: '32px', overflow: 'hidden', border: '2px solid rgba(94, 234, 212, 0.3)', boxShadow: '0 0 50px rgba(94, 234, 212, 0.2)' }}>
+                  <div className="id-hologram" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(45deg, transparent 45%, rgba(94, 234, 212, 0.1) 50%, transparent 55%)', backgroundSize: '200% 200%', animation: 'hologram-sweep 4s linear infinite', pointerEvents: 'none' }}></div>
+                  
+                  <div style={{ padding: '40px', textAlign: 'center' }}>
+                      <div className="v4-brand" style={{ color: '#fff', fontSize: '14px', fontWeight: 900, letterSpacing: '0.2em', marginBottom: '32px' }}>
+                          <i className="fas fa-leaf" style={{ color: '#5eead4' }}></i> AGRITRUST
+                      </div>
+
+                      <div className="id-photo" style={{ width: '120px', height: '120px', borderRadius: '50%', background: 'var(--v4-primary-gradient)', margin: '0 auto 24px', border: '4px solid #fff', display: 'grid', placeItems: 'center', fontSize: '48px', color: '#fff', fontWeight: 950, position: 'relative' }}>
+                          {profile?.full_name?.charAt(0)}
+                          <div style={{ position: 'absolute', bottom: '0', right: '0', width: '32px', height: '32px', background: '#20963D', borderRadius: '50%', display: 'grid', placeItems: 'center', fontSize: '14px', border: '2px solid #fff' }}>
+                              <i className="fas fa-check"></i>
+                          </div>
+                      </div>
+
+                      <h2 style={{ color: '#fff', fontSize: '24px', fontWeight: 950, margin: '0 0 4px 0' }}>{profile?.full_name}</h2>
+                      <p style={{ color: '#5eead4', fontSize: '12px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Field Operations Agent</p>
+
+                      <div className="id-details" style={{ marginTop: '32px', padding: '24px', background: 'rgba(255,255,255,0.05)', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                              <span style={{ fontSize: '9px', fontWeight: 900, color: 'rgba(255,255,255,0.4)' }}>AGENT CODE</span>
+                              <strong style={{ fontSize: '13px', color: '#fff' }}>{profile?.agent_code || 'AT-1002-ZIM'}</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                              <span style={{ fontSize: '9px', fontWeight: 900, color: 'rgba(255,255,255,0.4)' }}>REGION</span>
+                              <strong style={{ fontSize: '13px', color: '#fff' }}>{profile?.province || 'Harare'}</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ fontSize: '9px', fontWeight: 900, color: 'rgba(255,255,255,0.4)' }}>SINCE</span>
+                              <strong style={{ fontSize: '13px', color: '#fff' }}>APR 2026</strong>
+                          </div>
+                      </div>
+
+                      <div style={{ marginTop: '32px' }}>
+                          <div className="qr-sim" style={{ width: '80px', height: '80px', background: '#fff', borderRadius: '12px', margin: '0 auto', padding: '8px' }}>
+                             <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=AgriTrustAgent-1002" style={{ width: '100%', height: '100%' }} alt="QR Auth" />
+                          </div>
+                          <p style={{ fontSize: '8px', color: 'rgba(255,255,255,0.3)', marginTop: '12px', fontWeight: 800 }}>SCAN TO VERIFY CREDENTIALS</p>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
       <style>{`
+        @keyframes hologram-sweep {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .v4-digital-id-card { position: relative; cursor: default; }
         .v4-table-row-premium:hover { transform: scale(1.005); border-color: #f59e0b33 !important; }
         .v4-dashboard-container { display: flex; flex-direction: column; gap: 48px; }
         @keyframes pulse-ping {

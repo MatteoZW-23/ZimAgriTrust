@@ -1,4 +1,5 @@
 import uuid
+from typing import Dict
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -163,5 +164,42 @@ class DisputeService:
     @staticmethod
     def accept_settlement(db: Session, dispute: Dispute, user: User) -> Dispute:
         return accept_settlement(db, dispute, user)
+
+    @staticmethod
+    def admin_override(db: Session, dispute_id: int, decision: Dict, admin_user: User) -> Dispute:
+        """
+        Sovereign Admin Override: Direct forced settlement by high-level oversight.
+        """
+        from app.models.audit_log import AuditLog
+        from app.services.escrow_service import resolve_dispute as escrow_resolve
+        
+        dispute = db.query(Dispute).filter(Dispute.id == dispute_id).first()
+        if not dispute:
+            raise HTTPException(status_code=404, detail="Dispute not found")
+
+        # 1. Execute Escrow Adjustment
+        buyer_refund = decision.get("buyer_refund", 0)
+        seller_payout = decision.get("seller_payout", 0)
+        fee = decision.get("platform_fee", 0)
+        
+        escrow_resolve(db, dispute.order, buyer_refund, seller_payout, fee)
+        
+        # 2. Update Dispute Status
+        dispute.status = DisputeStatus.RESOLVED
+        dispute.resolution = f"ADMIN OVERSIGHT OVERRIDE: {decision.get('reason', 'Manual Override')}"
+        
+        # 3. Log the Audit Event
+        audit = AuditLog(
+            admin_id=admin_user.id,
+            action="DISPUTE_OVERRIDE",
+            resource_type="DISPUTE",
+            resource_id=str(dispute_id),
+            details=decision
+        )
+        db.add(audit)
+        
+        db.commit()
+        db.refresh(dispute)
+        return dispute
 
 dispute_core = DisputeService()

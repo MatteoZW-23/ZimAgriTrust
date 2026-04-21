@@ -11,7 +11,8 @@ from . import (
     config,
     ai,
     notifications,
-    permissions
+    permissions,
+    academy
 )
 
 router = APIRouter()
@@ -19,6 +20,7 @@ router = APIRouter()
 router.include_router(overview.router, tags=["admin-overview"])
 router.include_router(users.router, prefix="/users", tags=["admin-users"])
 router.include_router(agents.router, prefix="/agents", tags=["admin-agents"])
+router.include_router(academy.router, prefix="/academy", tags=["admin-academy"])
 router.include_router(transactions.router, prefix="/transactions", tags=["admin-transactions"])
 router.include_router(listings.router, prefix="/listings", tags=["admin-listings"])
 router.include_router(analytics.router, prefix="/analytics", tags=["admin-analytics"])
@@ -28,3 +30,4 @@ router.include_router(config.router, prefix="/config", tags=["admin-config"])
 router.include_router(ai.router, prefix="/ai", tags=["admin-ai"])
 router.include_router(notifications.router, prefix="/notifications", tags=["admin-notifications"])
 router.include_router(permissions.router, prefix="/permissions", tags=["admin-permissions"])
+
