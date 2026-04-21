@@ -342,17 +342,27 @@
             }
 
             try {
-                // In a real deployment, we fetch modules and agent status
-                const response = await fetch(`${API_BASE}/onboarding/academy/modules`, {
-                    headers: token ? { "Authorization": `Bearer ${token}` } : {}
+                const response = await fetch(`${API_BASE}/academy/my-progress`, {
+                    headers: { 
+                        "Authorization": `Bearer ${token}`,
+                        "Content-Type": "application/json"
+                    }
                 });
                 
                 if (response.ok) {
-                    currentModules = await response.json();
+                    const data = await response.json();
+                    agentProfile = data;
+                    currentModules = data.modules;
+                    
+                    document.getElementById('agent-name').innerText = data.agent_name;
                     renderModules(currentModules);
                     updateProgress(currentModules);
                 } else {
-                    throw new Error("Failed to fetch modules");
+                    if (response.status === 401 || response.status === 403) {
+                         alert("Session expired. Please log in through the application portal.");
+                         // window.location.href = '../login.html';
+                    }
+                    throw new Error("Failed to fetch modules. Status: " + response.status);
                 }
             } catch (err) {
                 console.error(err);
@@ -422,23 +432,80 @@
             document.getElementById('phase-text').innerText = `Current Phase: ${currentModule.title}`;
         }
 
-        function openReader(moduleReady) {
+        async function openReader(moduleReady, topicId = null) {
+            const token = localStorage.getItem('agritrust_token');
+            if (!token) return alert("Certification session required.");
+
+            if (!topicId) {
+                // Find first uncompleted topic
+                const progress = moduleReady.topics_progress || {};
+                const firstUncompleted = moduleReady.topics.find(t => !progress[t.id]);
+                topicId = firstUncompleted ? firstUncompleted.id : moduleReady.topics[0].id;
+            }
+
             document.getElementById('reader-modal').style.display = 'block';
             document.body.style.overflow = 'hidden';
+            document.getElementById('reader-body').innerHTML = '<div style="text-align:center; padding: 5rem;"><i class="fas fa-spinner fa-spin fa-2xl"></i><p style="margin-top:1rem;">Decrypting Module Content...</p></div>';
             
-            document.getElementById('reader-title').innerText = moduleReady.title;
-            const topic = moduleReady.topics?.[0] || { title: "Overview", pages: 0, content: "Content loading from secure vault..." };
-            
-            document.getElementById('reader-page-info').innerText = `${topic.pages} Pages in this Unit`;
-            
-            const content = topic.content || "Standard curriculum content is currently being decrypted for your secure session.";
-            // Simple markdown-ish to HTML conversion for demo
-            document.getElementById('reader-body').innerHTML = `
-                <h2>${topic.title}</h2>
-                <div style="margin-top: 1.5rem; white-space: pre-wrap;">${content}</div>
-            `;
+            try {
+                const response = await fetch(`${API_BASE}/academy/modules/${moduleReady.module_number}/topics/${topicId}/content`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
 
-            document.getElementById('mark-read-btn').onclick = () => markRead(moduleReady.id);
+                if (!response.ok) throw new Error("Content locked or unavailable");
+                
+                const data = await response.json();
+                document.getElementById('reader-title').innerText = data.title || moduleReady.title;
+                document.getElementById('reader-page-info').innerText = `AgriTrust Internal Mastery Document | Topic ${data.topic_id}`;
+                
+                // Enhanced Markdown-ish Rendering
+                let htmlContent = data.content
+                    .replace(/^# (.*$)/gim, '<h1 style="color:var(--primary); margin-bottom:1.5rem; font-size:1.75rem;">$1</h1>')
+                    .replace(/^## (.*$)/gim, '<h2 style="margin-top:2.0rem; margin-bottom:1rem; border-bottom:1px solid var(--border); padding-bottom:0.5rem; font-size:1.4rem;">$1</h2>')
+                    .replace(/^### (.*$)/gim, '<h3 style="margin-top:1.5rem; margin-bottom:0.8rem; color:var(--primary); font-size:1.2rem;">$1</h3>')
+                    .replace(/\*\*(.*)\*\*/gim, '<strong style="color:var(--primary);">$1</strong>')
+                    .replace(/^\* (.*$)/gim, '<div style="margin-left:1rem; margin-bottom:0.5rem;"><i class="fas fa-caret-right" style="color:var(--primary); margin-right:0.5rem;"></i> $1</div>')
+                    .replace(/> (.*$)/gim, '<blockquote style="border-left:4px solid var(--primary); padding:1rem; background:rgba(59,130,246,0.05); margin:1.5rem 0; font-style:italic;">$1</blockquote>')
+                    .replace(/\n\n/g, '</p><p style="margin-bottom:1.2rem;">')
+                    .replace(/\n/g, '<br>');
+
+                // Add Topic Navigation inside Reader
+                const currentIndex = moduleReady.topics.findIndex(t => t.id === topicId);
+                const nextTopic = moduleReady.topics[currentIndex + 1];
+                const prevTopic = moduleReady.topics[currentIndex - 1];
+
+                document.getElementById('reader-body').innerHTML = `
+                    <div class="content-animate" style="animation: fadeIn 0.5s ease;">
+                        <p style="margin-bottom:1.2rem;">${htmlContent}</p>
+                        
+                        <div style="margin-top:4rem; padding-top:2rem; border-top:1px solid var(--border); display:flex; justify-content:space-between; gap:1rem;">
+                            ${prevTopic ? `<button class="q-btn ghost" onclick="openReader(
+                                ${JSON.stringify(moduleReady).replace(/"/g, '&quot;')}, 
+                                '${prevTopic.id}'
+                            )" style="flex:1;"><i class="fas fa-arrow-left"></i> Previous Topic</button>` : '<div></div>'}
+                            
+                            ${nextTopic ? `<button class="q-btn primary-btn" onclick="openReader(
+                                ${JSON.stringify(moduleReady).replace(/"/g, '&quot;')}, 
+                                '${nextTopic.id}'
+                            )" style="flex:1;">Next Topic <i class="fas fa-arrow-right"></i></button>` : `
+                                <button class="q-btn primary-btn" onclick="markRead(${moduleReady.module_number}, '${topicId}')" style="flex:1; background:#10b981;">Complete Module <i class="fas fa-check-double"></i></button>
+                            `}
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('mark-read-btn').onclick = () => markRead(moduleReady.module_number, topicId);
+            } catch (err) {
+                console.error("Reader Error:", err);
+                document.getElementById('reader-body').innerHTML = `
+                    <div style="text-align:center; padding: 5rem; color:#ef4444;">
+                        <i class="fas fa-lock fa-3xl"></i>
+                        <h3 style="margin-top:1.5rem;">Access Restricted</h3>
+                        <p style="margin-top:0.5rem; color:var(--text-muted);">This topic is currently locked or your session has expired.</p>
+                        <button class="q-btn ghost" style="margin-top:2rem;" onclick="location.reload()">Reload Dashboard</button>
+                    </div>
+                `;
+            }
         }
 
         function closeReader() {
@@ -446,10 +513,22 @@
             document.body.style.overflow = 'auto';
         }
 
-        async function markRead(moduleId) {
-            // In recruitment mode, this would ping the quiz endpoint or progress endpoint
-            alert('Progress Synced. Certification Path Updated.');
-            closeReader();
+        async function markRead(moduleNumber, topicId) {
+            const token = localStorage.getItem('agritrust_token');
+            try {
+                const response = await fetch(`${API_BASE}/academy/modules/${moduleNumber}/topics/${topicId}/complete`, {
+                    method: 'POST',
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    alert('Progress Synced. Topic mastery recorded.');
+                    closeReader();
+                    initAcademy(); // Refresh dashboard
+                }
+            } catch (err) {
+                console.error("Failed to sync progress");
+            }
         }
 
         // Initialize on load

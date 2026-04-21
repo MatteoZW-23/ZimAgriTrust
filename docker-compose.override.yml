@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     volumes:
@@ -12,7 +10,7 @@ services:
 
   agent-dashboard:
     volumes:
-      - ./Admin_Dashboard_Web_App:/app
+      - ./apps/admin-dashboard:/app
       - /app/node_modules
     environment:
       - NODE_ENV=development

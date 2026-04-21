@@ -202,6 +202,28 @@ def accept_farmer_response(db: Session, response: FarmerResponse) -> Order:
     db.refresh(order)
     return order
 
+def expire_old_listings(db: Session, days: int = 30) -> int:
+    """
+    Auto-expires listings older than the specified duration.
+    """
+    from datetime import timedelta
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    expired_count = db.query(Listing).filter(
+        Listing.status == ListingStatus.ACTIVE,
+        Listing.created_at < cutoff
+    ).update({"status": ListingStatus.EXPIRED})
+    db.commit()
+    return expired_count
+
+def bump_listing(db: Session, listing: Listing) -> Listing:
+    """
+    Bumps a listing to the top of search results by updating its created_at timestamp.
+    """
+    listing.created_at = datetime.utcnow()
+    db.commit()
+    db.refresh(listing)
+    return listing
+
 class MarketplaceService:
     @staticmethod
     def create_listing(db: Session, seller: User, payload: ListingCreate) -> Listing:
@@ -227,5 +249,11 @@ class MarketplaceService:
     @staticmethod
     def accept_farmer_response(db: Session, response: FarmerResponse) -> Order:
         return accept_farmer_response(db, response)
+    @staticmethod
+    def expire_old_listings(db: Session, days: int = 30) -> int:
+        return expire_old_listings(db, days)
+    @staticmethod
+    def bump_listing(db: Session, listing: Listing) -> Listing:
+        return bump_listing(db, listing)
 
 marketplace_core = MarketplaceService()

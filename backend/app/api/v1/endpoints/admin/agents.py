@@ -41,6 +41,33 @@ def list_agents(
         for a in agents
     ]
 
+@router.get("/stats")
+def agent_stats(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(UserRole.ADMIN, UserRole.AGENT)),
+):
+    """Returns granular performance metrics for field agents (Legacy compat)."""
+    agents = db.query(Agent).options(joinedload(Agent.user)).all()
+    if not agents:
+        basic_agents = db.query(User).filter(User.role == UserRole.AGENT).all()
+        return [
+            {
+                "id": str(u.id), "full_name": u.full_name, "region": u.province or "Central",
+                "resolved": 0, "rating": 5.0
+            } for u in basic_agents
+        ]
+
+    return [
+        {
+            "id": str(a.user_id),
+            "full_name": a.user.full_name if a.user else "Anonymous Agent",
+            "region": a.user.province if a.user else "Verified Zone",
+            "resolved": len(a.assignments) if a.assignments else 0,
+            "rating": a.rating
+        }
+        for a in agents
+    ]
+
 @router.get("/{agent_id}", response_model=AgentDetailResponse)
 def get_agent_detail(
     agent_id: uuid.UUID,
@@ -82,33 +109,6 @@ def get_agent_detail(
             for asgn in agent.assignments
         ]
     )
-
-@router.get("/stats")
-def agent_stats(
-    db: Session = Depends(get_db),
-    _: User = Depends(require_roles(UserRole.ADMIN, UserRole.AGENT)),
-):
-    """Returns granular performance metrics for field agents (Legacy compat)."""
-    agents = db.query(Agent).options(joinedload(Agent.user)).all()
-    if not agents:
-        basic_agents = db.query(User).filter(User.role == UserRole.AGENT).all()
-        return [
-            {
-                "id": str(u.id), "full_name": u.full_name, "region": u.province or "Central",
-                "resolved": 0, "rating": 5.0
-            } for u in basic_agents
-        ]
-
-    return [
-        {
-            "id": str(a.user_id),
-            "full_name": a.user.full_name if a.user else "Anonymous Agent",
-            "region": a.user.province if a.user else "Verified Zone",
-            "resolved": len(a.assignments) if a.assignments else 0,
-            "rating": a.rating
-        }
-        for a in agents
-    ]
 
 @router.post("/{agent_id}/status")
 def update_agent_status(

@@ -11,7 +11,7 @@ from app.services.dispute_service import create_dispute, resolve_dispute, propos
 router = APIRouter()
 
 
-@router.post("/", response_model=DisputeResponse)
+@router.post("", response_model=DisputeResponse)
 def raise_dispute(
     payload: DisputeCreate,
     db: Session = Depends(get_db),
@@ -20,7 +20,7 @@ def raise_dispute(
     return create_dispute(db, payload, current_user)
 
 
-@router.get("/", response_model=list[DisputeResponse])
+@router.get("", response_model=list[DisputeResponse])
 def list_disputes(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles(UserRole.AGENT, UserRole.ADMIN)),

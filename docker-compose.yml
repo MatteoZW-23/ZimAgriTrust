@@ -35,7 +35,7 @@ services:
       ALLOWED_HOSTS: "*"
     volumes:
       - ./backend:/app
-      - ./backend/ml_weights:/app/ml_weights
+      - ./data/ml-weights:/app/ml_weights
     depends_on:
       postgres:
         condition: service_healthy
@@ -43,44 +43,44 @@ services:
         condition: service_started
 
   node-gateway:
-    build: ./IoT_Sensor_Gateway
+    build: ./apps/iot-gateway
     ports:
       - "3005:3005"
     depends_on:
       - backend
 
   agent-dashboard:
-    build: ./Admin_Dashboard_Web_App
+    build: ./apps/admin-dashboard
     ports:
       - "3001:3000"
     environment:
       - VITE_API_URL=http://localhost:8080/api/v1
     volumes:
-      - ./Admin_Dashboard_Web_App:/app
+      - ./apps/admin-dashboard:/app
       - /app/node_modules
     depends_on:
       - backend
 
   ussd-simulator:
-    build: ./Telecom_USSD_Simulator
+    build: ./apps/ussd-simulator
     ports:
       - "5000:5000"
     environment:
       - BACKEND_URL=http://backend:8000
     volumes:
-      - ./Telecom_USSD_Simulator:/app
+      - ./apps/ussd-simulator:/app
     depends_on:
       - backend
 
   whatsapp-bridge:
-    build: ./Whatsapp_Bridge
+    build: ./apps/whatsapp-bridge
     ports:
       - "3006:3006"
     environment:
       - BACKEND_URL=http://backend:8000/api/v1/whatsapp/webhook
       - PORT=3006
     volumes:
-      - ./Whatsapp_Bridge:/app
+      - ./apps/whatsapp-bridge:/app
       - /app/node_modules
     depends_on:
       - backend
@@ -91,8 +91,8 @@ services:
       context: .
       dockerfile: Dockerfile.scheduler
     volumes:
-      - ./research:/research
-      - ./backend/ml_weights:/backend/ml_weights
+      - ./data/research:/research
+      - ./data/ml-weights:/backend/ml_weights
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - BACKEND_API_URL=http://backend:8000/api/v1

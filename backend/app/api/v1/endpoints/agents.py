@@ -1,3 +1,4 @@
+import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Dict
 from app.api.deps import get_db
@@ -7,7 +8,7 @@ from app.services.recruitment_service import recruitment_service
 router = APIRouter()
 
 @router.get("/my-status/{user_id}")
-async def get_agent_status(user_id: int, db: Session = Depends(get_db)):
+async def get_agent_status(user_id: uuid.UUID, db: Session = Depends(get_db)):
     """
     Returns current position in the 10-step recruitment pipeline.
     """

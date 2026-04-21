@@ -17,10 +17,12 @@ AgriTrust is a sovereign-grade digital infrastructure designed to modernize Zimb
 The AgriTrust ecosystem is built as a series of integrated micro-services:
 
 *   **`backend/`**: High-concurrency FastAPI core managing the ledger, authentication, and service orchestration.
-*   **`Admin_Dashboard_Web_App/`**: A premium React 18 interface for HQ staff and Field Agents.
-*   **`Whatsapp_Bridge/`**: A Node.js gateway that maintains secure persistent sessions with the WhatsApp network.
-*   **`Telecom_USSD_Simulator/`**: A developer environment to test GSM-based USSD menus and session flows.
-*   **`IoT_Sensor_Gateway/`**: Integration points for regional soil sensors and storage humidity monitors.
+*   **`apps/admin-dashboard/`**: A premium React 18 interface for HQ staff and Field Agents.
+*   **`apps/whatsapp-bridge/`**: A Node.js gateway that maintains secure persistent sessions with the WhatsApp network.
+*   **`apps/ussd-simulator/`**: A developer environment to test GSM-based USSD menus and session flows.
+*   **`apps/iot-gateway/`**: Integration points for regional soil sensors and storage humidity monitors.
+*   **`apps/agent-portal/`**: Training and academy portal for field agents.
+*   **`apps/farmer-app/`**: Interface focused on farmer trade and listings.
 
 ## 📊 System Visualizations
 
@@ -140,6 +142,31 @@ docker-compose up -d --build
 *   **Master Admin Phone**: `+263777777777`
 *   **Master Admin PIN**: `master`
 *   **Bootstrap Secret**: `agritrust-init-secret-2026` *(Required for new Staff/Agent registrations)*
+
+
+## 📂 Project Structure
+
+```text
+AgriTrust/
+├── apps/               # User-facing and supporting applications
+│   ├── admin-dashboard/ # HQ and Agent administrative interface
+│   ├── agent-portal/    # Agent academy and training environment
+│   ├── farmer-app/      # Farmer listing and trade interface
+│   ├── iot-gateway/     # Soil and humidity sensor integration
+│   ├── ussd-simulator/  # GSM/USSD session simulator
+│   └── whatsapp-bridge/ # WhatsApp persistence layer
+├── backend/            # Main FastAPI core and Business Logic
+├── data/               # Persistent assets and ML data
+│   ├── ml-weights/      # Pre-trained vision and price models
+│   ├── research/       # Notebooks and market analysis
+│   └── training-materials/ # Agent certification curriculum
+├── docs/               # Unified system documentation
+├── infra/              # DevOps and Monitoring configuration
+│   └── monitoring/      # Prometheus and Grafana dashboards
+├── scripts/            # Automation and system utility scripts
+├── tests/              # Global integration test suites
+└── docker-compose.yml  # Root orchestration manifest
+```
 
 ---
 

@@ -167,6 +167,42 @@ def get_module_content(
     }
 
 
+@router.get("/modules/{module_number}/topics/{topic_id}/content")
+def get_topic_content(
+    module_number: int,
+    topic_id: str,
+    current_agent: Agent = Depends(get_current_agent),
+    db: Session = Depends(get_db)
+):
+    """Read individual topic content with access verification"""
+    
+    training = db.query(AgentTraining).filter(AgentTraining.agent_id == current_agent.id).first()
+    if not training:
+        raise HTTPException(status_code=403, detail="Academy registration required.")
+
+    # Sequence Enforcement
+    if module_number > 1:
+        prev_status = getattr(training, f"module_{module_number-1}_status")
+        if prev_status != ModuleStatus.COMPLETED:
+             raise HTTPException(status_code=403, detail=f"🔒 Module {module_number} is locked.")
+
+    module = db.query(AcademyModule).filter(AcademyModule.module_number == module_number).first()
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+        
+    topic = next((t for t in (module.topics or []) if str(t.get("id")) == topic_id), None)
+    if not topic:
+        raise HTTPException(status_code=404, detail="Topic not found within this module")
+        
+    return {
+        "module_number": module_number,
+        "topic_id": topic_id,
+        "title": topic.get("title"),
+        "abstract": topic.get("abstract") or (topic.get("content", "")[:150] + "..." if topic.get("content") else "Confidential Field Intelligence."),
+        "content": topic.get("content", "Content restricted or currently being updated.")
+    }
+
+
 @router.post("/modules/{module_number}/topics/{topic_id}/complete")
 def complete_topic(
     module_number: int,

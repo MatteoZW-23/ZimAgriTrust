@@ -11,13 +11,13 @@ from app.db.base import Base
 
 
 class OrderStatus(str, enum.Enum):
-    PENDING = "pending"
-    ESCROW_HELD = "escrow_held"
-    DELIVERED = "delivered"
-    COMPLETED = "completed"
-    REFUNDED = "refunded"
-    SETTLED = "settled" # Resolved via agent mediation
-    DISPUTED = "disputed"
+    PENDING = "PENDING"
+    ESCROW_HELD = "ESCROW_HELD"
+    DELIVERED = "DELIVERED"
+    COMPLETED = "COMPLETED"
+    REFUNDED = "REFUNDED"
+    SETTLED = "SETTLED" # Resolved via agent mediation
+    DISPUTED = "DISPUTED"
 
 
 class Order(Base):
@@ -78,14 +78,14 @@ class Order(Base):
 
 
 class TransactionType(str, enum.Enum):
-    PAYMENT = "payment"
-    ESCROW_HOLD = "escrow_hold"
-    ESCROW_RELEASE = "escrow_release"
-    REFUND = "refund"
-    ADJUSTMENT = "adjustment" # Specialized for discounted settlements
-    FEE = "fee"
-    WITHDRAWAL = "withdrawal"
-    DEPOSIT = "deposit"
+    PAYMENT = "PAYMENT"
+    ESCROW_HOLD = "ESCROW_HOLD"
+    ESCROW_RELEASE = "ESCROW_RELEASE"
+    REFUND = "REFUND"
+    ADJUSTMENT = "ADJUSTMENT" # Specialized for discounted settlements
+    FEE = "FEE"
+    WITHDRAWAL = "WITHDRAWAL"
+    DEPOSIT = "DEPOSIT"
 
 
 class Transaction(Base):

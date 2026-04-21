@@ -14,6 +14,15 @@ def hold_payment(db: Session, order: Order) -> Order:
     return order
 
 
+def verify_handover_code(order: Order, provided_code: str) -> bool:
+    """
+    Validates a 6-character hex code for delivery confirmation.
+    """
+    if not provided_code or not order.handover_code:
+        return False
+    return provided_code.strip().upper() == order.handover_code.upper()
+
+
 def mark_delivered(db: Session, order: Order) -> Order:
     if order.status != OrderStatus.ESCROW_HELD:
         raise HTTPException(status_code=400, detail="Order must be in ESCROW_HELD to mark as delivered")
@@ -34,7 +43,7 @@ def release_payment(db: Session, order: Order, handover_code: str = None) -> Ord
     # SECURE HANDOVER VERIFICATION (FOR SELF-LOGISTICS)
     from app.models.listing import LogisticsType
     if order.logistics_type in {LogisticsType.SELF_COLLECT, LogisticsType.SELF_DELIVER}:
-        if not handover_code or handover_code != order.handover_code:
+        if not verify_handover_code(order, handover_code):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Invalid Handover Code. Mandatory for Self-Logistics verification."

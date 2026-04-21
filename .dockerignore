@@ -38,6 +38,11 @@ backend/logs/
 *.sqlite
 *.sqlite3
 data/
+!data/research/
+!data/research/scheduler/
+!data/research/scheduler/**
+!data/research/notebooks/
+!data/research/notebooks/**
 
 # ML Models (too large for Docker)
 *.pkl

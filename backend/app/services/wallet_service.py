@@ -162,8 +162,39 @@ class WalletService:
         return True
 
     @staticmethod
+    def initiate_external_payment(db: Session, user_id: uuid.UUID, amount: float, currency: str, provider: str = "EcoCash") -> dict:
+        """
+        Simulates integration with Zimbabwean payment gateways (EcoCash, OneMoney, Banks).
+        """
+        # In a real system, this would call an external API (e.g., Paynow, Pesepay)
+        payment_id = f"PAY-{uuid.uuid4().hex[:8].upper()}"
+        
+        logger.info(f"Initiated {provider} payment of {amount} {currency} for user {user_id}. Ref: {payment_id}")
+        
+        return {
+            "status": "pending",
+            "payment_id": payment_id,
+            "provider": provider,
+            "instruction": "Please check your phone for a USSD prompt to authorize the transaction."
+        }
+
+    @staticmethod
+    def confirm_external_payment(db: Session, payment_id: str) -> bool:
+        """
+        Simulates a callback/webhook verification of payment.
+        In this simulation, we always confirm it for demonstration.
+        """
+        # Real logic would check a 'Payment' table or call provider API
+        logger.info(f"External payment {payment_id} confirmed via webhook simulation.")
+        return True
+
+    @staticmethod
     def get_balance(db: Session, user_id: uuid.UUID) -> float:
         user = db.query(User).filter(User.id == user_id).first()
         return user.balance_usd if user else 0.0
+
+    @staticmethod
+    def get_transaction_history(db: Session, user_id: uuid.UUID, limit: int = 10) -> list[Transaction]:
+        return db.query(Transaction).filter(Transaction.user_id == user_id).order_by(Transaction.created_at.desc()).limit(limit).all()
 
 wallet_service = WalletService()

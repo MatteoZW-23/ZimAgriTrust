@@ -96,10 +96,15 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
       const res = await request(`/academy/modules/${selectedModule.module_number}/topics/${topic.id}/content`, {
           headers: { "Authorization": `Bearer ${academyToken}` }
       });
+      const rawContent = res.content || "Content synchronization in progress...";
+      const processedContent = typeof rawContent === 'string' 
+        ? rawContent.split(/\n\n+/).map(p => p.trim()).filter(p => p.length > 0)
+        : rawContent;
+
       setActiveLesson({ 
           ...topic, 
           abstract: res.abstract || "Historical field intelligence for this module is restricted to authorized trainees.",
-          content: res.content || ["Content synchronization in progress..."]
+          content: processedContent
       });
     } catch (err) {
       setError("CONTENT_SYNC_FAILURE: " + err.message);
@@ -619,7 +624,7 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                                <div className="v4-progress-bar" style={{ height: '6px', background: '#f1f5f9', borderRadius: '3px', marginBottom: '32px', overflow: 'hidden' }}>
                                   <div style={{ width: `${((activePageIndex + 1) / examQuestions.length) * 100}%`, background: '#f59e0b', height: '100%', transition: 'width 0.3s' }}></div>
                                </div>
-                               <h3 style={{ fontSize: '24px', fontWeight: 1000, color: '#000E2B', lineHeight: 1.4, marginBottom: '32px' }}>{examQuestions[activePageIndex]?.question}</h3>
+                               <h3 style={{ fontSize: '24px', fontWeight: 1000, color: '#000E2B', lineHeight: 1.4, marginBottom: '32px' }}>{examQuestions[activePageIndex]?.text}</h3>
                                <div className="options-grid" style={{ display: 'grid', gap: '12px' }}>
                                    {examQuestions[activePageIndex]?.options?.map((opt, idx) => (
                                        <button 
@@ -639,11 +644,13 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                                </div>
                                <div style={{ display: 'flex', gap: '16px', marginTop: '40px' }}>
                                    {activePageIndex > 0 && <button className="q-btn ghost" style={{ flex: 1, padding: '18px' }} onClick={() => setActivePageIndex(v => v-1)}><i className="fas fa-arrow-left"></i> Previous</button>}
-                                   {activePageIndex < examQuestions.length - 1 ? (
-                                       <button className="q-btn primary-btn" style={{ flex: 2, background: '#000E2B', padding: '18px' }} onClick={() => setActivePageIndex(v => v+1)} disabled={userAnswers[examQuestions[activePageIndex].id] === undefined}>Next Question <i className="fas fa-arrow-right" style={{ marginLeft: '8px' }}></i></button>
-                                   ) : (
-                                       <button className="q-btn" style={{ flex: 2, background: '#f59e0b', color: '#fff', padding: '18px', borderRadius: '16px', fontWeight: 1000 }} onClick={submitExam} disabled={userAnswers[examQuestions[activePageIndex].id] === undefined}>SUBMIT FINAL EXAM</button>
-                                   )}
+                                    {activePageIndex < examQuestions.length - 1 ? (
+                                        <button className="q-btn primary-btn" style={{ flex: 2, background: '#000E2B', padding: '18px' }} onClick={() => setActivePageIndex(v => v+1)} disabled={userAnswers[examQuestions[activePageIndex].id] === undefined}>Next Question <i className="fas fa-arrow-right" style={{ marginLeft: '8px' }}></i></button>
+                                    ) : (
+                                        <button className="q-btn" style={{ flex: 2, background: '#f59e0b', color: '#fff', padding: '18px', borderRadius: '16px', fontWeight: 1000 }} onClick={submitExam} disabled={userAnswers[examQuestions[activePageIndex].id] === undefined}>
+                                            {isModuleQuiz ? "SUBMIT MODULE QUIZ" : "SUBMIT FINAL CERTIFICATION"}
+                                        </button>
+                                    )}
                                </div>
                             </div>
                          </div>
@@ -806,11 +813,21 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                                                     {activeLesson.abstract}
                                                 </div>
                                                 <div className="academic-content">
-                                                    {activeLesson.content.map((p, i) => (
-                                                        <div key={i} className="content-segment">
-                                                            <p>{p}</p>
-                                                        </div>
-                                                    ))}
+                                                    {activeLesson.content.map((p, i) => {
+                                                         // Basic Markdown interpreter for the React View
+                                                         if (p.startsWith('#')) return <h3 key={i} style={{ color: '#000E2B', fontSize: '20px', marginTop: '24px', marginBottom: '12px' }}>{p.replace(/#/g, '').trim()}</h3>;
+                                                         if (p.startsWith('*')) return <li key={i} style={{ marginLeft: '20px', marginBottom: '8px', color: '#475569' }}>{p.replace(/^\*/, '').trim()}</li>;
+                                                         
+                                                         return (
+                                                             <div key={i} className="content-segment">
+                                                                 <p style={{ lineHeight: '1.6', marginBottom: '16px', color: '#475569' }}>
+                                                                     {p.split('**').map((part, idx) => 
+                                                                         idx % 2 === 1 ? <strong key={idx} style={{ color: '#20963D' }}>{part}</strong> : part
+                                                                     )}
+                                                                 </p>
+                                                             </div>
+                                                         );
+                                                    })}
                                                 </div>
                                                 <div className="reader-footer-note">
                                                     <i className="fas fa-microchip"></i>

@@ -13,10 +13,10 @@ clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 
 retrain:
-	python scripts/retrain_models.sh
+	sh scripts/retrain_models.sh
 
 seed-training:
-	python scripts/seed_agent_training.sh
+	python scripts/seed_agent_training.py
 
 deploy:
 	sh scripts/deploy.sh

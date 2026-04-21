@@ -13,7 +13,7 @@ from app.services.price_service import price_core
 from app.services.dispute_service import dispute_core
 from app.services.trust_service import trust_core
 from app.models.user import User, UserRole
-from app.models.listing import Listing, Offer, OfferStatus
+from app.models.listing import Listing, ListingStatus, Offer, OfferStatus
 from app.models.transaction import Order, OrderStatus
 from app.models.price_history import PriceHistory
 from app.services.knowledge_service import knowledge_service
@@ -119,7 +119,7 @@ class WhatsAppService:
         if user.role == UserRole.AGENT:
             if any(k in body_clean for k in ["task", "job", "assignment", "pending"]):
                 from app.models.listing import Listing
-                pending_tasks = db.query(Listing).filter(Listing.status == "pending").limit(5).all()
+                pending_tasks = db.query(Listing).filter(Listing.status == ListingStatus.PENDING).limit(5).all()
                 if not pending_tasks:
                    return "✅ *Operational Status*: All assigned crop verifications are complete. Stand by for new regional assignments."
                 
@@ -134,7 +134,8 @@ class WhatsAppService:
                         f"Current Balance: ${user.balance_usd:.2f}\n"
                         f"Unpaid Commission: ${commission:.2f}\n"
                         f"Total Life Earnings: ${user.balance_usd + 1450.00:.2f}\n\n"
-                        f"Note: Your next auto-payout is scheduled for Friday 14:00 CAT.")
+                        f"Note: Your next auto-payout is scheduled for Friday 14:00 CAT.\n"
+                        f"Reply 'WALLETHIST' for recent transactions.")
 
             if any(k in body_clean for k in ["location", "direction", "map"]):
                 return "📍 *Verification Rendezvous*: Coordinates locked for [HARARE HUB]. \n\n(Lat: -17.82, Lon: 31.05)\nETA from current sector: 22 mins."
@@ -218,6 +219,9 @@ class WhatsAppService:
         if any(k in body_clean for k in ["my listings", "manage crops"]):
             return await WhatsAppService._handle_my_listings(db, user)
 
+        if "wallethist" in body_clean or "wallet history" in body_clean:
+            return await WhatsAppService._handle_wallet_history(db, user)
+
         if body_clean.startswith("delete listing "):
             listing_id = body_clean.split(" ")[-1]
             return await WhatsAppService._handle_delete_listing(db, user, listing_id)
@@ -253,7 +257,7 @@ class WhatsAppService:
                 return "🚚 *Delivery Confirmation*\n\nPlease enter the 6-character **Handover Code** provided by the farmer."
 
             # C. My Orders (Missing Function #67)
-            if "my orders" in body_clean or "history" in body_clean:
+            if "my orders" in body_clean or ("history" in body_clean and "wallet" not in body_clean):
                 return await WhatsAppService._handle_my_orders(db, user)
 
             # D. Check for Trade Order status
@@ -331,7 +335,7 @@ class WhatsAppService:
             # Get Role-Specific Essential Duty Summary
             if user.role == UserRole.AGENT:
                 from app.models.listing import Listing
-                pending_count = db.query(func.count(Listing.id)).filter(Listing.status == "pending").scalar()
+                pending_count = db.query(func.count(Listing.id)).filter(Listing.status == ListingStatus.PENDING).scalar()
                 
                 return (f"👨‍✈️ *Command Center: Field Agent {user.full_name.split(' ')[0]}*\n\n"
                         f"Current Sector: *Operational*\n"
@@ -344,7 +348,7 @@ class WhatsAppService:
 
             if user.role == UserRole.FARMER:
                 from app.models.listing import Listing
-                active_listings = db.query(func.count(Listing.id)).filter(Listing.seller_id == user.id, Listing.status == "active").scalar()
+                active_listings = db.query(func.count(Listing.id)).filter(Listing.seller_id == user.id, Listing.status == ListingStatus.ACTIVE).scalar()
                 
                 return (f"🚜 *Harvest Manager: {user.full_name.split(' ')[0]}*\n\n"
                         f"Active GMB Listings: *{active_listings}*\n"
@@ -425,13 +429,13 @@ class WhatsAppService:
     @staticmethod
     async def _handle_my_listings(db, user):
         from app.models.listing import Listing
-        listings = db.query(Listing).filter(Listing.seller_id == user.id, Listing.status != "deleted").limit(10).all()
+        listings = db.query(Listing).filter(Listing.seller_id == user.id, Listing.status != ListingStatus.DELETED).limit(10).all()
         if not listings:
             return "📭 You don't have any active listings. Type 'sell' to list your first crop!"
         
         text = ["📋 *Your Active Listings:*"]
         for l in listings:
-            status_emoji = "✅" if l.status == "active" else "⏳" if l.status == "pending" else "📦"
+            status_emoji = "✅" if l.status == ListingStatus.ACTIVE else "⏳" if l.status == ListingStatus.PENDING else "📦"
             text.append(f"\n{status_emoji} {l.product_type} ({l.quantity}{l.quantity_unit})\nID: `{l.id}`\nDraft: 'delete listing {l.id}' to remove.")
         
         return "\n".join(text)
@@ -444,7 +448,7 @@ class WhatsAppService:
             if not listing:
                 return "⚠️ Listing not found or unauthorized."
             
-            listing.status = "deleted"
+            listing.status = ListingStatus.DELETED
             db.commit()
             return f"🗑️ Listing for *{listing.product_type}* has been removed."
         except Exception as e:
@@ -464,6 +468,21 @@ class WhatsAppService:
         text = ["📊 *Trade History (Last 10):*"]
         for o in orders:
             text.append(f"\n#{o.order_number}\nStatus: *{o.status.upper()}*\nTotal: ${o.total_amount}")
+            
+        return "\n".join(text)
+
+    @staticmethod
+    async def _handle_wallet_history(db, user):
+        from app.services.wallet_service import wallet_service
+        history = wallet_service.get_transaction_history(db, user.id)
+        
+        if not history:
+            return "💰 No wallet transactions found."
+            
+        text = ["📈 *Recent Wallet Activities:*"]
+        for tx in history:
+            type_label = tx.type.replace('_', ' ').title()
+            text.append(f"\n• {tx.created_at.strftime('%d/%m')} | {type_label}\n  Amt: ${tx.amount} {tx.currency}")
             
         return "\n".join(text)
 
@@ -518,7 +537,20 @@ class WhatsAppService:
             if has_media:
                 from app.ml.vision.vision_service import vision_core
                 # In production, we'd download the actual media. For now, we simulate.
-                analysis = vision_core.analyze_produce("path/to/downloaded/image.jpg")
+                import base64
+                import tempfile
+                import os
+                
+                # Use base64 data from bridge
+                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+                    tmp.write(base64.b64decode(media['data']))
+                    image_path = tmp.name
+                
+                analysis = vision_core.analyze_produce(image_path)
+                
+                # Cleanup
+                try: os.remove(image_path)
+                except: pass
                 
                 if not analysis.get("is_agricultural", True):
                     return (f"⚠️ *Visual Validation Failed*\n\n"
@@ -602,7 +634,20 @@ class WhatsAppService:
         
         # In production, we'd download the media from WhatsApp's API here.
         # For now, we simulate the analysis result using the production vision_core engine.
-        analysis = vision_core.analyze_produce("path/to/downloaded/image.jpg")
+        import base64
+        import tempfile
+        import os
+        
+        # Use base64 data from bridge
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+            tmp.write(base64.b64decode(media['data']))
+            image_path = tmp.name
+        
+        analysis = vision_core.analyze_produce(image_path)
+        
+        # Cleanup
+        try: os.remove(image_path)
+        except: pass
         
         if not analysis.get("is_agricultural", True):
             return (f"⚠️ *Visual Validation Failed*\n\n"
@@ -647,7 +692,7 @@ class WhatsAppService:
         # Logic to search real database
         from app.models.listing import Listing
         results = db.query(Listing).filter(
-            Listing.status == "active",
+            Listing.status == ListingStatus.ACTIVE,
             Listing.product_type.ilike(f"%{body}%")
         ).limit(5).all()
         

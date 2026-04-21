@@ -11,50 +11,49 @@ from app.db.base import Base
 
 
 class Sector(str, enum.Enum):
-    CROPS = "crops"
-    LIVESTOCK = "livestock"
-    POULTRY = "poultry"
-    DAIRY = "dairy"
-    FISHERIES = "fisheries"
-    VALUE_ADDED = "value_added"
-    
-    # Advanced Agricultural Domains
-    HORTICULTURE = "horticulture"
-    AQUACULTURE = "aquaculture"
-    APICULTURE = "apiculture"
-    SERICULTURE = "sericulture"
-    FLORICULTURE = "floriculture"
-    VITICULTURE = "viticulture"
-    OLERICULTURE = "olericulture"
-    POMOLOGY = "pomology"
-    PISCICULTURE = "pisciculture"
-    MARICULTURE = "mariculture"
-    INPUTS = "inputs" # Seed, Fertilizer, Feed
-    MIXED_FARMING = "mixed_farming"
-    ARABLE_FARMING = "arable_farming"
-    PASTORAL_FARMING = "pastoral_farming"
+    CROPS = "CROPS"
+    LIVESTOCK = "LIVESTOCK"
+    POULTRY = "POULTRY"
+    DAIRY = "DAIRY"
+    FISHERIES = "FISHERIES"
+    VALUE_ADDED = "VALUE_ADDED"
+    HORTICULTURE = "HORTICULTURE"
+    AQUACULTURE = "AQUACULTURE"
+    APICULTURE = "APICULTURE"
+    SERICULTURE = "SERICULTURE"
+    FLORICULTURE = "FLORICULTURE"
+    VITICULTURE = "VITICULTURE"
+    OLERICULTURE = "OLERICULTURE"
+    POMOLOGY = "POMOLOGY"
+    PISCICULTURE = "PISCICULTURE"
+    MARICULTURE = "MARICULTURE"
+    INPUTS = "INPUTS"
+    MIXED_FARMING = "MIXED_FARMING"
+    ARABLE_FARMING = "ARABLE_FARMING"
+    PASTORAL_FARMING = "PASTORAL_FARMING"
 
 
 class LogisticsType(str, enum.Enum):
-    PLATFORM = "platform"       # Third-party transporter
-    SELF_COLLECT = "self_collect" # Buyer picks up from farm
-    SELF_DELIVER = "self_deliver" # Farmer delivers to buyer
+    PLATFORM = "PLATFORM"       # Third-party transporter
+    SELF_COLLECT = "SELF_COLLECT" # Buyer picks up from farm
+    SELF_DELIVER = "SELF_DELIVER" # Farmer delivers to buyer
 
 
 class ListingStatus(str, enum.Enum):
-    ACTIVE = "active"
-    PENDING = "pending"
-    SOLD = "sold"
-    EXPIRED = "expired"
-    CANCELLED = "cancelled"
-    SUSPENDED = "suspended"
+    ACTIVE = "ACTIVE"
+    PENDING = "PENDING"
+    SOLD = "SOLD"
+    EXPIRED = "EXPIRED"
+    CANCELLED = "CANCELLED"
+    SUSPENDED = "SUSPENDED"
+    DELETED = "DELETED"
 
 
 class CropGrade(str, enum.Enum):
-    GRADE_A = "grade_a"
-    GRADE_B = "grade_b"
-    GRADE_C = "grade_c"
-    EXPORT = "export"
+    GRADE_A = "GRADE_A"
+    GRADE_B = "GRADE_B"
+    GRADE_C = "GRADE_C"
+    EXPORT = "EXPORT"
 
 
 class Listing(Base):
@@ -130,12 +129,12 @@ class Listing(Base):
 
 
 class OfferStatus(str, enum.Enum):
-    PENDING = "pending"
-    ACCEPTED = "accepted"
-    DECLINED = "declined"
-    COUNTERED = "countered"
-    EXPIRED = "expired"
-    CANCELLED = "cancelled"
+    PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    DECLINED = "DECLINED"
+    COUNTERED = "COUNTERED"
+    EXPIRED = "EXPIRED"
+    CANCELLED = "CANCELLED"
 
 
 class Offer(Base):

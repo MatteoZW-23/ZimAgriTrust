@@ -13,8 +13,8 @@ COPY requirements.scheduler.txt .
 RUN pip install --no-cache-dir -r requirements.scheduler.txt
 
 # Copy scheduler code
-COPY research/scheduler/ ./scheduler/
-COPY research/notebooks/ ./notebooks/
+COPY data/research/scheduler/ ./scheduler/
+COPY data/research/notebooks/ ./notebooks/
 
 # Create directories
 RUN mkdir -p logs outputs
