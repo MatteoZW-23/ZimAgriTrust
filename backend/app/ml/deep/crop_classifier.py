@@ -8,7 +8,7 @@ class CropClassifier:
     Sovereign ConvNeXt-based Crop Classifier.
     Identifies crop species and varieties from high-resolution imagery.
     """
-    def __init__(self, model_path="ml_weights/crop_classifier_convnext.pth"):
+    def __init__(self, model_path="data/ml-weights/crop_classifier_convnext.pth"):
         self.architecture = "ConvNeXt-Tiny"
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"Sovereign Vision: {self.architecture} loaded on {self.device}.")

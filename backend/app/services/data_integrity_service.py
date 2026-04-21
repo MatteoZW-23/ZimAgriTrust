@@ -9,8 +9,8 @@ class DataIntegrityService:
     Cleans raw scraped/research data and prepares "Production-Ready" datasets.
     """
     def __init__(self):
-        self.raw_path = "research/data/raw"
-        self.processed_path = "research/data/processed"
+        self.raw_path = "data/research/data/raw"
+        self.processed_path = "data/research/data/processed"
         os.makedirs(self.processed_path, exist_ok=True)
 
     def clean_scraped_prices(self, raw_data: list) -> list:

@@ -43,13 +43,16 @@ jobs:
       
       - name: Install dependencies
         run: |
-          cd agent-dashboard
+          cd apps/admin-dashboard
           npm ci
       
       - name: Run tests
         run: |
-          cd agent-dashboard
+          cd apps/admin-dashboard
           npm test -- --coverage
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
 
   build-and-push:
     needs: [test-backend, test-dashboard]
@@ -74,6 +77,6 @@ jobs:
       - name: Build and push dashboard
         uses: docker/build-push-action@v4
         with:
-          context: ./agent-dashboard
+          context: ./apps/admin-dashboard
           push: true
           tags: agritrust/dashboard:latest

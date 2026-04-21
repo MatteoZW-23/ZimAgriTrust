@@ -13,7 +13,7 @@ class DeepForecaster:
     
     def __init__(self):
         self.architecture = "Hybrid ARIMA-LSTM (Transformer-Ready)"
-        self.weights_path = "ml_weights/hybrid_price_engine.pkl"
+        self.weights_path = "data/ml-weights/hybrid_price_engine.pkl"
         self._initialize_hybrid_params()
 
     def _initialize_hybrid_params(self):

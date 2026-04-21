@@ -338,7 +338,7 @@ def get_final_exam_questions(
         )
 
     # Load master pool from the physical assets
-    pool_path = "agent_training_materials/final_exam/master_question_pool_1000.json"
+    pool_path = "data/training-materials/final_exam/master_question_pool_1000.json"
     if not os.path.exists(pool_path):
          pool_path = os.path.join(os.getcwd(), pool_path) # Absolute path fallback
          
@@ -404,7 +404,7 @@ def submit_final_exam(
         raise HTTPException(status_code=403, detail="Maximum of 2 attempts reached.")
 
     # Load master pool to verify answers server-side
-    pool_path = "agent_training_materials/final_exam/master_question_pool_1000.json"
+    pool_path = "data/training-materials/final_exam/master_question_pool_1000.json"
     with open(pool_path, 'r', encoding='utf-8') as f:
         pool_data = json.load(f)
     

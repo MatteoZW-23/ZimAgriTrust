@@ -106,7 +106,7 @@ async def get_farmer_recommendations(soil_type: str = "Sandy Loam"):
     return recommender.recommend_for_farmer(profile)
 
 @router.post("/train/{model_name}")
-async def trigger_model_training(model_name: str, data_source: str = "research/data/processed"):
+async def trigger_model_training(model_name: str, data_source: str = "data/research/data/processed"):
     """
     MLOps Trigger: Recalibrates specified model on fresh production data.
     """

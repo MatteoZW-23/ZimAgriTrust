@@ -6,7 +6,7 @@ class FraudDetector:
     Sovereign Anomaly Detection Engine.
     Uses Isolation Forests to detect fraudulent transaction patterns.
     """
-    def __init__(self, model_path="ml_weights/fraud_model_v1.pkl"):
+    def __init__(self, model_path="data/ml-weights/fraud_model_v1.pkl"):
         self.model = IsolationForest(contamination=0.01)
         print("Sovereign Security: Isolation Forest Anomaly Detection Online.")
 

@@ -5,7 +5,7 @@ class DiseaseDetector:
     Sovereign ResNet-9 Disease Diagnosis Engine.
     Detects pathological patterns in crop leaves.
     """
-    def __init__(self, model_path="ml_weights/disease_detector_resnet.pth"):
+    def __init__(self, model_path="data/ml-weights/disease_detector_resnet.pth"):
         self.architecture = "ResNet-9"
         print(f"Sovereign Diagnosis: {self.architecture} Online.")
 
