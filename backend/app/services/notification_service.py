@@ -90,4 +90,22 @@ class NotificationService:
             logger.error(f"Failed to send 2FA via WhatsApp: {e}")
             wa_sent = False
             
-        return sms_sent or wa_sent
+    @staticmethod
+    async def send_whatsapp_vision_result(phone: str, result: dict):
+        """Sends AI vision analysis results directly to farmer's WhatsApp."""
+        from app.services.whatsapp_service import whatsapp_service
+        
+        status_emoji = "✅" if result.get("success") else "⚠️"
+        crop_name = result.get("crop", {}).get("crop_name", "Produce")
+        grade = result.get("grade", {}).get("grade", "Standard")
+        
+        message = (
+            f"{status_emoji} *AgriTrust AI Analysis Complete*\n\n"
+            f"🌿 *Produce:* {crop_name}\n"
+            f"⭐ *Grade Estimate:* {grade}\n"
+            f"📊 *AI Confidence:* {int(result.get('crop', {}).get('confidence', 0)*100)}%\n\n"
+            f"This analysis has been logged to your listing. "
+            f"Our agents will use this to fast-track your verification."
+        )
+        
+        return await whatsapp_service.send_whatsapp_message(phone, message)

@@ -95,7 +95,21 @@ class Listing(Base):
     def seller_phone_masked(self) -> str:
         return self.seller.masked_phone if self.seller else "****"
 
+    # AI Vision Fields
+    ai_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    ai_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    ai_crop_type: Mapped[Optional[str]] = mapped_column(String(50))
+    ai_confidence: Mapped[Optional[float]] = mapped_column(Float)
+    ai_grade_estimate: Mapped[Optional[str]] = mapped_column(String(10))
+    ai_health_status: Mapped[Optional[str]] = mapped_column(String(100))
+    ai_verification_level: Mapped[Optional[str]] = mapped_column(String(20))  # auto_approve, suggest_approve, flag_review, reject
+    ai_raw_response: Mapped[Optional[dict]] = mapped_column(JSON)
+    
+    # Verification tracking
     verification_status: Mapped[str] = mapped_column(String(20), default="pending") # pending, verified, rejected
+    verified_by: Mapped[Optional[str]] = mapped_column(String(100))  # 'ai' or agent user_id
+    verification_notes: Mapped[Optional[str]] = mapped_column(Text)
+    
     is_boosted: Mapped[bool] = mapped_column(Boolean, default=False)
     boost_fee: Mapped[float] = mapped_column(Float, default=0.0)
     

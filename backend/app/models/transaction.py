@@ -1,9 +1,9 @@
 import enum
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any, Dict
 
-from sqlalchemy import Enum, Float, ForeignKey, Integer, String, Text, DateTime
+from sqlalchemy import Enum, Float, ForeignKey, Integer, String, Text, DateTime, Boolean, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -49,6 +49,12 @@ class Order(Base):
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     
+    # AI Fraud Detection
+    fraud_risk_score: Mapped[float] = mapped_column(Float, default=0.0)
+    fraud_risk_level: Mapped[Optional[str]] = mapped_column(String(20))  # low, medium, high
+    fraud_flags: Mapped[Optional[dict]] = mapped_column(JSON)  # List of flags
+    ai_reviewed: Mapped[bool] = mapped_column(Boolean, default=False)
+
     # Relationships
     offer = relationship("Offer", back_populates="order")
     listing = relationship("Listing", back_populates="orders")

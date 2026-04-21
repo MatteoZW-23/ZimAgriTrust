@@ -1,0 +1,40 @@
+<!-- Admin Dashboard - Vision System Monitor -->
+
+<div class="vision-monitor">
+    <h2>AI Vision System Status</h2>
+    
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h4>Total Analyses Today</h4>
+            <div class="stat-value" id="totalAnalyses">1,247</div>
+        </div>
+        <div class="stat-card">
+            <h4>Auto-Verified</h4>
+            <div class="stat-value" id="autoVerified">892</div>
+            <div class="stat-trend">71.5%</div>
+        </div>
+        <div class="stat-card">
+            <h4>Flagged for Review</h4>
+            <div class="stat-value" id="flaggedReviews">124</div>
+            <div class="stat-trend warning">9.9%</div>
+        </div>
+        <div class="stat-card">
+            <h4>AI Confidence Avg</h4>
+            <div class="stat-value" id="avgConfidence">82%</div>
+        </div>
+    </div>
+    
+    <div class="chart-container">
+        <canvas id="verificationTrends"></canvas>
+    </div>
+    
+    <div class="pending-reviews">
+        <h3>Pending Agent Reviews</h3>
+        <table id="pendingReviewsTable">
+            <thead>
+                <tr><th>Listing ID</th><th>Product</th><th>AI Confidence</th><th>Action</th></tr>
+            </thead>
+            <tbody id="pendingReviewsBody"></tbody>
+        </table>
+    </div>
+</div>

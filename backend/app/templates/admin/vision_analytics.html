@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Vision Analytics</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; margin: 2rem; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .row { display: flex; gap: 1.5rem; margin-bottom: 2rem; }
+        .card { background: #1e293b; padding: 1.5rem; border-radius: 12px; flex: 1; }
+        .full-width { width: 100%; }
+        h1 { color: #3b82f6; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        th { color: #94a3b8; }
+        .grade-a { color: #10b981; }
+        .confidence-high { background: #10b98122; color: #10b981; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI Vision System Analytics</h1>
+        
+        <div class="row">
+            <div class="card">
+                <h3>Accuracy by Crop Type</h3>
+                <canvas id="accuracyChart"></canvas>
+            </div>
+            
+            <div class="card">
+                <h3>Verification Volume (Last 7 Days)</h3>
+                <canvas id="volumeChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="card full-width">
+                <h3>Recent AI Decisions</h3>
+                <table id="decisionsTable">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Channel</th>
+                            <th>Detected Crop</th>
+                            <th>Confidence</th>
+                            <th>Decision</th>
+                        </tr>
+                    </thead>
+                    <tbody id="decisionsBody">
+                        <!-- Mock data for demo -->
+                        <tr>
+                            <td>12:45:02</td>
+                            <td>WhatsApp</td>
+                            <td>White Maize</td>
+                            <td class="confidence-high">94%</td>
+                            <td>Auto-Approved</td>
+                        </tr>
+                        <tr>
+                            <td>12:42:15</td>
+                            <td>Mobile App</td>
+                            <td>Roma Tomato</td>
+                            <td>78%</td>
+                            <td>Agent Review</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Placeholder for data loading
+        async function loadAnalytics() {
+            // In a real implementation:
+            // const response = await fetch('/api/v1/admin/vision/analytics');
+            // const data = await response.json();
+        }
+        
+        // Initialize charts with mock data
+        const ctxAccuracy = document.getElementById('accuracyChart').getContext('2d');
+        new Chart(ctxAccuracy, {
+            type: 'bar',
+            data: {
+                labels: ['Maize', 'Tomato', 'Soya', 'Tobacco'],
+                datasets: [{
+                    label: 'Accuracy %',
+                    data: [92, 85, 88, 76],
+                    backgroundColor: '#3b82f6'
+                }]
+            }
+        });
+    </script>
+</body>
+</html>

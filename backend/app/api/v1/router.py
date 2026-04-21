@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import admin, audit, auth, disputes, listings, market, payments, transactions, ussd, agents, logistics, ai, whatsapp, trades, recruitment, onboarding, requests, academy
+from app.api.v1.endpoints import admin, audit, auth, disputes, listings, market, payments, transactions, ussd, agents, logistics, ai, whatsapp, trades, recruitment, onboarding, requests, academy, vision
+from app.api.v1.endpoints.webhooks import vision_webhook
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -21,5 +22,7 @@ api_router.include_router(payments.router, prefix="/payments", tags=["payments"]
 api_router.include_router(audit.router, prefix="/audit", tags=["audit"])
 api_router.include_router(agents.router, prefix="/agents", tags=["agents"])
 api_router.include_router(ai.router, prefix="/ai", tags=["ai"])
+api_router.include_router(vision.router)
+api_router.include_router(vision_webhook.router)
 
 

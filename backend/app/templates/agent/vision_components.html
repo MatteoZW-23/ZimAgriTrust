@@ -1,0 +1,80 @@
+<!-- Agent Dashboard - Vision Verification Component -->
+
+<div class="vision-verification-panel">
+    <h3>AI Crop Verification</h3>
+    
+    <div class="upload-area" id="cropUploadArea">
+        <p>Upload crop image for AI analysis</p>
+        <input type="file" id="cropImage" accept="image/*" capture="environment" onchange="uploadAndAnalyze()">
+    </div>
+    
+    <div id="analysisResults" style="display:none;">
+        <div class="result-card">
+            <h4>Detection Results</h4>
+            <div class="crop-info">
+                <span class="label">Detected Crop:</span>
+                <span class="value" id="detectedCrop">-</span>
+            </div>
+            <div class="crop-info">
+                <span class="label">Confidence:</span>
+                <span class="value" id="confidence">-</span>
+            </div>
+            <div class="crop-info">
+                <span class="label">Estimated Grade:</span>
+                <span class="value" id="grade">-</span>
+            </div>
+            <div class="crop-info">
+                <span class="label">Health Status:</span>
+                <span class="value" id="healthStatus">-</span>
+            </div>
+        </div>
+        
+        <div class="action-buttons">
+            <button onclick="approveListing()">✓ Approve Listing</button>
+            <button onclick="requestNewPhoto()">📷 Request New Photo</button>
+            <button onclick="flagForReview()">⚠️ Flag for Review</button>
+        </div>
+    </div>
+</div>
+
+<script>
+async function uploadAndAnalyze() {
+    const file = document.getElementById('cropImage').files[0];
+    const formData = new FormData();
+    formData.append('image', file);
+    // currentListingCrop should be defined in the parent scope
+    if (typeof currentListingCrop !== 'undefined') {
+        formData.append('claimed_crop', currentListingCrop);
+    }
+    
+    try {
+        const response = await fetch('/api/v1/vision/analyze-crop', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        document.getElementById('detectedCrop').textContent = result.crop.crop_name;
+        document.getElementById('confidence').textContent = `${Math.round(result.crop.confidence * 100)}%`;
+        document.getElementById('grade').textContent = result.grade.grade;
+        document.getElementById('healthStatus').textContent = result.diseases[0]?.disease_name || 'Healthy';
+        
+        document.getElementById('analysisResults').style.display = 'block';
+    } catch (error) {
+        console.error('Vision analysis failed:', error);
+    }
+}
+
+function approveListing() {
+    // Send approval to backend
+    fetch('/api/v1/vision/verify-listing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            listing_id: typeof currentListingId !== 'undefined' ? currentListingId : null,
+            verified: true
+        })
+    });
+}
+</script>
