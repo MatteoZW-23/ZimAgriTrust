@@ -55,7 +55,7 @@ export function ReportsPanel() {
                     <div style={{ display: 'flex', gap: '8px' }}>
                         <button 
                             className="q-btn ghost small" 
-                            onClick={() => exportToJSON({ flow: '$1.4M', escrow: '89.4%', avg: '$640.22' }, 'parity_report.json')}
+                            onClick={() => exportToJSON({}, 'parity_report.json')}
                         >
                             <i className="fas fa-download"></i> EXPORT JSON
                         </button>
@@ -88,12 +88,11 @@ export function ReportsPanel() {
 
                   </div>
 
-                  <div style={{ height: '300px', background: 'var(--v4-bg)', borderRadius: '24px', border: '1.5px solid var(--v4-border)', padding: '24px', display: 'flex', alignItems: 'flex-end', gap: '20px' }}>
-                    {[40, 60, 45, 90, 75, 55, 100].map((h, idx) => (
-                        <div key={idx} style={{ flex: 1, height: `${h}%`, background: 'var(--v4-primary)', borderRadius: '8px 8px 0 0', opacity: 0.1 + (idx * 0.1), position: 'relative' }}>
-                            <div style={{ position: 'absolute', top: '-25px', width: '100%', textAlign: 'center', fontSize: '10px', fontWeight: 900 }}>{h}k</div>
-                        </div>
-                    ))}
+                  <div style={{ height: '300px', background: 'var(--v4-bg)', borderRadius: '24px', border: '1.5px solid var(--v4-border)', padding: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ textAlign: 'center', color: 'var(--v4-text-dim)', fontWeight: 700 }}>
+                      <i className="fas fa-chart-bar" style={{ fontSize: '32px', marginBottom: '12px', display: 'block', opacity: 0.3 }}></i>
+                      No transaction data yet. Chart will populate as orders are placed.
+                    </div>
                   </div>
               </div>
           </div>

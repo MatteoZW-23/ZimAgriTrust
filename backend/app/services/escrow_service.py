@@ -1,6 +1,10 @@
+import logging
 import uuid
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
+
 from app.models.transaction import Order, OrderStatus
 
 
@@ -79,7 +83,21 @@ def release_payment(db: Session, order: Order, handover_code: str = None) -> Ord
 
     db.commit()
     db.refresh(order)
-    
+
+    # Settle driver payout if a third-party driver was used
+    if order.driver_payout and order.driver_payout > 0:
+        try:
+            from app.models.driver import DriverJob
+            from app.services.transport_service import settle_driver_payout
+            job = db.query(DriverJob).filter(
+                DriverJob.order_id == order.id,
+                DriverJob.status == "DELIVERED",
+            ).first()
+            if job:
+                settle_driver_payout(db, job)
+        except Exception as e:
+            logger.error("Driver payout failed for order %s: %s", order.id, e)
+
     # Trigger trust updates
     from app.services.trust_service import update_scores_after_success
     update_scores_after_success(db, order)

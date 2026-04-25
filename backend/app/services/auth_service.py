@@ -7,10 +7,12 @@ from app.schemas.auth import UserRegister
 
 
 def register_user(db: Session, payload: UserRegister) -> User:
+    hashed_pin = get_password_hash(payload.password)
     user = User(
         full_name=payload.full_name,
         phone_number=payload.phone_number,
-        password_hash=get_password_hash(payload.password),
+        password_hash=hashed_pin,
+        ussd_pin_hash=hashed_pin,  # Same PIN for both app and USSD
         role=payload.role,
     )
     db.add(user)

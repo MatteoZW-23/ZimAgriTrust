@@ -19,33 +19,46 @@ from app.services.settlement_service import settlement_worker
 from app.services.auth_service import build_phone_lookup_candidates, normalize_phone_identifier
 from app.models.user import User, UserRole, UserStatus, FarmerProfile, BuyerProfile, AgentProfile
 from app.core.security import get_password_hash
+from app.services.startup_scraper import run_startup_scrape, start_scheduler
+from app.db.schema_patch import apply_schema_patches
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # CRITICAL: Table Creation Sequence
     print("SYSLOG | Initializing Strategic Database Schema...")
     try:
         Base.metadata.create_all(bind=engine)
         print(f"SYSLOG | Tables Confirmed: {list(Base.metadata.tables.keys())}")
-        
+
+        # Patch any columns added to ORM models after the table was first created
+        apply_schema_patches(engine)
+
         with SessionLocal() as db:
             print("SYSLOG | Finalizing Production Environment...")
-            # Ensure the master system administrator exists via the init_db script
-            pass
-            
-            # Flush settlement queues for initial deployment
             settlement_worker.run_settlement_sweep(db)
             print("SYSLOG | Platform Live and Ready for Market Deployment.")
 
     except Exception as e:
         print(f"BOOT_ERROR | Managed startup failure: {str(e)}")
-        
+
+    # ── SCRAPING STARTUP ──────────────────────────────────────────────────
+    import asyncio
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, run_startup_scrape)
+
+    start_scheduler()
+    print("SYSLOG | Background scraper and scheduler started.")
+    # ─────────────────────────────────────────────────────────────────────
+
     yield
 
 
 app = FastAPI(title=settings.APP_NAME, version="1.0.0", lifespan=lifespan)
 
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts_list)
+# Only apply TrustedHostMiddleware when a specific host list is configured.
+# When ALLOWED_HOSTS="*" (default in Docker), skip it — the middleware does NOT
+# treat "*" as allow-all; it would redirect every request with a real hostname.
+if settings.ALLOWED_HOSTS.strip() != "*":
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts_list)
 
 if settings.FORCE_HTTPS:
     app.add_middleware(HTTPSRedirectMiddleware)

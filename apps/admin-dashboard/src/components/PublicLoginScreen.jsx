@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { login, register, forgotPassword, resetPassword, getProfile, request, verifyLogin2FA } from "../api";
+import React, { useState, useCallback, useMemo } from 'react';
+import { login, register, getProfile, request, verifyLogin2FA } from "../api";
 
 
 export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
@@ -20,8 +20,6 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showRegPassword, setShowRegPassword] = useState(false);
   
   // Login flow states
   const [loginStep, setLoginStep] = useState(1); // 1: Credentials, 2: OTP
@@ -43,6 +41,13 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
   const [academyPin, setAcademyPin] = useState("");
   const [academyToken, setAcademyToken] = useState(null);
   const [certificationLevel, setCertificationLevel] = useState("trainee");
+
+  // Show/hide PIN toggles
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showAcademyPin, setShowAcademyPin] = useState(false);
+  const [showNewPin, setShowNewPin] = useState(false);
 
   const enterAcademy = async () => {
     if (!academyAppId || !academyPin) {
@@ -113,12 +118,21 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
     }
   };
 
-  const closeLesson = async () => {
+  const closeLesson = useCallback(async () => {
     if (activeLesson) {
-        await markTopicRead(selectedModule.module_number, activeLesson.id);
-        setActiveLesson(null);
+        // Prevent multiple simultaneous calls
+        if (loading) return;
+        setLoading(true);
+        try {
+            await markTopicRead(selectedModule.module_number, activeLesson.id);
+            setActiveLesson(null);
+        } catch (err) {
+            setError("Failed to mark lesson as complete: " + err.message);
+        } finally {
+            setLoading(false);
+        }
     }
-  };
+  }, [activeLesson, selectedModule, loading]);
 
   const markTopicRead = async (module_num, topic_id) => {
     try {
@@ -228,6 +242,56 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
     }
   };
 
+  // ── Forgot PIN ──────────────────────────────────────────────────────────────
+  const [forgotPhone, setForgotPhone] = useState("");
+  async function handleForgotRequest(e) {
+    e.preventDefault();
+    setLoading(true); setError(""); setSuccessMsg("");
+    try {
+      let cleaned = forgotPhone.replace(/\s/g, "");
+      if (cleaned.startsWith("0")) cleaned = cleaned.substring(1);
+      await request("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ phone_number: "+263" + cleaned })
+      });
+      setForgotStep(2);
+      setSuccessMsg("Verification code sent via WhatsApp & SMS.");
+    } catch (err) { setError(err.message || "Failed to send code."); }
+    finally { setLoading(false); }
+  }
+
+  async function handleForgotReset(e) {
+    e.preventDefault();
+    setLoading(true); setError("");
+    try {
+      let cleaned = forgotPhone.replace(/\s/g, "");
+      if (cleaned.startsWith("0")) cleaned = cleaned.substring(1);
+      await request("/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ phone_number: "+263" + cleaned, otp, new_password: newPassword })
+      });
+      setSuccessMsg("PIN updated! You can now log in with your new PIN.");
+      setTab("login"); setForgotStep(1); setOtp(""); setNewPassword("");
+    } catch (err) { setError(err.message || "Reset failed. Check your code."); }
+    finally { setLoading(false); }
+  }
+
+  // ── Resend Credentials (Academy) ────────────────────────────────────────────
+  const [resendPhone, setResendPhone] = useState("");
+  async function handleResendCredentials(e) {
+    e.preventDefault();
+    setLoading(true); setError(""); setSuccessMsg("");
+    try {
+      let cleaned = resendPhone.replace(/\s/g, "");
+      if (cleaned.startsWith("0")) cleaned = cleaned.substring(1);
+      await request("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ phone_number: "+263" + cleaned })
+      });
+      setSuccessMsg("A PIN reset code has been sent to your WhatsApp. Use it to set a new PIN, then log in to the Academy.");
+    } catch (err) { setError(err.message || "Could not send reset code."); }
+    finally { setLoading(false); }
+  }
 
   async function handleLoginSubmit(e) {
     if (e) e.preventDefault();
@@ -360,7 +424,7 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                           <span onClick={() => setTab('forgot')} style={{ fontSize: '10px', color: '#000E2B', fontWeight: 800, cursor: 'pointer', opacity: 0.8 }}>Recover PIN?</span>
                       </div>
                       <input 
-                          type="password" 
+                          type={showPassword ? "text" : "password"}
                           inputMode="numeric"
                           pattern="[0-9]*"
                           placeholder="••••" 
@@ -370,6 +434,9 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                           style={{ width: '100%', border: 'none', outline: 'none', fontSize: '24px', fontWeight: 950, background: 'transparent', textAlign: 'center', letterSpacing: '0.2em' }}
                           required 
                       />
+                      <button type="button" className="v4-pw-toggle" onClick={() => setShowPassword(v => !v)} tabIndex={-1}>
+                        <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                      </button>
                   </div>
                 </>
               ) : (
@@ -434,7 +501,7 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                 <label>Create Security PIN</label>
                 <div className="v4-input-group">
                    <input 
-                      type="password" 
+                      type={showRegPassword ? "text" : "password"}
                       inputMode="numeric"
                       pattern="[0-9]*"
                       value={regPassword} 
@@ -443,13 +510,16 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                       maxLength={6}
                       required 
                    />
+                   <button type="button" className="v4-pw-toggle" onClick={() => setShowRegPassword(v => !v)} tabIndex={-1}>
+                     <i className={`fas ${showRegPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                   </button>
                 </div>
               </div>
               <div className="v4-field">
                 <label>Repeat Security PIN</label>
                 <div className="v4-input-group">
                    <input 
-                      type="password" 
+                      type={showConfirmPassword ? "text" : "password"}
                       inputMode="numeric"
                       pattern="[0-9]*"
                       value={confirmPassword} 
@@ -458,6 +528,9 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                       maxLength={6}
                       required 
                    />
+                   <button type="button" className="v4-pw-toggle" onClick={() => setShowConfirmPassword(v => !v)} tabIndex={-1}>
+                     <i className={`fas ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                   </button>
                 </div>
               </div>
               <button type="submit" className="v4-submit-btn" disabled={loading}>
@@ -537,6 +610,84 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
             </div>
           )}
 
+          {tab === 'forgot' && (
+            <div className="v4-form animate-fade-in">
+              <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔑</div>
+                <h3 style={{ fontWeight: 900, color: '#000E2B', margin: 0 }}>Reset Your PIN</h3>
+                <p style={{ fontSize: '13px', color: '#64748b', marginTop: '8px' }}>
+                  {forgotStep === 1 ? "Enter your phone number and we'll send a reset code via WhatsApp." : "Enter the code you received and choose a new PIN."}
+                </p>
+              </div>
+
+              {forgotStep === 1 ? (
+                <form onSubmit={handleForgotRequest}>
+                  <div className="v4-field">
+                    <label>Mobile Number</label>
+                    <div className="v4-input-group">
+                      <span className="v4-prefix">+263</span>
+                      <input type="tel" value={forgotPhone} onChange={e => setForgotPhone(e.target.value)} placeholder="771 000 001" required />
+                    </div>
+                  </div>
+                  <button type="submit" className="v4-submit-btn" disabled={loading}>
+                    {loading ? <i className="fas fa-spinner fa-spin"></i> : 'Send Reset Code'}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleForgotReset}>
+                  <div className="v4-field">
+                    <label>Verification Code</label>
+                    <div className="v4-input-group">
+                      <input type="text" inputMode="numeric" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, ''))} placeholder="000000" maxLength={6} required style={{ textAlign: 'center', fontSize: '22px', letterSpacing: '0.3em' }} />
+                    </div>
+                  </div>
+                  <div className="v4-field">
+                    <label>New PIN</label>
+                    <div className="v4-input-group">
+                      <input type={showNewPin ? "text" : "password"} inputMode="numeric" pattern="[0-9]*" value={newPassword} onChange={e => setNewPassword(e.target.value.replace(/[^0-9]/g, ''))} placeholder="••••" maxLength={6} required style={{ textAlign: 'center', fontSize: '22px', letterSpacing: '0.3em' }} />
+                      <button type="button" className="v4-pw-toggle" onClick={() => setShowNewPin(v => !v)} tabIndex={-1}>
+                        <i className={`fas ${showNewPin ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                      </button>
+                    </div>
+                  </div>
+                  <button type="submit" className="v4-submit-btn" disabled={loading}>
+                    {loading ? <i className="fas fa-spinner fa-spin"></i> : 'Set New PIN'}
+                  </button>
+                </form>
+              )}
+              <button type="button" className="v4-ghost-btn" style={{ marginTop: '12px' }} onClick={() => { setTab('login'); setForgotStep(1); }}>
+                <i className="fas fa-arrow-left"></i> Back to Login
+              </button>
+            </div>
+          )}
+
+          {tab === 'resend-credentials' && (
+            <div className="v4-form animate-fade-in">
+              <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                <div style={{ fontSize: '40px', marginBottom: '12px' }}>📲</div>
+                <h3 style={{ fontWeight: 900, color: '#000E2B', margin: 0 }}>Resend My Credentials</h3>
+                <p style={{ fontSize: '13px', color: '#64748b', marginTop: '8px' }}>
+                  Enter your registered phone number. We'll send a PIN reset code to your WhatsApp so you can access the Academy.
+                </p>
+              </div>
+              <form onSubmit={handleResendCredentials}>
+                <div className="v4-field">
+                  <label>Registered Phone Number</label>
+                  <div className="v4-input-group">
+                    <span className="v4-prefix">+263</span>
+                    <input type="tel" value={resendPhone} onChange={e => setResendPhone(e.target.value)} placeholder="771 000 001" required />
+                  </div>
+                </div>
+                <button type="submit" className="v4-submit-btn" style={{ background: '#f59e0b', color: '#000' }} disabled={loading}>
+                  {loading ? <i className="fas fa-spinner fa-spin"></i> : '📲 Send to WhatsApp'}
+                </button>
+              </form>
+              <button type="button" className="v4-ghost-btn" style={{ marginTop: '12px' }} onClick={() => setTab('academy-portal')}>
+                <i className="fas fa-arrow-left"></i> Back to Academy Login
+              </button>
+            </div>
+          )}
+
           {tab === 'academy-portal' && (
             <div className="v4-form animate-fade-in academy-container">
                {!isExamStarted ? (
@@ -564,13 +715,18 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
 
                       <div className="v4-field" style={{ marginBottom: '24px' }}>
                           <label style={{ fontSize: '10px', fontWeight: 900, color: '#f59e0b', marginBottom: '8px', display: 'block' }}>SECURITY PIN</label>
-                          <input 
-                             type="password" 
-                             className="v4-basic-input" 
-                             placeholder="******" 
-                             value={academyPin} 
-                             onChange={(e) => setAcademyPin(e.target.value)} 
-                          />
+                          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+                            <input 
+                               type={showAcademyPin ? "text" : "password"}
+                               style={{ flex: 1, border: 'none', outline: 'none', padding: '14px 16px', fontSize: '18px', fontWeight: 800, background: 'transparent', letterSpacing: '0.2em' }}
+                               placeholder="••••••" 
+                               value={academyPin} 
+                               onChange={(e) => setAcademyPin(e.target.value)} 
+                            />
+                            <button type="button" className="v4-pw-toggle" onClick={() => setShowAcademyPin(v => !v)} tabIndex={-1}>
+                              <i className={`fas ${showAcademyPin ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                            </button>
+                          </div>
                       </div>
 
                       <button className="v4-submit-btn" style={{ background: '#000E2B' }} onClick={enterAcademy} disabled={loading}>
@@ -578,6 +734,13 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                       </button>
                       
                       <button className="v4-ghost-btn" style={{ marginTop: '12px' }} onClick={() => setTab('login')}>Back to Home</button>
+                      
+                      <div style={{ marginTop: '16px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 700 }}>Forgot your credentials? </span>
+                        <button type="button" onClick={() => setTab('resend-credentials')} style={{ background: 'none', border: 'none', color: '#f59e0b', fontWeight: 900, cursor: 'pointer', fontSize: '11px', textDecoration: 'underline' }}>
+                          Resend via WhatsApp
+                        </button>
+                      </div>
                   </div>
                 ) : (
                   <div className="academy-session-layer animate-fade-in" style={{ width: '100%', flex: 1 }}>
@@ -810,24 +973,29 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                                             <div className="reader-body">
                                                 <div className="academic-abstract">
                                                     <strong>ABSTRACT: </strong>
-                                                    {activeLesson.abstract}
+                                                    {activeLesson.abstract.split('**').map((part, idx) => 
+                                                        idx % 2 === 1 ? <strong key={idx} style={{ color: '#20963D' }}>{part}</strong> : part
+                                                    )}
                                                 </div>
                                                 <div className="academic-content">
-                                                    {activeLesson.content.map((p, i) => {
-                                                         // Basic Markdown interpreter for the React View
-                                                         if (p.startsWith('#')) return <h3 key={i} style={{ color: '#000E2B', fontSize: '20px', marginTop: '24px', marginBottom: '12px' }}>{p.replace(/#/g, '').trim()}</h3>;
-                                                         if (p.startsWith('*')) return <li key={i} style={{ marginLeft: '20px', marginBottom: '8px', color: '#475569' }}>{p.replace(/^\*/, '').trim()}</li>;
-                                                         
-                                                         return (
-                                                             <div key={i} className="content-segment">
-                                                                 <p style={{ lineHeight: '1.6', marginBottom: '16px', color: '#475569' }}>
-                                                                     {p.split('**').map((part, idx) => 
-                                                                         idx % 2 === 1 ? <strong key={idx} style={{ color: '#20963D' }}>{part}</strong> : part
-                                                                     )}
-                                                                 </p>
-                                                             </div>
-                                                         );
-                                                    })}
+                                                    {useMemo(() => 
+                                                        activeLesson.content.map((p, i) => {
+                                                             // Basic Markdown interpreter for the React View
+                                                             if (p.startsWith('#')) return <h3 key={i} style={{ color: '#000E2B', fontSize: '20px', marginTop: '24px', marginBottom: '12px' }}>{p.replace(/#/g, '').trim()}</h3>;
+                                                             if (p.startsWith('*')) return <li key={i} style={{ marginLeft: '20px', marginBottom: '8px', color: '#475569' }}>{p.replace(/^\*/, '').trim()}</li>;
+                                                             
+                                                             return (
+                                                                 <div key={i} className="content-segment">
+                                                                     <p style={{ lineHeight: '1.6', marginBottom: '16px', color: '#475569' }}>
+                                                                         {p.split('**').map((part, idx) => 
+                                                                             idx % 2 === 1 ? <strong key={idx} style={{ color: '#20963D' }}>{part}</strong> : part
+                                                                         )}
+                                                                     </p>
+                                                                 </div>
+                                                             );
+                                                        }),
+                                                        [activeLesson.content]
+                                                    )}
                                                 </div>
                                                 <div className="reader-footer-note">
                                                     <i className="fas fa-microchip"></i>
@@ -835,8 +1003,8 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                                                 </div>
                                             </div>
                                             <div className="reader-actions">
-                                                <button className="v4-submit-btn" style={{ background: '#000E2B' }} onClick={closeLesson}>
-                                                    FINISH STUDY SESSION
+                                                <button className="v4-submit-btn" style={{ background: '#000E2B' }} onClick={closeLesson} disabled={loading}>
+                                                    {loading ? <i className="fas fa-spinner fa-spin"></i> : "FINISH STUDY SESSION"}
                                                 </button>
                                             </div>
                                         </div>

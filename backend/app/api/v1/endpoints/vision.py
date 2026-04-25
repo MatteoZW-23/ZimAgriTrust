@@ -5,9 +5,8 @@ Mobile App Vision API - REST endpoints for mobile app
 from fastapi import APIRouter, UploadFile, File, Form, Depends
 from typing import Optional
 from sqlalchemy.orm import Session
-from app.db.session import get_db
+from app.api.deps import get_db, get_current_user
 from app.ml.vision.core.vision_engine import vision_engine
-from app.api.deps import get_current_user
 from app.models.user import User
 
 router = APIRouter(prefix="/vision", tags=["AI Vision"])

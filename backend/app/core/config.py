@@ -9,9 +9,10 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = "change-me-to-a-high-entropy-string-for-production"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 1 week 
-    REFRESH_TOKEN_EXPIRE_MINUTES: int = 43200  # 30 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15          # 15 minutes — short-lived
+    REFRESH_TOKEN_EXPIRE_MINUTES: int = 43200       # 30 days
     DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/agri_trust"
+    ADMIN_BOOTSTRAP_TOKEN: str = "secret-bootstrap-token"
     
     # --- AUTHENTICATION CONFIG ---
     # The platform has transitioned to numeric PINs for all roles (Farmer, Buyer, Agent, Admin)
@@ -27,6 +28,11 @@ class Settings(BaseSettings):
             return v.replace("postgres://", "postgresql://", 1)
         return v
 
+    # --- SMS CONFIG (AfricasTalking) ---
+    SMS_API_KEY: str = ""
+    SMS_USERNAME: str = "sandbox"
+    SMS_SENDER_ID: str = "AgriTrust"
+
     REDIS_URL: str = "redis://localhost:6379/0"
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:19006,http://localhost:5000,http://localhost:5173"
     ALLOWED_HOSTS: str = "localhost,127.0.0.1,host.docker.internal"
@@ -38,7 +44,11 @@ class Settings(BaseSettings):
 
     @property
     def allowed_hosts_list(self) -> list[str]:
-        return [host.strip() for host in self.ALLOWED_HOSTS.split(",") if host.strip()]
+        hosts = [host.strip() for host in self.ALLOWED_HOSTS.split(",") if host.strip()]
+        # If wildcard is present, return just ["*"] — TrustedHostMiddleware treats this as allow-all
+        if "*" in hosts:
+            return ["*"]
+        return hosts
 
 
 settings = Settings()

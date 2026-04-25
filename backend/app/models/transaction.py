@@ -16,7 +16,8 @@ class OrderStatus(str, enum.Enum):
     DELIVERED = "DELIVERED"
     COMPLETED = "COMPLETED"
     REFUNDED = "REFUNDED"
-    SETTLED = "SETTLED" # Resolved via agent mediation
+    CANCELLED = "REFUNDED"   # alias — maps to REFUNDED in DB
+    SETTLED = "SETTLED"      # Resolved via agent mediation
     DISPUTED = "DISPUTED"
 
 
@@ -41,7 +42,16 @@ class Order(Base):
     # Logistics Tracking
     from app.models.listing import LogisticsType
     logistics_type: Mapped[LogisticsType] = mapped_column(Enum(LogisticsType), default=LogisticsType.PLATFORM)
-    handover_code: Mapped[Optional[str]] = mapped_column(String(10)) # For Self-Logistics verification
+    handover_code: Mapped[Optional[str]] = mapped_column(String(10))
+
+    # Transport fee (added to order total when 3rd party / platform fleet)
+    transport_fee: Mapped[float] = mapped_column(Float, default=0.0)
+    transport_commission: Mapped[float] = mapped_column(Float, default=0.0)  # Platform's cut
+    driver_payout: Mapped[float] = mapped_column(Float, default=0.0)         # Driver's net
+
+    # Optional transport insurance (buyer-elected, flat $1.50 fee)
+    transport_insurance_elected: Mapped[bool] = mapped_column(Boolean, default=False)
+    transport_insurance_fee: Mapped[float] = mapped_column(Float, default=0.0)
     
     # Post-Mediation Adjustments
     refunded_amount: Mapped[float] = mapped_column(Float, default=0.0) # For settlements
@@ -107,3 +117,30 @@ class Transaction(Base):
     status: Mapped[str] = mapped_column(String(20), default="completed") # pending, completed, failed
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class TransportSurvey(Base):
+    """
+    Post-delivery survey capturing off-platform transport data.
+    Submitted by buyer after confirming receipt.
+    Used to understand transport patterns and identify partner opportunities.
+    """
+    __tablename__ = "transport_surveys"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id"), nullable=False, unique=True, index=True)
+    submitted_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+
+    # How did goods move?
+    transport_method: Mapped[Optional[str]] = mapped_column(String(50))
+    # e.g. "own_vehicle", "friend_family", "local_taxi", "cooperative", "platform_driver"
+
+    transport_cost_usd: Mapped[Optional[float]] = mapped_column(Float)
+    distance_km: Mapped[Optional[float]] = mapped_column(Float)
+    would_use_platform_transport: Mapped[Optional[bool]] = mapped_column(Boolean)
+    satisfaction_rating: Mapped[Optional[int]] = mapped_column(Integer)  # 1-5
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    order = relationship("Order", foreign_keys=[order_id])

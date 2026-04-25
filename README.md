@@ -170,6 +170,121 @@ AgriTrust/
 
 ---
 
+## 📱 USSD + SMS Channel Architecture
+
+AgriTrust is **USSD-first** — every core transaction works on a basic feature phone with zero data, zero app install.
+
+### Channel Strategy
+
+| Channel | Role | Best For |
+|---------|------|----------|
+| **USSD `*123#`** | Primary transaction channel | Price checks, listings, offers, wallet, delivery confirm |
+| **SMS** | Fallback + notifications | Receipts, alerts, OTPs, session timeout recovery |
+| **WhatsApp** | Supplementary (data required) | Rich media, AI assistant, document sharing |
+
+### USSD Menu Tree
+
+```
+*123#  →  🌾 AGRITRUST
+          1. Check Prices       →  Live ZAMACE/GMB prices per crop
+          2. Sell Crops         →  Create listing (crop → qty → price → grade → location → confirm)
+          3. My Listings        →  View active listings + incoming offers
+          4. My Orders          →  Track escrow, delivery, completion
+          5. Make Offer         →  Offer on listing ID (price → qty → confirm)
+          6. My Wallet          →  Balance, deposit, withdraw to EcoCash
+          7. Dispute Help       →  Open or check dispute status
+          8. My Profile         →  Trust score, verification status
+          9. Agent Corner       →  Agent-only: verifications, assignments
+          0. Help
+```
+
+### USSD → SMS Hybrid Flow
+
+```mermaid
+sequenceDiagram
+    participant F as Farmer (Feature Phone)
+    participant T as Telco USSD Gateway
+    participant B as AgriTrust Backend
+    participant S as SMS Gateway (AfricasTalking)
+
+    F->>T: Dials *123#
+    T->>B: POST /api/v1/ussd/session
+    B-->>T: Menu response (CON/END)
+    T-->>F: Display menu
+
+    F->>T: Selects "2. Sell Crops"
+    T->>B: Input forwarded
+    B-->>T: Step prompts (crop, qty, price...)
+    B->>S: Trigger SMS confirmation
+    S-->>F: "✅ Listing LST-12345 created. View offers via *123#"
+
+    Note over F,S: Later — buyer makes offer
+    B->>S: "🔔 New offer $0.38/kg for your maize"
+    F->>T: Dials *123# → My Listings → Accept
+    B->>S: "✅ Offer accepted! Buyer arranging delivery."
+```
+
+### SMS Notification Events
+
+| Trigger | SMS Sent |
+|---------|----------|
+| Listing created | `✅ Listing LST-{id} created. View offers via *123#` |
+| Offer received | `🔔 New offer of $X/kg for your {crop} listing` |
+| Offer accepted | `✅ Your offer was accepted! Pay via *123#` |
+| Payment locked | `💰 $X held in escrow for order #TRX-{id}` |
+| Delivery reported | `📦 Order #TRX-{id} delivered. Confirm via *123#` |
+| Payment released | `💰 $X sent to your EcoCash for order #TRX-{id}` |
+| Dispute opened | `⚠️ Dispute opened on transaction #TRX-{id}` |
+| Dispute resolved | `⚖️ Dispute resolved. $X refunded.` |
+| Trust score up | `📈 Your trust score increased to {score}/100` |
+| Low balance | `⚠️ Wallet balance $X. Add funds via *123#` |
+| Session timeout | `Your session expired. Dial *123# to continue.` |
+| Verification reminder | `📋 Complete ID verification to unlock higher limits` |
+
+### USSD Gateway Rollout Plan
+
+| Phase | Action | Timeline |
+|-------|--------|----------|
+| **Phase 1 — MVP** | USSD simulator (`localhost:5000`) + SMS via AfricasTalking | Week 1–2 |
+| **Phase 2 — Telco** | Register with POTRAZ, apply for `*123#` shortcode | Week 3–6 |
+| **Phase 3 — Live** | Sign agreements with Econet, NetOne, Telecel; deploy gateway | Week 7–10 |
+
+### SMS Provider
+
+**Recommended: [AfricasTalking](https://africastalking.com)** — cheapest Zimbabwe coverage, REST API, $0.02/SMS.
+
+Setup: create account → get API key → set sender ID `AgriTrust` → add `AT_API_KEY` to `.env`.
+
+### Implementation Status
+
+| Component | Status |
+|-----------|--------|
+| USSD menu tree | ✅ Designed |
+| USSD simulator (`apps/ussd-simulator/`) | ✅ Running |
+| Backend session handler (`/api/v1/ussd/`) | ✅ Built |
+| SMS notification service | ✅ Built |
+| AfricasTalking integration | ⚙️ Configure `AT_API_KEY` |
+| POTRAZ shortcode application | 📋 Pending company registration |
+| Econet / NetOne / Telecel agreements | 📋 Pending shortcode approval |
+| End-to-end live testing | 📋 After telco go-live |
+
+---
+
+## 🌐 Public Marketplace
+
+A fully public-facing marketplace — no login required to browse.
+
+| Page | What Users See |
+|------|---------------|
+| **Homepage** | Live crop prices (ZAMACE/GMB), trending crops, agriculture news, weather forecast, seasonal calendar |
+| **Browse** | Searchable/filterable listing grid with seller trust scores |
+| **Listing Detail** | Full crop info, price history chart, seller profile, similar listings |
+| **Login prompt** | Triggered only when user clicks "Make Offer" or "Contact Seller" |
+
+Live data sources: ZAMACE/GMB web scraping · Zimbabwe RSS news feeds · OpenWeatherMap API · Platform DB activity
+
+---
+
 *AgriTrust is engineered for economic resilience, market integrity, and the empowerment of the Zimbabwean farmer.*
 
 🔗 **Lead Infrastructure Architect**: [Mathew Mabira](https://www.linkedin.com/in/mathew-mabira-24861632b)

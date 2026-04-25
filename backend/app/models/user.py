@@ -2,7 +2,7 @@ import enum
 import uuid
 from typing import List, Optional
 
-from sqlalchemy import Boolean, Enum, Float, Integer, String, Text, ForeignKey, JSON, DateTime
+from sqlalchemy import Boolean, Enum, Float, Integer, String, Text, ForeignKey, JSON, DateTime, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,6 +24,7 @@ class UserStatus(str, enum.Enum):
     SUSPENDED = "suspended"
     CLOSED = "closed"
 
+
 class SubscriptionTier(str, enum.Enum):
     BASIC = "basic"
     PREMIUM = "premium"
@@ -42,11 +43,18 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False)
     
+    created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    
     # Verification & Trust (KYC)
     national_id: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)
     id_document_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True) # Secure link to ID
     id_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    id_verified_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
     id_verification_notes: Mapped[Optional[str]] = mapped_column(Text)
+    
+    # Phone Verification
+    is_phone_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    phone_verified_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
     
     # Location Data (Verified via GPS)
     province: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
@@ -55,6 +63,21 @@ class User(Base):
     latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     is_location_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    location_verified_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    # Buyer Business Verification
+    business_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    business_verified_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    # Agent Verification Stages
+    background_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    background_verified_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    training_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    training_completed_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    practical_passed: Mapped[bool] = mapped_column(Boolean, default=False)
+    practical_passed_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    shadowing_complete: Mapped[bool] = mapped_column(Boolean, default=False)
+    shadowing_complete_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
     
     # Intelligence Scoring
     trust_score: Mapped[int] = mapped_column(Integer, default=0)
@@ -65,6 +88,9 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True) # Legacy support
     is_suspended: Mapped[bool] = mapped_column(Boolean, default=False)
     status_notes: Mapped[Optional[str]] = mapped_column(Text)
+    
+    # Activity Tracking (for inactivity penalties)
+    last_activity_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), server_default=func.now())
     
     # Balance & Wallet (Agri-Telecom Marketplace Specs)
     balance_usd: Mapped[float] = mapped_column(Float, default=0.0)
@@ -79,6 +105,12 @@ class User(Base):
     # USSD & Localization
     ussd_pin_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     preferred_language: Mapped[str] = mapped_column(String(10), default="en") # en, sn, nd
+
+    # Force PIN change on first login (set when system provisions account)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Notification Preferences
+    notification_prefs: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     # Relationships
     farmer_profile = relationship("FarmerProfile", back_populates="user", uselist=False)
@@ -100,6 +132,21 @@ class User(Base):
         if len(self.phone_number) <= 7:
             return "*" * len(self.phone_number)
         return f"{self.phone_number[:6]}****{self.phone_number[-3:]}"
+
+
+class TrustScoreEvent(Base):
+    """Audit trail for all trust score changes"""
+    __tablename__ = "trust_score_events"
+    
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    previous_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    new_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    delta: Mapped[int] = mapped_column(Integer, nullable=False)
+    reason: Mapped[str] = mapped_column(String(100), nullable=False)
+    details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    triggered_by: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # system, admin, buyer, farmer, agent
+    created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 

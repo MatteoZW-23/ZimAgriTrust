@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from datetime import datetime
 from app.api.deps import get_db, get_current_user
 
 router = APIRouter()
@@ -27,7 +28,7 @@ def get_market_summary(
     scraped_prices = AgriScraper.scrape_market_prices()
     market_data = {}
     for item in scraped_prices:
-        market_data[item["commodity"]] = {"price": item["price"], "unit": item["unit"], "origin": item["origin"]}
+        market_data[item["commodity"]] = {"price": item["price"], "unit": item["unit"], "origin": item.get("source", "")}
         
     return market_data
 
@@ -44,13 +45,13 @@ def get_regional_insights(
         return {"error": "SUBSCRIPTION_REQUIRED", "message": "Regional analytics require a PREMIUM subscription."}
 
     from sqlalchemy import func
-    from app.models.listing import Listing
-    
+    from app.models.listing import Listing, ListingStatus
+
     stats = db.query(
         Listing.location_province,
         func.count(Listing.id).label("count"),
         func.avg(Listing.price_per_unit).label("avg_price")
-    ).filter(Listing.status == "active").group_by(Listing.location_province).all()
+    ).filter(Listing.status == ListingStatus.ACTIVE).group_by(Listing.location_province).all()
     
     return [
         {"province": s.location_province or "Other", "listings": s.count, "avg_price": round(s.avg_price, 2)}
@@ -65,20 +66,28 @@ def get_price_trends(
     user = Depends(get_current_user)
 ):
     """
-    Historical price trends. Restricted to PREMIUM.
+    Historical price trends from completed platform orders (last 30 days).
+    Falls back to scraper spot prices when no order history exists.
     """
-    if user.role not in [UserRole.ADMIN, UserRole.AGENT] and user.subscription_tier == SubscriptionTier.BASIC:
-        return {"error": "SUBSCRIPTION_REQUIRED", "message": "Historical trends are reserved for PREMIUM members."}
+    from app.ml.price_predictor import deep_engine as price_engine
 
-    from app.models.price_history import PriceHistory
-    history = db.query(PriceHistory).filter(
-        PriceHistory.product_type.ilike(f"%{crop}%")
-    ).order_by(PriceHistory.date.desc()).limit(30).all()
-    
-    return [
-        {"date": h.date.isoformat(), "price": h.price_per_unit, "source": h.source}
-        for h in history
-    ]
+    # Try live DB history first
+    history = price_engine.get_price_history(crop, db=db, days=30)
+    if history:
+        return history
+
+    # Fallback: scraper spot price as a single data point
+    try:
+        from app.services.scraper_service import AgriScraper
+        prices = AgriScraper.scrape_market_prices()
+        for item in prices:
+            if crop.lower() in item.get("commodity", "").lower():
+                today = datetime.utcnow().date().isoformat()
+                return [{"date": today, "price": item["price"], "source": item.get("source", "scraper")}]
+    except Exception:
+        pass
+
+    return []
 
 
 @router.get("/demand/{crop}")

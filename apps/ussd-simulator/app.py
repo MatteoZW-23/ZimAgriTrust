@@ -5,10 +5,23 @@ import requests
 from flask import Flask, render_template_string, request, session
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "agri-trust-ussd-demo")
-BACKEND_URL = "http://localhost:8080/api/v1/ussd/session"
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
+if not app.secret_key:
+    raise RuntimeError("FLASK_SECRET_KEY environment variable is not set")
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8080") + "/api/v1/ussd/session"
 
-PRESETS = []
+PRESETS = [
+    ("Main Menu", ""),
+    ("Sell Maize", "1"),
+    ("Buy Products", "2"),
+    ("AI Prices", "3"),
+    ("My Profile", "4"),
+    ("My Wallet", "5"),
+    ("Raise Dispute", "6"),
+    ("Change PIN", "7"),
+    ("Transactions", "8"),
+    ("Help", "9"),
+]
 
 
 TEMPLATE = """

@@ -1,89 +1,101 @@
 import joblib
 import os
 import numpy as np
-import pandas as pd
+from datetime import datetime, timedelta
 from typing import Dict, Any
 
 class RiskScorer:
     """
-    Sovereign Fraud Detection & Risk Scoring Engine.
-    Implements the AGRINET protocol: Layered scoring with Isolation Forests 
-    and Behavioral Anomaly Detection.
+    Multi-factor risk scoring engine.
+    Scores are derived from real user behaviour in the database:
+    transaction velocity, dispute history, cancellation rate,
+    verification tier, and trust score.
     """
     def __init__(self, db=None):
         self.db = db
-        self.architecture = "Layered Ensemble (Isolation Forest + RF Classifier + VAE)"
-        print(f"Sovereign Trust Core: {self.architecture} Initialized.")
 
     def calculate_risk_score(self, user_id: int) -> Dict[str, Any]:
-        """
-        Deep analysis of user behavior, transaction velocity, and content integrity.
-        """
         from app.models.user import User
         from app.models.transaction import Order, OrderStatus
-        
+        from app.models.dispute import Dispute
+
         user = self.db.query(User).filter(User.id == user_id).first()
         if not user:
             return {"risk_score": 100, "status": "HARD_BLOCK", "recommendation": "Reject Access"}
 
-        # 1. Behavioral Features
-        orders = self.db.query(Order).filter(Order.buyer_id == user_id).all()
-        total_amount = sum(o.total_amount for o in orders)
-        
-        # 2. Anomaly Detection (Isolation Forest Logic)
-        # We check for unusual "Velocity" (many transactions in short time)
-        # and "Outlier Amounts"
-        velocity_score = self._calculate_velocity(orders)
-        amount_outlier = 1.0 if total_amount > 50000 else 0.0 # High value anomaly
-        
-        # 3. Trust Baseline
-        base_trust = user.trust_score # From TrustService
-        
-        # 4. Layered Scoring
-        # Higher score = higher risk
-        risk_score = (velocity_score * 40) + (amount_outlier * 30) + ((100 - base_trust) * 0.3)
-        
-        # 5. Threshold Logic (AGRINET Protocol)
-        status = "VERIFIED"
-        recommendation = "Allow Transaction"
-        
-        if risk_score > 85:
+        # ── 1. Transaction velocity (last 24 h) ──────────────────────────
+        cutoff = datetime.utcnow() - timedelta(hours=24)
+        recent_orders = self.db.query(Order).filter(
+            (Order.buyer_id == user_id) | (Order.seller_id == user_id),
+            Order.created_at >= cutoff
+        ).count()
+        # >10 orders in 24 h is unusual for a smallholder marketplace
+        velocity_penalty = min(30, recent_orders * 3)
+
+        # ── 2. Dispute rate ───────────────────────────────────────────────
+        total_orders = self.db.query(Order).filter(
+            (Order.buyer_id == user_id) | (Order.seller_id == user_id)
+        ).count()
+        dispute_count = self.db.query(Dispute).join(Order, Dispute.order_id == Order.id).filter(
+            (Order.buyer_id == user_id) | (Order.seller_id == user_id)
+        ).count()
+        dispute_rate = (dispute_count / total_orders) if total_orders > 0 else 0.0
+        dispute_penalty = min(25, dispute_rate * 100)
+
+        # ── 3. Cancellation / refund rate ────────────────────────────────
+        refunded = self.db.query(Order).filter(
+            (Order.buyer_id == user_id) | (Order.seller_id == user_id),
+            Order.status == OrderStatus.REFUNDED
+        ).count()
+        cancel_rate = (refunded / total_orders) if total_orders > 0 else 0.0
+        cancel_penalty = min(20, cancel_rate * 80)
+
+        # ── 4. Trust score contribution ──────────────────────────────────
+        trust = float(user.trust_score or 50)
+        trust_penalty = max(0, (50 - trust) * 0.5)  # penalty only below 50
+
+        # ── 5. Verification bonus (reduces risk) ─────────────────────────
+        verification_bonus = 0
+        if user.is_verified:
+            verification_bonus = 10
+        if getattr(user, 'verification_tier', None) in ('FULL', 'PREMIUM'):
+            verification_bonus = 15
+
+        # ── Final score ───────────────────────────────────────────────────
+        risk_score = velocity_penalty + dispute_penalty + cancel_penalty + trust_penalty - verification_bonus
+        risk_score = max(0.0, min(100.0, round(risk_score, 2)))
+
+        if risk_score > 70:
             status = "HARD_BLOCK"
-            recommendation = "Account Suspended (Fraud Predicted)"
-        elif risk_score > 60:
+            recommendation = "Account flagged — manual review required"
+        elif risk_score > 45:
             status = "SOFT_BLOCK"
-            recommendation = "ID Verification Required (Manual Review)"
-        elif risk_score > 30:
+            recommendation = "ID re-verification required"
+        elif risk_score > 20:
             status = "MONITORED"
-            recommendation = "Escrow Enforcement Enabled"
+            recommendation = "Escrow enforcement active"
+        else:
+            status = "VERIFIED"
+            recommendation = "Allow transaction"
 
         return {
-            "risk_score": round(risk_score, 2),
+            "risk_score": risk_score,
             "status": status,
             "recommendation": recommendation,
-            "architecture": self.architecture,
+            "risk_level": status,
             "metrics": {
-                "velocity_anomaly": velocity_score,
-                "value_outlier": amount_outlier,
-                "behavioral_drift": 0.05 # Simulated VAE residual
+                "velocity_penalty": velocity_penalty,
+                "dispute_penalty": round(dispute_penalty, 2),
+                "cancel_penalty": round(cancel_penalty, 2),
+                "trust_penalty": round(trust_penalty, 2),
+                "verification_bonus": verification_bonus,
             },
-            "audit_timestamp": datetime.now().isoformat()
+            "audit_timestamp": datetime.utcnow().isoformat()
         }
 
-    def _calculate_velocity(self, orders) -> float:
-        """
-        Calculates transaction frequency anomalies.
-        """
-        if not orders: return 0.0
-        # Simulating velocity check: > 5 orders in 1 hour
-        return 0.1 # Baseline low velocity
-
     def train(self, behavioral_log_path: str):
-        """
-        Isolation Forest Recalibration: Updates anomaly thresholds.
-        """
-        print(f"Trust Core: recalibrating on {behavioral_log_path}...")
-        return {"status": "recalibrated", "new_contamination_level": 0.008}
+        """Placeholder — risk scoring uses live DB queries, no weights file needed."""
+        return {"status": "ok", "note": "Risk scorer uses live DB queries — no training required."}
 
-# Production Instances
+# Production instance (db injected per-request via risk_service)
 risk_engine = RiskScorer()

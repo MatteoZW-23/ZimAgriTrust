@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchMarketSummary, fetchPriceTrends } from '../api';
+import { fetchPriceTrends, fetchRegionalInsights } from '../api';
 import LineChart from './LineChart';
 
 const HERO_CONTENT = {
@@ -32,22 +32,39 @@ export function OverviewPanel({ overview, pulse, profile, onSync, onViewChange, 
     const role = profile?.role || "ADMIN";
     const [isExtended, setIsExtended] = useState(true);
     const [trendData, setTrendData] = useState([]);
+    const [regionalData, setRegionalData] = useState([]);
+    const [ppiChange, setPpiChange] = useState(null);
 
     useEffect(() => {
         const loadTrends = async () => {
             try {
-                // Default to Maize for general overview
                 const data = await fetchPriceTrends(token, 'Maize');
-                if (Array.isArray(data)) {
-                    setTrendData(data.map(d => ({ label: d.label || d.date, value: d.value || d.price })));
+                if (Array.isArray(data) && data.length > 0) {
+                    const mapped = data.map(d => ({ label: d.date || d.label, value: d.price || d.value }));
+                    setTrendData(mapped);
+                    // Calculate PPI change: last vs first price
+                    if (mapped.length >= 2) {
+                        const first = mapped[0].value;
+                        const last = mapped[mapped.length - 1].value;
+                        const pct = first > 0 ? (((last - first) / first) * 100).toFixed(1) : null;
+                        setPpiChange(pct);
+                    }
                 }
             } catch (err) {
                 console.warn("Trend sync deferred:", err.message);
-                // Fallback to minimal data if API fails or returns nothing
                 setTrendData([]);
             }
         };
+        const loadRegional = async () => {
+            try {
+                const data = await fetchRegionalInsights(token);
+                if (Array.isArray(data)) setRegionalData(data);
+            } catch {
+                setRegionalData([]);
+            }
+        };
         loadTrends();
+        loadRegional();
     }, [token]);
 
     const mergedActivities = React.useMemo(() => {
@@ -98,9 +115,9 @@ export function OverviewPanel({ overview, pulse, profile, onSync, onViewChange, 
                 <div className="hero-visual">
                     <div className="v4-glass-card-mini">
                         <label>TOTAL MARKET VALUE</label>
-                        <strong>$0</strong>
-                        <div className="trend-label"><i className="fas fa-arrow-trend-up"></i> 0.0% today</div>
-                        <div className="v4-progress-bar"><div style={{ width: '0%' }}></div></div>
+                        <strong>${overview?.total_volume ? Number(overview.total_volume).toLocaleString(undefined, { maximumFractionDigits: 0 }) : '0'}</strong>
+                        <div className="trend-label"><i className="fas fa-arrow-trend-up"></i> {overview?.platform_revenue ? `$${Number(overview.platform_revenue).toFixed(2)} platform revenue` : 'No transactions yet'}</div>
+                        <div className="v4-progress-bar"><div style={{ width: overview?.total_volume ? `${Math.min(100, (overview.total_volume / 100000) * 100)}%` : '0%' }}></div></div>
                     </div>
                 </div>
             </header>
@@ -112,7 +129,7 @@ export function OverviewPanel({ overview, pulse, profile, onSync, onViewChange, 
                     <div className="kpi-icon"><i className="fas fa-wallet"></i></div>
                     <div className="kpi-data">
                         <label>Escrow Pool</label>
-                        <strong>${overview?.escrow_total?.toLocaleString() ?? '0'}</strong>
+                        <strong>${overview?.escrow_total != null ? Number(overview.escrow_total).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '0'}</strong>
                     </div>
                 </div>
 
@@ -120,21 +137,21 @@ export function OverviewPanel({ overview, pulse, profile, onSync, onViewChange, 
                     <div className="kpi-icon" style={{ color: '#20963D' }}><i className="fas fa-handshake"></i></div>
                     <div className="kpi-data">
                         <label>Network Trust</label>
-                        <strong>0.0%</strong>
+                        <strong>{overview?.avg_trust_score ? `${overview.avg_trust_score.toFixed(1)}%` : '—'}</strong>
                     </div>
                 </div>
                 <div className="v4-kpi-card hover-lift">
                     <div className="kpi-icon" style={{ color: '#f59e0b' }}><i className="fas fa-bolt"></i></div>
                     <div className="kpi-data">
                         <label>Settlement Speed</label>
-                        <strong>--</strong>
+                        <strong>{overview?.avg_settlement_hours ? `${overview.avg_settlement_hours}h` : '—'}</strong>
                     </div>
                 </div>
                 <div className="v4-kpi-card hover-lift">
                     <div className="kpi-icon" style={{ color: '#3b82f6' }}><i className="fas fa-users"></i></div>
                     <div className="kpi-data">
                         <label>Active Nodes</label>
-                        <strong>0</strong>
+                        <strong>{overview?.stats?.total_users ?? overview?.total_users ?? 0}</strong>
                     </div>
                 </div>
 
@@ -163,8 +180,10 @@ export function OverviewPanel({ overview, pulse, profile, onSync, onViewChange, 
                                         <p style={{ margin: 0, fontSize: '11px', color: 'var(--v4-text-dim)', fontWeight: 700 }}>Weighted regional average for staple commodities.</p>
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
-                                        <div style={{ fontSize: '18px', fontWeight: 1000, color: '#20963D' }}>0.0%</div>
-                                        <div style={{ fontSize: '9px', fontWeight: 900, opacity: 0.6 }}>QUARTERLY TREND</div>
+                                        <div style={{ fontSize: '18px', fontWeight: 1000, color: ppiChange !== null ? (Number(ppiChange) >= 0 ? '#20963D' : '#ef4444') : '#94a3b8' }}>
+                                            {ppiChange !== null ? `${Number(ppiChange) >= 0 ? '+' : ''}${ppiChange}%` : trendData.length === 0 ? 'No data' : '—'}
+                                        </div>
+                                        <div style={{ fontSize: '9px', fontWeight: 900, opacity: 0.6 }}>30-DAY TREND</div>
                                     </div>
 
                                 </div>
@@ -204,14 +223,17 @@ export function OverviewPanel({ overview, pulse, profile, onSync, onViewChange, 
                                 </div>
                                 
                                 <div className="v4-advisory-stack" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                    <div className="adv-item" style={{ padding: '20px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <strong style={{ display: 'block', fontSize: '13px', marginBottom: '4px', color: '#3b82f6' }}>Supply Status</strong>
-                                        <p style={{ fontSize: '12px', opacity: 0.6, margin: 0, lineHeight: 1.5 }}>Synchronizing regional supply signals. No anomalies detected in current trade lot flow.</p>
-                                    </div>
-                                    <div className="adv-item" style={{ padding: '20px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <strong style={{ display: 'block', fontSize: '13px', marginBottom: '4px', color: '#f59e0b' }}>Logistics Notice</strong>
-                                        <p style={{ fontSize: '12px', opacity: 0.6, margin: 0, lineHeight: 1.5 }}>Awaiting logistics synchronization. Regional transport schedules are currently stable.</p>
-                                    </div>
+                                    {activities?.listings?.length > 0 ? (
+                                        <div className="adv-item" style={{ padding: '20px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <strong style={{ display: 'block', fontSize: '13px', marginBottom: '4px', color: '#3b82f6' }}>Active Listings</strong>
+                                            <p style={{ fontSize: '12px', opacity: 0.6, margin: 0, lineHeight: 1.5 }}>{activities.listings.length} listing{activities.listings.length !== 1 ? 's' : ''} currently active in your region.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="adv-item" style={{ padding: '20px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <strong style={{ display: 'block', fontSize: '13px', marginBottom: '4px', color: '#94a3b8' }}>No Data Yet</strong>
+                                            <p style={{ fontSize: '12px', opacity: 0.6, margin: 0, lineHeight: 1.5 }}>Local farm updates will appear here as activity is recorded.</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             {profile?.subscription_tier === 'basic' && (
@@ -232,40 +254,48 @@ export function OverviewPanel({ overview, pulse, profile, onSync, onViewChange, 
                                 </div>
                                 <div style={{ padding: '20px 0' }}>
                                     <div className="v4-matrix-rows" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                        <div className="matrix-item">
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 700, marginBottom: '8px' }}>
-                                                <span>MASH CENTRAL</span>
-                                                <span style={{ color: '#20963D' }}>0%</span>
-                                            </div>
-                                            <div style={{ height: '4px', background: 'var(--v4-border)', borderRadius: '10px', overflow: 'hidden' }}>
-                                                <div style={{ width: '0%', height: '100%', background: '#20963D' }}></div>
-                                            </div>
-                                        </div>
-                                        <div className="matrix-item">
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 700, marginBottom: '8px' }}>
-                                                <span>MANICALAND</span>
-                                                <span style={{ color: '#3b82f6' }}>0%</span>
-                                            </div>
-                                            <div style={{ height: '4px', background: 'var(--v4-border)', borderRadius: '10px', overflow: 'hidden' }}>
-                                                <div style={{ width: '0%', height: '100%', background: '#3b82f6' }}></div>
-                                            </div>
-                                        </div>
-                                        <div className="matrix-item">
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 700, marginBottom: '8px' }}>
-                                                <span>MATAB NORTH</span>
-                                                <span style={{ color: '#f59e0b' }}>0%</span>
-                                            </div>
-                                            <div style={{ height: '4px', background: 'var(--v4-border)', borderRadius: '10px', overflow: 'hidden' }}>
-                                                <div style={{ width: '0%', height: '100%', background: '#f59e0b' }}></div>
-                                            </div>
-                                        </div>
+                                        {regionalData.length > 0 ? regionalData.slice(0, 5).map((r, i) => {
+                                            const colors = ['#20963D', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444'];
+                                            const maxListings = Math.max(...regionalData.map(x => x.listings || 0), 1);
+                                            const pct = Math.round(((r.listings || 0) / maxListings) * 100);
+                                            return (
+                                                <div key={r.province} className="matrix-item">
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 700, marginBottom: '8px' }}>
+                                                        <span>{(r.province || 'Other').toUpperCase()}</span>
+                                                        <span style={{ color: colors[i % colors.length] }}>{pct}% ({r.listings} listings)</span>
+                                                    </div>
+                                                    <div style={{ height: '4px', background: 'var(--v4-border)', borderRadius: '10px', overflow: 'hidden' }}>
+                                                        <div style={{ width: `${pct}%`, height: '100%', background: colors[i % colors.length], transition: 'width 0.6s ease' }}></div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }) : (
+                                            <>
+                                                {['MASH CENTRAL', 'MANICALAND', 'MATAB NORTH'].map((name, i) => (
+                                                    <div key={name} className="matrix-item">
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 700, marginBottom: '8px' }}>
+                                                            <span>{name}</span>
+                                                            <span style={{ color: '#94a3b8' }}>No data</span>
+                                                        </div>
+                                                        <div style={{ height: '4px', background: 'var(--v4-border)', borderRadius: '10px' }}></div>
+                                                    </div>
+                                                ))}
+                                            </>
+                                        )}
 
                                         <div style={{ marginTop: '24px' }}>
-                                            <label style={{ display: 'block', fontSize: '9px', fontWeight: 900, color: 'var(--v4-text-dim)', marginBottom: '12px', letterSpacing: '0.05em' }}>HISTORICAL CLEARING PULSE</label>
+                                            <label style={{ display: 'block', fontSize: '9px', fontWeight: 900, color: 'var(--v4-text-dim)', marginBottom: '12px', letterSpacing: '0.05em' }}>LISTING ACTIVITY (LAST 30 DAYS)</label>
                                             <div className="v4-heatmap">
-                                                {[...Array(30)].map((_, i) => (
-                                                    <div key={i} className={`v4-heatmap-cell ${i % 7 === 0 ? 'high' : i % 3 === 0 ? 'mid' : ''}`} />
-                                                ))}
+                                                {(() => {
+                                                    const maxListings = Math.max(...regionalData.map(r => r.listings || 0), 1);
+                                                    return [...Array(30)].map((_, i) => {
+                                                        const regionIdx = i % Math.max(regionalData.length, 1);
+                                                        const intensity = regionalData[regionIdx] ? Math.min(1, (regionalData[regionIdx].listings || 0) / maxListings) : 0;
+                                                        return (
+                                                            <div key={i} className="v4-heatmap-cell" style={{ background: intensity > 0 ? `rgba(32,150,61,${0.15 + intensity * 0.85})` : undefined }} />
+                                                        );
+                                                    });
+                                                })()}
                                             </div>
                                         </div>
                                     </div>

@@ -30,10 +30,14 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 .wwebjs_auth/
+.wwebjs_cache/
 *.db
 *.sqlite3
 postgres_data/
 ml_weights/model_*.pt
+*.pt
 logs/
 outputs/
 .ipynb_checkpoints/
+.kiro/
+fastapi-import-fixer.agent.md

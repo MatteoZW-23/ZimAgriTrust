@@ -34,7 +34,7 @@ def sync_schema():
     ]
     
     with engine.connect() as conn:
-        print("Starting manual schema synchronization for agent_applications...")
+        print("Starting schema synchronization for agent_applications...")
         for cmd in commands:
             try:
                 conn.execute(text(cmd))

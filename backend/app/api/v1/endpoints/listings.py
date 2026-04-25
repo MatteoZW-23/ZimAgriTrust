@@ -1,18 +1,27 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles, check_lockdown
 from app.models.listing import Listing, ListingStatus, Offer
 from app.models.user import User, UserRole
-from app.schemas.listing import ListingCreate, ListingResponse, OfferCreate, OfferResponse, CounterOfferRequest
+from app.schemas.listing import (
+    CounterOfferRequest,
+    ListingCreate,
+    ListingResponse,
+    ListingSearchResponse,
+    PaginationMeta,
+    OfferCreate,
+    OfferResponse,
+)
 from app.schemas.transaction import OrderResponse
 from app.services.marketplace_service import marketplace_core
 
 router = APIRouter()
 
 
-@router.post("/", response_model=ListingResponse)
+@router.post("", response_model=ListingResponse)
+@router.post("/", response_model=ListingResponse, include_in_schema=False)
 def create_market_listing(
     payload: ListingCreate,
     db: Session = Depends(get_db),
@@ -22,7 +31,45 @@ def create_market_listing(
     return marketplace_core.create_listing(db, seller, payload)
 
 
-@router.get("/", response_model=list[ListingResponse])
+@router.get("/search", response_model=ListingSearchResponse)
+def search_market_listings(
+    db: Session = Depends(get_db),
+    crop: str | None = Query(default=None, min_length=1, max_length=50),
+    location: str | None = Query(default=None, min_length=1, max_length=200),
+    min_price: float | None = Query(default=None, ge=0),
+    max_price: float | None = Query(default=None, ge=0),
+    grade: str | None = Query(default=None, min_length=1, max_length=20),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> ListingSearchResponse:
+    if min_price is not None and max_price is not None and min_price > max_price:
+        raise HTTPException(status_code=400, detail="min_price cannot be greater than max_price")
+
+    listings, total = marketplace_core.search_listings(
+        db=db,
+        crop=crop,
+        location=location,
+        min_price=min_price,
+        max_price=max_price,
+        grade=grade,
+        limit=limit,
+        offset=offset,
+    )
+
+    return ListingSearchResponse(
+        success=True,
+        data=listings,
+        pagination=PaginationMeta(
+            limit=limit,
+            offset=offset,
+            total=total,
+            has_more=(offset + len(listings)) < total,
+        ),
+    )
+
+
+@router.get("", response_model=list[ListingResponse])
+@router.get("/", response_model=list[ListingResponse], include_in_schema=False)
 def list_market_listings(db: Session = Depends(get_db)) -> list[Listing]:
     return (
         db.query(Listing)

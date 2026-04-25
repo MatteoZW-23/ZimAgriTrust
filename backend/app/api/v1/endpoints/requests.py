@@ -12,7 +12,8 @@ from app.services.marketplace_service import marketplace_core
 router = APIRouter()
 
 
-@router.post("/", response_model=BuyerRequestResponse)
+@router.post("", response_model=BuyerRequestResponse)
+@router.post("/", response_model=BuyerRequestResponse, include_in_schema=False)
 def create_request(
     payload: BuyerRequestCreate,
     db: Session = Depends(get_db),
@@ -24,7 +25,8 @@ def create_request(
     return marketplace_core.create_buyer_request(db, buyer, payload)
 
 
-@router.get("/", response_model=list[BuyerRequestResponse])
+@router.get("", response_model=list[BuyerRequestResponse])
+@router.get("/", response_model=list[BuyerRequestResponse], include_in_schema=False)
 def list_requests(db: Session = Depends(get_db)) -> list[BuyerRequest]:
     """
     Farmers browse active requests.

@@ -1,221 +1,288 @@
-import React, { useState, useEffect } from 'react';
-import { 
-    fetchTransactions, 
-    fetchAuditLogs, 
-    fetchNationalRevenue, 
-    reconcilePlatform, 
-    downloadReceipt 
- } from '../api';
-import { exportToCSV, handleImport } from '../utils/dataTransfer';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  fetchTransactions, fetchAuditLogs, fetchNationalRevenue,
+  fetchRevenueBreakdown,
+  reconcilePlatform, downloadReceipt, listAdminTransactions,
+  forceEscrowRelease, forceEscrowRefund,
+} from '../api';
+import { exportToCSV } from '../utils/dataTransfer';
+
+const STATUS_META = {
+  COMPLETED:  { color: '#16a34a', bg: '#f0fdf4', label: 'Completed' },
+  PENDING:    { color: '#d97706', bg: '#fffbeb', label: 'Pending'   },
+  IN_ESCROW:  { color: '#2563eb', bg: '#eff6ff', label: 'In Escrow' },
+  DISPUTED:   { color: '#dc2626', bg: '#fef2f2', label: 'Disputed'  },
+  REFUNDED:   { color: '#7c3aed', bg: '#f5f3ff', label: 'Refunded'  },
+  CANCELLED:  { color: '#64748b', bg: '#f8fafc', label: 'Cancelled' },
+};
+function StatusPill({ status = '' }) {
+  const m = STATUS_META[status.toUpperCase()] || { color: '#64748b', bg: '#f8fafc', label: status };
+  return (
+    <span style={{ fontSize: 11, fontWeight: 800, color: m.color, background: m.bg,
+      border: `1px solid ${m.color}33`, padding: '3px 10px', borderRadius: 100, whiteSpace: 'nowrap' }}>
+      {m.label}
+    </span>
+  );
+}
+
+function KpiCard({ icon, label, value, sub, accent }) {
+  return (
+    <div className="erp-kpi">
+      <div className="erp-kpi-icon" style={{ background: accent + '18', color: accent }}>
+        <i className={`fas ${icon}`} />
+      </div>
+      <div className="erp-kpi-body">
+        <span className="erp-kpi-label">{label}</span>
+        <span className="erp-kpi-value">{value}</span>
+        {sub && <span className="erp-kpi-sub">{sub}</span>}
+      </div>
+    </div>
+  );
+}
+
+const PAGE_SIZE = 15;
 
 export default function EscrowRevenuePanel({ token, onEscrowAction }) {
-  const [isExporting, setIsExporting] = useState(false);
-  const [escrowHolds, setEscrowHolds] = useState([]);
-  const [revenueStats, setRevenueStats] = useState({ 
-      total_earnings: 0, 
-      stream_royalties: 0, 
-      stream_boosts: 0, 
-      gross_volume: 0, 
-      platform_yield_pct: 0 
+  const [stats,    setStats]    = useState({ total_earnings:0, stream_royalties:0, stream_boosts:0, gross_volume:0, platform_yield_pct:0 });
+  const [breakdown, setBreakdown] = useState({ total_earnings:0, gross_volume:0, platform_yield_pct:0, streams:{} });
+  const [rows,     setRows]     = useState([]);
+  const [total,    setTotal]    = useState(0);
+  const [page,     setPage]     = useState(1);
+  const [filter,   setFilter]   = useState('ALL');
+  const [search,   setSearch]   = useState('');
+  const [busy,     setBusy]     = useState(false);
+  const [loading,  setLoading]  = useState(true);
+  const [selected, setSelected] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [txns, rev, det] = await Promise.all([
+        listAdminTransactions(token, {
+          status: filter === 'ALL' ? undefined : filter,
+          limit: PAGE_SIZE,
+          offset: (page - 1) * PAGE_SIZE,
+        }).catch(() => ({ items: [], total: 0 })),
+        fetchNationalRevenue(token).catch(() => null),
+        fetchRevenueBreakdown(token),
+      ]);
+
+      // listAdminTransactions may return array or { items, total }
+      const items = Array.isArray(txns) ? txns : (txns?.items ?? []);
+      const count = Array.isArray(txns) ? txns.length : (txns?.total ?? items.length);
+
+      setRows(items.map(t => ({
+        id:        t.id,
+        short:     t.id ? t.id.slice(0, 8).toUpperCase() : '—',
+        date:      t.created_at ? new Date(t.created_at).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—',
+        buyer:     t.buyer_name  || ('Buyer '  + (t.buyer_id  ? t.buyer_id.slice(0,6)  : '—')),
+        seller:    t.seller_name || ('Seller ' + (t.seller_id ? t.seller_id.slice(0,6) : '—')),
+        crop:      t.product_type || t.crop || '—',
+        amount:    t.total_amount ?? t.amount ?? 0,
+        fee:       t.platform_fee ?? (t.total_amount ?? 0) * 0.01,
+        status:    t.status ?? 'PENDING',
+        raw:       t,
+      })));
+      setTotal(count);
+      if (rev) setStats(rev);
+      if (det) setBreakdown(det);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, filter, page]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = rows.filter(r => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return r.buyer.toLowerCase().includes(q) || r.seller.toLowerCase().includes(q) ||
+           r.crop.toLowerCase().includes(q)  || r.short.toLowerCase().includes(q);
   });
 
-  const loadData = async () => {
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const act = async (type, row) => {
+    if (!window.confirm(`${type === 'release' ? 'Release escrow' : 'Refund'} for order ${row.short}?`)) return;
+    setBusy(true);
     try {
-        const [txns, stats] = await Promise.all([
-            fetchTransactions(token),
-            fetchNationalRevenue(token)
-        ]);
-        if (Array.isArray(txns)) {
-            setEscrowHolds(txns.map(t => ({
-                id: String(t.id),
-                displayId: t.id ? t.id.slice(0, 8) : 'UNK',
-                date: t.created_at ? new Date(t.created_at).toLocaleDateString() : 'Today',
-                buyer: 'Buyer-' + (t.buyer_id ? t.buyer_id.slice(0,4) : '...'), 
-                seller: 'Seller-' + (t.seller_id ? t.seller_id.slice(0,4) : '...'),
-                amount: t.amount || 0,
-                age: 'Active',
-                status: t.status ? t.status.toUpperCase() : 'PENDING'
-            })));
-        }
-        if (stats) setRevenueStats(stats);
-    } catch (err) {
-        console.error("Dashboard Sync Failed", err);
-    }
+      if (type === 'release') await forceEscrowRelease(row.id, 'Admin override', token);
+      else                    await forceEscrowRefund(row.id, 'Admin override', token);
+      load();
+      if (onEscrowAction) onEscrowAction(row.id, type.toUpperCase(), 'Admin override');
+    } catch (e) { alert(e.message); }
+    finally { setBusy(false); }
   };
 
-  useEffect(() => {
-     loadData();
-  }, [token]);
-
-
-  const handleExportCSV = async () => {
-      setIsExporting(true);
-      try {
-          const data = await fetchTransactions(token);
-          exportToCSV(data, `AgriTrust_Escrow_Ledger_${new Date().getTime()}.csv`);
-      } catch (err) {
-          alert('Export System Error: ' + err.message);
-      } finally {
-          setIsExporting(false);
-      }
-  };
-
-  const handleGlobalAudit = async () => {
-      setIsExporting(true);
-      try {
-          const data = await fetchAuditLogs(token);
-          exportToCSV(data, `AgriTrust_Security_Audit_${new Date().getTime()}.csv`);
-      } catch (err) {
-          alert('Audit Error: ' + err.message);
-      } finally {
-          setIsExporting(false);
-      }
-  };
-
-  const handleManualReconcile = async () => {
-    if (!window.confirm("INITIATE NATIONAL ECONOMIC RECONCILIATION? This will perform a live secondary audit of the platform virtual ledger.")) return;
-    setIsExporting(true);
+  const exportCSV = async () => {
+    setBusy(true);
     try {
-        const results = await reconcilePlatform(token);
-        alert(`RECONCILIATION SUCCESS:\nSystem Liability: $${results.total_liability.usd} USD\nIntegrity Status: ${results.integrity_check}`);
-        loadData();
-    } catch (err) {
-        alert('Audit Failure: ' + err.message);
-    } finally {
-        setIsExporting(false);
-    }
- };
+      const data = await fetchTransactions(token);
+      exportToCSV(data, `AgriTrust_Ledger_${Date.now()}.csv`);
+    } catch (e) { alert(e.message); }
+    finally { setBusy(false); }
+  };
 
- const handleDownloadReceipt = async (orderId) => {
-     try {
-         await downloadReceipt(token, orderId);
-     } catch (err) {
-         alert('Receipt Engine Error: ' + err.message);
-     }
- };
+  const auditExport = async () => {
+    setBusy(true);
+    try {
+      const data = await fetchAuditLogs(token);
+      exportToCSV(data, `AgriTrust_Audit_${Date.now()}.csv`);
+    } catch (e) { alert(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const reconcile = async () => {
+    if (!window.confirm('Run national reconciliation? This audits the full platform ledger.')) return;
+    setBusy(true);
+    try {
+      const r = await reconcilePlatform(token);
+      alert(`Reconciliation complete\nLiability: $${r?.total_liability?.usd ?? 0}\nStatus: ${r?.integrity_check ?? 'OK'}`);
+      load();
+    } catch (e) { alert(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const fmt = n => '$' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const FILTERS = ['ALL','PENDING','IN_ESCROW','COMPLETED','DISPUTED','REFUNDED'];
 
   return (
-    <div className="v4-escrow-revenue animate-fade">
-      <div className="v4-revenue-hero">
-          <div className="glow-strip"></div>
-          <div className="hero-main">
-             <div className="kicker">National Command Center</div>
-             <h1>Platform Profits</h1>
-             <p>Real-time oversight of administrative royalties and premium ecosystem revenues.</p>
-             <div style={{ display: 'flex', gap: '12px' }}>
-                <button className="v4-btn ghost mt-24" style={{ borderColor: 'rgba(255,255,255,0.2)' }} onClick={handleExportCSV}>
-                    <i className="fas fa-file-export"></i> FINANCIAL AUDIT EXPORT
-                </button>
-                <button className="v4-btn ghost mt-24" style={{ borderColor: 'rgba(255,255,255,0.2)', background: 'rgba(59, 130, 246, 0.1)' }} onClick={handleManualReconcile} disabled={isExporting}>
-                    <i className="fas fa-shield-halved"></i> NATIONAL RECONCILE
-                </button>
-             </div>
-          </div>
-          <div className="hero-metrics">
-               <div className="m-box highlight">
-                  <span className="l">Platform Net Earnings</span>
-                  <span className="v">${revenueStats.total_earnings.toLocaleString()}</span>
-               </div>
-               <div className="m-box">
-                  <span className="l">Gross Volume (GMV)</span>
-                  <span className="v">${revenueStats.gross_volume.toLocaleString()}</span>
-               </div>
-          </div>
-      </div>
+    <div className="erp-root">
 
-      <div className="v4-revenue-summary">
-        <div className="v4-rev-card">
-            <div className="card-icon" style={{ background: '#f0fdf4', color: '#166534' }}><i className="fas fa-percentage"></i></div>
-            <div className="card-body">
-                 <span className="lbl">Transaction Fees (1%)</span>
-                 <div className="val-row">
-                      <strong>${revenueStats.stream_royalties.toLocaleString()}</strong>
-                      <span className="trend pos">DYNAMIC</span>
-                 </div>
-            </div>
+      {/* ── HEADER ─────────────────────────────────────────── */}
+      <div className="erp-header">
+        <div>
+          <p className="erp-eyebrow">National Command Center</p>
+          <h1 className="erp-title">Escrow &amp; Revenue</h1>
+          <p className="erp-desc">Real-time oversight of platform earnings, escrow holds, and transaction settlements.</p>
         </div>
-        <div className="v4-rev-card">
-            <div className="card-icon" style={{ background: '#eff6ff', color: '#1e40af' }}><i className="fas fa-industry"></i></div>
-            <div className="card-body">
-                 <span className="lbl">Visibility Revenue</span>
-                 <div className="val-row">
-                      <strong>${revenueStats.stream_boosts.toLocaleString()}</strong>
-                      <span className="trend">Premium Boosts</span>
-                 </div>
-            </div>
-        </div>
-        <div className="v4-rev-card">
-            <div className="card-icon" style={{ background: '#fdf2f8', color: '#9d174d' }}><i className="fas fa-chart-line"></i></div>
-            <div className="card-body">
-                 <span className="lbl">System Margin</span>
-                 <div className="val-row">
-                      <strong>{revenueStats.platform_yield_pct.toFixed(2)}%</strong>
-                      <span className="status-badge green">EFFICIENT</span>
-                 </div>
-            </div>
+        <div className="erp-header-actions">
+          <button className="erp-btn erp-btn-ghost" onClick={exportCSV} disabled={busy}>
+            <i className="fas fa-file-arrow-down" /> Export Ledger
+          </button>
+          <button className="erp-btn erp-btn-ghost" onClick={auditExport} disabled={busy}>
+            <i className="fas fa-shield-halved" /> Audit Log
+          </button>
+          <button className="erp-btn erp-btn-primary" onClick={reconcile} disabled={busy}>
+            <i className="fas fa-rotate" /> Reconcile
+          </button>
         </div>
       </div>
 
-      <div className="v4-ledger-section">
-          <div className="section-header-v4">
-               <h3><i className="fas fa-server"></i> Payment List</h3>
-              <div className="header-actions">
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                      <button className="q-btn ghost small" onClick={handleExportCSV} disabled={isExporting}>
-                          {isExporting ? 'Syncing...' : 'Export CSV'}
-                      </button>
-                      <label className="q-btn ghost small" style={{ cursor: 'pointer' }}>
-                          Import Ledger
-                          <input type="file" style={{ display: 'none' }} accept=".csv" onChange={(e) => {
-                              const file = e.target.files[0];
-                              if (file) handleImport(file, (data) => alert(`LEDGER_SYNC: Successfully ingested ${data.length} records.`));
-                          }} />
-                      </label>
-                      <button className="q-btn primary-btn small" onClick={handleGlobalAudit} disabled={isExporting}>
-                          Global Audit
-                      </button>
-                  </div>
-              </div>
+      {/* ── KPI ROW ────────────────────────────────────────── */}
+      <div className="erp-kpi-row">
+        <KpiCard icon="fa-circle-dollar-to-slot" label="Gross Volume"      value={fmt(stats.gross_volume)}        sub="All-time GMV"          accent="#2563eb" />
+        <KpiCard icon="fa-sack-dollar"           label="Net Earnings"      value={fmt(stats.total_earnings)}      sub="Platform profit"       accent="#16a34a" />
+        <KpiCard icon="fa-percentage"            label="Transaction Fees"  value={fmt(stats.stream_royalties)}    sub="1% per settlement"     accent="#d97706" />
+        <KpiCard icon="fa-rocket"                label="Boost Revenue"     value={fmt(stats.stream_boosts)}       sub="Premium visibility"    accent="#7c3aed" />
+        <KpiCard icon="fa-chart-line"            label="System Margin"     value={`${Number(stats.platform_yield_pct||0).toFixed(2)}%`} sub="Yield efficiency" accent="#0891b2" />
+      </div>
+
+      {/* ── REVENUE STREAMS BREAKDOWN ───────────────────────── */}
+      <div className="erp-section" style={{ marginTop: 24 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 800, color: '#64748b', marginBottom: 12, letterSpacing: 0.5 }}>ALL REVENUE STREAMS</h3>
+        <div className="erp-stream-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+          {Object.values(breakdown.streams || {}).map((s, i) => (
+            <div key={i} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.label}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', marginTop: 6 }}>{fmt(s.amount)}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginTop: 4 }}>{s.rate} · Paid by {s.payer}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── LEDGER TABLE ───────────────────────────────────── */}
+      <div className="erp-table-card">
+
+        {/* toolbar */}
+        <div className="erp-toolbar">
+          <div className="erp-filter-tabs">
+            {FILTERS.map(f => (
+              <button key={f} className={`erp-tab ${filter===f?'active':''}`}
+                onClick={() => { setFilter(f); setPage(1); }}>
+                {f === 'ALL' ? 'All' : STATUS_META[f]?.label ?? f}
+              </button>
+            ))}
           </div>
-          
-          <div className="v4-table-shell">
-            <table className="v4-data-table">
-              <thead>
-                <tr>
-                   <th>ID</th>
-                   <th>BUYER TO SELLER</th>
-                   <th>AMOUNT</th>
-                   <th>STATUS</th>
-                   <th>ACTION</th>
+          <div className="erp-toolbar-right">
+            <div className="erp-search">
+              <i className="fas fa-magnifying-glass" />
+              <input placeholder="Search buyer, seller, crop…" value={search} onChange={e=>setSearch(e.target.value)} />
+              {search && <button onClick={()=>setSearch('')}><i className="fas fa-xmark"/></button>}
+            </div>
+            <span className="erp-count">{total} records</span>
+          </div>
+        </div>
+
+        {/* table */}
+        <div className="erp-table-wrap" style={{ maxHeight: '600px', overflowY: 'auto' }}>
+          <table className="erp-table">
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Date</th>
+                <th>Buyer → Seller</th>
+                <th>Crop</th>
+                <th style={{textAlign:'right'}}>Amount</th>
+                <th style={{textAlign:'right'}}>Fee (1%)</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={8} className="erp-empty"><i className="fas fa-spinner fa-spin" /> Loading…</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={8} className="erp-empty">No transactions found</td></tr>
+              ) : filtered.map(row => (
+                <tr key={row.id} className={selected===row.id?'erp-row-selected':''} onClick={()=>setSelected(row.id===selected?null:row.id)}>
+                  <td><span className="erp-id">{row.short}</span></td>
+                  <td className="erp-date">{row.date}</td>
+                  <td>
+                    <div className="erp-party">
+                      <span className="erp-party-name">{row.buyer}</span>
+                      <i className="fas fa-arrow-right" style={{fontSize:9,opacity:.4}} />
+                      <span className="erp-party-name">{row.seller}</span>
+                    </div>
+                  </td>
+                  <td className="erp-crop">{row.crop}</td>
+                  <td className="erp-amount">{fmt(row.amount)}</td>
+                  <td className="erp-fee">{fmt(row.fee)}</td>
+                  <td><StatusPill status={row.status} /></td>
+                  <td onClick={e=>e.stopPropagation()}>
+                    <div className="erp-actions">
+                      <button className="erp-act erp-act-release" title="Release escrow" disabled={busy}
+                        onClick={()=>act('release',row)}><i className="fas fa-check-double"/></button>
+                      <button className="erp-act erp-act-refund" title="Refund" disabled={busy}
+                        onClick={()=>act('refund',row)}><i className="fas fa-rotate-left"/></button>
+                      <button className="erp-act erp-act-pdf" title="Download receipt" disabled={busy}
+                        onClick={()=>downloadReceipt(token,row.id).catch(e=>alert(e.message))}>
+                        <i className="fas fa-file-pdf"/></button>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {escrowHolds.map(hold => (
-                  <tr key={hold.id}>
-                    <td className="id-cell">{hold.displayId}</td>
-                    <td>
-                      <div className="party-flow">
-                        <strong>{hold.buyer}</strong>
-                        <i className="fas fa-chevron-right"></i>
-                        <span>{hold.seller}</span>
-                      </div>
-                    </td>
-                    <td className="amount-cell">${hold.amount.toLocaleString()}</td>
-                    <td><span className={`v4-status-pill ${hold.status.toLowerCase()}`}>{hold.status}</span></td>
-                    <td>
-                       <div className="v4-action-strip">
-                           <button className="a-btn release" title="Process Settlement" onClick={() => onEscrowAction(hold.id, 'RELEASE', 'Administrative Override')}><i className="fas fa-check-double"></i></button>
-                           <button className="a-btn refund" title="Revert Transaction" onClick={() => onEscrowAction(hold.id, 'REFUND', 'Administrative Override')}><i className="fas fa-rotate-left"></i></button>
-                           <button className="a-btn audit" style={{ background: 'var(--v4-bg)', color: 'var(--v4-accent)' }} title="Download Verified Receipt" onClick={() => handleDownloadReceipt(hold.id)}><i className="fas fa-file-pdf"></i></button>
-                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-      </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
+        {/* pagination */}
+        <div className="erp-pagination">
+          <span className="erp-page-info">Page {page} of {totalPages}</span>
+          <div className="erp-page-btns">
+            <button disabled={page<=1} onClick={()=>setPage(p=>p-1)}><i className="fas fa-chevron-left"/></button>
+            {Array.from({length:Math.min(5,totalPages)},(_,i)=>{
+              const p = Math.max(1, Math.min(page-2,totalPages-4)) + i;
+              return p<=totalPages && (
+                <button key={p} className={page===p?'active':''} onClick={()=>setPage(p)}>{p}</button>
+              );
+            })}
+            <button disabled={page>=totalPages} onClick={()=>setPage(p=>p+1)}><i className="fas fa-chevron-right"/></button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

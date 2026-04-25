@@ -71,7 +71,7 @@ class TrainingService:
             "timestamp": str(datetime.utcnow()),
             "action": action,
             "data": data,
-            "hash": str(uuid.uuid4().hex[:16]) # Mock hash
+            "hash": None  # Replace with real ledger hash when blockchain integration is active
         }
         
         ledger = []

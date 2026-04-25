@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchAuditLogs } from "../api";
+import { fetchAuditLogs, updateProfile, updateNotificationPrefs, deactivateAccount } from "../api";
 
 export function TermsOfService({ onClose }) {
   return (
@@ -118,6 +118,70 @@ export function SettingsPanel({ profile, token, theme, setTheme, onSync }) {
   const [activeTab, setActiveTab] = useState("account");
   const [activeModal, setActiveModal] = useState(null); 
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState("");
+
+  // Account form state
+  const [fullName, setFullName] = useState(profile?.full_name || "");
+  const [email, setEmail] = useState(profile?.email || "");
+  const [province, setProvince] = useState(profile?.province || "");
+  const [district, setDistrict] = useState(profile?.district || "");
+
+  // Language state
+  const [preferredLanguage, setPreferredLanguage] = useState(profile?.preferred_language || "en");
+
+  // Notification prefs state
+  const defaultPrefs = { sms: false, push: true, email: false, market_alerts: true, weather_alerts: true };
+  const [notifPrefs, setNotifPrefs] = useState({ ...defaultPrefs, ...(profile?.notification_prefs || {}) });
+
+  const showSaveMsg = (msg) => {
+    setSaveMsg(msg);
+    setTimeout(() => setSaveMsg(""), 3000);
+  };
+
+  const handleSaveProfile = async () => {
+    setSaving(true);
+    try {
+      await updateProfile(token, { full_name: fullName, email, province, district });
+      showSaveMsg("Profile saved successfully.");
+    } catch (err) {
+      showSaveMsg("Error: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveLanguage = async (lang) => {
+    setPreferredLanguage(lang);
+    try {
+      await updateProfile(token, { preferred_language: lang });
+      showSaveMsg("Language preference saved.");
+    } catch (err) {
+      showSaveMsg("Error: " + err.message);
+    }
+  };
+
+  const handleToggleNotif = async (key) => {
+    const updated = { ...notifPrefs, [key]: !notifPrefs[key] };
+    setNotifPrefs(updated);
+    try {
+      await updateNotificationPrefs(token, updated);
+      showSaveMsg("Notification preferences saved.");
+    } catch (err) {
+      showSaveMsg("Error: " + err.message);
+    }
+  };
+
+  const handleDeactivate = async () => {
+    if (!window.confirm("Are you sure you want to deactivate your account? You will be logged out.")) return;
+    try {
+      await deactivateAccount(token);
+      alert("Account deactivated. You will now be logged out.");
+      window.location.reload();
+    } catch (err) {
+      alert("Error: " + err.message);
+    }
+  };
   
   const role = profile?.role || "AGENT";
 
@@ -197,19 +261,23 @@ export function SettingsPanel({ profile, token, theme, setTheme, onSync }) {
                 
                 <div className="settings-list-v4">
                     <CardRow label="Public Display Name" description="How you appear to other market participants.">
-                        <input type="text" className="v4-input text-field" defaultValue={profile.full_name} />
+                        <input type="text" className="v4-input text-field" value={fullName} onChange={e => setFullName(e.target.value)} />
                     </CardRow>
-                    <CardRow label="Primary Phone Number" description="Authenticated channel for USSD and SMS fallback.">
-                        <input type="text" className="v4-input text-field" defaultValue={profile.phone} />
+                    <CardRow label="Email Address" description="Optional contact email for notifications.">
+                        <input type="email" className="v4-input text-field" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" />
                     </CardRow>
-                    <CardRow label="Regional Jurisdiction" description="Your primary operational coverage area.">
-                        <select className="v4-input select-field">
-                            <option>Mashonaland West</option>
-                            <option>Harare Hub</option>
-                            <option>Bulawayo District</option>
-                            <option>Manicaland Sector</option>
-                        </select>
+                    <CardRow label="Province" description="Your primary operational province.">
+                        <input type="text" className="v4-input text-field" value={province} onChange={e => setProvince(e.target.value)} placeholder="e.g. Harare" />
                     </CardRow>
+                    <CardRow label="District" description="Your operational district.">
+                        <input type="text" className="v4-input text-field" value={district} onChange={e => setDistrict(e.target.value)} placeholder="e.g. Harare Central" />
+                    </CardRow>
+                </div>
+                {saveMsg && <p style={{ color: saveMsg.startsWith("Error") ? "#ef4444" : "#15803d", marginTop: "12px", fontWeight: 700 }}>{saveMsg}</p>}
+                <div style={{ marginTop: "24px" }}>
+                    <button className="q-btn primary-btn" onClick={handleSaveProfile} disabled={saving}>
+                        {saving ? "Saving..." : "Save Changes"}
+                    </button>
                 </div>
             </div>
             )}
@@ -243,8 +311,10 @@ export function SettingsPanel({ profile, token, theme, setTheme, onSync }) {
                         </div>
                     </CardRow>
                     <CardRow label="Operational Language" description="Select the vernacular for automated alerts.">
-                        <select className="v4-input select-field">
-                            <option selected>English (International)</option>
+                        <select className="v4-input select-field" value={preferredLanguage} onChange={e => handleSaveLanguage(e.target.value)}>
+                            <option value="en">English (International)</option>
+                            <option value="sn">Shona (ChiShona)</option>
+                            <option value="nd">Ndebele (isiNdebele)</option>
                         </select>
                     </CardRow>
                     <CardRow label="Interface Visual Theme" description="Optimize for local field conditions or global office view.">
@@ -262,26 +332,21 @@ export function SettingsPanel({ profile, token, theme, setTheme, onSync }) {
                     <h2 className="page-heading">My Alerts</h2>
                     <div className="settings-list-v4">
                         <CardRow label="Instant Push Alerts" description="Browser-level notifications for millisecond market changes.">
-                            <div className="v4-switch on"></div>
+                            <div className={`v4-switch ${notifPrefs.push ? 'on' : ''}`} onClick={() => handleToggleNotif('push')} style={{ cursor: 'pointer' }}></div>
                         </CardRow>
                         <CardRow label="SMS Red-Alerts" description="Offline notifications for critical escrow failures.">
-                            <div className="v4-switch"></div>
+                            <div className={`v4-switch ${notifPrefs.sms ? 'on' : ''}`} onClick={() => handleToggleNotif('sms')} style={{ cursor: 'pointer' }}></div>
                         </CardRow>
-                        
-                        <div className="notification-matrix mt-32">
-                            <h3>Event Logic Table</h3>
-                            <div className="matrix-scroll">
-                                {['New Bid Placed', 'Order Cancellation', 'Escrow Release', 'System Health Alert'].map(ev => (
-                                    <div key={ev} className="matrix-row">
-                                        <span>{ev}</span>
-                                        <div className="checks">
-                                            <label><input type="checkbox" defaultChecked /> SMS</label>
-                                            <label><input type="checkbox" defaultChecked /> App</label>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                        <CardRow label="Email Notifications" description="Receive updates via email.">
+                            <div className={`v4-switch ${notifPrefs.email ? 'on' : ''}`} onClick={() => handleToggleNotif('email')} style={{ cursor: 'pointer' }}></div>
+                        </CardRow>
+                        <CardRow label="Market Alerts" description="Price and availability updates from the marketplace.">
+                            <div className={`v4-switch ${notifPrefs.market_alerts ? 'on' : ''}`} onClick={() => handleToggleNotif('market_alerts')} style={{ cursor: 'pointer' }}></div>
+                        </CardRow>
+                        <CardRow label="Weather Alerts" description="Critical weather notifications for your region.">
+                            <div className={`v4-switch ${notifPrefs.weather_alerts ? 'on' : ''}`} onClick={() => handleToggleNotif('weather_alerts')} style={{ cursor: 'pointer' }}></div>
+                        </CardRow>
+                        {saveMsg && <p style={{ color: saveMsg.startsWith("Error") ? "#ef4444" : "#15803d", marginTop: "12px", fontWeight: 700 }}>{saveMsg}</p>}
                     </div>
                 </div>
             )}
@@ -397,7 +462,7 @@ export function SettingsPanel({ profile, token, theme, setTheme, onSync }) {
                         <p>Perform these actions ONLY under localized system failure.</p>
                         <div className="e-actions">
                             <button className="q-btn ghost full-w" onClick={onSync}><i className="fas fa-sync-alt"></i> REFRESH INFRASTRUCTURE</button>
-                            <button className="danger-text-btn mt-16" onClick={() => alert("Deletion protocol restricted.")}>Request Platform Deactivation</button>
+                            <button className="danger-text-btn mt-16" onClick={handleDeactivate}>Request Account Deactivation</button>
                         </div>
                     </div>
                 </div>

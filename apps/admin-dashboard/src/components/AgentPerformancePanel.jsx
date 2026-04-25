@@ -7,12 +7,12 @@ export function AgentPerformancePanel({ agents = [], onRefresh, profile }) {
       id: a.id,
       name: a.full_name || "Agent Node",
       region: a.region || "Verified District",
-      resolved: a.resolution_count || 0,
-      rating: a.average_rating ? a.average_rating.toFixed(1) : '0.0',
-      bonus: '0.00',
-      trend: 'stable'
-
-  })).sort((a,b) => b.resolved - a.resolved);
+      resolved: a.resolution_count ?? a.resolved ?? 0,
+      rating: a.average_rating ? Number(a.average_rating).toFixed(1) : (a.rating ? Number(a.rating).toFixed(1) : '0.0'),
+      wallet: a.wallet_balance ?? 0,
+      pending: a.pending_earnings ?? 0,
+      trend: 'stable',
+  })).sort((a, b) => b.resolved - a.resolved);
 
   return (
     <div className="v4-performance-dashboard animate-fade">
@@ -20,7 +20,7 @@ export function AgentPerformancePanel({ agents = [], onRefresh, profile }) {
         <div className="header-labels">
           <span className="v4-pill">OPERATIONAL OVERSIGHT</span>
           <h1>Agent Performance Hub</h1>
-          <p>Real-time analytics for field agent efficiency and resolution velocity.</p>
+          <p>Field agent efficiency and earnings — sourced from live platform data.</p>
         </div>
         <div className="header-filters" style={{ display: 'flex', gap: '12px' }}>
             <button className="q-btn primary-btn small" onClick={onRefresh} style={{ background: '#3b82f6', color: '#fff' }}>
@@ -34,8 +34,8 @@ export function AgentPerformancePanel({ agents = [], onRefresh, profile }) {
 
       <div className="v4-card perf-main-card">
           <div className="card-top">
-             <h3><i className="fas fa-trophy"></i> Elite Resolver Ranking</h3>
-             <span className="v4-badge">Cycle 12: Active</span>
+             <h3><i className="fas fa-trophy"></i> Agent Leaderboard</h3>
+             <span className="v4-badge">Cycle: Active</span>
           </div>
           <div className="v4-table-wrapper">
               <table className="v4-perf-table">
@@ -44,10 +44,10 @@ export function AgentPerformancePanel({ agents = [], onRefresh, profile }) {
                           <th>Rank</th>
                           <th>Agent Profile</th>
                           <th>Region</th>
-                          <th>Tickets Resolved</th>
-                          <th>AV. RATING</th>
-                          <th>BONUS ACCRUED</th>
-                          <th>Trend</th>
+                          <th>Tasks Resolved</th>
+                          <th>Avg. Rating</th>
+                          <th>Wallet Balance</th>
+                          <th>Pending</th>
                       </tr>
                   </thead>
                   <tbody>
@@ -61,7 +61,7 @@ export function AgentPerformancePanel({ agents = [], onRefresh, profile }) {
                                       <div className="agent-avatar" style={{ background: a.rank === 1 ? '#fef3c7' : '#eff6ff', color: a.rank === 1 ? '#92400e' : '#1e40af' }}>{a.name.charAt(0)}</div>
                                       <div className="agent-info">
                                           <strong>{a.name}</strong>
-                                          <span>Verified Logistics Lead</span>
+                                          <span>Field Agent</span>
                                       </div>
                                   </div>
                               </td>
@@ -73,10 +73,8 @@ export function AgentPerformancePanel({ agents = [], onRefresh, profile }) {
                                       <span>{a.rating}</span>
                                   </div>
                               </td>
-                              <td className="bonus-cell">${a.bonus}</td>
-                              <td>
-                                  <i className={`fas fa-caret-${a.trend === 'up' ? 'up trend-up' : a.trend === 'down' ? 'down trend-down' : 'right trend-stable'}`}></i>
-                              </td>
+                              <td className="bonus-cell">${Number(a.wallet).toFixed(2)}</td>
+                              <td style={{ color: '#f59e0b', fontWeight: 800 }}>${Number(a.pending).toFixed(2)}</td>
                           </tr>
                       ))}
                   </tbody>
@@ -93,13 +91,12 @@ export function AgentPerformancePanel({ agents = [], onRefresh, profile }) {
       <div className="v4-perf-grid">
           <div className="v4-card analytic-card">
               <div className="card-top">
-                  <h3><i className="fas fa-chart-line"></i> Resolution Velocity - Leading Agent</h3>
-                  <span className="v4-tag blue">TRENDING UP</span>
+                  <h3><i className="fas fa-chart-bar"></i> Tasks Resolved — Top 5</h3>
               </div>
               <div className="visual-chart-wrap mt-24">
-                  <LineChart 
-                      data={[]}
-                      xKey="month"
+                  <LineChart
+                      data={leaderboard.slice(0, 5).map(a => ({ name: a.name.split(' ')[0], tickets: a.resolved }))}
+                      xKey="name"
                       yKey="tickets"
                       color="#3b82f6"
                       height={180}
@@ -109,33 +106,33 @@ export function AgentPerformancePanel({ agents = [], onRefresh, profile }) {
 
           <div className="v4-card config-card">
               <div className="card-top">
-                  <h3><i className="fas fa-gift"></i> Operational Rewards</h3>
-                  <span className="v4-tag green">LIVE PAYOUTS</span>
+                  <h3><i className="fas fa-wallet"></i> Earnings Summary</h3>
+                  <span className="v4-tag green">LIVE</span>
               </div>
               <div className="reward-stack mt-24">
                   <div className="reward-item">
-                      <div className="r-icon"><i className="fas fa-hashtag"></i></div>
+                      <div className="r-icon"><i className="fas fa-check-circle"></i></div>
                       <div className="r-text">
-                          <label>Base Resolution Rate</label>
-                          <p>$5.00 flat fee per verified resolution.</p>
+                          <label>Total Realized (All Agents)</label>
+                          <p>${leaderboard.reduce((s, a) => s + Number(a.wallet), 0).toFixed(2)} in agent wallets</p>
                       </div>
                       <span className="v4-status success">ACTIVE</span>
                   </div>
                   <div className="reward-item">
-                      <div className="r-icon"><i className="fas fa-certificate"></i></div>
+                      <div className="r-icon"><i className="fas fa-clock"></i></div>
                       <div className="r-text">
-                          <label>Quality Accelerator</label>
-                          <p>+20% bonus for ratings above 4.5/5.0.</p>
+                          <label>Pending Disbursement</label>
+                          <p>${leaderboard.reduce((s, a) => s + Number(a.pending), 0).toFixed(2)} awaiting settlement</p>
                       </div>
-                      <span className="v4-status success">APPLIED</span>
+                      <span className="v4-status" style={{ background: '#fef3c7', color: '#92400e' }}>PENDING</span>
                   </div>
                   <div className="reward-item">
-                      <div className="r-icon"><i className="fas fa-bolt"></i></div>
+                      <div className="r-icon"><i className="fas fa-users"></i></div>
                       <div className="r-text">
-                          <label>Velocity Protocol</label>
-                          <p>+10% bonus for resolutions under 48h.</p>
+                          <label>Active Agents</label>
+                          <p>{leaderboard.length} agents on the network</p>
                       </div>
-                      <span className="v4-status locked">LOCKED</span>
+                      <span className="v4-status success">ONLINE</span>
                   </div>
               </div>
           </div>
@@ -173,10 +170,6 @@ export function AgentPerformancePanel({ agents = [], onRefresh, profile }) {
         .reg-badge { background: #f8fafc; padding: 4px 10px; border-radius: 6px; border: 1px solid #f1f5f9; font-size: 11.5px; }
         .perf-rating { display: flex; align-items: center; gap: 6px; color: #f59e0b; font-weight: 900; }
         .bonus-cell { color: #16a34a; font-weight: 950; }
-        
-        .trend-up { color: #22c55e; }
-        .trend-down { color: #ef4444; }
-        .trend-stable { color: #cbd5e1; }
 
         .v4-perf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
         .v4-card { background: #fff; border-radius: 20px; padding: 24px; border: 1.5px solid #f1f5f9; }

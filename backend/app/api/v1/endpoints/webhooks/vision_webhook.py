@@ -6,7 +6,7 @@ Single endpoint for all vision processing
 from fastapi import APIRouter, Request, BackgroundTasks
 from datetime import datetime
 from app.ml.vision.core.vision_engine import vision_engine
-from app.services.notification_service import notification_service
+from app.services.notification_service import NotificationService
 
 router = APIRouter(prefix="/webhooks/vision", tags=["Webhooks"])
 
@@ -52,7 +52,7 @@ async def process_vision_background(image_data: str, channel: str, context: dict
         
         # Send notification based on channel
         if channel == "whatsapp":
-            await notification_service.send_whatsapp_vision_result(
+            await NotificationService.send_whatsapp_vision_result(
                 context.get("user_phone"),
                 result
             )

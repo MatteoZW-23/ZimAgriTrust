@@ -12,7 +12,9 @@ from . import (
     ai,
     notifications,
     permissions,
-    academy
+    academy,
+    scraping,
+    command_center,
 )
 
 router = APIRouter()
@@ -30,4 +32,6 @@ router.include_router(config.router, prefix="/config", tags=["admin-config"])
 router.include_router(ai.router, prefix="/ai", tags=["admin-ai"])
 router.include_router(notifications.router, prefix="/notifications", tags=["admin-notifications"])
 router.include_router(permissions.router, prefix="/permissions", tags=["admin-permissions"])
+router.include_router(scraping.router, prefix="/scraping", tags=["admin-scraping"])
+router.include_router(command_center.router, prefix="/command-center", tags=["admin-command-center"])
 

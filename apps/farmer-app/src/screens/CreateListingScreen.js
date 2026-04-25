@@ -4,14 +4,7 @@ import { Text, TextInput, TouchableOpacity, View, ScrollView } from "react-nativ
 import { createListing } from "../api";
 import { appStyles } from "../styles";
 
-const SECTORS = [
-  { id: "CROPS", label: "Crops", icon: "🌽", color: '#E8F5E9' },
-  { id: "LIVESTOCK", label: "Livestock", icon: "🐂", color: '#FFF3E0' },
-  { id: "POULTRY", label: "Poultry", icon: "🐔", color: '#FFEBEE' },
-  { id: "DAIRY", label: "Dairy", icon: "🥛", color: '#E3F2FD' },
-  { id: "FISHERIES", label: "Fisheries", icon: "🐟", color: '#E0F2F1' },
-  { id: "VALUE_ADDED", label: "Processed", icon: "🍯", color: '#F3E5F5' },
-];
+const SECTORS = [];
 
 export default function CreateListingScreen({ navigation, route }) {
   const { role = 'farmer' } = route.params || {};
@@ -25,18 +18,24 @@ export default function CreateListingScreen({ navigation, route }) {
       </View>
 
       {/* Sector Grid */}
-      <View style={styles.grid}>
-        {SECTORS.map(s => (
-          <TouchableOpacity 
-            key={s.id} 
-            style={[styles.sectorCard, { backgroundColor: s.color }, form.sector === s.id && styles.sectorActive]}
-            onPress={() => setForm({...form, sector: s.id})}
-          >
-            <Text style={{ fontSize: 30 }}>{s.icon}</Text>
-            <Text style={styles.sectorLabel}>{s.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {SECTORS.length > 0 ? (
+        <View style={styles.grid}>
+          {SECTORS.map(s => (
+            <TouchableOpacity 
+              key={s.id} 
+              style={[styles.sectorCard, { backgroundColor: s.color }, form.sector === s.id && styles.sectorActive]}
+              onPress={() => setForm({...form, sector: s.id})}
+            >
+              <Text style={{ fontSize: 30 }}>{s.icon}</Text>
+              <Text style={styles.sectorLabel}>{s.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : (
+        <View style={{ padding: 24, alignItems: 'center' }}>
+          <Text style={{ fontSize: 14, color: '#999' }}>Select a sector to begin</Text>
+        </View>
+      )}
 
       {/* Form */}
       <View style={styles.form}>
@@ -56,11 +55,12 @@ export default function CreateListingScreen({ navigation, route }) {
 
         <Text style={styles.label}>Quality Grade</Text>
         <View style={styles.chipRow}>
-            {['Grade A', 'Grade B', 'Grade C'].map(g => (
-                <TouchableOpacity key={g} style={[styles.chip, form.grade === g && styles.chipActive]} onPress={() => setForm({...form, grade: g})}>
-                    <Text style={[styles.chipText, form.grade === g && styles.chipTextActive]}>{g}</Text>
-                </TouchableOpacity>
-            ))}
+            <TextInput 
+              style={[styles.input, { flex: 1 }]} 
+              placeholder="e.g. Grade A, Premium, etc."
+              value={form.grade}
+              onChangeText={v => setForm({...form, grade: v})}
+            />
         </View>
 
         <TouchableOpacity style={styles.primaryBtn}>

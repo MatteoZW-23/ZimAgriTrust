@@ -7,7 +7,8 @@ import {
     fetchPriceTrends,
     fetchRiskDistribution,
     fetchMarketForecast,
-    fetchAIProof
+    fetchAIProof,
+    syncPlatform,
 } from '../api';
 import { CropScanner } from './CropScanner';
 import { useState, useEffect } from 'react';
@@ -27,6 +28,12 @@ export function NationalMarketHub({ token }) {
   const [systemAudit, setSystemAudit] = useState(null);
   const [deepForecast, setDeepForecast] = useState(null);
   const [showAuditModal, setShowAuditModal] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  const handleResync = async () => {
+    setSyncing(true);
+    try { await syncPlatform(token); } catch { /* ignore */ } finally { setSyncing(false); }
+  };
 
   useEffect(() => {
     async function loadDS() {
@@ -98,8 +105,8 @@ export function NationalMarketHub({ token }) {
              <p style={{ maxWidth: '600px', fontSize: '14px', lineHeight: 1.6, opacity: 0.8 }}>Zimbabwe's national trade monitoring platform. Utilizing advanced statistical modeling to monitor market volatility and secure regional food supply chains.</p>
              
              <div className="hero-actions" style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-                <button className="q-btn primary-btn small" style={{ background: '#4f46e5', color: '#fff', padding: '12px 24px', fontSize: '12px', fontWeight: 900 }}>
-                    <i className="fas fa-microchip"></i> RE-SYNC SYSTEM
+                <button className="q-btn primary-btn small" style={{ background: '#4f46e5', color: '#fff', padding: '12px 24px', fontSize: '12px', fontWeight: 900 }} onClick={handleResync} disabled={syncing}>
+                    <i className={`fas ${syncing ? 'fa-circle-notch fa-spin' : 'fa-microchip'}`}></i> {syncing ? 'SYNCING...' : 'RE-SYNC SYSTEM'}
                 </button>
                 <button className="q-btn ghost small" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', padding: '12px 24px', fontSize: '12px', fontWeight: 900, border: '1.5px solid rgba(255,255,255,0.1)' }} onClick={() => setShowAuditModal(true)}>
                     <i className="fas fa-file-shield"></i> VIEW SYSTEM AUDIT
@@ -124,11 +131,10 @@ export function NationalMarketHub({ token }) {
       {/* KPI STRIP */}
       <div className="v4-stats-grid" style={{ marginTop: '-24px', padding: '0 48px' }}>
           {[
-              { label: 'Market Verticals', val: '0', icon: 'fa-layer-group', color: '#818cf8' },
-              { label: 'Statistical Accuracy', val: '0.0%', icon: 'fa-chart-pie', color: '#20963D' },
-              { label: 'Flagged Anomalies', val: riskData?.flagged_anomalies || 0, icon: 'fa-shield-halved', color: '#ef4444' },
-              { label: 'Regional Mesh Sync', val: 'ACTIVE', icon: 'fa-tower-broadcast', color: '#3b82f6' }
-
+              { label: 'Market Verticals', val: trends.length || 0, icon: 'fa-layer-group', color: '#818cf8' },
+              { label: 'Statistical Accuracy', val: systemAudit ? (systemAudit.accuracy || '—') : '—', icon: 'fa-chart-pie', color: '#20963D' },
+              { label: 'Flagged Anomalies', val: riskData?.flagged_anomalies ?? 0, icon: 'fa-shield-halved', color: '#ef4444' },
+              { label: 'Regional Mesh Sync', val: regionalData.length > 0 ? 'ACTIVE' : '—', icon: 'fa-tower-broadcast', color: '#3b82f6' }
           ].map((k, i) => (
               <div key={i} className="v4-kpi-card hover-lift" style={{ background: 'white', border: '1.5px solid var(--v4-border)' }}>
                   <div className="kpi-icon" style={{ background: `${k.color}10`, color: k.color }}><i className={`fas ${k.icon}`}></i></div>
@@ -236,15 +242,15 @@ export function NationalMarketHub({ token }) {
                   <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                       <div className="proof-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                           <span style={{ opacity: 0.6 }}>Audit Layer</span>
-                          <strong style={{ color: '#818cf8' }}>{systemAudit?.status || 'AWAITING'}</strong>
+                          <strong style={{ color: '#818cf8' }}>{systemAudit?.status || '—'}</strong>
                       </div>
                       <div className="proof-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                           <span style={{ opacity: 0.6 }}>Analysis Engine</span>
-                          <strong style={{ color: '#818cf8' }}>Verified Matrix</strong>
+                          <strong style={{ color: '#818cf8' }}>{systemAudit?.engine || '—'}</strong>
                       </div>
                       <div className="proof-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                           <span style={{ opacity: 0.6 }}>Price Models</span>
-                          <strong style={{ color: '#818cf8' }}>Active</strong>
+                          <strong style={{ color: '#818cf8' }}>{trends.length > 0 ? `${trends.length} active` : '—'}</strong>
                       </div>
                   </div>
                   <button className="v4-btn primary-glow small full-w" style={{ marginTop: '24px' }} onClick={() => setShowAuditModal(true)}>Open System Audit</button>
@@ -267,12 +273,12 @@ export function NationalMarketHub({ token }) {
                        <div className="research-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
                            <div className="r-card" style={{ padding: '24px', background: 'var(--v4-bg)', borderRadius: '20px', border: '1.5px solid var(--v4-border)' }}>
                                <label style={{ fontSize: '10px', fontWeight: 950, opacity: 0.5, letterSpacing: '0.12em' }}>ANALYTICS STATUS</label>
-                               <div style={{ marginTop: '12px', color: '#20963D', fontWeight: 1000, fontSize: '14px' }}>{systemAudit?.status || 'Active'}</div>
+                               <div style={{ marginTop: '12px', color: '#20963D', fontWeight: 1000, fontSize: '14px' }}>{systemAudit?.status || '—'}</div>
                                <p style={{ fontSize: '11px', marginTop: '8px', lineHeight: 1.5 }}>Multi-layered regression engines executing data processing via optimized matrix operations.</p>
                            </div>
                            <div className="r-card" style={{ padding: '24px', background: 'var(--v4-bg)', borderRadius: '20px', border: '1.5px solid var(--v4-border)' }}>
                                <label style={{ fontSize: '10px', fontWeight: 950, opacity: 0.5, letterSpacing: '0.12em' }}>INTELLIGENCE LAYER</label>
-                               <div style={{ marginTop: '12px', color: '#818cf8', fontWeight: 1000, fontSize: '14px' }}>{systemAudit?.intelligence_landscape || 'Full Coverage'}</div>
+                               <div style={{ marginTop: '12px', color: '#818cf8', fontWeight: 1000, fontSize: '14px' }}>{systemAudit?.intelligence_landscape || '—'}</div>
                                <p style={{ fontSize: '11px', marginTop: '8px', lineHeight: 1.5 }}>High-fidelity analysis kernels for gradient and feature density profiling.</p>
                            </div>
                        </div>

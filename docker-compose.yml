@@ -31,11 +31,17 @@ services:
       DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/agri_trust
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: test-key-replace-in-prod
-      CORS_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:5000,http://localhost:5173
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:5000,http://localhost:5173,http://localhost:19006
       ALLOWED_HOSTS: "*"
+      # Limit watchfiles to only the app source — prevents inotify exhaustion
+      WATCHFILES_FORCE_POLLING: "false"
     volumes:
       - ./backend:/app
       - ./data/ml-weights:/app/ml_weights
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
+    sysctls:
+      - fs.inotify.max_user_watches=524288
+      - fs.inotify.max_user_instances=512
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,6 +73,7 @@ services:
       - "5000:5000"
     environment:
       - BACKEND_URL=http://backend:8000
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-default-dev-secret-key-change-in-production}
     volumes:
       - ./apps/ussd-simulator:/app
     depends_on:
@@ -82,6 +89,8 @@ services:
     volumes:
       - ./apps/whatsapp-bridge:/app
       - /app/node_modules
+      - wwebjs_auth:/app/.wwebjs_auth
+      - wwebjs_cache:/app/.wwebjs_cache
     depends_on:
       - backend
     restart: always
@@ -105,3 +114,5 @@ services:
 
 volumes:
   postgres_data:
+  wwebjs_auth:
+  wwebjs_cache:

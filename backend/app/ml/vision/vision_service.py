@@ -1,176 +1,195 @@
-import numpy as np
-from PIL import Image
-import os
+"""
+Vision Service - Main entry point for all AI vision features
+Handles crop classification, disease detection, and quality grading
+"""
+
+import logging
+from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
-from typing import Dict, Tuple
+import asyncio
+
+from app.ml.vision.crop_classifier import crop_classifier, grade_estimator
+from app.ml.vision.disease_detector import disease_detector
+
+logger = logging.getLogger(__name__)
+
 
 class VisionService:
     """
-    Sovereign Computer Vision Service for Produce Grading & Disease Detection.
-    Simulates state-of-the-art architectures (EfficientNet, ResNet-9, ConvNeXt) 
-    built on Pure Math & NumPy logic.
+    Main vision service for crop analysis
+    Integrates classification, disease detection, and grading
     """
     
     def __init__(self):
-        self.grading_engine = "EfficientNet-B0 (Simulated)"
-        self.disease_engine = "ResNet-9 (Simulated)"
-        print(f"Sovereign Vision Core: {self.grading_engine} and {self.disease_engine} Initialized.")
-
-    def analyze_produce(self, image_path: str) -> Dict:
+        self.classifier = crop_classifier
+        self.grader = grade_estimator
+        self.disease = disease_detector
+        
+        # Confidence thresholds
+        self.CONFIDENCE_HIGH = 0.85
+        self.CONFIDENCE_MEDIUM = 0.70
+        self.CONFIDENCE_LOW = 0.55
+    
+    async def analyze_crop(self, image_data: bytes, expected_crop: Optional[str] = None) -> Dict[str, Any]:
         """
-        Full spectrum analysis: Classification, Grading, and Health Diagnosis.
+        Complete crop analysis
+        If expected_crop is provided, verifies match
         """
-        if not os.path.exists(image_path):
-            return {"error": "Image not found"}
-
-        try:
-            # 1. Image Pre-processing (Common to all vision tasks)
-            with Image.open(image_path) as img:
-                img_resized = img.resize((224, 224))
-                img_data = np.array(img_resized)
-            
-            # 2. Multi-Output prediction for (Crop Type, Grade)
-            # Simulated via high-order feature extraction
-            crop_type = self._classify_crop(img_data)
-            grade, confidence = self._calculate_agri_grade(img_data)
-            
-            # 3. Disease Diagnosis (ResNet-9 inspired logic)
-            health_status = self.diagnose_health(img_data)
-            
-            # 4. Meta-Metrics
-            entropy = self._calculate_pixel_entropy(img_data)
-
-            # Check if it's agricultural
-            is_agricultural = crop_type != "NON_AGRICULTURAL_IMAGE"
-
+        # Step 1: Classify the crop
+        classification = await self.classifier.classify(image_data)
+        
+        if not classification.get("success"):
             return {
-                "status": "Success",
-                "is_agricultural": is_agricultural,
-                "crop_type": crop_type, # Added for flat access
-                "classification": {
-                    "crop": crop_type,
-                    "confidence": 0.982 if is_agricultural else 0.15
-                },
-                "grading": {
-                    "grade": grade if is_agricultural else "N/A",
-                    "confidence": float(confidence) if is_agricultural else 0.0,
-                    "architecture": self.grading_engine
-                },
-                "health": health_status if is_agricultural else {"status": "N/A"},
-                "cv_metrics": {
-                    "structural_entropy": float(entropy),
-                    "processing_mode": "Sovereign Gradient Analysis"
-                }
+                "success": False,
+                "error": classification.get("error", "Unable to analyze image"),
+                "verified": False,
+                "message": "Could not identify the crop. Please send a clearer photo."
             }
-        except Exception as e:
-            return {"error": f"Sovereign Vision Failure: {str(e)}"}
-
-    def diagnose_health(self, img_data: np.ndarray) -> Dict:
-        """
-        Diagnoses crop health issues from leaf/produce photos.
-        Inspired by ResNet-9 on PlantVillage dataset.
-        """
-        # Feature extraction for disease (simulating spot/rust detection)
-        # We look for specific chromatic clusters (brown/yellow/rust)
-        variance = np.var(img_data)
-        avg_rgb = np.mean(img_data, axis=(0, 1))
         
-        # Heuristic for rust/spots
-        is_healthy = True
-        condition = "Healthy"
-        confidence = 0.99
-        issues = []
+        detected_crop = classification.get("crop_type")
+        confidence = classification.get("confidence", 0)
         
-        # Check for high variance in specific channels (simulating disease spots)
-        if variance > 4000:
-            is_healthy = False
-            condition = "Early Blight / Rust Detected"
-            confidence = 0.92
-            issues.append("Chlorotic spots identified via high-order variance")
+        # Step 2: Verify against expected crop if provided
+        verified = False
+        match_message = None
+        
+        if expected_crop:
+            # Normalize crop names for comparison
+            expected_normalized = expected_crop.lower().strip()
+            detected_normalized = detected_crop.lower().strip()
             
-        return {
-            "is_healthy": is_healthy,
-            "status": condition, # Changed from condition to status for consistency
-            "confidence": confidence,
-            "architecture": self.disease_engine,
-            "issues": issues if issues else ["No diseases detected"]
+            if expected_normalized == detected_normalized:
+                verified = True
+                match_message = f"✅ Verified: This is {classification.get('crop_name', detected_crop.title())}"
+            else:
+                verified = False
+                match_message = (
+                    f"⚠️ MISMATCH: You are trying to list **{expected_crop.title()}** "
+                    f"but the image shows **{classification.get('crop_name', detected_crop.title())}**.\n\n"
+                    f"Please send the correct photo of your {expected_crop.title()} to proceed."
+                )
+        
+        # Step 3: Estimate grade
+        # Note: In production, you'd need to load the image properly
+        # For now, use classification confidence as proxy
+        grade_result = {
+            "grade": classification.get("grade", "Standard"),
+            "quality_score": confidence,
+            "description": self._get_grade_description(classification.get("grade", "Standard"))
         }
-
-    def _classify_crop(self, img_data: np.ndarray) -> str:
+        
+        # Step 4: Build response
+        result = {
+            "success": True,
+            "verified": verified if expected_crop else None,
+            "match_message": match_message,
+            "crop": {
+                "type": detected_crop,
+                "name": classification.get("crop_name", detected_crop.title()),
+                "confidence": confidence,
+                "confidence_level": self._get_confidence_level(confidence)
+            },
+            "grade": grade_result,
+            "health": {
+                "status": classification.get("health_status", "Unknown"),
+                "issues": classification.get("health_issues", [])
+            },
+            "recommendations": classification.get("recommendations", []),
+            "features": classification.get("detected_features", {})
+        }
+        
+        return result
+    
+    async def verify_crop_match(self, image_data: bytes, claimed_crop: str) -> Dict[str, Any]:
         """
-        High-Precision Crop Classification using Multi-Spectral Color Moments.
-        Analyzes R-G-B distribution and Greenness Index (ExG).
+        Specifically verify if the image matches the claimed crop
+        This is the main function for listing verification
         """
-        # Calculate Color Moments
-        mean = np.mean(img_data, axis=(0, 1))
-        std = np.std(img_data, axis=(0, 1))
+        analysis = await self.analyze_crop(image_data, expected_crop=claimed_crop)
         
-        # Excess Green Index (ExG) for Maize/Soybeans
-        exg = 2 * mean[1] - mean[0] - mean[2]
-        
-        # Ratio of Red to Green for Ripeness (Tomatoes/Potatoes)
-        rg_ratio = mean[0] / (mean[1] + 1e-6)
-
-        # Basic Check: If the image is too dark, too bright, or too "flat" (low variance), 
-        # or if it doesn't match common crop color domains.
-        variance = np.var(img_data)
-        if variance < 500 or mean.max() < 30 or mean.min() > 220:
-             return "NON_AGRICULTURAL_IMAGE"
-
-        if exg > 35:
-            # High green biomass: Maize or Soybeans
-            if mean[1] > 140: return "White Maize (Hybrid)"
-            return "Soybeans (Grade 1)"
-        elif rg_ratio > 1.3:
-            # High red/yellow content
-            return "Field Tomatoes"
-        elif mean[0] > 110 and mean[1] > 100:
-            return "Irish Potatoes"
-        
-        # If it doesn't fit the specific ones, check if it's agricultural at all
-        # Common agricultural products have a decent green or earth-tone component
-        if mean[1] > mean[2] or (mean[0] > 100 and mean[1] > 80):
-            return "Unidentified Premium Commodity"
-            
-        return "NON_AGRICULTURAL_IMAGE"
-
-    def _calculate_agri_grade(self, img_data: np.ndarray) -> Tuple[str, float]:
+        return {
+            "is_match": analysis.get("verified", False),
+            "detected_crop": analysis.get("crop", {}).get("name", "Unknown"),
+            "detected_crop_type": analysis.get("crop", {}).get("type", "unknown"),
+            "confidence": analysis.get("crop", {}).get("confidence", 0),
+            "message": analysis.get("match_message", "Unable to verify"),
+            "grade": analysis.get("grade", {}).get("grade", "Standard"),
+            "quality_score": analysis.get("grade", {}).get("quality_score", 0)
+        }
+    
+    async def analyze_for_agent(self, image_data: bytes) -> Dict[str, Any]:
         """
-        Agricultural Quality Grading using Structural Boundary Analysis.
-        Grade A requires high color uniformity AND low structural defect entropy.
+        Enhanced analysis for agent verification
+        Provides more detailed information for agent review
         """
-        # 1. Structural Defect Analysis via Sobel Edge Frequency
-        # We simulate a Sobel filter to detect 'roughness' or 'bruises'
-        kernel_x = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
-        gray = np.dot(img_data[...,:3], [0.2989, 0.5870, 0.1140])
+        analysis = await self.analyze_crop(image_data)
         
-        # Simple local variance check as a proxy for Sobel edge frequency
-        local_var = np.var(gray)
-        color_uniformity = np.std(img_data)
+        if not analysis.get("success"):
+            return analysis
         
-        # 2. Grading Logic (Zimbabwean Standards)
-        # Grade A: Smooth (low local_var) + Uniform Color (low color_std)
-        if local_var < 1500 and color_uniformity < 45:
-            return "Grade A (Export Quality)", 0.98
-        elif local_var < 3000 and color_uniformity < 65:
-            return "Grade B (Commercial)", 0.89
+        return {
+            "success": True,
+            "crop_type": analysis["crop"]["type"],
+            "crop_name": analysis["crop"]["name"],
+            "confidence": analysis["crop"]["confidence"],
+            "estimated_grade": analysis["grade"]["grade"],
+            "quality_score": analysis["grade"]["quality_score"],
+            "health_status": analysis["health"]["status"],
+            "issues_detected": analysis["health"]["issues"],
+            "requires_agent_review": analysis["crop"]["confidence"] < self.CONFIDENCE_MEDIUM,
+            "recommendations": analysis["recommendations"]
+        }
+    
+    async def detect_disease(self, image_data: bytes) -> dict:
+        """
+        Detect crop diseases using the trained YOLOv8-cls disease model.
+        Falls back to colour heuristics if model is not yet trained.
+        """
+        result = self.disease.detect(image_data)
+        return result
+
+    async def full_analysis(self, image_data: bytes, expected_crop: str = None) -> dict:
+        """
+        Combined crop classification + disease detection in one call.
+        """
+        crop_result    = await self.analyze_crop(image_data, expected_crop)
+        disease_result = self.disease.detect(image_data)
+
+        return {
+            **crop_result,
+            "disease": {
+                "detected":         disease_result.get("disease_detected", False),
+                "name":             disease_result.get("disease_name"),
+                "severity":         disease_result.get("severity"),
+                "severity_color":   disease_result.get("severity_color"),
+                "confidence":       disease_result.get("confidence"),
+                "treatment":        disease_result.get("treatment"),
+                "prevention":       disease_result.get("prevention"),
+                "top_predictions":  disease_result.get("top_predictions", []),
+                "requires_review":  disease_result.get("requires_agent_review", False),
+                "model":            disease_result.get("model"),
+            },
+        }
+    
+    def _get_confidence_level(self, confidence: float) -> str:
+        """Convert confidence score to human-readable level"""
+        if confidence >= self.CONFIDENCE_HIGH:
+            return "High"
+        elif confidence >= self.CONFIDENCE_MEDIUM:
+            return "Medium"
         else:
-            return "Grade C (Processing)", 0.76
+            return "Low"
+    
+    def _get_grade_description(self, grade: str) -> str:
+        """Get description for each grade"""
+        descriptions = {
+            "Grade A": "Premium quality - excellent appearance, no defects",
+            "Grade B": "Good quality - minor imperfections",
+            "Grade C": "Standard quality - some defects visible",
+            "Standard": "Basic quality - review recommended"
+        }
+        return descriptions.get(grade, "Quality assessment completed")
 
-    def _calculate_pixel_entropy(self, img_data) -> float:
-        """
-        Shannon Entropy (Structural Complexity).
-        """
-        hist, _ = np.histogram(img_data, bins=256, range=(0, 255), density=True)
-        hist = hist[hist > 0]
-        return -np.sum(hist * np.log2(hist))
 
-    def train(self, dataset_path: str):
-        """
-        Sovereign Calibration: Refines EfficientNet/ResNet features on local data.
-        """
-        print(f"Vision Core: Training on {dataset_path}...")
-        return {"status": "success", "new_accuracy": 0.985, "model": self.grading_engine}
-
-# Global Instance
-vision_core = VisionService()
+# Singleton instance
+vision_service = VisionService()

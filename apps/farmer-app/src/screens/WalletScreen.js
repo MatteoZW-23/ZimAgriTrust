@@ -2,13 +2,20 @@ import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../styles';
 
-export default function WalletScreen({ navigation }) {
-  const transactions = [
-    { id: '#AG-067', date: 'Mar 28', amount: '-$450.00', product: 'Maize', status: '🟡 Escrow' },
-    { id: '#AG-054', date: 'Mar 25', amount: '-$160.00', product: 'Milk', status: '✅ Completed' },
-    { id: '#AG-042', date: 'Mar 22', amount: '-$280.00', product: 'Toms', status: '✅ Completed' },
-    { id: '#R-2500', date: 'Mar 20', amount: '+$2,500.00', product: 'Refund', status: '✅ Resolved' },
-  ];
+export default function WalletScreen({ navigation, route }) {
+  const { token } = route.params || {};
+  const [transactions, setTransactions] = React.useState([]);
+  const [balance, setBalance] = React.useState(null);
+  const [earnings, setEarnings] = React.useState(null);
+
+  React.useEffect(() => {
+    if (!token) return;
+    import('../api').then(({ getWalletBalance, getTransactions, getEarnings }) => {
+      getWalletBalance(token).then(data => setBalance(data)).catch(() => {});
+      getTransactions(token).then(data => setTransactions(Array.isArray(data) ? data : data?.data || [])).catch(() => {});
+      getEarnings(token).then(data => setEarnings(data)).catch(() => {});
+    });
+  }, [token]);
 
   return (
     <ScrollView style={styles.container}>
@@ -23,14 +30,48 @@ export default function WalletScreen({ navigation }) {
         <Text style={styles.sectionTitle}>WALLET BALANCE</Text>
         <View style={styles.balanceCard}>
            <Text style={styles.currencySymbol}>$</Text>
-           <Text style={styles.balanceValue}>12,450.00</Text>
-           <Text style={styles.balanceTag}>Trading Limit: $50k</Text>
+           <Text style={styles.balanceValue}>{balance?.balance_usd != null ? balance.balance_usd.toFixed(2) : '--'}</Text>
+           <Text style={styles.balanceTag}>ZIG: {balance?.balance_zig != null ? balance.balance_zig.toFixed(2) : '--'} · Pending: ${balance?.pending_usd != null ? balance.pending_usd.toFixed(2) : '--'}</Text>
 
            <View style={styles.actionRow}>
                 <TouchableOpacity style={styles.actionBtn}><Text style={styles.actionBtnText}>Add Funds</Text></TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn}><Text style={styles.actionBtnText}>Withdraw</Text></TouchableOpacity>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Withdraw', { token })}>
+                  <Text style={styles.actionBtnText}>Withdraw</Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.actionBtn}><Text style={styles.actionBtnText}>History</Text></TouchableOpacity>
            </View>
+        </View>
+      </View>
+
+      {/* Earnings Summary */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>EARNINGS SUMMARY</Text>
+        <View style={styles.card}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.label}>Total Sales</Text>
+            <Text style={styles.value}>${(earnings?.total_sales ?? 0).toFixed(2)}</Text>
+          </View>
+          <View style={styles.rowBetween}>
+            <Text style={styles.label}>Platform Fees</Text>
+            <Text style={styles.valueRed}>-${(earnings?.total_fees ?? 0).toFixed(2)}</Text>
+          </View>
+          <View style={styles.rowBetween}>
+            <Text style={styles.label}>Net Payout</Text>
+            <Text style={styles.valueGreen}>${(earnings?.net_payout ?? 0).toFixed(2)}</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.rowBetween}>
+            <Text style={styles.label}>Transport Commission</Text>
+            <Text style={styles.value}>${(earnings?.transport_commission ?? 0).toFixed(2)}</Text>
+          </View>
+          <View style={styles.rowBetween}>
+            <Text style={styles.label}>Boost Fees Paid</Text>
+            <Text style={styles.valueRed}>-${(earnings?.boost_fees_paid ?? 0).toFixed(2)}</Text>
+          </View>
+          <View style={styles.rowBetween}>
+            <Text style={styles.label}>Orders Completed</Text>
+            <Text style={styles.value}>{earnings?.order_count ?? 0}</Text>
+          </View>
         </View>
       </View>
 
@@ -38,14 +79,18 @@ export default function WalletScreen({ navigation }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>RECENT TRANSACTIONS</Text>
         <View style={styles.listCard}>
-            {transactions.map((tx, i) => (
+            {transactions.length === 0 ? (
+                <View style={{ padding: 24, alignItems: 'center' }}>
+                    <Text style={{ color: '#999', fontWeight: '700' }}>No transactions yet</Text>
+                </View>
+            ) : transactions.map((tx, i) => (
                 <View key={i} style={[styles.txItem, i === 0 && { borderTopWidth: 0 }]}>
                     <View style={styles.txLeft}>
-                        <Text style={styles.txDate}>{tx.date}</Text>
-                        <Text style={styles.txRef}>{tx.id} • {tx.product}</Text>
+                        <Text style={styles.txDate}>{tx.date || tx.created_at?.slice(0, 10)}</Text>
+                        <Text style={styles.txRef}>{tx.id} • {tx.product || tx.description}</Text>
                     </View>
                     <View style={styles.txRight}>
-                        <Text style={[styles.txAmount, tx.amount.startsWith('+') ? { color: theme.colors.green } : { color: theme.colors.red }]}>{tx.amount}</Text>
+                        <Text style={[styles.txAmount, tx.amount > 0 ? { color: theme.colors.green } : { color: theme.colors.red }]}>{tx.amount > 0 ? '+' : ''}${Math.abs(tx.amount).toFixed(2)}</Text>
                         <Text style={styles.txStatus}>{tx.status}</Text>
                     </View>
                 </View>
@@ -61,16 +106,9 @@ export default function WalletScreen({ navigation }) {
             <View style={styles.methodRow}>
                 <View style={[styles.radioCircle, { backgroundColor: theme.colors.sky, borderColor: theme.colors.sky }]} />
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.methodTitle}>EcoCash: +263 77 123 4567</Text>
-                    <Text style={styles.methodSub}>[Default Payment Method]</Text>
+                    <Text style={styles.methodTitle}>{balance?.payment_method || 'No payment method saved'}</Text>
+                    <Text style={styles.methodSub}>{balance?.payment_method ? '[Default Payment Method]' : ''}</Text>
                 </View>
-            </View>
-            <View style={[styles.methodRow, { marginTop: 20 }]}>
-                <View style={styles.radioCircle} />
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.methodTitle}>NMB Bank: ****1234</Text>
-                </View>
-                <TouchableOpacity><Text style={styles.editBtn}>Edit</Text></TouchableOpacity>
             </View>
         </View>
         <TouchableOpacity style={styles.addBtn}><Text style={styles.addBtnText}>Add New Payment Method +</Text></TouchableOpacity>
@@ -110,5 +148,11 @@ const styles = StyleSheet.create({
   methodSub: { fontSize: 12, color: theme.colors.green, fontWeight: '700', marginTop: 2 },
   editBtn: { color: theme.colors.sky, fontWeight: '700', fontSize: 13 },
   addBtn: { margin: 24, paddingVertical: 14, borderStyle: 'dashed', borderWidth: 2, borderColor: '#DDD', borderRadius: 16, alignItems: 'center' },
-  addBtnText: { color: '#999', fontWeight: '800', fontSize: 14 }
+  addBtnText: { color: '#999', fontWeight: '800', fontSize: 14 },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#EEE' },
+  label: { fontSize: 14, fontWeight: '700', color: theme.colors.black },
+  value: { fontSize: 14, fontWeight: '800', color: theme.colors.black },
+  valueRed: { fontSize: 14, fontWeight: '800', color: theme.colors.red || '#dc2626' },
+  valueGreen: { fontSize: 14, fontWeight: '800', color: theme.colors.green },
+  divider: { height: 1, backgroundColor: '#EEE', marginVertical: 8 }
 });

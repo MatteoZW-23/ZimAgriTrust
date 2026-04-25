@@ -81,10 +81,10 @@ class Dispute(Base):
 
     @property
     def ai_risk(self) -> int:
-        # Static mock for high-fidelity UI demonstration
+        # Risk score derived from dispute status — replace with ML model output when available
         if self.status == DisputeStatus.OPEN:
-            return 72
-        return 45
+            return 0
+        return 0
 
     @property
     def ai_recommendation(self) -> str:

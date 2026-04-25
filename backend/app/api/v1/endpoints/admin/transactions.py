@@ -22,9 +22,14 @@ def list_transactions(
     Function 73: View all transactions (Orders) with filtering.
     """
     query = db.query(Order).options(joinedload(Order.buyer), joinedload(Order.seller), joinedload(Order.listing))
-    
-    if status:
-        query = query.filter(Order.status == status.lower())
+
+    if status and status.lower() not in ("undefined", "null", "all", ""):
+        from app.models.transaction import OrderStatus
+        valid_values = {s.value.upper() for s in OrderStatus}
+        status_upper = status.upper()
+        if status_upper in valid_values:
+            query = query.filter(Order.status == status_upper)
+        # silently ignore unrecognised status values — don't crash
     if buyer_id:
         query = query.filter(Order.buyer_id == buyer_id)
     if seller_id:

@@ -4,7 +4,8 @@ from sqlalchemy import func
 from app.api.deps import get_db, require_roles
 from app.models.listing import Listing, Offer
 from app.models.user import User, UserRole
-from app.models.transaction import Order
+from app.models.transaction import Order, OrderStatus
+from app.models.dispute import Dispute, DisputeStatus
 from app.schemas.admin import AdminOverviewResponse
 
 router = APIRouter()
@@ -17,6 +18,36 @@ def overview(
     total_vol = db.query(func.sum(Order.total_amount)).scalar() or 0.0
     platform_rev = total_vol * 0.01
 
+    # Real dispute counts
+    open_disputes = db.query(Dispute).filter(
+        Dispute.status.in_([DisputeStatus.OPEN, DisputeStatus.UNDER_REVIEW, DisputeStatus.ESCALATED])
+    ).count()
+    resolved_disputes = db.query(Dispute).filter(
+        Dispute.status.in_([DisputeStatus.RESOLVED, DisputeStatus.CLOSED])
+    ).count()
+
+    # Average trust score
+    avg_trust = db.query(func.avg(User.trust_score)).scalar() or 0.0
+
+    # Escrow pool (sum of ESCROW_HELD orders)
+    escrow_total = db.query(func.sum(Order.total_amount)).filter(
+        Order.status == OrderStatus.ESCROW_HELD
+    ).scalar() or 0.0
+
+    # Average settlement time in hours (completed orders with updated_at - created_at)
+    from sqlalchemy import cast, Float
+    from datetime import datetime
+    completed_orders = db.query(Order).filter(Order.status == OrderStatus.COMPLETED).limit(100).all()
+    if completed_orders:
+        deltas = [
+            (o.updated_at - o.created_at).total_seconds() / 3600
+            for o in completed_orders
+            if o.updated_at and o.created_at
+        ]
+        avg_settlement_hours = round(sum(deltas) / len(deltas), 1) if deltas else None
+    else:
+        avg_settlement_hours = None
+
     return {
         "users": db.query(User).count(),
         "farmers": db.query(User).filter(User.role == UserRole.FARMER).count(),
@@ -27,8 +58,14 @@ def overview(
         "platform_revenue": platform_rev,
         "pending_verifications": db.query(Listing).filter(Listing.verification_status == "PENDING").count(),
         "suspended_listings": db.query(Listing).filter(Listing.status == "SUSPENDED").count(),
-        "open_disputes": 0, # Placeholder, link to disputes model later
-        "resolved_disputes": 0,
+        "open_disputes": open_disputes,
+        "resolved_disputes": resolved_disputes,
+        "avg_trust_score": round(avg_trust, 1),
+        "escrow_total": round(escrow_total, 2),
+        "avg_settlement_hours": avg_settlement_hours,
+        "stats": {
+            "total_users": db.query(User).count(),
+        },
         "system_health": {
             "api": "OPERATIONAL",
             "database": "OPERATIONAL",

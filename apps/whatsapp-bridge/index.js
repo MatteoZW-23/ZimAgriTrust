@@ -13,27 +13,34 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://backend:8000/api/v1/whats
 const PORT = process.env.PORT || 3006;
 
 let lastQrString = null;
+let isRestarting = false;
 
 const client = new Client({
     authStrategy: new LocalAuth({
         dataPath: './.wwebjs_auth'
     }),
-    authTimeoutMs: 0, // Disable timeout to give the user plenty of time
+    authTimeoutMs: 60000,
     qrMaxRetries: 10,
+    takeoverOnConflict: true,
+    takeoverTimeoutMs: 0,
     puppeteer: {
         args: [
-            '--no-sandbox', 
+            '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--single-process', // <- this one can help memory in some docker envs
-            '--disable-gpu'
+            '--disable-gpu',
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--disable-web-security',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding'
         ],
         headless: true,
-        executablePath: process.platform === 'linux' 
-            ? '/usr/bin/chromium' 
+        executablePath: process.platform === 'linux'
+            ? '/usr/bin/chromium'
             : 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
     }
 });
@@ -99,6 +106,17 @@ app.get('/qr', async (req, res) => {
 
 client.on('ready', () => {
     console.log('WhatsApp Bridge is READY!');
+    isRestarting = false;
+});
+
+client.on('auth_failure', (msg) => {
+    console.error('AUTHENTICATION FAILURE:', msg);
+    scheduleRestart(5000);
+});
+
+client.on('disconnected', (reason) => {
+    console.warn('CLIENT DISCONNECTED:', reason);
+    scheduleRestart(3000);
 });
 
 client.on('message', async (msg) => {
@@ -165,20 +183,57 @@ app.listen(PORT, () => {
     console.log(`WhatsApp Bridge control API listening on port ${PORT}`);
 });
 
-const startClient = async (retries = 5) => {
+const scheduleRestart = (delayMs = 5000) => {
+    if (isRestarting) return;
+    isRestarting = true;
+    console.log(`Scheduling restart in ${delayMs}ms...`);
+    setTimeout(async () => {
+        try {
+            console.log('Destroying old client...');
+            await client.destroy().catch(() => {});
+        } catch (_) { /* ignore */ }
+        // Reset flag so future failures can trigger another restart
+        isRestarting = false;
+        console.log('Re-initializing client...');
+        try {
+            await client.initialize();
+            console.log('Client re-initialized successfully');
+        } catch (err) {
+            console.error('Re-initialization failed:', err.message);
+            scheduleRestart(10000);
+        }
+    }, delayMs);
+};
+
+const startClient = async () => {
     try {
-        console.log(`Starting WhatsApp Bridge... (Attempts remaining: ${retries})`);
+        console.log('Starting WhatsApp Bridge...');
         await client.initialize();
     } catch (err) {
         console.error('FAILED TO INITIALIZE WHATSAPP CLIENT:', err.message);
-        if (retries > 0) {
-            console.log('Retrying in 10 seconds...');
-            setTimeout(() => startClient(retries - 1), 10000);
-        } else {
-            console.error('MAX RETRIES REACHED. EXITING.');
-            process.exit(1);
-        }
+        scheduleRestart(10000);
     }
 };
+
+process.on('unhandledRejection', (reason) => {
+    const msg = reason?.message || String(reason);
+    if (msg.includes('Execution context was destroyed') || msg.includes('Target closed') || msg.includes('Protocol error')) {
+        console.error('Unhandled Puppeteer error:', msg);
+        scheduleRestart(3000);
+    } else {
+        console.error('Unhandled rejection:', reason);
+    }
+});
+
+process.on('uncaughtException', (err) => {
+    const msg = err.message || String(err);
+    if (msg.includes('Execution context was destroyed') || msg.includes('Target closed') || msg.includes('Protocol error')) {
+        console.error('Uncaught Puppeteer error:', msg);
+        scheduleRestart(3000);
+    } else {
+        console.error('Uncaught exception:', err);
+        process.exit(1);
+    }
+});
 
 startClient();

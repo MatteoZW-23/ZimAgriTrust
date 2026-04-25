@@ -1,13 +1,130 @@
 import { useState } from 'react';
 import { register } from '../api';
 import { exportToCSV, handleImport } from '../utils/dataTransfer';
+import { request } from '../api';
+
+// ── Governance Action Modal ──────────────────────────────────────────────────
+function GovernanceModal({ user, token, onClose, onDone }) {
+  const [action, setAction] = useState('');
+  const [reason, setReason] = useState('');
+  const [adjustment, setAdjustment] = useState('');
+  const [newRole, setNewRole] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const ACTIONS = [
+    { key: 'SUSPEND',   label: '🚫 Suspend',        color: '#f59e0b', desc: 'Freeze account access. User notified via WhatsApp & SMS.' },
+    { key: 'REINSTATE', label: '✅ Reinstate',       color: '#22c55e', desc: 'Restore full access. User notified via WhatsApp & SMS.' },
+    { key: 'FLAG',      label: '⚠️ Flag',            color: '#f97316', desc: 'Mark for review. Restricts some features.' },
+    { key: 'VERIFY',    label: '🪪 Verify ID',       color: '#3b82f6', desc: 'Approve identity verification.' },
+    { key: 'UNVERIFY',  label: '❌ Reject ID',       color: '#ef4444', desc: 'Reject verification. User notified.' },
+    { key: 'TRUST',     label: '📊 Adjust Trust',    color: '#8b5cf6', desc: 'Add or subtract trust score points.' },
+    { key: 'ROLE',      label: '🔄 Change Role',     color: '#06b6d4', desc: 'Change the user\'s platform role.' },
+    { key: 'DELETE',    label: '🗑️ Delete Account',  color: '#ef4444', desc: 'Permanently remove. Irreversible. User notified.' },
+  ];
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!reason.trim()) { setError('Reason is required.'); return; }
+    if (action === 'DELETE' && !window.confirm(`PERMANENT DELETE: This cannot be undone. Proceed?`)) return;
+    setLoading(true); setError('');
+    try {
+      const id = user.raw_id || user.id;
+      const headers = { Authorization: `Bearer ${token}` };
+      if (action === 'SUSPEND')   await request(`/admin/users/${id}/status?target_status=SUSPENDED&reason=${encodeURIComponent(reason)}`, { method: 'POST', headers });
+      if (action === 'REINSTATE') await request(`/admin/users/${id}/reinstate?reason=${encodeURIComponent(reason)}`, { method: 'POST', headers });
+      if (action === 'FLAG')      await request(`/admin/users/${id}/status?target_status=FLAGGED&reason=${encodeURIComponent(reason)}`, { method: 'POST', headers });
+      if (action === 'VERIFY')    await request(`/admin/users/${id}/verify?reason=${encodeURIComponent(reason)}`, { method: 'POST', headers });
+      if (action === 'UNVERIFY')  await request(`/admin/users/${id}/verify-reject?reason=${encodeURIComponent(reason)}`, { method: 'POST', headers });
+      if (action === 'TRUST')     await request(`/admin/users/${id}/trust?adjustment=${adjustment}&reason=${encodeURIComponent(reason)}`, { method: 'POST', headers });
+      if (action === 'ROLE')      await request(`/admin/users/${id}/role?new_role=${newRole}&reason=${encodeURIComponent(reason)}`, { method: 'PATCH', headers });
+      if (action === 'DELETE')    await request(`/admin/users/${id}?reason=${encodeURIComponent(reason)}`, { method: 'DELETE', headers });
+      onDone(`Action "${action}" applied to ${user.name}. User notified via WhatsApp & SMS.`);
+    } catch (err) {
+      setError(err.message || 'Action failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selected = ACTIONS.find(a => a.key === action);
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      <div style={{ background: 'var(--v4-card, #fff)', borderRadius: '24px', padding: '40px', width: '100%', maxWidth: '520px', boxShadow: '0 40px 80px rgba(0,0,0,0.3)', position: 'relative' }}>
+        <button onClick={onClose} style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#94a3b8' }}>✕</button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#f1f5f9', display: 'grid', placeItems: 'center', fontSize: '20px', fontWeight: 900, color: '#000E2B' }}>{user.name?.charAt(0)}</div>
+          <div>
+            <div style={{ fontWeight: 900, fontSize: '16px' }}>{user.name}</div>
+            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 700 }}>{user.role} · {user.phone}</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '24px' }}>
+          {ACTIONS.map(a => (
+            <button key={a.key} onClick={() => setAction(a.key)} style={{ padding: '12px', borderRadius: '12px', border: `2px solid ${action === a.key ? a.color : '#e2e8f0'}`, background: action === a.key ? `${a.color}15` : 'transparent', fontWeight: 800, fontSize: '12px', cursor: 'pointer', textAlign: 'left', color: action === a.key ? a.color : '#475569', transition: 'all 0.15s' }}>
+              {a.label}
+            </button>
+          ))}
+        </div>
+
+        {selected && (
+          <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '12px 16px', marginBottom: '16px', fontSize: '12px', color: '#64748b', fontWeight: 700, borderLeft: `3px solid ${selected.color}` }}>
+            {selected.desc}
+          </div>
+        )}
+
+        {action && (
+          <form onSubmit={handleSubmit}>
+            {action === 'TRUST' && (
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 900, color: '#475569', display: 'block', marginBottom: '6px' }}>ADJUSTMENT (e.g. +10 or -5)</label>
+                <input type="number" value={adjustment} onChange={e => setAdjustment(e.target.value)} placeholder="+10 or -5" required style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '10px 14px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+            )}
+            {action === 'ROLE' && (
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 900, color: '#475569', display: 'block', marginBottom: '6px' }}>NEW ROLE</label>
+                <select value={newRole} onChange={e => setNewRole(e.target.value)} required style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '10px 14px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}>
+                  <option value="">Select role...</option>
+                  <option value="farmer">Farmer</option>
+                  <option value="buyer">Buyer</option>
+                  <option value="agent">Agent</option>
+                  <option value="admin">Admin</option>
+                  <option value="transporter">Transporter</option>
+                </select>
+              </div>
+            )}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 900, color: '#475569', display: 'block', marginBottom: '6px' }}>REASON <span style={{ color: '#ef4444' }}>*</span> <span style={{ fontWeight: 600, opacity: 0.6 }}>(sent to user)</span></label>
+              <textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="Provide a clear reason — this will be included in the WhatsApp & SMS notification sent to the user." required rows={3} style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '10px 14px', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+            </div>
+            {error && <div style={{ background: '#fff1f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '10px 14px', fontSize: '13px', color: '#be123c', fontWeight: 700, marginBottom: '12px' }}>{error}</div>}
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button type="button" onClick={onClose} style={{ flex: 1, padding: '12px', background: 'none', border: '1.5px solid #e2e8f0', borderRadius: '12px', fontWeight: 800, cursor: 'pointer', color: '#64748b' }}>Cancel</button>
+              <button type="submit" disabled={loading || !action} style={{ flex: 2, padding: '12px', background: selected?.color || '#000E2B', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 900, cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>
+                {loading ? 'Applying...' : `Apply — ${selected?.label || 'Select action'}`}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function UserDirectoryPanel({ users = [], token, onGovernance, profile }) {
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [selectedUserDetail, setSelectedUserDetail] = useState(null);
   const [enrollData, setEnrollData] = useState({ name: '', phone: '', region: 'Harare Hub', role: 'AGENT' });
   const [selectedUsers, setSelectedUsers] = useState([]);
+  const [governanceTarget, setGovernanceTarget] = useState(null); // user for GovernanceModal
+  const [toast, setToast] = useState('');
   const isAdmin = profile?.role === 'ADMIN';
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 5000); };
 
   const handleBulkAction = (action) => {
       if (action === 'MSG') alert(`Broadcasting high-priority alert to ${selectedUsers.length} selected entities...`);
@@ -17,6 +134,25 @@ export default function UserDirectoryPanel({ users = [], token, onGovernance, pr
           selectedUsers.forEach(id => onGovernance(id, 'DELETE', null, 'Administrative Mass Purge'));
       }
       setSelectedUsers([]);
+  };
+
+  const getVerificationSnapshot = (u = {}) => {
+    const checks = [
+      Boolean(u.is_phone_verified),
+      Boolean(u.id_verified),
+      Boolean(u.is_location_verified),
+      Boolean(u.business_verified),
+      Boolean(u.background_verified),
+      Boolean(u.training_completed),
+      Boolean(u.practical_passed),
+      Boolean(u.shadowing_complete),
+    ];
+    const completed = checks.filter(Boolean).length;
+    return {
+      completed,
+      total: checks.length,
+      ratio: Math.round((completed / checks.length) * 100),
+    };
   };
 
   // Use the real users if provided, strict sync.
@@ -29,7 +165,8 @@ export default function UserDirectoryPanel({ users = [], token, onGovernance, pr
      phone: u.phone_number || '+263 ---',
      trust: u.trust_score || 0,
      status: u.status ? u.status.toUpperCase() : (u.is_suspended ? 'SUSPENDED' : 'ACTIVE'),
-     is_verified: u.is_verified || false,
+     is_verified: Boolean(u.is_phone_verified && u.id_verified),
+     verification: getVerificationSnapshot(u),
      location: 'National Grid'
   }));
 
@@ -206,6 +343,9 @@ export default function UserDirectoryPanel({ users = [], token, onGovernance, pr
                                              <i className={`fas ${u.is_verified ? 'fa-certificate' : 'fa-triangle-exclamation'}`}></i>
                                              <span>{u.is_verified ? 'VERIFIED_FULL' : 'RESTRICTED'}</span>
                                          </div>
+                                         <div style={{ fontSize: '10px', color: 'var(--v4-text-dim)', marginTop: '6px', fontWeight: 700 }}>
+                                           Verification {u.verification.completed}/{u.verification.total}
+                                         </div>
                                      </td>
                                      <td>
                                          <div className="trust-meter-v4">
@@ -222,18 +362,8 @@ export default function UserDirectoryPanel({ users = [], token, onGovernance, pr
                                      </td>
                                      <td style={{ textAlign: 'right' }}>
                                          <div className="gov-actions">
-                                             {!u.is_verified && ((profile?.role?.toUpperCase() === 'AGENT' && (u.role?.toUpperCase() === 'FARMER' || u.role?.toUpperCase() === 'BUYER')) || profile?.role?.toUpperCase() === 'ADMIN') && (
-                                                <button className="q-btn primary-btn small" onClick={(e) => { e.stopPropagation(); onGovernance(u.raw_id || u.id, 'VERIFY', true, 'Agent Verification'); }}>
-                                                    VERIFY
-                                                </button>
-                                             )}
-                                             {isAdmin && (
-                                               <button className="q-btn ghost small dangerous" onClick={(e) => { e.stopPropagation(); onGovernance(u.raw_id || u.id, 'DELETE', null, 'Administrative Purge'); }}>
-                                                   <i className="fas fa-trash-can"></i>
-                                               </button>
-                                             )}
-                                             <button className="q-btn ghost small" onClick={(e) => { e.stopPropagation(); onGovernance(u.raw_id || u.id, 'STATUS', u.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE', 'HQ Override'); }}>
-                                                 <i className={`fas ${u.status === 'ACTIVE' ? 'fa-user-slash' : 'fa-user-check'}`}></i>
+                                             <button className="q-btn primary-btn small" onClick={(e) => { e.stopPropagation(); setGovernanceTarget(u); }}>
+                                                 <i className="fas fa-shield-halved"></i> Manage
                                              </button>
                                          </div>
                                      </td>
@@ -299,9 +429,25 @@ export default function UserDirectoryPanel({ users = [], token, onGovernance, pr
           <UserDetailView 
               user={selectedUserDetail} 
               onBack={() => setSelectedUserDetail(null)} 
-              onGovernance={onGovernance} 
+              onGovernance={onGovernance}
+              onManage={(u) => setGovernanceTarget(u)}
               profile={profile} 
           />
+      )}
+
+      {governanceTarget && (
+        <GovernanceModal
+          user={governanceTarget}
+          token={token}
+          onClose={() => setGovernanceTarget(null)}
+          onDone={(msg) => { setGovernanceTarget(null); showToast(msg); if (onGovernance) onGovernance(null, 'REFRESH', null, 'Governance action'); }}
+        />
+      )}
+
+      {toast && (
+        <div style={{ position: 'fixed', bottom: '32px', left: '50%', transform: 'translateX(-50%)', background: '#000E2B', color: '#fff', padding: '14px 28px', borderRadius: '16px', fontWeight: 800, fontSize: '13px', zIndex: 300, boxShadow: '0 8px 32px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <i className="fas fa-check-circle" style={{ color: '#22c55e' }}></i> {toast}
+        </div>
       )}
 
       <style>{`
@@ -313,7 +459,7 @@ export default function UserDirectoryPanel({ users = [], token, onGovernance, pr
   );
 }
 
-function UserDetailView({ user, onBack, onGovernance, profile }) {
+function UserDetailView({ user, onBack, onGovernance, onManage, profile }) {
     const isAdmin = profile?.role === 'ADMIN';
     return (
         <div className="v4-dashboard-container animate-fade-in compact-mode">
@@ -330,6 +476,7 @@ function UserDetailView({ user, onBack, onGovernance, profile }) {
                             <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
                                 <span className="status-tag active">{user.role}</span>
                                 <span className={`compliance-tag ${user.is_verified ? 'verified' : 'restricted'}`}>{user.is_verified ? 'VERIFIED' : 'UNVERIFIED'}</span>
+                                <span className={`status-tag ${user.status?.toLowerCase()}`}>{user.status}</span>
                             </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
@@ -339,12 +486,11 @@ function UserDetailView({ user, onBack, onGovernance, profile }) {
                     </div>
                     
                     <div className="u-actions" style={{ marginTop: '32px', display: 'flex', gap: '12px' }}>
-                        {isAdmin && (
-                            <button className="q-btn primary-btn small" onClick={() => onGovernance(user.raw_id, 'STATUS', user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE', 'Admin Toggle')}>
-                                {user.status === 'ACTIVE' ? 'Suspend Account' : 'Activate Account'}
+                        {(isAdmin || profile?.role === 'AGENT') && (
+                            <button className="q-btn primary-btn small" style={{ background: '#f59e0b', color: '#000' }} onClick={() => onManage && onManage(user)}>
+                                <i className="fas fa-shield-halved"></i> Governance Actions
                             </button>
                         )}
-                        <button className="q-btn ghost small" style={{ color: '#fff' }}><i className="fas fa-message"></i> Send Notification</button>
                     </div>
                 </div>
             </div>
@@ -402,6 +548,7 @@ function UserDetailView({ user, onBack, onGovernance, profile }) {
                             <div className="m-item"><strong>Region:</strong> {user.location}</div>
                             <div className="m-item"><strong>Enrolled:</strong> 2026-04-10</div>
                             <div className="m-item"><strong>KYC Status:</strong> LEVEL_2</div>
+                            <div className="m-item"><strong>Verification Progress:</strong> {user.verification?.completed || 0}/{user.verification?.total || 8}</div>
                         </div>
                     </div>
                 </aside>

@@ -111,15 +111,15 @@ class AgentService:
     @staticmethod
     def _analyze_listing_photos(photos: List[str]) -> Dict:
         """
-        AI Photo Analysis (Mock): 
-        Pre-screens crop photos for quality issues or fraud before agent review.
+        AI Photo Analysis — integrate with vision service for real analysis.
+        Returns empty result until vision model is connected.
         """
         return {
-            "detected_produce": "White Maize",
-            "quality_confidence": 0.92,
-            "anomalies_detected": False,
-            "suggested_grade": "Grade A",
-            "gps_metadata_match": True
+            "detected_produce": None,
+            "quality_confidence": None,
+            "anomalies_detected": None,
+            "suggested_grade": None,
+            "gps_metadata_match": None
         }
 
     @staticmethod

@@ -13,6 +13,7 @@ from app.models.system_config import SystemConfig, ConfigGroup
 from app.models.notification_template import NotificationTemplate, TemplateChannel
 from app.models.ml_metadata import ModelVersion, MLJobLog, MLPrediction, MLInsight
 from app.models.academy import AgentTraining, AcademyModule, ExamAttempt
+from app.models.review import TradeReview
 
 __all__ = [
     "User", "UserRole", "FarmerProfile", "BuyerProfile", "AgentProfile",
@@ -27,6 +28,7 @@ __all__ = [
     "AgentApplication", "ApplicationStatus",
     "OnboardingPhase", "TrainingModule", "AgentTrainingProgress", "AgentContract", "ShadowingLog",
     "AgentTraining", "AcademyModule", "ExamAttempt",
+    "TradeReview",
     "SystemConfig", "ConfigGroup",
     "NotificationTemplate", "TemplateChannel",
     "ModelVersion", "MLJobLog", "MLPrediction", "MLInsight"

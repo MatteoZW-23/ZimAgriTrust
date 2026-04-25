@@ -1,102 +1,172 @@
-import numpy as np
-import joblib
-import os
-from datetime import datetime
-from typing import Dict, List
+"""
+Price Forecasting Engine.
+Uses live DB transaction history + scraper prices to produce deterministic forecasts.
+No fake LSTM/ARIMA — real weighted moving average with seasonal adjustment.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
+
+# Zimbabwe seasonal price multipliers by month (harvest = lower prices, off-season = higher)
+# Jan–Apr: post-harvest glut → lower; May–Oct: off-season → higher; Nov–Dec: new crop coming
+_SEASONAL_INDEX: Dict[int, float] = {
+    1: 0.92, 2: 0.88, 3: 0.85, 4: 0.90,
+    5: 1.00, 6: 1.05, 7: 1.08, 8: 1.10,
+    9: 1.08, 10: 1.05, 11: 0.98, 12: 0.95,
+}
+
+# GMB / ZAMACE reference floor prices (USD/tonne) — updated periodically
+_GMB_FLOOR: Dict[str, float] = {
+    "Maize":           285.0,
+    "Wheat":           390.0,
+    "Soybeans":        580.0,
+    "Tobacco":        1800.0,
+    "Sorghum":         220.0,
+    "Groundnuts":      650.0,
+    "Sunflower Seeds": 480.0,
+    "Sugar Beans":     900.0,
+    "Cotton":          420.0,
+    "Barley":          350.0,
+}
+
+_DEFAULT_FLOOR = 300.0
+
 
 class DeepForecaster:
     """
-    Sovereign Hybrid Forecasting Engine (ARIMA + LSTM).
-    Combines linear trend analysis (ARIMA) with non-linear memory networks (LSTM).
-    Implemented via Matrix Calculus in Pure NumPy.
+    Deterministic price forecasting engine.
+    Combines:
+      1. Live DB weighted average from recent completed orders
+      2. Scraper spot prices (GMB / AMA)
+      3. Seasonal adjustment index
+    Falls back to GMB floor prices when no live data is available.
     """
-    
+
     def __init__(self):
-        self.architecture = "Hybrid ARIMA-LSTM (Transformer-Ready)"
-        self.weights_path = "data/ml-weights/hybrid_price_engine.pkl"
-        self._initialize_hybrid_params()
+        self.architecture = "Weighted Moving Average + Seasonal Index (Live DB)"
 
-    def _initialize_hybrid_params(self):
+    def forecast_price(self, features: Dict, db=None, crop: str = "Maize") -> Dict:
         """
-        Initializes weights for LSTM-style gates (Forget, Input, Output) 
-        and ARIMA coefficients.
+        features: optional dict with keys demand, supply, trust, volatility (ignored — kept for API compat)
+        db: SQLAlchemy session (optional — enables live DB pricing)
+        crop: commodity name
         """
-        # LSTM Simulated Gates: [input_dim=5, hidden_dim=32]
-        self.params = {
-            "Wf": np.random.randn(37, 32) * 0.1, # Forget gate
-            "Wi": np.random.randn(37, 32) * 0.1, # Input gate
-            "Wo": np.random.randn(37, 32) * 0.1, # Output gate
-            "Wc": np.random.randn(37, 32) * 0.1, # Cell state
-            "Wy": np.random.randn(32, 1) * 0.1,   # Dense output
-            "arima_coeffs": np.array([0.65, 0.25, 0.1]) # AR(3) coefficients
-        }
-        print(f"Sovereign AI: {self.architecture} weights synchronized.")
+        month = datetime.utcnow().month
+        seasonal = _SEASONAL_INDEX.get(month, 1.0)
+        floor = _GMB_FLOOR.get(crop, _DEFAULT_FLOOR)
 
-    def forecast_price(self, features: Dict) -> Dict:
-        """
-        Executes Hybrid Inference: 
-        1. ARIMA for seasonal linear baseline.
-        2. LSTM for volatility and non-linear adjustment.
-        """
+        # 1. Try live DB average from recent completed orders
+        db_avg: Optional[float] = None
+        if db is not None:
+            try:
+                from sqlalchemy import func
+                from app.models.transaction import Order, OrderStatus
+                from app.models.listing import Listing
+                cutoff = datetime.utcnow() - timedelta(days=30)
+                row = (
+                    db.query(func.avg(Order.total_amount / Order.quantity_kg))
+                    .join(Listing, Order.listing_id == Listing.id)
+                    .filter(
+                        Listing.product_type.ilike(f"%{crop}%"),
+                        Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SETTLED]),
+                        Order.created_at >= cutoff,
+                        Order.quantity_kg > 0,
+                    )
+                    .scalar()
+                )
+                if row and row > 0:
+                    db_avg = float(row)
+            except Exception:
+                pass
+
+        # 2. Try scraper spot price
+        scraper_price: Optional[float] = None
         try:
-            # Feature extraction
-            day = datetime.now().timetuple().tm_yday
-            X = np.array([[
-                day, 
-                features.get("demand", 75.0), 
-                features.get("supply", 500.0), 
-                features.get("trust", 85.0), 
-                features.get("volatility", 1.2)
-            ]])
+            from app.services.scraper_service import AgriScraper
+            prices = AgriScraper.scrape_market_prices()
+            for item in prices:
+                if crop.lower() in item.get("commodity", "").lower():
+                    scraper_price = float(item["price"])
+                    break
+        except Exception:
+            pass
 
-            # 1. ARIMA Logic (Simulating AR(3) baseline)
-            # Baseline = p1*t-1 + p2*t-2...
-            base_price = 150.0 # Baseline for Maize
-            arima_adjustment = np.sum(self.params["arima_coeffs"] * [1.1, 1.05, 1.0])
-            baseline = base_price * arima_adjustment
+        # 3. Weighted blend: DB (60%) + scraper (30%) + floor (10%)
+        if db_avg and scraper_price:
+            base_price = db_avg * 0.60 + scraper_price * 0.30 + floor * 0.10
+            source = "live_db+scraper"
+        elif db_avg:
+            base_price = db_avg * 0.80 + floor * 0.20
+            source = "live_db"
+        elif scraper_price:
+            base_price = scraper_price * 0.80 + floor * 0.20
+            source = "scraper"
+        else:
+            base_price = floor
+            source = "gmb_floor"
 
-            # 2. LSTM Forward Pass (Simulated Hidden State Transition)
-            h_prev = np.zeros((1, 32))
-            X_combined = np.concatenate([X, h_prev], axis=1) # [1, 37]
-            
-            # Simplified LSTM Gate logic
-            i_gate = self._sigmoid(X_combined.dot(self.params["Wi"]))
-            o_gate = self._sigmoid(X_combined.dot(self.params["Wo"]))
-            prediction_delta = X_combined.dot(self.params["Wc"]).dot(self.params["Wy"])
-            
-            # Combine
-            final_price = baseline + float(prediction_delta[0][0])
-            final_price = max(10, final_price) # Economic floor
+        forecast = round(base_price * seasonal, 2)
+        low = round(forecast * 0.95, 2)
+        high = round(forecast * 1.05, 2)
 
-            volatility = features.get("volatility", 1.2)
-            confidence = 0.92 - (volatility * 0.05)
+        confidence = 0.90 if source == "live_db+scraper" else 0.78 if source in ("live_db", "scraper") else 0.60
 
-            return {
-                "forecasted_price": round(final_price, 2),
-                "confidence_interval": [round(final_price * 0.96, 2), round(final_price * 1.04, 2)],
-                "accuracy_rating": f"{confidence * 100:.1f}%",
-                "model_architecture": self.architecture,
-                "components": ["ARIMA(3,1,0)", "LSTM Hidden Layers"],
-                "insight": "Explainable AI (AGRICAF) confirms 12-month bullish trend."
-            }
-        except Exception as e:
-            return {"error": f"Hybrid Inference Error: {str(e)}"}
+        return {
+            "forecasted_price": forecast,
+            "confidence_interval": [low, high],
+            "accuracy_rating": f"{confidence * 100:.0f}%",
+            "model_architecture": self.architecture,
+            "data_source": source,
+            "seasonal_index": seasonal,
+            "month": month,
+            "components": {
+                "db_avg_price": round(db_avg, 2) if db_avg else None,
+                "scraper_price": round(scraper_price, 2) if scraper_price else None,
+                "gmb_floor": floor,
+            },
+        }
 
-    def _sigmoid(self, x):
-        return 1 / (1 + np.exp(-np.clip(x, -500, 500)))
+    def get_price_history(self, crop: str, db=None, days: int = 30) -> List[Dict]:
+        """
+        Returns daily average prices from completed orders for the last N days.
+        Used by /market/analytics/trends/{crop}.
+        """
+        if db is None:
+            return []
+        try:
+            from sqlalchemy import func, cast, Date
+            from app.models.transaction import Order, OrderStatus
+            from app.models.listing import Listing
+            cutoff = datetime.utcnow() - timedelta(days=days)
+            rows = (
+                db.query(
+                    cast(Order.created_at, Date).label("date"),
+                    func.avg(Order.total_amount / Order.quantity_kg).label("price"),
+                )
+                .join(Listing, Order.listing_id == Listing.id)
+                .filter(
+                    Listing.product_type.ilike(f"%{crop}%"),
+                    Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SETTLED]),
+                    Order.created_at >= cutoff,
+                    Order.quantity_kg > 0,
+                )
+                .group_by(cast(Order.created_at, Date))
+                .order_by(cast(Order.created_at, Date))
+                .all()
+            )
+            return [{"date": str(r.date), "price": round(float(r.price), 2)} for r in rows]
+        except Exception:
+            return []
 
     def train(self, data_path: str, epochs: int = 100):
-        """
-        Sovereign Backpropagation: Optimizes Hybrid weights via Gradient Descent.
-        """
-        print(f"Hybrid Engine: Retraining on {data_path}...")
-        # Simulated loss convergence
+        """No-op — this engine uses live DB data, no training required."""
         return {
-            "status": "converged",
-            "iterations": epochs,
-            "final_loss": 0.042,
-            "architecture": self.architecture
+            "status": "ok",
+            "note": "Price forecaster uses live DB + scraper data. No training file needed.",
+            "architecture": self.architecture,
         }
 
-# Global Instance
+
+# Global instance
 deep_engine = DeepForecaster()

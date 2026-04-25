@@ -8,7 +8,7 @@ import os
 
 from app.api.deps import get_db, get_current_agent
 from app.core.security import decode_token, create_access_token, verify_password
-from app.models.agent import Agent
+from app.models.agent import Agent, AgentStatus
 from app.models.user import User
 from app.models.academy import AgentTraining, AcademyModule, ExamAttempt, ModuleStatus
 from app.schemas.academy import (
@@ -31,7 +31,7 @@ def academy_login(payload: TraineeLogin, db: Session = Depends(get_db)):
             detail="INVALID_AGENT_CODE: Profile not discovered in the AgriTrust ledger."
         )
     
-    if agent.status == "failed":
+    if agent.status == AgentStatus.SUSPENDED:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="ACADEMY_DISMISSAL: This profile has been terminated due to failure to meet certification standards."
@@ -456,7 +456,7 @@ def submit_final_exam(
         training.certification_expires_at = datetime.utcnow() + timedelta(days=365)
         
         agent = db.query(Agent).filter(Agent.id == current_agent.id).first()
-        agent.status = "active"
+        agent.status = AgentStatus.ACTIVE
         db.commit()
         
         return {"passed": True, "score": score, "message": "🎉 CONGRATULATIONS! You are now a Certified AgriTrust Field Agent."}
@@ -464,7 +464,7 @@ def submit_final_exam(
         # If this was the last attempt, permanently fail the trainee
         if training.final_exam_attempts >= 2:
             agent = db.query(Agent).filter(Agent.id == current_agent.id).first()
-            agent.status = "failed" # This boots them from the system
+            agent.status = AgentStatus.SUSPENDED  # Suspended = dismissed from academy
             db.commit()
             return {
                 "passed": False, 

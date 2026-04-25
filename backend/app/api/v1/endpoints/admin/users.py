@@ -1,13 +1,85 @@
 import uuid
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
 from app.models.user import User, UserRole
 from app.schemas.auth import UserResponse, UserRegister
 from app.models.system_audit import SystemAudit
+from app.services.notification_service import NotificationService
 
 router = APIRouter()
+
+
+async def _notify_user(user: User, action: str, reason: str):
+    """Fire-and-forget notification to user via WhatsApp + SMS."""
+    phone = user.phone_number
+    name = user.full_name or "User"
+
+    messages = {
+        "SUSPENDED": (
+            f"🚨 *Account Suspended*\n\n"
+            f"Hello {name}, your AgriTrust account has been suspended.\n\n"
+            f"*Reason:* {reason}\n\n"
+            f"Contact support to appeal this decision."
+        ),
+        "ACTIVE": (
+            f"✅ *Account Reinstated*\n\n"
+            f"Hello {name}, your AgriTrust account has been reactivated.\n\n"
+            f"*Reason:* {reason}\n\n"
+            f"You can now log in and resume trading."
+        ),
+        "FLAGGED": (
+            f"⚠️ *Account Flagged*\n\n"
+            f"Hello {name}, your account has been flagged for review.\n\n"
+            f"*Reason:* {reason}\n\n"
+            f"Some features may be restricted until review is complete."
+        ),
+        "CLOSED": (
+            f"🔒 *Account Closed*\n\n"
+            f"Hello {name}, your AgriTrust account has been permanently closed.\n\n"
+            f"*Reason:* {reason}\n\n"
+            f"Contact support if you believe this is an error."
+        ),
+        "VERIFIED": (
+            f"✅ *Identity Verified*\n\n"
+            f"Hello {name}, your identity has been verified by AgriTrust.\n\n"
+            f"Your trust score has been updated. You now have full platform access."
+        ),
+        "VERIFY_REJECTED": (
+            f"❌ *Verification Rejected*\n\n"
+            f"Hello {name}, your identity verification was rejected.\n\n"
+            f"*Reason:* {reason}\n\n"
+            f"Please resubmit with a clearer ID document."
+        ),
+        "TRUST_UP": (
+            f"📈 *Trust Score Updated*\n\n"
+            f"Hello {name}, your trust score has been adjusted by an administrator.\n\n"
+            f"*Reason:* {reason}\n\n"
+            f"Check your dashboard for your new score."
+        ),
+        "TRUST_DOWN": (
+            f"📉 *Trust Score Reduced*\n\n"
+            f"Hello {name}, your trust score has been reduced by an administrator.\n\n"
+            f"*Reason:* {reason}\n\n"
+            f"Complete successful transactions to recover your score."
+        ),
+        "ROLE_CHANGED": (
+            f"🔄 *Account Role Updated*\n\n"
+            f"Hello {name}, your account role has been changed by an administrator.\n\n"
+            f"*Reason:* {reason}\n\n"
+            f"Log out and back in to see your updated access."
+        ),
+        "DELETED": (
+            f"🗑️ *Account Removed*\n\n"
+            f"Hello {name}, your AgriTrust account has been permanently removed.\n\n"
+            f"*Reason:* {reason}\n\n"
+            f"Contact support if you believe this is an error."
+        ),
+    }
+
+    msg = messages.get(action, f"AgriTrust: Your account has been updated. Reason: {reason}")
+    await NotificationService._notify_both_channels(phone, msg)
 
 @router.get("", response_model=list[UserResponse])
 def list_users(
@@ -69,27 +141,18 @@ def bulk_verify_users(
 def reject_verification(
     user_id: uuid.UUID,
     reason: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     admin: User = Depends(require_roles(UserRole.ADMIN, UserRole.AGENT)),
 ):
-    """
-    Function 12: Reject verification.
-    """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    user.id_verified = False # Explicitly mark as not verified
-    
-    audit = SystemAudit(
-        admin_id=admin.id,
-        action="VERIFICATION_REJECT",
-        target_type="USER",
-        target_id=user.id,
-        note=reason
-    )
+    user.id_verified = False
+    audit = SystemAudit(admin_id=admin.id, action="VERIFICATION_REJECT", target_type="USER", target_id=user.id, note=reason)
     db.add(audit)
     db.commit()
+    background_tasks.add_task(_notify_user, user, "VERIFY_REJECTED", reason)
     return {"status": "Verification rejected"}
 
 @router.post("/{user_id}/reset-password")
@@ -124,28 +187,21 @@ def admin_reset_password(
 def change_user_role(
     user_id: uuid.UUID,
     new_role: UserRole,
+    reason: str = "Administrative role update",
+    background_tasks: BackgroundTasks = None,
     db: Session = Depends(get_db),
     admin: User = Depends(require_roles(UserRole.ADMIN)),
 ):
-    """
-    Function 25: Change user role.
-    """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-        
     old_role = user.role
     user.role = new_role
-    
-    audit = SystemAudit(
-        admin_id=admin.id,
-        action="USER_ROLE_CHANGE",
-        target_type="USER",
-        target_id=user.id,
-        note=f"Changed from {old_role} to {new_role}"
-    )
+    audit = SystemAudit(admin_id=admin.id, action="USER_ROLE_CHANGE", target_type="USER", target_id=user.id, note=f"Changed from {old_role} to {new_role}. {reason}")
     db.add(audit)
     db.commit()
+    if background_tasks:
+        background_tasks.add_task(_notify_user, user, "ROLE_CHANGED", f"Role changed from {old_role.value} to {new_role.value}. {reason}")
     return {"status": "Role updated", "new_role": new_role}
 
 @router.post("/enroll", response_model=UserResponse)
@@ -165,21 +221,16 @@ def enroll_user(
 def delete_user(
     user_id: uuid.UUID,
     reason: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     admin: User = Depends(require_roles(UserRole.ADMIN)),
 ):
-    """Purge a user record for security or compliance protocols."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    audit = SystemAudit(
-        admin_id=admin.id,
-        action="USER_PURGE",
-        target_type="USER",
-        target_id=user_id,
-        note=reason
-    )
+    # Notify before deleting so we still have the phone number
+    background_tasks.add_task(_notify_user, user, "DELETED", reason)
+    audit = SystemAudit(admin_id=admin.id, action="USER_PURGE", target_type="USER", target_id=user_id, note=reason)
     db.add(audit)
     db.delete(user)
     db.commit()
@@ -189,24 +240,18 @@ def delete_user(
 def verify_user_identity(
     user_id: uuid.UUID,
     reason: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     admin: User = Depends(require_roles(UserRole.ADMIN, UserRole.AGENT)),
 ):
-    """Authenticate and verify a user's national identity credentials."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
     user.id_verified = True
-    audit = SystemAudit(
-        admin_id=admin.id,
-        action="USER_VERIFY",
-        target_type="USER",
-        target_id=user.id,
-        note=reason
-    )
+    audit = SystemAudit(admin_id=admin.id, action="USER_VERIFY", target_type="USER", target_id=user.id, note=reason)
     db.add(audit)
     db.commit()
+    background_tasks.add_task(_notify_user, user, "VERIFIED", reason)
     return {"message": "Identity Verified"}
 
 @router.post("/{user_id}/status")
@@ -214,54 +259,40 @@ def update_user_status(
     user_id: uuid.UUID,
     target_status: str,
     reason: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     admin: User = Depends(require_roles(UserRole.ADMIN, UserRole.AGENT)),
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
     user.status = target_status.lower()
     user.is_suspended = (target_status.upper() in ["SUSPENDED", "CLOSED", "FLAGGED"])
-    
-    audit = SystemAudit(
-        admin_id=admin.id,
-        action="USER_STATUS_UPDATE",
-        target_type="USER",
-        target_id=user.id,
-        note=reason,
-        details={"new_status": target_status}
-    )
+    audit = SystemAudit(admin_id=admin.id, action="USER_STATUS_UPDATE", target_type="USER", target_id=user.id, note=reason, details={"new_status": target_status})
     db.add(audit)
     db.commit()
+    # Map status to notification key
+    notif_key = target_status.upper() if target_status.upper() in ("SUSPENDED", "ACTIVE", "FLAGGED", "CLOSED") else "ACTIVE"
+    background_tasks.add_task(_notify_user, user, notif_key, reason)
     return {"message": "User status adjusted", "audit_ref": str(audit.id)}
 
 @router.post("/{user_id}/reinstate")
 def reinstate_user(
     user_id: uuid.UUID,
     reason: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     admin: User = Depends(require_roles(UserRole.ADMIN)),
 ):
-    """
-    Function 19: Reinstate user (Remove suspension).
-    """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
     user.status = "active"
     user.is_suspended = False
-    
-    audit = SystemAudit(
-        admin_id=admin.id,
-        action="USER_REINSTATE",
-        target_type="USER",
-        target_id=user.id,
-        note=reason
-    )
+    audit = SystemAudit(admin_id=admin.id, action="USER_REINSTATE", target_type="USER", target_id=user.id, note=reason)
     db.add(audit)
     db.commit()
+    background_tasks.add_task(_notify_user, user, "ACTIVE", reason)
     return {"status": "User reinstated to active duty"}
 
 @router.post("/{user_id}/trust")
@@ -269,6 +300,7 @@ def adjust_trust_score(
     user_id: uuid.UUID,
     adjustment: float,
     reason: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     admin: User = Depends(require_roles(UserRole.ADMIN)),
 ):
@@ -276,15 +308,9 @@ def adjust_trust_score(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     user.trust_score = max(0, min(100, user.trust_score + adjustment))
-    
-    audit = SystemAudit(
-        admin_id=admin.id,
-        action="TRUST_SCORE_ADJUST",
-        target_type="USER",
-        target_id=user.id,
-        note=reason,
-        details={"adjustment": adjustment}
-    )
+    audit = SystemAudit(admin_id=admin.id, action="TRUST_SCORE_ADJUST", target_type="USER", target_id=user.id, note=reason, details={"adjustment": adjustment})
     db.add(audit)
     db.commit()
+    notif_key = "TRUST_UP" if adjustment >= 0 else "TRUST_DOWN"
+    background_tasks.add_task(_notify_user, user, notif_key, reason)
     return {"new_score": user.trust_score}

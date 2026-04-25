@@ -48,10 +48,10 @@ export function RiskWatchPanel({ users, loading }) {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', background: 'var(--v4-bg)', padding: '16px', borderRadius: '14px', border: '1px solid var(--v4-border)' }}>
-                <div><label style={{ display: 'block', fontSize: '9px', fontWeight: 900, color: 'var(--v4-text-dim)', marginBottom: '4px', textTransform: 'uppercase' }}>Verification</label><strong style={{ fontSize: '12px' }}>{user.verification_tier}</strong></div>
+                <div><label style={{ display: 'block', fontSize: '9px', fontWeight: 900, color: 'var(--v4-text-dim)', marginBottom: '4px', textTransform: 'uppercase' }}>Verification</label><strong style={{ fontSize: '12px' }}>{user.verification_tier || 'BASIC'}</strong></div>
                 <div><label style={{ display: 'block', fontSize: '9px', fontWeight: 900, color: 'var(--v4-text-dim)', marginBottom: '4px', textTransform: 'uppercase' }}>Trust Score</label><strong style={{ fontSize: '12px' }}>{Math.round(user.trust_score)}/100</strong></div>
-                <div><label style={{ display: 'block', fontSize: '9px', fontWeight: 900, color: 'var(--v4-text-dim)', marginBottom: '4px', textTransform: 'uppercase' }}>Auto-Audit</label><strong style={{ fontSize: '12px', color: '#20963D' }}>PASSED</strong></div>
-                <div><label style={{ display: 'block', fontSize: '9px', fontWeight: 900, color: 'var(--v4-text-dim)', marginBottom: '4px', textTransform: 'uppercase' }}>Status</label><strong style={{ fontSize: '12px', color: user.is_suspended ? '#ef4444' : '#20963D' }}>{user.is_suspended ? "QUARANTINED" : "ACTIVE MONITOR"}</strong></div>
+                <div><label style={{ display: 'block', fontSize: '9px', fontWeight: 900, color: 'var(--v4-text-dim)', marginBottom: '4px', textTransform: 'uppercase' }}>Disputes</label><strong style={{ fontSize: '12px', color: (user.dispute_count ?? 0) > 0 ? '#f59e0b' : '#20963D' }}>{user.dispute_count ?? 0}</strong></div>
+                <div><label style={{ display: 'block', fontSize: '9px', fontWeight: 900, color: 'var(--v4-text-dim)', marginBottom: '4px', textTransform: 'uppercase' }}>Status</label><strong style={{ fontSize: '12px', color: user.is_suspended ? '#ef4444' : '#20963D' }}>{user.is_suspended ? "SUSPENDED" : "ACTIVE"}</strong></div>
               </div>
 
               {user.flags && user.flags.length > 0 && (
@@ -75,7 +75,7 @@ export function RiskWatchPanel({ users, loading }) {
               
               <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dotted var(--v4-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontSize: '9px', color: 'var(--v4-text-dim)', fontWeight: 800, fontFamily: 'monospace' }}>
-                        LAST_RESCAN: {new Date().toLocaleTimeString()} // ADAPTIVE_LEARNING: ENABLED
+                        RISK_SCORE: {Math.round(user.risk_score)} / 100 &nbsp;|&nbsp; DISPUTES: {user.dispute_count ?? '—'} &nbsp;|&nbsp; ORDERS: {user.order_count ?? '—'}
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                         <button className="q-btn ghost small" style={{ fontSize: '9px', padding: '4px 12px' }}>DEEP AUDIT</button>

@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import joblib
 from app.ml.deep.deep_forecaster import deep_engine
-from app.ml.vision.vision_service import vision_core
+from app.ml.vision.vision_service import vision_service as vision_core
 from datetime import datetime
 
 def calibrate_sovereign_ai():

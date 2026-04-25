@@ -1,493 +1,409 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { ZIMBABWE_AGRI_CATALOG } from '../ZimbabweDatabase';
-import { fetchAllListings, placeOffer } from '../api';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { fetchAllListings, placeOffer, startTradeSession } from '../api';
 
-const provinces = ["All", "Harare", "Bulawayo", "Manicaland", "Mashonaland Central", "Mashonaland East", "Mashonaland West", "Masvingo", "Matabeleland North", "Matabeleland South", "Midlands"];
+const PROVINCES = ["All Zimbabwe","Harare","Bulawayo","Manicaland","Mashonaland Central","Mashonaland East","Mashonaland West","Masvingo","Matabeleland North","Matabeleland South","Midlands"];
+const GRADES    = ["All","GRADE_A","GRADE_B","GRADE_C","EXPORT"];
+const GRADE_LABEL = { GRADE_A:"Grade A", GRADE_B:"Grade B", GRADE_C:"Grade C", EXPORT:"Export", All:"All Grades" };
+const GRADE_COLOR = { GRADE_A:"#16a34a", GRADE_B:"#2563eb", GRADE_C:"#d97706", EXPORT:"#7c3aed" };
+const QTY_OPTS  = [{ label:"Any", min:0 },{ label:"100 kg+", min:100 },{ label:"500 kg+", min:500 },{ label:"1 000 kg+", min:1000 },{ label:"5 000 kg+", min:5000 }];
+const SORT_OPTS = [
+  { label:"Newest first",       fn:(a,b)=> new Date(b.created_at||0)-new Date(a.created_at||0) },
+  { label:"Price: low → high",  fn:(a,b)=> (a.price_per_unit||0)-(b.price_per_unit||0) },
+  { label:"Price: high → low",  fn:(a,b)=> (b.price_per_unit||0)-(a.price_per_unit||0) },
+  { label:"Trust score",        fn:(a,b)=> (b.seller_trust_score||0)-(a.seller_trust_score||0) },
+];
+const PRICE_PRESETS = [
+  { label:"Any",          min:null, max:null },
+  { label:"Under $0.30",  min:null, max:0.30 },
+  { label:"$0.30–$0.40",  min:0.30, max:0.40 },
+  { label:"$0.40–$0.50",  min:0.40, max:0.50 },
+  { label:"Over $0.50",   min:0.50, max:null },
+];
+const CROP_EMOJI = { maize:"🌽", wheat:"🌾", soybeans:"🫘", tobacco:"🍃", cotton:"☁️", tomatoes:"🍅", potatoes:"🥔", onions:"🧅", default:"🌱" };
+function cropEmoji(name=""){ return CROP_EMOJI[name.toLowerCase()]||CROP_EMOJI.default; }
+function timeAgo(ts){
+  if(!ts) return "";
+  const s=Math.floor((Date.now()-new Date(ts))/1000);
+  if(s<60) return "just now";
+  if(s<3600) return `${Math.floor(s/60)}m ago`;
+  if(s<86400) return `${Math.floor(s/3600)}h ago`;
+  return `${Math.floor(s/86400)}d ago`;
+}
 
-const recentTrades = [];
+function GradeBadge({ grade }){
+  if(!grade) return null;
+  const label = GRADE_LABEL[grade] || grade;
+  const color = GRADE_COLOR[grade] || "#64748b";
+  return <span style={{ fontSize:"10px", fontWeight:800, color, background:color+"18", border:`1px solid ${color}33`, padding:"2px 8px", borderRadius:100 }}>{label}</span>;
+}
 
-const getMarketParity = (commodity, price) => {
-    const avgMap = { 'Maize': 350, 'Tomatoes': 1.1, 'Soya Beans': 500 };
-    const avg = avgMap[commodity] || 350;
-    const diff = ((price - avg) / avg) * 100;
-    return {
-        isFair: Math.abs(diff) < 5,
-        isHigher: diff > 5,
-        percent: Math.abs(diff).toFixed(1)
-    };
-};
+function TrustBadge({ score }){
+  const color = score>=80?"#16a34a":score>=60?"#d97706":"#ef4444";
+  return <span style={{ fontSize:"10px", fontWeight:800, color, display:"flex", alignItems:"center", gap:3 }}><i className="fas fa-shield-halved" style={{fontSize:9}}></i>{score||0}</span>;
+}
 
-function MarketHero({ onBroadcast }) {
+function ListingCard({ item, isGuest, onAction }){
+  const crop = item.crop || item.product_type || "Listing";
+  const price = item.price_per_unit || 0;
+  const qty   = item.quantity || 0;
+  const unit  = item.quantity_unit || "kg";
+  const loc   = [item.location_district, item.location_province].filter(Boolean).join(", ") || item.location || "Zimbabwe";
+
   return (
-    <header className="v4-hero-ultra">
-        <div className="v4-hero-glow"></div>
-        <div className="hero-content-v4">
-           <div className="kicker-group">
-              <span className="v4-badge-gold">ZIMBABWE SOVEREIGN NETWORK</span>
-              <div className="sync-pulse"><div className="p-dot"></div>INSTITUTIONAL NODES ONLINE</div>
-           </div>
-           <h1>Fostering the <span className="text-accent">Breadbasket</span> <br/> of the SADC Region.</h1>
-           <p className="hero-description">A deterministic decentralized exchange for Zimbabwe's entire agricultural spectrum. Protected by cold-chain logistics and bank-grade escrow.</p>
-           <div className="hero-actions">
-              <button className="q-btn primary-btn large" onClick={onBroadcast}><i className="fas fa-bullhorn"></i> Broadcast National RFP</button>
-              <div className="trust-divider">
-                  <div className="trust-shield"><i className="fas fa-shield-halved"></i></div>
-                  <div className="trust-meta"><strong>100% Asset-Backed</strong><span>Every unit verified by regional agents.</span></div>
-              </div>
-           </div>
+    <div className="bmp-card">
+      <div className="bmp-card-top">
+        <span className="bmp-emoji">{cropEmoji(crop)}</span>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
+            <span className="bmp-crop-name">{crop}</span>
+            <GradeBadge grade={item.grade || item.ai_grade_estimate} />
+          </div>
+          <div className="bmp-meta">
+            <span><i className="fas fa-location-dot" style={{fontSize:9,marginRight:3}}></i>{loc}</span>
+            {item.created_at && <span style={{opacity:.6}}>{timeAgo(item.created_at)}</span>}
+          </div>
         </div>
-        <div className="hero-trust-strip">
-           <div className="t-icon-node"><i className="fas fa-satellite"></i><span>SATELLITE VERIFIED</span></div>
-           <div className="t-icon-node"><i className="fas fa-landmark-dome"></i><span>TREASURY LINKED</span></div>
-           <div className="t-icon-node"><i className="fas fa-microchip"></i><span>DETERMINISTIC LOGIC</span></div>
-           <div className="t-icon-node"><i className="fas fa-handshake-simple"></i><span>ESCROW PROTECTED</span></div>
+        <TrustBadge score={item.seller_trust_score} />
+      </div>
+
+      <div className="bmp-card-mid">
+        <div className="bmp-stat">
+          <span className="bmp-stat-label">Price</span>
+          <span className="bmp-stat-val">${price.toFixed(2)}<small>/{unit}</small></span>
         </div>
-    </header>
+        <div className="bmp-stat">
+          <span className="bmp-stat-label">Available</span>
+          <span className="bmp-stat-val">{Number(qty).toLocaleString()} <small>{unit}</small></span>
+        </div>
+        <div className="bmp-stat">
+          <span className="bmp-stat-label">Total value</span>
+          <span className="bmp-stat-val">${(price*qty).toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+        </div>
+      </div>
+
+      <div className="bmp-card-seller">
+        <div className="bmp-seller-av">{(item.seller_name||"?").charAt(0)}</div>
+        <span className="bmp-seller-name">{item.seller_name||"Verified Farmer"}</span>
+        {item.is_verified && <span className="bmp-badge-verified"><i className="fas fa-circle-check"></i> Verified</span>}
+      </div>
+
+      <div className="bmp-card-actions">
+        {isGuest ? (
+          <button className="bmp-btn bmp-btn-primary" onClick={()=>onAction("login")}>
+            <i className="fas fa-lock"></i> Login to Make Offer
+          </button>
+        ) : (
+          <>
+            <button className="bmp-btn bmp-btn-primary" onClick={()=>onAction("offer", item)}>
+              <i className="fas fa-handshake"></i> Make Offer
+            </button>
+            <button className="bmp-btn bmp-btn-ghost" onClick={()=>onAction("contact", item)} title="Contact seller">
+              <i className="fas fa-comment-dots"></i>
+            </button>
+            <button className="bmp-btn bmp-btn-ghost" onClick={()=>onAction("save", item)} title="Save listing">
+              <i className="fas fa-bookmark"></i>
+            </button>
+            <button className="bmp-btn bmp-btn-ghost" onClick={()=>onAction("share", item)} title="Share">
+              <i className="fas fa-share-nodes"></i>
+            </button>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
-export default function BuyerMarketplacePanel({ token, onPurchase, profile }) {
-  const [listings, setListings] = useState([]);
-  const [filter, setFilter] = useState(profile?.role === 'FARMER' ? 'Inputs' : 'All');
-  const [provinceFilter, setProvinceFilter] = useState('All');
+function OfferModal({ item, token, onClose, onSuccess }){
+  const [price, setPrice] = useState(String(item.price_per_unit||""));
+  const [qty,   setQty]   = useState(String(item.quantity||""));
+  const [busy,  setBusy]  = useState(false);
+  const [err,   setErr]   = useState("");
 
-  const [search, setSearch] = useState('');
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [showRequestForm, setShowRequestForm] = useState(false);
-  const isGuest = profile?.role === 'GUEST';
-  
-  const [offerPrice, setOfferPrice] = useState("");
-  const [offerQty, setOfferQty] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const total = (parseFloat(price)||0)*(parseFloat(qty)||0);
+  const fee   = total*0.01;
 
-  const [requestSector, setRequestSector] = useState('Crops');
-  const [requestProduct, setRequestProduct] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('NMB');
+  const submit = async()=>{
+    setErr(""); setBusy(true);
+    try{
+      await placeOffer(token, item.id, { price_per_unit:parseFloat(price), quantity:parseFloat(qty) });
+      onSuccess();
+    } catch(e){ setErr(e.message||"Failed to place offer"); }
+    finally{ setBusy(false); }
+  };
 
-  useEffect(() => {
-    loadListings();
-  }, [token]);
+  return (
+    <div className="bmp-overlay" onClick={onClose}>
+      <div className="bmp-modal" onClick={e=>e.stopPropagation()}>
+        <div className="bmp-modal-header">
+          <div>
+            <h3 className="bmp-modal-title">Make an Offer</h3>
+            <p className="bmp-modal-sub">{item.crop||item.product_type} · {item.seller_name||"Verified Farmer"}</p>
+          </div>
+          <button className="bmp-modal-close" onClick={onClose}><i className="fas fa-xmark"></i></button>
+        </div>
 
-  const loadListings = async () => {
-    try {
-        const data = await fetchAllListings(token);
-        if (Array.isArray(data)) {
-            setListings(data.filter(l => l.status === 'ACTIVE'));
-        } else {
-            setListings([]);
-        }
-    } catch (err) {
-        console.error("Failed to load listings:", err);
-        setListings([]);
+        <div className="bmp-modal-body">
+          <div className="bmp-field">
+            <label>Your price per {item.quantity_unit||"kg"} (USD)</label>
+            <input type="number" value={price} onChange={e=>setPrice(e.target.value)} placeholder="0.00" />
+            <span className="bmp-field-hint">Asking: ${(item.price_per_unit||0).toFixed(2)}</span>
+          </div>
+          <div className="bmp-field">
+            <label>Quantity ({item.quantity_unit||"kg"})</label>
+            <input type="number" value={qty} onChange={e=>setQty(e.target.value)} placeholder="0" />
+            <span className="bmp-field-hint">Available: {Number(item.quantity||0).toLocaleString()} {item.quantity_unit||"kg"}</span>
+          </div>
+
+          <div className="bmp-summary">
+            <div className="bmp-summary-row"><span>Offer amount</span><span>${total.toFixed(2)}</span></div>
+            <div className="bmp-summary-row"><span>Platform fee (1%)</span><span>${fee.toFixed(2)}</span></div>
+            <div className="bmp-summary-row bmp-summary-total"><span>Total to pay</span><span>${(total+fee).toFixed(2)}</span></div>
+          </div>
+
+          {err && <p className="bmp-error">{err}</p>}
+        </div>
+
+        <div className="bmp-modal-footer">
+          <button className="bmp-btn bmp-btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="bmp-btn bmp-btn-primary" onClick={submit} disabled={busy||!price||!qty}>
+            {busy ? <><i className="fas fa-spinner fa-spin"></i> Submitting…</> : <><i className="fas fa-lock"></i> Submit Offer</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function BuyerMarketplacePanel({ token, onPurchase, profile }){
+  const isGuest = profile?.role === "GUEST";
+
+  const [listings,    setListings]    = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [search,      setSearch]      = useState("");
+  const [province,    setProvince]    = useState("All Zimbabwe");
+  const [grade,       setGrade]       = useState("All");
+  const [pricePreset, setPricePreset] = useState(0);
+  const [minPrice,    setMinPrice]    = useState("");
+  const [maxPrice,    setMaxPrice]    = useState("");
+  const [minQty,      setMinQty]      = useState(0);
+  const [sortIdx,     setSortIdx]     = useState(0);
+  const [saved,       setSaved]       = useState(()=>{ try{ return JSON.parse(localStorage.getItem("bmp_saved")||"[]"); }catch{ return []; }});
+  const [offerItem,   setOfferItem]   = useState(null);
+  const [loginPrompt, setLoginPrompt] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const load = useCallback(async()=>{
+    setLoading(true);
+    try{
+      const data = await fetchAllListings(token);
+      setListings(Array.isArray(data) ? data.filter(l=>l.status==="ACTIVE") : []);
+    } catch{ setListings([]); }
+    finally{ setLoading(false); }
+  },[token]);
+
+  useEffect(()=>{ load(); },[load]);
+
+  const applyPreset = (idx)=>{
+    setPricePreset(idx);
+    const p = PRICE_PRESETS[idx];
+    setMinPrice(p.min!=null?String(p.min):"");
+    setMaxPrice(p.max!=null?String(p.max):"");
+  };
+
+  const filtered = useMemo(()=>{
+    const q = search.trim().toLowerCase();
+    const mn = parseFloat(minPrice)||0;
+    const mx = parseFloat(maxPrice)||Infinity;
+    const mq = QTY_OPTS[minQty].min;
+    return listings
+      .filter(l=>{
+        const crop = (l.crop||l.product_type||"").toLowerCase();
+        if(q && !crop.includes(q)) return false;
+        if(province!=="All Zimbabwe" && l.location_province!==province) return false;
+        if(grade!=="All" && l.grade!==grade && l.ai_grade_estimate!==grade) return false;
+        const p = l.price_per_unit||0;
+        if(p<mn || p>mx) return false;
+        if((l.quantity||0)<mq) return false;
+        return true;
+      })
+      .sort(SORT_OPTS[sortIdx].fn);
+  },[listings,search,province,grade,minPrice,maxPrice,minQty,sortIdx]);
+
+  const handleAction = (type, item)=>{
+    if(type==="login"){ setLoginPrompt(true); return; }
+    if(type==="offer"){ setOfferItem(item); return; }
+    if(type==="save"){
+      const next = saved.includes(item.id) ? saved.filter(id=>id!==item.id) : [...saved,item.id];
+      setSaved(next);
+      localStorage.setItem("bmp_saved", JSON.stringify(next));
+      return;
+    }
+    if(type==="share"){
+      const text = `Check out this listing on AgriTrust: ${item.crop||item.product_type} — $${item.price_per_unit}/kg in ${item.location_province||"Zimbabwe"}`;
+      if(navigator.share){ navigator.share({title:"AgriTrust Listing",text}); }
+      else{ navigator.clipboard?.writeText(text); }
+      return;
+    }
+    if(type==="contact"){
+      startTradeSession(token, item.id).catch(()=>{});
     }
   };
 
-  const submitOffer = async () => {
-      if (!selectedProduct) return;
-      setErrorMsg("");
-      setIsSubmitting(true);
-      try {
-          await placeOffer(token, selectedProduct.id, {
-              price_per_unit: Number(offerPrice) || selectedProduct.price,
-              quantity: Number(offerQty) || selectedProduct.qty
-          });
-          setSelectedProduct(null);
-          if (onPurchase) onPurchase();
-          loadListings();
-      } catch (err) {
-          setErrorMsg(err.message || "Failed to process payment lock.");
-      } finally {
-          setIsSubmitting(false);
-      }
+  const resetFilters = ()=>{
+    setSearch(""); setProvince("All Zimbabwe"); setGrade("All");
+    setPricePreset(0); setMinPrice(""); setMaxPrice(""); setMinQty(0); setSortIdx(0);
   };
 
-  const handleSelectProduct = (product) => {
-      setSelectedProduct(product);
-      setOfferPrice(product.price_per_unit || product.price);
-      setOfferQty(product.quantity || product.qty);
-      setErrorMsg("");
-  };
-
-  // Extract unique categories from the master catalog
-  const categories = useMemo(() => {
-    const cats = [...new Set(ZIMBABWE_AGRI_CATALOG.map(p => p.category))];
-    return cats.sort();
-  }, []);
-
-  const currentDatabase = useMemo(() => {
-    return ZIMBABWE_AGRI_CATALOG.filter(p => p.category === requestSector);
-  }, [requestSector]);
-
-  const productDetails = useMemo(() => {
-    return ZIMBABWE_AGRI_CATALOG.find(p => p.name === requestProduct);
-  }, [requestProduct]);
-
-  const filters = [
-    { label: 'All', icon: 'fa-globe' },
-    { label: 'Crops', icon: 'fa-wheat-awn' },
-    { label: 'Inputs', icon: 'fa-seedling' },
-    { label: 'Livestock', icon: 'fa-cow' },
-
-    { label: 'Poultry', icon: 'fa-feather-pointed' },
-    { label: 'Dairy', icon: 'fa-glass-water' },
-  ];
+  const activeFilterCount = [
+    search, province!=="All Zimbabwe", grade!=="All",
+    pricePreset!==0, minQty!==0
+  ].filter(Boolean).length;
 
   return (
-    <div className="v4-dashboard-container animate-fade-in">
-      {/* PREMIUM EYE-CATCHER HERO */}
-      <MarketHero onBroadcast={() => setShowRequestForm(true)} />
+    <div className="bmp-root">
 
-      {/* TRADE TICKER (Proof of Life) */}
-      <div className="v4-trade-ticker">
-          <div className="ticker-label">LIVE_NETWORK_PULSE</div>
-          <div className="ticker-scroll">
-              {recentTrades.concat(recentTrades).map((t, idx) => (
-                  <div key={`${t.id}-${idx}`} className="ticker-node">
-                      <i className="fas fa-check-circle"></i>
-                      <span><strong>{t.qty}</strong> of {t.crop} Verified in <span className="text-main">{t.loc} District</span></span>
-                      <small>- Securely Settled</small>
-                  </div>
+      {/* TOP BAR */}
+      <div className="bmp-topbar">
+        <div className="bmp-topbar-left">
+          <button className="bmp-sidebar-toggle" onClick={()=>setSidebarOpen(v=>!v)} title="Toggle filters">
+            <i className={`fas fa-${sidebarOpen?"filter":"sliders"}`}></i>
+            {activeFilterCount>0 && <span className="bmp-filter-badge">{activeFilterCount}</span>}
+          </button>
+          <div className="bmp-search-wrap">
+            <i className="fas fa-magnifying-glass"></i>
+            <input
+              type="text"
+              placeholder="Search crops — maize, wheat, tomatoes…"
+              value={search}
+              onChange={e=>setSearch(e.target.value)}
+            />
+            {search && <button className="bmp-search-clear" onClick={()=>setSearch("")}><i className="fas fa-xmark"></i></button>}
+          </div>
+        </div>
+        <div className="bmp-topbar-right">
+          <select className="bmp-select" value={sortIdx} onChange={e=>setSortIdx(Number(e.target.value))}>
+            {SORT_OPTS.map((s,i)=><option key={i} value={i}>{s.label}</option>)}
+          </select>
+          <span className="bmp-count">{loading?"…":filtered.length} listing{filtered.length!==1?"s":""}</span>
+        </div>
+      </div>
+
+      <div className="bmp-body">
+
+        {/* SIDEBAR FILTERS */}
+        {sidebarOpen && (
+          <aside className="bmp-sidebar">
+            <div className="bmp-sidebar-header">
+              <span><i className="fas fa-filter"></i> Filters</span>
+              {activeFilterCount>0 && <button className="bmp-reset-btn" onClick={resetFilters}>Reset all</button>}
+            </div>
+
+            {/* LOCATION */}
+            <div className="bmp-filter-group">
+              <label className="bmp-filter-label"><i className="fas fa-location-dot"></i> Location</label>
+              {PROVINCES.map(p=>(
+                <label key={p} className="bmp-radio-row">
+                  <input type="radio" name="province" checked={province===p} onChange={()=>setProvince(p)} />
+                  <span>{p}</span>
+                </label>
               ))}
-          </div>
+            </div>
+
+            {/* PRICE */}
+            <div className="bmp-filter-group">
+              <label className="bmp-filter-label"><i className="fas fa-dollar-sign"></i> Price Range</label>
+              {PRICE_PRESETS.map((p,i)=>(
+                <label key={i} className="bmp-radio-row">
+                  <input type="radio" name="price" checked={pricePreset===i} onChange={()=>applyPreset(i)} />
+                  <span>{p.label}</span>
+                </label>
+              ))}
+              <div className="bmp-price-inputs">
+                <input type="number" placeholder="Min $" value={minPrice} onChange={e=>{setMinPrice(e.target.value);setPricePreset(-1);}} />
+                <span>—</span>
+                <input type="number" placeholder="Max $" value={maxPrice} onChange={e=>{setMaxPrice(e.target.value);setPricePreset(-1);}} />
+              </div>
+            </div>
+
+            {/* GRADE */}
+            <div className="bmp-filter-group">
+              <label className="bmp-filter-label"><i className="fas fa-star"></i> Grade</label>
+              {GRADES.map(g=>(
+                <label key={g} className="bmp-check-row">
+                  <input type="radio" name="grade" checked={grade===g} onChange={()=>setGrade(g)} />
+                  <span>{GRADE_LABEL[g]||g}</span>
+                  {g!=="All" && <span className="bmp-grade-dot" style={{background:GRADE_COLOR[g]||"#64748b"}}></span>}
+                </label>
+              ))}
+            </div>
+
+            {/* QUANTITY */}
+            <div className="bmp-filter-group">
+              <label className="bmp-filter-label"><i className="fas fa-boxes-stacked"></i> Min Quantity</label>
+              {QTY_OPTS.map((q,i)=>(
+                <label key={i} className="bmp-radio-row">
+                  <input type="radio" name="qty" checked={minQty===i} onChange={()=>setMinQty(i)} />
+                  <span>{q.label}</span>
+                </label>
+              ))}
+            </div>
+          </aside>
+        )}
+
+        {/* LISTINGS GRID */}
+        <main className="bmp-main">
+          {loading ? (
+            <div className="bmp-state-card">
+              <i className="fas fa-spinner fa-spin" style={{fontSize:28,color:"var(--v4-accent)"}}></i>
+              <p>Loading listings…</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="bmp-state-card">
+              <i className="fas fa-seedling" style={{fontSize:36,opacity:.3}}></i>
+              <p style={{fontWeight:700}}>No listings match your filters</p>
+              <button className="bmp-btn bmp-btn-ghost" onClick={resetFilters}>Clear filters</button>
+            </div>
+          ) : (
+            <div className="bmp-grid">
+              {filtered.map(item=>(
+                <ListingCard key={item.id} item={item} isGuest={isGuest} onAction={handleAction} />
+              ))}
+            </div>
+          )}
+        </main>
       </div>
 
-      {/* KPI STRIP */}
-      <div className="v4-stats-grid">
-          <div className="v4-kpi-card">
-              <div className="kpi-icon"><i className="fas fa-boxes-stacked"></i></div>
-              <div className="kpi-data">
-                  <label>Verified Lots</label>
-                  <strong>{listings.length} Active</strong>
-              </div>
-          </div>
-          <div className="v4-kpi-card">
-              <div className="kpi-icon"><i className="fas fa-hand-holding-dollar"></i></div>
-              <div className="kpi-data">
-                  <label>Escrow Capacity</label>
-                  <strong>$0.0</strong>
-              </div>
-          </div>
-
-          <div className="v4-kpi-card">
-              <div className="kpi-icon"><i className="fas fa-clock-rotate-left"></i></div>
-              <div className="kpi-data">
-                  <label>Lock Time</label>
-                  <strong>Instant</strong>
-              </div>
-          </div>
-          <div className="v4-kpi-card">
-              <div className="kpi-icon"><i className="fas fa-shield-halved"></i></div>
-              <div className="kpi-data">
-                  <label>Trade Security</label>
-                  <strong>L6 BANK GRADE</strong>
-              </div>
-          </div>
-      </div>
-
-      {/* MARKET TRADE TERMINAL */}
-      <div className="v4-main-panel">
-          <div className="v4-glass-card-premium">
-              <div className="v4-card-header">
-                  <div>
-                      <h3>Market Trade Terminal</h3>
-                      <p style={{ fontSize: '13px', color: 'var(--v4-text-dim)', margin: '4px 0 0 0', fontWeight: 600 }}>Execute high-volume procurement locks with verified Zimbabwean producers.</p>
-                  </div>
-                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                      <div className="v4-select-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--v4-bg)', padding: '4px 12px', borderRadius: '12px', border: '1.5px solid var(--v4-border)' }}>
-                          <i className="fas fa-map-location-dot" style={{ color: 'var(--v4-text-dim)', fontSize: '13px' }}></i>
-                          <select 
-                            value={provinceFilter} 
-                            onChange={(e) => setProvinceFilter(e.target.value)}
-                            style={{ background: 'transparent', border: 'none', color: 'var(--v4-text-main)', fontSize: '11px', fontWeight: 850, padding: '8px 4px', outline: 'none' }}
-                          >
-                              {provinces.map(p => <option key={p} value={p}>{p}</option>)}
-                          </select>
-                      </div>
-                      <div className="v4-search-box" style={{ background: 'var(--v4-bg)', border: '1.5px solid var(--v4-border)', padding: '8px 16px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '12px', width: '250px' }}>
-                          <i className="fas fa-magnifying-glass" style={{ color: 'var(--v4-text-dim)' }}></i>
-                          <input 
-                            type="text" 
-                            placeholder="Search commodities..." 
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            style={{ border: 'none', background: 'transparent', outline: 'none', fontWeight: 600, fontSize: '13px', width: '100%' }} 
-                          />
-                      </div>
-                      <div className="v4-filter-strip" style={{ display: 'flex', gap: '8px', background: 'var(--v4-bg)', padding: '4px', borderRadius: '14px' }}>
-                          {filters.map((f) => (
-                            <button 
-                                key={f.label} 
-                                className={`f-node-v4 ${filter === f.label ? 'active' : ''}`}
-                                onClick={() => setFilter(f.label)}
-                                style={{ 
-                                    border: 'none', 
-                                    background: filter === f.label ? 'var(--v4-accent)' : 'transparent', 
-                                    color: filter === f.label ? '#fff' : 'var(--v4-text-dim)',
-                                    padding: '8px 16px',
-                                    borderRadius: '10px',
-                                    fontSize: '11px',
-                                    fontWeight: 850,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    transition: '0.2s'
-                                }}
-                            >
-                                <i className={`fas ${f.icon}`}></i> {f.label}
-                            </button>
-                          ))}
-                      </div>
-                  </div>
-              </div>
-
-              <div className="v4-commodity-matrix">
-                {listings
-                  .filter(item => {
-                    const matchesSearch = (item.crop || item.product || "").toLowerCase().includes(search.toLowerCase());
-                    const matchesCategory = filter === 'All' || (item.sector?.toLowerCase() === filter.toLowerCase());
-                    const matchesProvince = provinceFilter === 'All' || (item.location_province === provinceFilter);
-                    return matchesSearch && matchesCategory && matchesProvince;
-                  })
-                  .sort((a, b) => {
-                    // Farmer-specific prioritization: Inputs always move to the top
-                    if (profile?.role === 'FARMER') {
-                      if (a.sector === 'inputs' && b.sector !== 'inputs') return -1;
-                      if (a.sector !== 'inputs' && b.sector === 'inputs') return 1;
-                    }
-                    return 0; // Default order
-                  })
-
-                  .map((item) => {
-                    const parity = getMarketParity(item.crop || item.product, item.price_per_unit || item.price);
-                    return (
-                        <div key={item.id} className="v4-trade-node animate-rise" onClick={() => !isGuest && handleSelectProduct(item)} style={{ 
-                            border: '1.5px solid var(--v4-border)', 
-                            borderRadius: '32px', 
-                            overflow: 'hidden', 
-                            background: 'var(--v4-bg)', 
-                            cursor: isGuest ? 'default' : 'pointer', 
-                            transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                            position: 'relative',
-                            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
-                        }}>
-                            <div className="card-top-glow" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '100px', background: 'linear-gradient(180deg, rgba(32, 150, 61, 0.05) 0%, transparent 100%)', pointerEvents: 'none' }}></div>
-                            
-                            <div style={{ padding: '24px 32px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 2 }}>
-                                <span style={{ fontSize: '9px', fontWeight: 900, color: '#20963D', background: 'rgba(32, 150, 61, 0.1)', padding: '6px 12px', borderRadius: '100px', border: '1px solid rgba(32, 150, 61, 0.2)', letterSpacing: '0.05em' }}>
-                                    <i className="fas fa-location-crosshairs" style={{ marginRight: '6px' }}></i>
-                                    {isGuest ? (item.location_district || 'ZIMBABWE') : `${item.location_province || 'ZW'} • ${item.location_district || 'REG'}`}
-                                </span>
-                                {profile?.role === 'FARMER' && (
-                                    <span style={{ fontSize: '9px', fontWeight: 1000, color: '#1a237e', background: 'rgba(26, 35, 126, 0.1)', padding: '6px 12px', borderRadius: '100px', border: '1px solid rgba(26, 35, 126, 0.2)', letterSpacing: '0.05em' }}>
-                                        <i className="fas fa-handshake-angle" style={{ marginRight: '6px' }}></i> F2F_SUPPORT_ACTIVE
-                                    </span>
-                                )}
-
-                                {parity && (
-                                    <div style={{ fontSize: '10px', fontWeight: 900, color: parity.isFair ? '#20963D' : (parity.isHigher ? '#ef4444' : '#f59e0b'), display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <i className={`fas ${parity.isFair ? 'fa-check-circle' : 'fa-chart-line'}`}></i>
-                                        {parity.isFair ? 'FAIR VALUE' : `${parity.percent}% ${parity.isHigher ? 'ABOVE' : 'BELOW'} AVG`}
-                                    </div>
-                                )}
-                            </div>
-                            
-                            <div style={{ height: '160px', display: 'grid', placeItems: 'center', position: 'relative' }}>
-                                <div className="symbol-circle-v4" style={{ 
-                                    width: '100px', 
-                                    height: '100px', 
-                                    background: 'var(--v4-surface)', 
-                                    borderRadius: '32px', 
-                                    display: 'grid', 
-                                    placeItems: 'center', 
-                                    fontSize: '40px', 
-                                    color: '#1a237e',
-                                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.2)',
-                                    border: '1.5px solid var(--v4-border)'
-                                }}>
-                                    <i className={`fas ${item.sector === 'Livestock' ? 'fa-cow' : 'fa-wheat-awn'}`}></i>
-                                </div>
-                                <div style={{ position: 'absolute', bottom: '10px', right: '32px', background: '#fff', color: '#20963D', width: '24px', height: '24px', borderRadius: '50%', display: 'grid', placeItems: 'center', fontSize: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
-                                    <i className="fas fa-certificate"></i>
-                                </div>
-                            </div>
-
-                            <div style={{ padding: '0 32px 32px', position: 'relative', zIndex: 2 }}>
-                                <div className="producer-line" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                                    <div style={{ width: '24px', height: '24px', background: '#e0e7ff', color: '#1a237e', borderRadius: '8px', display: 'grid', placeItems: 'center', fontSize: '11px', fontWeight: 1000 }}>{(item.seller_name || 'P').charAt(0)}</div>
-                                    <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--v4-text-dim)' }}>{item.seller_name || 'Verified Producer'}</span>
-                                    <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
-                                        <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 950, background: '#f1f5f9', padding: '2px 8px', borderRadius: '6px' }}>
-                                            <i className="fas fa-eye-slash"></i> {item.seller_phone_masked}
-                                        </div>
-                                        <div style={{ fontSize: '10px', color: '#20963D', fontWeight: 900 }}><i className="fas fa-shield-check"></i> {item.seller_trust_score}% TRUST</div>
-                                    </div>
-                                </div>
-
-                                
-                                <h4 style={{ fontSize: '26px', fontWeight: 950, margin: '0 0 24px 0', color: 'var(--v4-text-main)', minHeight: '64px', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{item.crop || item.product}</h4>
-                                
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', paddingBottom: '20px', borderBottom: '1.5px solid var(--v4-border)', marginBottom: '20px' }}>
-                                    <div>
-                                        <label style={{ display: 'block', fontSize: '9px', fontWeight: 900, color: 'var(--v4-text-dim)', textTransform: 'uppercase', marginBottom: '4px' }}>Current Bid Lock</label>
-                                        <span style={{ fontSize: '32px', fontWeight: 1000, color: '#1a237e', letterSpacing: '-0.04em' }}>${(item.price_per_unit || item.price || 0).toFixed(2)}</span>
-                                        <span style={{ fontSize: '14px', color: 'var(--v4-text-dim)', fontWeight: 800, marginLeft: '4px' }}>/{item.quantity_unit || item.unit || 'kg'}</span>
-                                    </div>
-                                    <div style={{ textAlign: 'right' }}>
-                                        <strong style={{ display: 'block', fontSize: '20px', fontWeight: 950, color: 'var(--v4-text-main)' }}>{(item.quantity || item.qty || 0)}</strong>
-                                        <label style={{ fontSize: '9px', fontWeight: 1000, textTransform: 'uppercase', color: 'var(--v4-text-dim)' }}>National Supply</label>
-                                    </div>
-                                </div>
-
-                                {(item.is_perishable || item.harvest_date) && (
-                                    <div style={{ background: 'var(--v4-surface)', padding: '12px 16px', borderRadius: '12px', marginBottom: '24px', border: '1px solid var(--v4-border)' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                            <span style={{ fontSize: '9px', fontWeight: 900, color: item.is_perishable ? '#ef4444' : 'var(--v4-text-dim)' }}>
-                                                {item.is_perishable ? 'PERISHABLE' : 'STAPLE'}
-                                            </span>
-                                            {item.harvest_date && <span style={{ fontSize: '9px', fontWeight: 700, opacity: 0.6 }}>Harvest: {item.harvest_date}</span>}
-                                        </div>
-                                        {item.is_perishable && item.expiry_date && (
-                                            <div style={{ fontSize: '11px', fontWeight: 800, color: '#ef4444' }}>
-                                                <i className="fas fa-hourglass-half"></i> Shelf Life: {item.expiry_date}
-                                            </div>
-                                        )}
-                                        {item.storage_requirements && (
-                                            <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--v4-text-dim)', marginTop: '4px' }}>
-                                                <i className="fas fa-box-open"></i> {item.storage_requirements}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                <button 
-                                    className={`q-btn small ${isGuest ? 'primary-btn' : 'ghost'}`} 
-                                    onClick={() => isGuest ? alert('Registry Verification Required: Please register or login to secure these funds in escrow.') : handleSelectProduct(item)}
-                                    style={{ width: '100%', borderRadius: '16px', background: isGuest ? 'var(--v4-accent)' : '' }}
-                                >
-                                    {isGuest ? 'Register to Secure Lot' : 'Initialize Procurement'}
-                                </button>
-                            </div>
-                        </div>
-                    );
-                  })}
-              </div>
-
-              {!listings.length && (
-                  <div className="v4-empty-market" style={{ padding: '100px 0', textAlign: 'center' }}>
-                      <div style={{ fontSize: '64px', color: 'var(--v4-border)', marginBottom: '24px' }}><i className="fas fa-radar"></i></div>
-                      <h3 style={{ fontSize: '24px', fontWeight: 950, margin: '0 0 8px 0' }}>Registry Scan Complete</h3>
-                      <p style={{ color: 'var(--v4-text-dim)', fontWeight: 600, maxWidth: '400px', margin: '0 auto 32px auto' }}>No active lots match your parameters. Broadcast an RFP to aggregate regional supply.</p>
-                      <button className="q-btn primary-btn" onClick={() => setShowRequestForm(true)} style={{ margin: '0 auto', background: '#1a237e' }}>Broadcast Institutional RFP</button>
-                  </div>
-              )}
-          </div>
-      </div>
-
-      {selectedProduct && (
-          <div className="v4-modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', display: 'grid', placeItems: 'center', zIndex: 9999, padding: '40px' }}>
-              <div className="v5-ultra-glass-modal animate-fade-in" style={{ background: '#0d1242', width: '100%', maxWidth: '750px', borderRadius: '48px', border: '1.5px solid rgba(255,255,255,0.1)', padding: '60px', position: 'relative', overflow: 'hidden' }}>
-                  <div style={{ position: 'absolute', top: '-100px', right: '-100px', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(129,140,248,0.2) 0%, transparent 70%)', borderRadius: '50%' }}></div>
-                  
-                  <div className="modal-header" style={{ position: 'relative', zIndex: 2 }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '48px' }}>
-                          <span className="prio-tag" style={{ width: 'fit-content', background: 'rgba(129,140,248,0.2)', color: '#818cf8', border: '1px solid rgba(129,140,248,0.3)', padding: '4px 12px', borderRadius: '100px', fontSize: '10px', fontWeight: 900 }}>INSTITUTIONAL_LOCK_ACTIVE</span>
-                          <h2 style={{ fontSize: '32px', fontWeight: 1000, margin: 0, letterSpacing: '-0.04em', color: '#fff' }}>Secure Institutional <span style={{ color: '#818cf8' }}>Procurement Lock</span>.</h2>
-                          <p style={{ margin: 0, fontSize: '15px', opacity: 0.6, fontWeight: 600, color: '#fff' }}>Negotiating terms with <strong>{selectedProduct.farmer_name || 'Verified Producer'}</strong></p>
-                      </div>
-                      <button className="v4-close-btn" onClick={() => setSelectedProduct(null)} style={{ position: 'absolute', top: '0', right: '0', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', width: '48px', height: '48px', borderRadius: '16px', cursor: 'pointer' }}>
-                          <i className="fas fa-xmark"></i>
-                      </button>
-                  </div>
-                  
-                  <div className="modal-body" style={{ position: 'relative', zIndex: 2 }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', marginBottom: '40px' }}>
-                        <div className="input-group">
-                            <label style={{ display: 'block', fontSize: '11px', fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>Bid Valuation (USD)</label>
-                            <input style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(255,255,255,0.1)', padding: '18px 24px', borderRadius: '18px', color: '#fff', fontSize: '24px', fontWeight: 1000, outline: 'none' }} type="number" value={offerPrice} onChange={(e) => setOfferPrice(e.target.value)} />
-                        </div>
-                        <div className="input-group">
-                            <label style={{ display: 'block', fontSize: '11px', fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>Lock Volume</label>
-                            <input style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(255,255,255,0.1)', padding: '18px 24px', borderRadius: '18px', color: '#fff', fontSize: '24px', fontWeight: 1000, outline: 'none' }} type="number" value={offerQty} onChange={(e) => setOfferQty(e.target.value)} />
-                        </div>
-                      </div>
-
-                      <div style={{ marginBottom: '32px' }}>
-                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>Pre-Authorized Settlement Network</label>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                            {['NMB Wallet', 'EcoCash USD', 'Institutional RTGS'].map(p => (
-                                <button key={p} className={`f-node-v4 ${paymentMethod.includes(p.split(' ')[0]) ? 'active' : ''}`} onClick={() => setPaymentMethod(p.split(' ')[0])} style={{ padding: '16px', borderRadius: '16px', border: '1.5px solid rgba(255,255,255,0.1)', background: paymentMethod.includes(p.split(' ')[0]) ? '#818cf8' : 'rgba(255,255,255,0.05)', color: '#fff', fontSize: '12px', fontWeight: 900, cursor: 'pointer' }}>
-                                    {p}
-                                </button>
-                            ))}
-                        </div>
-                      </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '24px', marginTop: '48px', position: 'relative', zIndex: 2 }}>
-                      <button className="q-btn ghost" onClick={() => setSelectedProduct(null)} style={{ flex: 1, padding: '20px', color: '#fff', background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(255,255,255,0.1)' }}>Discard Trade</button>
-                      <button className="q-btn primary-btn" disabled={isSubmitting} onClick={submitOffer} style={{ flex: 2, padding: '20px', background: '#fff', color: '#1a237e' }}>
-                          <i className="fas fa-lock"></i>
-                          {isSubmitting ? 'Encrypting Escrow Lock...' : 'Authorize Procurement & Lock Funds'}
-                      </button>
-                  </div>
-              </div>
-          </div>
+      {/* OFFER MODAL */}
+      {offerItem && (
+        <OfferModal
+          item={offerItem}
+          token={token}
+          onClose={()=>setOfferItem(null)}
+          onSuccess={()=>{ setOfferItem(null); load(); if(onPurchase) onPurchase(); }}
+        />
       )}
 
-      {showRequestForm && (
-          <div className="v4-modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', display: 'grid', placeItems: 'center', zIndex: 9999, padding: '40px' }}>
-              <div className="v5-ultra-glass-modal animate-fade-in" style={{ background: '#1e293b', width: '100%', maxWidth: '700px', borderRadius: '48px', border: '1.5px solid rgba(255,255,255,0.1)', padding: '60px', position: 'relative', overflow: 'hidden' }}>
-                  <div style={{ position: 'absolute', top: '-100px', right: '-100px', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(59,130,246,0.2) 0%, transparent 70%)', borderRadius: '50%' }}></div>
-                  
-                  <div className="modal-header" style={{ position: 'relative', zIndex: 2 }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '48px' }}>
-                          <span className="prio-tag" style={{ width: 'fit-content', background: 'rgba(59,130,246,0.2)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)', padding: '4px 12px', borderRadius: '100px', fontSize: '10px', fontWeight: 900 }}>BROADCAST_RFP_READY</span>
-                          <h2 style={{ fontSize: '30px', fontWeight: 1000, margin: 0, letterSpacing: '-0.04em', color: '#fff' }}>Publish Procurement <span style={{ color: '#3b82f6' }}>RFP</span>.</h2>
-                          <p style={{ margin: 0, fontSize: '15px', opacity: 0.6, fontWeight: 700, color: '#fff' }}>Sync your institutional needs with the producer grid.</p>
-                      </div>
-                      <button className="v4-close-btn" onClick={() => setShowRequestForm(false)} style={{ position: 'absolute', top: '0', right: '0', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', width: '48px', height: '48px', borderRadius: '16px', cursor: 'pointer' }}>
-                          <i className="fas fa-xmark"></i>
-                      </button>
-                  </div>
-                  
-                  <div className="modal-body" style={{ position: 'relative', zIndex: 2 }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                        <div className="input-group">
-                            <label style={{ display: 'block', fontSize: '11px', fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>Sector Category</label>
-                            <select style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: '1.5px solid rgba(255,255,255,0.1)', padding: '18px 24px', borderRadius: '18px', color: '#fff', fontSize: '15px', fontWeight: 700, outline: 'none' }} value={requestSector} onChange={(e) => { setRequestSector(e.target.value); setRequestProduct(''); }}>
-                                <option value="" style={{ color: '#000' }}>Select sector...</option>
-                                {categories.map(cat => <option key={cat} value={cat} style={{ color: '#000' }}>{cat}</option>)}
-                            </select>
-                        </div>
-                        <div className="input-group">
-                            <label style={{ display: 'block', fontSize: '11px', fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>Target Commodity</label>
-                            <select style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: '1.5px solid rgba(255,255,255,0.1)', padding: '18px 24px', borderRadius: '18px', color: '#fff', fontSize: '15px', fontWeight: 700, outline: 'none' }} value={requestProduct} onChange={(e) => setRequestProduct(e.target.value)}>
-                                <option value="" style={{ color: '#000' }}>Select commodity...</option>
-                                {currentDatabase.map(p => <option key={p.id} value={p.name} style={{ color: '#000' }}>{p.name}</option>)}
-                            </select>
-                        </div>
-                      </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '24px', marginTop: '48px', position: 'relative', zIndex: 2 }}>
-                      <button className="q-btn ghost" onClick={() => setShowRequestForm(false)} style={{ flex: 1, padding: '20px', color: '#fff', background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(255,255,255,0.1)' }}>Discard</button>
-                      <button className="q-btn primary-btn" onClick={() => setShowRequestForm(false)} style={{ flex: 2, padding: '20px', background: '#fff', color: '#1e293b' }}>
-                          <i className="fas fa-tower-broadcast"></i> Broadcast Institutional RFP
-                      </button>
-                  </div>
-              </div>
+      {/* LOGIN PROMPT */}
+      {loginPrompt && (
+        <div className="bmp-overlay" onClick={()=>setLoginPrompt(false)}>
+          <div className="bmp-modal bmp-modal-sm" onClick={e=>e.stopPropagation()}>
+            <div className="bmp-modal-header">
+              <h3 className="bmp-modal-title">Login required</h3>
+              <button className="bmp-modal-close" onClick={()=>setLoginPrompt(false)}><i className="fas fa-xmark"></i></button>
+            </div>
+            <div className="bmp-modal-body" style={{textAlign:"center",padding:"32px 24px"}}>
+              <i className="fas fa-lock" style={{fontSize:36,color:"var(--v4-accent)",marginBottom:16}}></i>
+              <p style={{fontWeight:600,color:"var(--v4-text-dim)"}}>Create a free account to make offers, save listings, and contact sellers.</p>
+            </div>
+            <div className="bmp-modal-footer">
+              <button className="bmp-btn bmp-btn-ghost" onClick={()=>setLoginPrompt(false)}>Continue browsing</button>
+              <button className="bmp-btn bmp-btn-primary" onClick={()=>setLoginPrompt(false)}>
+                <i className="fas fa-user-plus"></i> Register / Login
+              </button>
+            </div>
           </div>
+        </div>
       )}
-
-      <style>{`
-        .v4-dashboard-container { display: flex; flex-direction: column; gap: 48px; }
-        @keyframes ticker {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-      `}</style>
     </div>
   );
 }

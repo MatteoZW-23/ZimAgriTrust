@@ -3,65 +3,35 @@ import { fetchNationalPulse } from '../api';
 
 const NationalPulse = ({ token }) => {
     const [pulse, setPulse] = useState(null);
-    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        async function loadPulse() {
-            setLoading(true);
-            try {
-                const data = await fetchNationalPulse(token);
-                setPulse({
-                    index: data?.index ?? 0,
-                    status: data?.status ?? 'STABLE',
-                    gmv: data?.gmv ?? 0,
-                    vitality: data?.vitality ?? '---',
-                    latency: '12ms'
-                });
-            } catch (err) {
-                console.error("Pulse Sync Error:", err);
-                setPulse({ index: 0, status: 'CONNECTED', gmv: 0, vitality: '---', latency: '---' });
-            } finally {
-                setLoading(false);
-            }
-        }
-        if (token) loadPulse();
-        else setLoading(false);
+        if (!token) return;
+        fetchNationalPulse(token)
+            .then(data => setPulse({
+                index: data?.index ?? 0,
+                status: data?.status ?? 'STABLE',
+                gmv: data?.gmv ?? 0,
+                vitality: data?.vitality ?? '0.0%',
+            }))
+            .catch(() => setPulse({ index: 0, status: 'STABLE', gmv: 0, vitality: '0.0%' }));
     }, [token]);
 
-    if (loading) return <div className="pulse-loading-v4">Synchronizing with Regional Cloud...</div>;
+    if (!pulse) return null;
+
+    const statusColor = pulse.status === 'HIGH_LIQUIDITY' ? '#16a34a' : pulse.status === 'EMERGING' ? '#f59e0b' : '#3b82f6';
 
     return (
-        <div className="pulse-card-clean animate-fade-in">
-            <div className="pulse-header-clean">
-                <div className="title-area">
-                    <i className="fas fa-chart-line"></i>
-                    <strong>Market Intelligence Overview</strong>
-                </div>
-                <div className="sync-status">Real-time Data Stream</div>
-            </div>
-            
-            <div className="pulse-stats-clean">
-                <div className="stat-node-clean">
-                    <span className="l">Commerce Index</span>
-                    <span className="v">{pulse.index} <small>pts</small></span>
-                </div>
-                <div className="stat-node-clean">
-                    <span className="l">Market Vitality</span>
-                    <span className="v">{pulse.vitality}</span>
-                </div>
-            </div>
-
-            <div className="regional-matrix-v4">
-                <label>Status: <span className={`h-status ${pulse.status.toLowerCase()}`}>{pulse.status}</span></label>
-                <div className="h-row">
-                    <span className="h-name">Gross Volume</span>
-                    <div className="h-bar-bg">
-                        <div className="h-bar-fill" style={{width: `${Math.min(100, pulse.index * 2)}%`}}></div>
-                    </div>
-                    <span className="h-name" style={{ textAlign: 'right' }}>${pulse.gmv.toLocaleString()}</span>
-                </div>
-            </div>
-
+        <div className="np-bar">
+            <span className="np-brand"><i className="fas fa-chart-line"></i> Market Pulse</span>
+            <div className="np-divider" />
+            <span className="np-item"><span className="np-label">Index</span><strong>{pulse.index} pts</strong></span>
+            <div className="np-divider" />
+            <span className="np-item"><span className="np-label">Vitality</span><strong>{pulse.vitality}</strong></span>
+            <div className="np-divider" />
+            <span className="np-item"><span className="np-label">GMV</span><strong>${Number(pulse.gmv).toLocaleString()}</strong></span>
+            <div className="np-divider" />
+            <span className="np-status-dot" style={{ background: statusColor }} />
+            <span className="np-status-text" style={{ color: statusColor }}>{pulse.status.replace('_', ' ')}</span>
         </div>
     );
 };

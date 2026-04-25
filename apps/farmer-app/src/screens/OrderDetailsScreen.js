@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image } from 'rea
 import { theme } from '../styles';
 
 export default function OrderDetailsScreen({ navigation, route }) {
-  const { role = 'buyer', orderId = 'AG-067' } = route.params || {};
+  const { role, orderId, order } = route.params || {};
 
   return (
     <ScrollView style={styles.container}>
@@ -50,8 +50,8 @@ export default function OrderDetailsScreen({ navigation, route }) {
                 <Text style={[styles.stepLabel, { left: '78%' }]}>Completed</Text>
             </View>
             <View style={styles.escrowBanner}>
-                <Text style={styles.escrowText}>🛡️ Funds in Escrow: <Text style={{fontWeight: '800'}}>$450.00</Text></Text>
-                <Text style={styles.deliveryDate}>Expected: March 30, 2026</Text>
+                <Text style={styles.escrowText}>🛡️ Funds in Escrow: <Text style={{fontWeight: '800'}}>{order?.escrow_amount ? `$${order.escrow_amount}` : '--'}</Text></Text>
+                <Text style={styles.deliveryDate}>{order?.expected_delivery ? `Expected: ${order.expected_delivery}` : ''}</Text>
             </View>
         </View>
       </View>
@@ -60,10 +60,10 @@ export default function OrderDetailsScreen({ navigation, route }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>PRODUCT DETAILS</Text>
         <View style={styles.card}>
-            <Text style={styles.cardRow}><Text style={styles.cardLabel}>Product:</Text> Grade A Maize</Text>
-            <Text style={styles.cardRow}><Text style={styles.cardLabel}>Quantity:</Text> 500kg</Text>
-            <Text style={styles.cardRow}><Text style={styles.cardLabel}>Price:</Text> $0.45/kg</Text>
-            <Text style={styles.cardRow}><Text style={styles.cardLabel}>{role === 'buyer' ? 'Seller' : 'Buyer'}:</Text> {role === 'buyer' ? 'Tendai M.' : 'Harare Milling'}</Text>
+            <Text style={styles.cardRow}><Text style={styles.cardLabel}>Product:</Text> {order?.product_type || '--'}</Text>
+            <Text style={styles.cardRow}><Text style={styles.cardLabel}>Quantity:</Text> {order?.quantity ? `${order.quantity} ${order.unit || ''}` : '--'}</Text>
+            <Text style={styles.cardRow}><Text style={styles.cardLabel}>Price:</Text> {order?.price_per_unit ? `$${order.price_per_unit}/unit` : '--'}</Text>
+            <Text style={styles.cardRow}><Text style={styles.cardLabel}>{role === 'buyer' ? 'Seller' : 'Buyer'}:</Text> {role === 'buyer' ? (order?.seller_name || '--') : (order?.buyer_name || '--')}</Text>
         </View>
       </View>
 

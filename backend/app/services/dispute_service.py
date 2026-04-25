@@ -26,6 +26,20 @@ def create_dispute(db: Session, payload: DisputeCreate, actor: User) -> Dispute:
     db.commit()
     db.refresh(dispute)
 
+    # Apply temporary trust freeze/penalty on dispute open for both parties.
+    from app.services.verification_service import verification_service
+    verification_service.apply_dispute_penalty(db, order.buyer, ruled_against=False)
+    verification_service.apply_dispute_penalty(db, order.seller, ruled_against=False)
+    from app.services.notification_service import notification_service
+    notification_service._send_sms(
+        order.buyer.phone_number,
+        f"AgriTrust: A dispute has been opened for transaction #{order.id}. Your trust score is temporarily impacted pending resolution."
+    )
+    notification_service._send_sms(
+        order.seller.phone_number,
+        f"AgriTrust: A dispute has been opened for transaction #{order.id}. Your trust score is temporarily impacted pending resolution."
+    )
+
     # Hybrid AI Triage: Auto-resolve or Assign Agent
     _ai_triage_dispute(db, dispute, actor)
     
@@ -76,6 +90,22 @@ def resolve_dispute(db: Session, dispute: Dispute, payload: DisputeResolve) -> D
 
     dispute.status = DisputeStatus.RESOLVED
     dispute.resolution = payload.resolution
+
+    # Apply additional trust deduction to losing party on final ruling.
+    from app.services.verification_service import verification_service
+    losing_user = order.buyer if payload.release_to_farmer else order.seller
+    verification_service.apply_dispute_penalty(db, losing_user, ruled_against=True)
+    from app.services.notification_service import notification_service
+    outcome = "released to farmer" if payload.release_to_farmer else "refunded to buyer"
+    notification_service._send_sms(
+        order.buyer.phone_number,
+        f"AgriTrust: Dispute for transaction #{order.id} resolved. Outcome: {outcome}."
+    )
+    notification_service._send_sms(
+        order.seller.phone_number,
+        f"AgriTrust: Dispute for transaction #{order.id} resolved. Outcome: {outcome}."
+    )
+
     db.commit()
     db.refresh(dispute)
     return dispute

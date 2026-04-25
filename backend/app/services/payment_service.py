@@ -12,7 +12,7 @@ from app.core.constants import ZIG_USD_BENCHMARK_RATE
 from app.core.policy import calculate_platform_fees
 
 # Zimbabwe-Specific Business Logic
-ZIG_USD_RATE = ZIG_USD_BENCHMARK_RATE               # Simulated ZiG to USD rate (Simulated for demo)
+ZIG_USD_RATE = ZIG_USD_BENCHMARK_RATE  # Set via ZIG_USD_RATE environment variable
 
 
 def calculate_fees(amount: float, user_trust_score: float = 0) -> float:
@@ -67,6 +67,10 @@ def process_ecocash_callback(db: Session, request_id: str, status: str, merchant
             return True
         else:
             order.status = OrderStatus.REFUNDED
+            buyer = db.query(User).filter(User.id == order.buyer_id).first()
+            if buyer:
+                from app.services.verification_service import verification_service
+                verification_service.apply_payment_failure(db, buyer)
             db.commit()
             logger.warning(f"❌ PAYMENT FAIL: Order {order_id} | Status {status}")
             return False

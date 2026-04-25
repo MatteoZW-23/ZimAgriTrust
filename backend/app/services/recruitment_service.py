@@ -58,14 +58,17 @@ class RecruitmentService:
         temp_pin = ''.join(random.choices(string.digits, k=6))
         
         if not user:
+            hashed_pin = get_password_hash(temp_pin)
             user = User(
                 full_name=application.full_name,
                 phone_number=application.phone_number,
-                password_hash=get_password_hash(temp_pin),
+                password_hash=hashed_pin,
+                ussd_pin_hash=hashed_pin,
                 role=UserRole.AGENT,
                 is_active=True,
                 id_verified=True,
-                trust_score=85
+                trust_score=85,
+                must_change_password=True,  # Force PIN change on first login
             )
             db.add(user)
             db.flush()
@@ -73,6 +76,11 @@ class RecruitmentService:
             if user.role != UserRole.ADMIN: # Don't downgrade admins
                 user.role = UserRole.AGENT
             user.id_verified = True
+            # Always sync the PIN so the WhatsApp message matches what's stored
+            hashed_pin = get_password_hash(temp_pin)
+            user.password_hash = hashed_pin
+            user.ussd_pin_hash = hashed_pin
+            user.must_change_password = True  # Force PIN change on first login
 
         # Create Trainee Agent record
         agent = db.query(Agent).filter(Agent.user_id == user.id).first()
@@ -212,10 +220,12 @@ class RecruitmentService:
              user = db.query(User).filter(User.phone_number == application.phone_number).first()
              if not user:
                  temp_pin = ''.join(random.choices(string.digits, k=6))
+                 hashed_pin = get_password_hash(temp_pin)
                  user = User(
                      full_name=application.full_name,
                      phone_number=application.phone_number,
-                     password_hash=get_password_hash(temp_pin),
+                     password_hash=hashed_pin,
+                     ussd_pin_hash=hashed_pin,
                      role=UserRole.AGENT,
                      is_active=True,
                      id_verified=True

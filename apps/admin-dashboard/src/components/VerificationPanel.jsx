@@ -12,6 +12,12 @@ const SECTOR_TAGS = {
 export function VerificationPanel({ listings = [], onVerify }) {
   const safeListings = Array.isArray(listings) ? listings : [];
   const pending = safeListings.filter(l => l.verification_status === "PENDING" || l.verification_status === "TSF_VERIFIED");
+  const trustForListing = (l) => {
+    if (typeof l.farmer_trust === 'number') return l.farmer_trust;
+    if (typeof l.seller_trust_score === 'number') return l.seller_trust_score;
+    if (typeof l.trust_score === 'number') return l.trust_score;
+    return 50;
+  };
 
   return (
     <div className="main-content-v4">
@@ -109,6 +115,9 @@ export function VerificationPanel({ listings = [], onVerify }) {
                         </thead>
                         <tbody>
                             {pending.map((l) => (
+                                (() => {
+                                  const trust = trustForListing(l);
+                                  return (
                                 <tr key={l.id} className="v4-table-row-premium" style={{ background: 'var(--v4-bg)', transition: '0.2s' }}>
                                     <td style={{ padding: '24px', borderRadius: '16px 0 0 16px', border: '1.5px solid var(--v4-border)', borderRight: 'none' }}>
                                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '8px', background: 'var(--v4-surface)', color: 'var(--v4-text-main)', fontSize: '11px', fontWeight: 900 }}>
@@ -125,9 +134,9 @@ export function VerificationPanel({ listings = [], onVerify }) {
                                     <td style={{ padding: '24px', borderTop: '1.5px solid var(--v4-border)', borderBottom: '1.5px solid var(--v4-border)' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                             <div style={{ flex: 1, height: '4px', background: 'var(--v4-surface)', borderRadius: '10px', overflow: 'hidden', minWidth: '60px' }}>
-                                                <div style={{ width: `${l.farmer_trust || 50}%`, height: '100%', background: (l.farmer_trust || 50) > 80 ? '#20963D' : '#f59e0b' }}></div>
+                                                <div style={{ width: `${trust}%`, height: '100%', background: trust > 80 ? '#20963D' : '#f59e0b' }}></div>
                                             </div>
-                                            <span style={{ fontSize: '12px', fontWeight: 900 }}>{l.farmer_trust || 50}%</span>
+                                            <span style={{ fontSize: '12px', fontWeight: 900 }}>{trust}%</span>
                                         </div>
                                     </td>
                                     <td style={{ padding: '24px', borderTop: '1.5px solid var(--v4-border)', borderBottom: '1.5px solid var(--v4-border)', color: 'var(--v4-text-dim)', fontWeight: 800 }}>{l.location}</td>
@@ -135,6 +144,8 @@ export function VerificationPanel({ listings = [], onVerify }) {
                                         <button className="q-btn primary-btn small" onClick={() => onVerify(l.id)} style={{ background: '#000E2B', borderRadius: '10px' }}>Authorize Trade</button>
                                     </td>
                                 </tr>
+                                  );
+                                })()
                             ))}
                         </tbody>
                     </table>

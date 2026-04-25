@@ -254,14 +254,13 @@ class AgentAssignmentService:
 
     def _get_optimized_route(self, agent_id: int, target_listing_id: int) -> Dict:
         """
-        AI Route Optimization (Mock): 
-        Suggests the most efficient travel route for the agent.
+        Route optimization placeholder — integrate with a mapping API for real data.
         """
         return {
-            "estimated_distance_km": 12.5,
-            "estimated_travel_time_mins": 45,
-            "fuel_cost_estimate_usd": 3.50,
-            "suggested_route": ["Main St", "Harare Rd", "Farm Track 4"]
+            "estimated_distance_km": None,
+            "estimated_travel_time_mins": None,
+            "fuel_cost_estimate_usd": None,
+            "suggested_route": []
         }
     
     def _calculate_deadline(self, priority: int, urgent: bool = False) -> datetime:

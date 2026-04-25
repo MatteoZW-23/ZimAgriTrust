@@ -15,12 +15,17 @@ import OrderDetailsScreen from './screens/OrderDetailsScreen';
 import MakeOfferScreen from './screens/MakeOfferScreen';
 import ConfirmationScreen from './screens/ConfirmationScreen';
 import WalletScreen from './screens/WalletScreen';
+import MyListingsScreen from './screens/MyListingsScreen';
+import MyOrdersScreen from './screens/MyOrdersScreen';
+import RateUserScreen from './screens/RateUserScreen';
+import WithdrawScreen from './screens/WithdrawScreen';
+import PaymentScreen from './screens/PaymentScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function MainTabs({ route }) {
-  const { role = 'buyer' } = route.params || {};
+  const { role = 'buyer', token, profile = {} } = route.params || {};
 
   return (
     <Tab.Navigator
@@ -35,28 +40,31 @@ function MainTabs({ route }) {
         <Tab.Screen
             name="FarmerDash"
             component={HomeScreen}
+            initialParams={{ role, token, profile: route.params?.profile || {} }}
             options={{
                 tabBarLabel: 'HOME',
-                tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📍</Text>,
+                tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🏠</Text>,
             }}
         />
       ) : (
         <Tab.Screen
             name="Marketplace"
             component={MarketplaceScreen}
+            initialParams={{ token }}
             options={{
                 tabBarLabel: 'MARKET',
-                tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📍</Text>,
+                tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🛒</Text>,
             }}
         />
       )}
 
       <Tab.Screen
-        name="Orders"
-        component={WalletScreen}
+        name="MyOrders"
+        component={MyOrdersScreen}
+        initialParams={{ role, token }}
         options={{
             tabBarLabel: 'ORDERS',
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🛒</Text>,
+            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📦</Text>,
         }}
       />
 
@@ -64,6 +72,7 @@ function MainTabs({ route }) {
         <Tab.Screen
             name="AddListing"
             component={CreateListingScreen}
+            initialParams={{ token }}
             options={{
                 tabBarLabel: 'ADD',
                 tabBarIcon: ({ color }) => <View style={styles.addBtn}><Text style={styles.addBtnText}>+</Text></View>,
@@ -72,17 +81,19 @@ function MainTabs({ route }) {
       )}
 
       <Tab.Screen
-        name="Ledger"
-        component={HomeScreen}
+        name="Wallet"
+        component={WalletScreen}
+        initialParams={{ token }}
         options={{
-            tabBarLabel: 'LEDGER',
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📊</Text>,
+            tabBarLabel: 'WALLET',
+            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>💰</Text>,
         }}
       />
 
       <Tab.Screen
         name="Profile"
         component={HomeScreen}
+        initialParams={{ role, token, profile }}
         options={{
             tabBarLabel: 'PROFILE',
             tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>👤</Text>,
@@ -144,11 +155,17 @@ export default function AppShell() {
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Main" component={MainTabs} initialParams={{ role, profile: session?.profile }} />
+        <Stack.Screen name="Main" component={MainTabs} initialParams={{ role, token: session?.access_token, profile: session?.profile }} />
         <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} />
         <Stack.Screen name="MakeOffer" component={MakeOfferScreen} />
         <Stack.Screen name="ConfirmDelivery" component={ConfirmationScreen} />
         <Stack.Screen name="Wallet" component={WalletScreen} />
+        <Stack.Screen name="MyListings" component={MyListingsScreen} />
+        <Stack.Screen name="MyOrders" component={MyOrdersScreen} />
+        <Stack.Screen name="RateUser" component={RateUserScreen} />
+        <Stack.Screen name="Withdraw" component={WithdrawScreen} />
+        <Stack.Screen name="CreateListing" component={CreateListingScreen} />
+        <Stack.Screen name="Payment" component={PaymentScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

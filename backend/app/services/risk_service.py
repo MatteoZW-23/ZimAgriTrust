@@ -4,19 +4,21 @@ from sqlalchemy.orm import Session
 
 def evaluate_user_risk(db: Session, user: User) -> dict:
     """
-    Evaluates user risk using the Advanced Random Forest Risk Scorer.
-    Eliminates basic linear mocks.
+    Evaluates user risk from real DB behaviour (velocity, disputes, cancellations, trust).
+    Persists the updated risk_score back to the user record.
     """
     scorer = RiskScorer(db)
     result = scorer.calculate_risk_score(user.id)
-    
-    # Sync core model
+
+    # Persist updated score
     user.risk_score = float(result["risk_score"])
-    
+    db.commit()
+
     return {
         "user_id": user.id,
         "risk_score": result["risk_score"],
-        "risk_label": result["risk_level"],
+        "risk_label": result["status"],
         "recommendation": result["recommendation"],
-        "analysis_mode": "System Analysis (v4)"
+        "metrics": result.get("metrics", {}),
+        "audit_timestamp": result.get("audit_timestamp"),
     }

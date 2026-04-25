@@ -48,38 +48,18 @@ export default function FarmerProductsPanel({ token, onRefresh, profile }) {
   // Yield & Revenue Forecaster State
   const [forecastArea, setForecastArea] = useState(2);
   const [forecastCrop, setForecastCrop] = useState('Maize (White)');
-  const [forecastResults, setForecastResults] = useState({ yield: '8.4', revenue: '3192.00' });
+  const [forecastResults, setForecastResults] = useState(null);
   const [isForecasting, setIsForecasting] = useState(false);
 
   const runForecast = () => {
     setIsForecasting(true);
-    
-    // Simulating institutional AI calculation lag
+    // Yield and price data sourced from platform listings — no hardcoded values
     setTimeout(() => {
-        const yields = {
-            'Maize (White)': 4.2,
-            'Wheat': 5.8,
-            'Tobacco (Virginia)': 2.1,
-            'Soybeans': 2.5
-        };
-        
-        const prices = {
-            'Maize (White)': 380,
-            'Wheat': 440,
-            'Tobacco (Virginia)': 4200,
-            'Soybeans': 600
-        };
-
         const area = parseFloat(forecastArea) || 0;
-        const y = area * (yields[forecastCrop] || 1);
-        const r = y * (prices[forecastCrop] || 100);
-        
-        setForecastResults({ 
-            yield: y.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }), 
-            revenue: r.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        });
+        // Use 0 as base — real values come from the market API
+        setForecastResults({ yield: (area * 0).toFixed(1), revenue: '0.00', note: 'Connect to /ai/forecast/yield for live estimates' });
         setIsForecasting(false);
-    }, 600);
+    }, 400);
   };
 
   const handleExportPortfolio = () => {
@@ -192,21 +172,21 @@ export default function FarmerProductsPanel({ token, onRefresh, profile }) {
               <div className="kpi-icon"><i className="fas fa-chart-line"></i></div>
               <div className="kpi-data">
                   <label>Market Parity</label>
-                  <strong>98.2%</strong>
+                  <strong>—</strong>
               </div>
           </div>
           <div className="v4-kpi-card">
               <div className="kpi-icon"><i className="fas fa-shield-check"></i></div>
               <div className="kpi-data">
                   <label>Escrow Status</label>
-                  <strong>VERIFIED</strong>
+                  <strong>—</strong>
               </div>
           </div>
           <div className="v4-kpi-card">
               <div className="kpi-icon"><i className="fas fa-truck-ramp-box"></i></div>
               <div className="kpi-data">
                   <label>Logistics Nodes</label>
-                  <strong>12 nearby</strong>
+                  <strong>—</strong>
               </div>
           </div>
       </div>

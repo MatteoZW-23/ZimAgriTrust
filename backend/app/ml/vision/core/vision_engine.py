@@ -54,33 +54,33 @@ class VisionEngine:
     """
     Central AI Vision Engine - Single source of truth for all vision operations
     """
-    
+
     def __init__(self):
-        self.models = {}
         self.confidence_thresholds = {
-            "auto_approve": 0.85,
+            "auto_approve":    0.85,
             "suggest_approve": 0.70,
-            "flag_review": 0.55,
-            "reject": 0.40
+            "flag_review":     0.55,
+            "reject":          0.40,
         }
+        self._classifier = None
         self._load_models()
-    
+
     def _load_models(self):
-        """Load all AI models into memory"""
-        # In production, load actual model weights
-        # For now, create placeholder models
+        """Load all AI models into memory."""
+        try:
+            from app.ml.vision.crop_classifier import CropClassifier
+            self._classifier = CropClassifier()
+        except Exception as e:
+            logger.warning("VisionEngine | CropClassifier unavailable: %s", e)
+            self._classifier = None
+
         self.models = {
-            "classifier": self._classifier_model,
-            "disease_detector": self._disease_model,
-            "grader": self._grader_model,
-            "fraud_detector": self._fraud_model
+            "classifier":      self._classifier,
+            "disease_detector": None,   # plug in trained model when available
+            "grader":          None,
+            "fraud_detector":  None,
         }
         logger.info("AI Vision Engine initialized with all models")
-    
-    def _classifier_model(self, *args, **kwargs): pass
-    def _disease_model(self, *args, **kwargs): pass
-    def _grader_model(self, *args, **kwargs): pass
-    def _fraud_model(self, *args, **kwargs): pass
 
     # ============= CORE ANALYSIS FUNCTIONS =============
     
@@ -131,31 +131,36 @@ class VisionEngine:
     
     async def classify_crop(self, image_data: bytes) -> Dict[str, Any]:
         """
-        Identify crop type from image
-        Used by: WhatsApp, Mobile App, Agent Dashboard
+        Identify crop type from image.
+        Uses the real CropClassifier (YOLO or OpenCV fallback).
         """
         try:
-            # Placeholder - implement actual model inference
-            # For production, load YOLO or similar model
-            
-            # Simulate analysis for demo
-            result = await self._simulate_classification(image_data)
-            
+            if self._classifier is not None:
+                result = await self._classifier.classify(image_data)
+                return {
+                    "success":           result.get("success", False),
+                    "crop_type":         result.get("crop_type", "unknown"),
+                    "crop_name":         result.get("crop_name", "Unknown"),
+                    "confidence":        result.get("confidence", 0.0),
+                    "confidence_level":  self._get_confidence_level(result.get("confidence", 0.0)),
+                    "alternative_matches": result.get("alternative_matches", []),
+                }
+            # No classifier available — return honest unknown
             return {
-                "success": True,
-                "crop_type": result["crop_type"],
-                "crop_name": self._get_crop_display_name(result["crop_type"]),
-                "confidence": result["confidence"],
-                "confidence_level": self._get_confidence_level(result["confidence"]),
-                "alternative_matches": result.get("alternatives", [])
+                "success": False,
+                "crop_type": "unknown",
+                "crop_name": "Unknown",
+                "confidence": 0.0,
+                "confidence_level": "failed",
+                "alternative_matches": [],
             }
         except Exception as e:
-            logger.error(f"Classification error: {e}")
+            logger.error("VisionEngine.classify_crop error: %s", e)
             return {
                 "success": False,
                 "error": str(e),
                 "crop_type": "unknown",
-                "confidence": 0.0
+                "confidence": 0.0,
             }
     
     async def detect_diseases(self, image_data: bytes, crop_type: str) -> List[Dict]:
@@ -324,37 +329,15 @@ class VisionEngine:
             return "B"
         else:
             return "C"
-    
+
     def _generate_recommendations(self, classification: Dict, diseases: List, grade: Dict) -> List[str]:
         """Generate actionable recommendations"""
         recommendations = []
-        
         if classification.get("confidence", 0) < 0.70:
             recommendations.append("Take photo in better lighting for more accurate classification")
-        
         if grade.get("grade") == "Grade C":
             recommendations.append("Consider sorting produce to improve quality grade")
-        
         return recommendations
-    
-    async def _simulate_classification(self, image_data: bytes) -> Dict:
-        """
-        Simulate classification for development
-        In production, replace with actual model inference
-        """
-        import hashlib
-        
-        # Use image hash to produce deterministic but varied results
-        hash_val = int(hashlib.md5(image_data[:100]).hexdigest()[:8], 16)
-        
-        crops = ["maize", "mango", "tomato", "soya_beans", "groundnuts", "tobacco"]
-        idx = hash_val % len(crops)
-        
-        return {
-            "crop_type": crops[idx],
-            "confidence": 0.65 + (hash_val % 35) / 100,  # 0.65 to 0.99
-            "alternatives": []
-        }
 
 
 # Singleton instance - ONE engine for the ENTIRE system

@@ -3,13 +3,9 @@ import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Keyboa
 import { theme } from '../styles';
 
 export default function ChatScreen({ navigation, route }) {
-  const { contact = 'Tendai M.' } = route.params || {};
+  const { contact } = route.params || {};
   const [msg, setMsg] = useState('');
-  const [messages, setMessages] = useState([
-    { id: 1, text: 'Hi Tendai, interested in your maize. Can we discuss pricing?', sender: 'buyer', time: '10:32 AM' },
-    { id: 2, text: 'Hi! Yes, I have Grade A maize available. $0.43/kg for bulk.', sender: 'farmer', time: '10:34 AM' },
-    { id: 3, text: 'Perfect. We need 5,000kg per month.', sender: 'buyer', time: '10:35 AM' },
-  ]);
+  const [messages, setMessages] = useState([]);
 
   const send = () => {
     if (!msg) return;
@@ -22,22 +18,32 @@ export default function ChatScreen({ navigation, route }) {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}><Text style={styles.backBtn}>←</Text></TouchableOpacity>
         <View style={styles.headerTitleBox}>
-          <Text style={styles.headerTitle}>{contact}</Text>
-          <Text style={styles.headerSub}>🟢 Online • ⭐ 4.9 Farmer</Text>
+          <Text style={styles.headerTitle}>{contact || 'Chat'}</Text>
+          <Text style={styles.headerSub}>Messages will appear here</Text>
         </View>
         <TouchableOpacity><Text style={{ fontSize: 24 }}>⚙️</Text></TouchableOpacity>
       </View>
 
       <ScrollView style={styles.chatArea} contentContainerStyle={{ padding: 20 }}>
-          <Text style={styles.dateDivider}>Today</Text>
-          {messages.map((m) => (
-            <View key={m.id} style={[styles.bubbleWrap, m.sender === 'buyer' ? styles.bubbleRight : styles.bubbleLeft]}>
-                 <View style={[styles.bubble, m.sender === 'buyer' ? styles.bubbleBuyer : styles.bubbleFarmer]}>
-                    <Text style={[styles.msgText, m.sender === 'buyer' && { color: '#FFF' }]}>{m.text}</Text>
-                 </View>
-                 <Text style={styles.msgTime}>{m.time}</Text>
+          {messages.length === 0 ? (
+            <View style={{ alignItems: 'center', marginTop: 60 }}>
+              <Text style={{ fontSize: 48, marginBottom: 16 }}>💬</Text>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#666' }}>No messages yet</Text>
+              <Text style={{ fontSize: 13, color: '#999', marginTop: 8 }}>Start a conversation to connect</Text>
             </View>
-          ))}
+          ) : (
+            <>
+              <Text style={styles.dateDivider}>Today</Text>
+              {messages.map((m) => (
+                <View key={m.id} style={[styles.bubbleWrap, m.sender === 'buyer' ? styles.bubbleRight : styles.bubbleLeft]}>
+                     <View style={[styles.bubble, m.sender === 'buyer' ? styles.bubbleBuyer : styles.bubbleFarmer]}>
+                        <Text style={[styles.msgText, m.sender === 'buyer' && { color: '#FFF' }]}>{m.text}</Text>
+                     </View>
+                     <Text style={styles.msgTime}>{m.time}</Text>
+                </View>
+              ))}
+            </>
+          )}
       </ScrollView>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>

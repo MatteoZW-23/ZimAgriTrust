@@ -1,4 +1,3 @@
-# Monkeypatch passlib to support bcrypt 4.0+ (MUST BE AT THE VERY TOP)
 try:
     import bcrypt as _orig_bcrypt
     from passlib.handlers.bcrypt import bcrypt as _passlib_bcrypt
@@ -11,7 +10,6 @@ except Exception:
 
 from app.db.base import Base
 from app.db.session import SessionLocal
-# Import models to register them
 from app.models.dispute import Dispute
 from app.models.listing import Listing, Offer
 from app.models.transaction import Transaction

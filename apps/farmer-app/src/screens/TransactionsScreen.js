@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Text, TextInput, TouchableOpacity, View } from "react-native";
 
-import { confirmDelivery, getTransactions } from "../api";
+import { confirmDelivery, getTransactions, submitReview, getOrderReviews } from "../api";
 import { appStyles } from "../styles";
 
 export function TransactionsScreen({ token, profile }) {
@@ -10,6 +10,8 @@ export function TransactionsScreen({ token, profile }) {
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  const [reviewInputs, setReviewInputs] = useState({});
+  const [reviewsByOrder, setReviewsByOrder] = useState({});
 
   useEffect(() => {
     setExpandedId(null);
@@ -42,6 +44,29 @@ export function TransactionsScreen({ token, profile }) {
     }
   }
 
+  async function loadReviews(orderId) {
+    try {
+      const reviews = await getOrderReviews(token, orderId);
+      setReviewsByOrder((prev) => ({ ...prev, [orderId]: reviews || [] }));
+    } catch {
+      setReviewsByOrder((prev) => ({ ...prev, [orderId]: [] }));
+    }
+  }
+
+  async function handleReview(orderId) {
+    const input = reviewInputs[orderId] || { rating: "5", comment: "" };
+    try {
+      await submitReview(token, orderId, {
+        rating: Number(input.rating || 5),
+        comment: input.comment || null,
+      });
+      setNotice("Review submitted successfully.");
+      await loadReviews(orderId);
+    } catch (error) {
+      setNotice(error.message || "Failed to submit review");
+    }
+  }
+
   return (
     <View style={appStyles.panel}>
       <Text style={appStyles.panelTitle}>Transactions</Text>
@@ -62,10 +87,15 @@ export function TransactionsScreen({ token, profile }) {
         const canConfirm = transaction.escrow_state === "ESCROW" || transaction.escrow_state === "DELIVERED";
         const isFarmer = profile?.role === "FARMER";
         const isExpanded = expandedId === transaction.id;
+        const orderId = transaction.id;
         const statusColor = transaction.escrow_state === "DISPUTED" ? "red" : "#2f6f42";
         
         return (
-          <TouchableOpacity key={transaction.id} style={appStyles.card} onPress={() => setExpandedId(isExpanded ? null : transaction.id)}>
+          <TouchableOpacity key={transaction.id} style={appStyles.card} onPress={async () => {
+            const nextId = isExpanded ? null : transaction.id;
+            setExpandedId(nextId);
+            if (nextId) await loadReviews(nextId);
+          }}>
             <View style={appStyles.row}>
               <Text style={appStyles.cardTitle}>{isFarmer ? "Outgoing Supply" : "Order"} #{transaction.listing_id}</Text>
               <View style={appStyles.row}>
@@ -88,6 +118,30 @@ export function TransactionsScreen({ token, profile }) {
                   <View style={appStyles.metricBox}>
                     <Text style={appStyles.metricLabel}>Platform Status</Text>
                     <Text style={appStyles.metricValue}>{transaction.status}</Text>
+                  </View>
+                </View>
+
+                <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: "#f0f0f0" }}>
+                  <Text style={[appStyles.metricLabel, { marginBottom: 8 }]}>Fee Breakdown</Text>
+                  <View style={appStyles.metricRow}>
+                    <View style={appStyles.metricBox}>
+                      <Text style={appStyles.metricLabel}>Gross Amount</Text>
+                      <Text style={appStyles.metricValue}>${transaction.total_amount ?? transaction.amount}</Text>
+                    </View>
+                    <View style={appStyles.metricBox}>
+                      <Text style={appStyles.metricLabel}>Platform Fee</Text>
+                      <Text style={[appStyles.metricValue, { color: '#dc2626' }]}>-${transaction.platform_fee ?? 0}</Text>
+                    </View>
+                  </View>
+                  <View style={appStyles.metricRow}>
+                    <View style={appStyles.metricBox}>
+                      <Text style={appStyles.metricLabel}>Seller Payout</Text>
+                      <Text style={[appStyles.metricValue, { color: '#16a34a' }]}>${transaction.seller_payout ?? 0}</Text>
+                    </View>
+                    <View style={appStyles.metricBox}>
+                      <Text style={appStyles.metricLabel}>Transport Fee</Text>
+                      <Text style={appStyles.metricValue}>${transaction.transport_fee ?? 0}</Text>
+                    </View>
                   </View>
                 </View>
 
@@ -115,6 +169,48 @@ export function TransactionsScreen({ token, profile }) {
                         <Text style={appStyles.buttonText}>{submitting ? "..." : "Release Payout"}</Text>
                       </TouchableOpacity>
                     </View>
+                  </View>
+                )}
+
+                {transaction.status === "COMPLETED" && (
+                  <View style={{ marginTop: 16, borderTopWidth: 1, borderTopColor: "#eee", paddingTop: 16 }}>
+                    <Text style={appStyles.metricLabel}>Rate Counterparty (1-5)</Text>
+                    <View style={appStyles.rowSpaced}>
+                      <TextInput
+                        style={[appStyles.inputSmall, { width: 70 }]}
+                        keyboardType="numeric"
+                        value={reviewInputs[orderId]?.rating || "5"}
+                        onChangeText={(v) =>
+                          setReviewInputs((prev) => ({
+                            ...prev,
+                            [orderId]: { ...(prev[orderId] || {}), rating: v },
+                          }))
+                        }
+                      />
+                      <TouchableOpacity
+                        style={[appStyles.button, { marginBottom: 0, paddingVertical: 10, marginLeft: 8 }]}
+                        onPress={() => handleReview(orderId)}
+                      >
+                        <Text style={appStyles.buttonText}>Submit Review</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <TextInput
+                      style={[appStyles.input, { marginTop: 8 }]}
+                      placeholder="Write optional review comment"
+                      value={reviewInputs[orderId]?.comment || ""}
+                      onChangeText={(v) =>
+                        setReviewInputs((prev) => ({
+                          ...prev,
+                          [orderId]: { ...(prev[orderId] || {}), comment: v },
+                        }))
+                      }
+                    />
+                    {(reviewsByOrder[orderId] || []).map((r) => (
+                      <View key={r.id} style={[appStyles.emptyState, { marginTop: 8, padding: 10 }]}>
+                        <Text style={{ fontWeight: "700" }}>Rating: {r.rating}/5</Text>
+                        <Text style={appStyles.muted}>{r.comment || "No comment"}</Text>
+                      </View>
+                    ))}
                   </View>
                 )}
               </View>

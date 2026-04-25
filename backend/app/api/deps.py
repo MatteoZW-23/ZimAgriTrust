@@ -1,6 +1,6 @@
 from collections.abc import Generator
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
@@ -8,10 +8,11 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.user import User, UserRole
-from app.models.agent import Agent
+from app.models.agent import Agent, AgentStatus
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
 
+from app.services.cache_service import cache_service
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -22,20 +23,38 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-def get_current_user(
-    db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)
+async def get_current_user(
+    request: Request, db: Session = Depends(get_db)
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    token = request.cookies.get("access_token")
+    if not token:
+        authorization = request.headers.get("Authorization")
+        if authorization and authorization.startswith("Bearer "):
+            token = authorization.split(" ")[1]
+            
+    if not token:
+        raise credentials_exception
+
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         user_id: str | None = payload.get("sub")
         token_type: str | None = payload.get("type")
+        jti: str | None = payload.get("jti")
+        
         if user_id is None or token_type != "access":
             raise credentials_exception
+            
+        # Check Redis blacklist
+        is_blacklisted = await cache_service.get(f"blacklist_{jti}")
+        if is_blacklisted:
+            raise credentials_exception
+            
     except JWTError as exc:
         raise credentials_exception from exc
 
@@ -80,7 +99,7 @@ def get_current_agent(
             detail="Current user does not have an associated agent profile"
         )
     
-    if agent.status == "failed":
+    if agent.status == AgentStatus.SUSPENDED:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="ACADEMY_DISMISSAL: Access denied. Your certification candidacy has been terminated."

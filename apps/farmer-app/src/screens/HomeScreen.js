@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView } from "react-native";
 import { theme } from "../styles";
 
-export function HomeScreen({ route }) {
+export default function HomeScreen({ route }) {
   const { profile = {}, role = 'farmer' } = route.params || {};
   const name = profile.name || "User";
   const trustScore = profile.trust_score || 0;

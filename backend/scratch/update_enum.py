@@ -7,8 +7,6 @@ def update_enum():
     with engine.connect() as conn:
         print("Adding 'deleted' to listingstatus enum...")
         try:
-            # Postgres doesn't allow ALTER TYPE ... ADD VALUE inside a transaction block in some versions/contexts
-            # but we can try it here. SQLAlchemy's connect() might be in a transaction.
             conn.execute(text("ALTER TYPE listingstatus ADD VALUE 'deleted';"))
             conn.commit()
             print("Success!")

@@ -4,12 +4,20 @@ import { theme } from "../styles";
 import { getProfile, login, register } from "../api";
 
 export function LoginScreen({ role, onAuthenticated }) {
-  const [subStep, setSubStep] = useState('phone'); // 'phone', 'otp', 'profile'
+  const [subStep, setSubStep] = useState('phone'); // 'phone', 'otp', 'profile', 'forgot', 'forgot-reset'
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
-  const [profileForm, setProfileForm] = useState({ name: "", location: "Harare", additional: "" });
+  const [profileForm, setProfileForm] = useState({ name: "", location: "", additional: "" });
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(45);
+  const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+
+  // Forgot PIN state
+  const [forgotPhone, setForgotPhone] = useState("");
+  const [forgotOtp, setForgotOtp] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [showNewPin, setShowNewPin] = useState(false);
 
   useEffect(() => {
     if (subStep === 'otp' && timer > 0) {
@@ -17,6 +25,33 @@ export function LoginScreen({ role, onAuthenticated }) {
       return () => clearTimeout(t);
     }
   }, [subStep, timer]);
+
+  const API_BASE = (process.env.EXPO_PUBLIC_API_URL || "http://localhost:8080/api/v1").replace(/\/$/, "");
+
+  const handleForgotRequest = async () => {
+    if (forgotPhone.length < 9) return;
+    setLoading(true); setError("");
+    try {
+      const fullPhone = forgotPhone.startsWith('+') ? forgotPhone : `+263${forgotPhone}`;
+      await fetch(`${API_BASE}/auth/forgot-password`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone_number: fullPhone }) });
+      setSubStep('forgot-reset');
+      setSuccessMsg("Reset code sent to your WhatsApp.");
+    } catch (e) { setError("Failed to send code. Try again."); }
+    finally { setLoading(false); }
+  };
+
+  const handleForgotReset = async () => {
+    if (!forgotOtp || newPin.length < 4) return;
+    setLoading(true); setError("");
+    try {
+      const fullPhone = forgotPhone.startsWith('+') ? forgotPhone : `+263${forgotPhone}`;
+      const res = await fetch(`${API_BASE}/auth/reset-password`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone_number: fullPhone, otp: forgotOtp, new_password: newPin }) });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.detail || "Reset failed"); }
+      setSuccessMsg("PIN updated! You can now log in.");
+      setSubStep('phone'); setForgotPhone(""); setForgotOtp(""); setNewPin("");
+    } catch (e) { setError(e.message || "Reset failed."); }
+    finally { setLoading(false); }
+  };
 
   const handleSendCode = () => {
     if (phone.length < 9) return;
@@ -40,12 +75,12 @@ export function LoginScreen({ role, onAuthenticated }) {
     setLoading(true);
     try {
         const payload = {
-            name: profileForm.name || "Tendai Moyo",
+            name: profileForm.name,
             phone: phone.startsWith('+') ? phone : `+263${phone}`,
-            password: "password123",
+            password: otp.join(''),
             role: role?.toUpperCase() || "FARMER"
         };
-        await register(payload);
+        await register(payload.name, payload.phone, payload.role, payload.password);
         const data = await login(payload.phone, payload.password);
         const loadedProfile = await getProfile(data.access_token);
         onAuthenticated({ access_token: data.access_token, profile: loadedProfile });
@@ -55,6 +90,60 @@ export function LoginScreen({ role, onAuthenticated }) {
         setLoading(false);
     }
   };
+
+  // --- Forgot PIN ---
+  if (subStep === 'forgot') {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={{ fontSize: 40 }}>🔑</Text>
+          <Text style={styles.title}>Reset Your PIN</Text>
+          <Text style={styles.subTitle}>Enter your phone number and we'll send a reset code via WhatsApp.</Text>
+        </View>
+        <View style={styles.form}>
+          {error ? <Text style={{ color: '#ef4444', fontWeight: '700', marginBottom: 16, textAlign: 'center' }}>{error}</Text> : null}
+          <View style={styles.phoneInputRow}>
+            <View style={styles.countryCode}><Text style={styles.codeText}>+263</Text></View>
+            <TextInput style={styles.phoneInput} placeholder="77 123 4567" keyboardType="phone-pad" value={forgotPhone} onChangeText={setForgotPhone} />
+          </View>
+          <TouchableOpacity style={[styles.primaryBtn, forgotPhone.length < 9 && { backgroundColor: '#CCC' }]} onPress={handleForgotRequest} disabled={forgotPhone.length < 9 || loading}>
+            <Text style={styles.primaryBtnText}>{loading ? "Sending..." : "Send Reset Code"}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={{ marginTop: 16, alignItems: 'center' }} onPress={() => setSubStep('phone')}>
+            <Text style={{ color: '#64748b', fontWeight: '700' }}>← Back to Login</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // --- Forgot PIN Reset ---
+  if (subStep === 'forgot-reset') {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={{ fontSize: 40 }}>🔐</Text>
+          <Text style={styles.title}>Set New PIN</Text>
+          <Text style={styles.subTitle}>{successMsg || "Enter the code from WhatsApp and your new PIN."}</Text>
+        </View>
+        <View style={styles.form}>
+          {error ? <Text style={{ color: '#ef4444', fontWeight: '700', marginBottom: 16, textAlign: 'center' }}>{error}</Text> : null}
+          <Text style={styles.label}>Verification Code</Text>
+          <TextInput style={[styles.input, { textAlign: 'center', fontSize: 22, letterSpacing: 8 }]} placeholder="000000" keyboardType="number-pad" maxLength={6} value={forgotOtp} onChangeText={setForgotOtp} />
+          <Text style={styles.label}>New PIN</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9F9F9', borderRadius: 16, marginBottom: 8 }}>
+            <TextInput style={[styles.input, { flex: 1, marginBottom: 0, backgroundColor: 'transparent' }]} placeholder="4–6 digits" keyboardType="number-pad" maxLength={6} secureTextEntry={!showNewPin} value={newPin} onChangeText={v => setNewPin(v.replace(/[^0-9]/g, ''))} />
+            <TouchableOpacity onPress={() => setShowNewPin(v => !v)} style={{ padding: 16 }}>
+              <Text style={{ fontSize: 18 }}>{showNewPin ? '🙈' : '👁️'}</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={[styles.primaryBtn, (!forgotOtp || newPin.length < 4) && { backgroundColor: '#CCC' }]} onPress={handleForgotReset} disabled={!forgotOtp || newPin.length < 4 || loading}>
+            <Text style={styles.primaryBtnText}>{loading ? "Saving..." : "Set New PIN"}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   // --- Step 5: Phone ---
   if (subStep === 'phone') {
@@ -82,6 +171,9 @@ export function LoginScreen({ role, onAuthenticated }) {
                 disabled={phone.length < 9 || loading}
             >
                 <Text style={styles.primaryBtnText}>{loading ? "Sending..." : "Send Code"}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={{ marginTop: 16, alignItems: 'center' }} onPress={() => { setSubStep('forgot'); setError(""); }}>
+              <Text style={{ color: '#64748b', fontSize: 13, fontWeight: '700' }}>Forgot PIN? Reset via WhatsApp</Text>
             </TouchableOpacity>
         </View>
       </View>
@@ -136,7 +228,7 @@ export function LoginScreen({ role, onAuthenticated }) {
             <Text style={styles.label}>Full Name</Text>
             <TextInput 
                 style={styles.input} 
-                placeholder="Tendai Moyo" 
+                placeholder="Your full name" 
                 value={profileForm.name}
                 onChangeText={v => setProfileForm({...profileForm, name: v})}
             />

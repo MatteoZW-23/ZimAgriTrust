@@ -89,6 +89,48 @@ class ListingResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ListingSearchItem(BaseModel):
+    id: uuid.UUID
+    seller_id: uuid.UUID
+    sector: Sector
+    product_type: str
+    product_subtype: Optional[str]
+    crop: Optional[str]
+    grade: Optional[str]
+    quantity: float
+    quantity_unit: str
+    price_per_unit: float
+    currency: str
+    location_province: Optional[str]
+    location_district: Optional[str]
+    location: Optional[str]
+    status: ListingStatus
+    verification_status: str
+    seller_name: str
+    seller_trust_score: int
+    seller_phone_masked: str
+    created_at: datetime
+    is_perishable: bool
+    expiry_date: Optional[date]
+    harvest_date: Optional[date]
+    storage_requirements: Optional[str]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PaginationMeta(BaseModel):
+    limit: int
+    offset: int
+    total: int
+    has_more: bool
+
+
+class ListingSearchResponse(BaseModel):
+    success: bool = True
+    data: List[ListingSearchItem] = Field(default_factory=list)
+    pagination: PaginationMeta
+
+
 class TradeMessageCreate(BaseModel):
     content: str = Field(min_length=1)
     is_formal_offer: bool = Field(default=False)

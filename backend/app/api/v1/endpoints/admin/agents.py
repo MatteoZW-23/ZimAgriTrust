@@ -46,14 +46,15 @@ def agent_stats(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles(UserRole.ADMIN, UserRole.AGENT)),
 ):
-    """Returns granular performance metrics for field agents (Legacy compat)."""
+    """Returns granular performance metrics for field agents."""
     agents = db.query(Agent).options(joinedload(Agent.user)).all()
     if not agents:
         basic_agents = db.query(User).filter(User.role == UserRole.AGENT).all()
         return [
             {
                 "id": str(u.id), "full_name": u.full_name, "region": u.province or "Central",
-                "resolved": 0, "rating": 5.0
+                "resolved": 0, "rating": 5.0, "wallet_balance": 0.0, "pending_earnings": 0.0,
+                "average_rating": 5.0, "resolution_count": 0,
             } for u in basic_agents
         ]
 
@@ -62,8 +63,12 @@ def agent_stats(
             "id": str(a.user_id),
             "full_name": a.user.full_name if a.user else "Anonymous Agent",
             "region": a.user.province if a.user else "Verified Zone",
-            "resolved": len(a.assignments) if a.assignments else 0,
-            "rating": a.rating
+            "resolved": len([x for x in (a.assignments or []) if x.status == "completed"]),
+            "resolution_count": len([x for x in (a.assignments or []) if x.status == "completed"]),
+            "rating": round(a.rating, 1) if a.rating else 0.0,
+            "average_rating": round(a.rating, 1) if a.rating else 0.0,
+            "wallet_balance": round(a.wallet_balance or 0.0, 2),
+            "pending_earnings": round(a.pending_earnings or 0.0, 2),
         }
         for a in agents
     ]

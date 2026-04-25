@@ -181,12 +181,11 @@ class WalletService:
     @staticmethod
     def confirm_external_payment(db: Session, payment_id: str) -> bool:
         """
-        Simulates a callback/webhook verification of payment.
-        In this simulation, we always confirm it for demonstration.
+        Webhook verification of payment — implement real provider callback logic here.
         """
-        # Real logic would check a 'Payment' table or call provider API
-        logger.info(f"External payment {payment_id} confirmed via webhook simulation.")
-        return True
+        # Real logic: check a 'Payment' table or call provider API
+        logger.info(f"External payment {payment_id} — awaiting real provider confirmation.")
+        return False
 
     @staticmethod
     def get_balance(db: Session, user_id: uuid.UUID) -> float:

@@ -4,7 +4,8 @@ import secrets
 import string
 from datetime import datetime
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy import or_
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.listing import Listing, ListingStatus, Offer, OfferStatus, Sector, BuyerRequest, FarmerResponse
 from app.models.transaction import Order, OrderStatus, Transaction, TransactionType
@@ -60,23 +61,44 @@ def create_offer(db: Session, buyer: User, listing: Listing, payload: OfferCreat
     db.refresh(offer)
     return offer
 
-def accept_offer(db: Session, listing: Listing, offer: Offer) -> Order:
+def accept_offer(
+    db: Session,
+    listing: Listing,
+    offer: Offer,
+    transport_insurance_elected: bool = False,
+) -> Order:
     if offer.status != OfferStatus.PENDING:
         raise HTTPException(status_code=400, detail="Offer not pending")
 
     # Update state
     offer.status = OfferStatus.ACCEPTED
     listing.status = ListingStatus.SOLD
-    
+
     # Reject competing offers
     db.query(Offer).filter(
-        Offer.listing_id == listing.id, 
+        Offer.listing_id == listing.id,
         Offer.id != offer.id
     ).update({"status": OfferStatus.REJECTED})
-    
+
     total_amount = offer.quantity * offer.price_per_unit
-    fee, payout = calculate_seller_settlement(total_amount, listing.seller.trust_score, offer.currency)
-    
+
+    # Determine if buyer is using on-platform transport (incentive discount)
+    from app.models.listing import LogisticsType
+    using_platform_transport = offer.logistics_type == LogisticsType.PLATFORM
+
+    fee, payout = calculate_seller_settlement(
+        total_amount,
+        listing.seller.trust_score,
+        offer.currency,
+        using_platform_transport=using_platform_transport,
+    )
+
+    # Transport insurance fee (optional, buyer-elected)
+    from app.core.policy import calculate_transport_insurance_fee
+    insurance_fee = calculate_transport_insurance_fee(
+        total_amount, offer.currency, transport_insurance_elected
+    )
+
     order = Order(
         listing_id=listing.id,
         offer_id=offer.id,
@@ -89,22 +111,32 @@ def accept_offer(db: Session, listing: Listing, offer: Offer) -> Order:
         seller_payout=payout,
         currency=offer.currency,
         status=OrderStatus.PENDING,
-        handover_code=secrets.token_hex(3).upper() # 6-char code
+        logistics_type=offer.logistics_type,
+        handover_code=secrets.token_hex(3).upper(),
+        transport_insurance_elected=transport_insurance_elected,
+        transport_insurance_fee=insurance_fee,
     )
     db.add(order)
     db.flush()
-    
-    # Trigger Escrow Hold (Moves buyer balance to pending)
-    success = wallet_service.hold_escrow(db, order.buyer_id, order.total_amount, order.currency)
+
+    # Escrow holds goods amount + insurance fee
+    escrow_amount = round(total_amount + insurance_fee, 2)
+    success = wallet_service.hold_escrow(db, order.buyer_id, escrow_amount, order.currency)
     if success:
         order.status = OrderStatus.ESCROW_HELD
         db.add(Transaction(
             order_id=order.id, user_id=order.buyer_id, type=TransactionType.ESCROW_HOLD,
-            amount=order.total_amount, currency=order.currency
+            amount=escrow_amount, currency=order.currency
         ))
-    
+
     db.commit()
     db.refresh(order)
+
+    # Create delivery tracking record immediately after escrow is funded
+    if order.status == OrderStatus.ESCROW_HELD:
+        from app.services.delivery_service import create_delivery_record
+        create_delivery_record(db, order)
+
     return order
 
 def reject_offer(db: Session, offer: Offer) -> Offer:
@@ -224,6 +256,72 @@ def bump_listing(db: Session, listing: Listing) -> Listing:
     db.refresh(listing)
     return listing
 
+
+def search_listings(
+    db: Session,
+    crop: str | None = None,
+    location: str | None = None,
+    min_price: float | None = None,
+    max_price: float | None = None,
+    grade: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[list[Listing], int]:
+    query = (
+        db.query(Listing)
+        .options(selectinload(Listing.seller))
+        .filter(Listing.status == ListingStatus.ACTIVE)
+    )
+
+    if crop:
+        term = f"%{crop.strip()}%"
+        if term != "%%":
+            query = query.filter(
+                or_(
+                    Listing.crop.ilike(term),
+                    Listing.product_type.ilike(term),
+                    Listing.product_subtype.ilike(term),
+                    Listing.ai_crop_type.ilike(term),
+                )
+            )
+
+    if location:
+        term = f"%{location.strip()}%"
+        if term != "%%":
+            query = query.filter(
+                or_(
+                    Listing.location.ilike(term),
+                    Listing.location_province.ilike(term),
+                    Listing.location_district.ilike(term),
+                    Listing.pickup_address.ilike(term),
+                )
+            )
+
+    if min_price is not None:
+        query = query.filter(Listing.price_per_unit >= min_price)
+
+    if max_price is not None:
+        query = query.filter(Listing.price_per_unit <= max_price)
+
+    if grade:
+        term = f"%{grade.strip()}%"
+        if term != "%%":
+            query = query.filter(
+                or_(
+                    Listing.grade.ilike(term),
+                    Listing.ai_grade_estimate.ilike(term),
+                )
+            )
+
+    total = query.count()
+    results = (
+        query.order_by(Listing.is_boosted.desc(), Listing.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return results, total
+
 class MarketplaceService:
     @staticmethod
     def create_listing(db: Session, seller: User, payload: ListingCreate) -> Listing:
@@ -255,5 +353,17 @@ class MarketplaceService:
     @staticmethod
     def bump_listing(db: Session, listing: Listing) -> Listing:
         return bump_listing(db, listing)
+    @staticmethod
+    def search_listings(
+        db: Session,
+        crop: str | None = None,
+        location: str | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        grade: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[Listing], int]:
+        return search_listings(db, crop, location, min_price, max_price, grade, limit, offset)
 
 marketplace_core = MarketplaceService()

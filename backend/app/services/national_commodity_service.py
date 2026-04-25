@@ -58,13 +58,16 @@ class NationalCommodityService:
         listing.quantity = quantity
         listing.grade = final_grade
         listing.verification_status = verification_map.get(listing.sector, "NATIONAL_AGRI_VERIFIED")
-        listing.price_per_unit = NationalCommodityService.get_seasonal_market_price(listing.product_type, listing.sector)
+        market_price = NationalCommodityService.get_seasonal_market_price(listing.product_type, listing.sector)
+        if market_price is not None:
+            listing.price_per_unit = market_price
         
         # Grading-based Price Adjustment (e.g., Export/Premium adds 15%)
-        if "PREMIUM" in final_grade.upper() or "EXPORT" in final_grade.upper() or "EXTRA" in final_grade.upper() or "6A" in final_grade.upper():
-            listing.price_per_unit *= 1.15
-        elif "GRADE 2" in final_grade.upper() or "C" in final_grade.upper() or "PROCESS" in final_grade.upper():
-            listing.price_per_unit *= 0.80
+        if listing.price_per_unit:
+            if "PREMIUM" in final_grade.upper() or "EXPORT" in final_grade.upper() or "EXTRA" in final_grade.upper() or "6A" in final_grade.upper():
+                listing.price_per_unit *= 1.15
+            elif "GRADE 2" in final_grade.upper() or "C" in final_grade.upper() or "PROCESS" in final_grade.upper():
+                listing.price_per_unit *= 0.80
 
         db.commit()
         return {
@@ -90,24 +93,14 @@ class NationalCommodityService:
                 return item["price"]
                 
         # Comprehensive fallback database for all requested sectors
-        sector_benchmarks = {
-            Sector.CROPS: {"MAIZE": 420.0, "SOYBEANS": 550.0, "WHEAT": 480.0, "SORGHUM": 380.0},
-            Sector.POULTRY: {"BROILER": 6.50, "LAYER": 5.80, "EGGS": 4.50},
-            Sector.DAIRY: {"MILK": 1.20, "CHEESE": 12.0, "YOGURT": 3.50},
-            Sector.HORTICULTURE: {"TOMATO": 0.80, "POTATO": 0.45, "ONION": 0.65, "PAPRIKA": 2.50},
-            Sector.APICULTURE: {"HONEY": 8.50, "WAX": 15.0},
-            Sector.AQUACULTURE: {"TILAPIA": 3.50, "BREAM": 4.20},
-            Sector.FLORICULTURE: {"ROSES": 1.20, "PROTEA": 2.50},
-            Sector.VITICULTURE: {"GRAPES": 2.80, "WINE": 15.0},
-            Sector.SERICULTURE: {"SILK": 45.0, "COCOON": 12.0}
-        }
+        sector_benchmarks = {}
         
-        sector_data = sector_benchmarks.get(sector, sector_benchmarks[Sector.CROPS])
+        sector_data = sector_benchmarks.get(sector, {})
         
         # Try finding product in sector data
         for p, price in sector_data.items():
             if p in product_name.upper():
                 return price
                 
-        # Absolute fallback
-        return 1.0
+        # No fallback price — return None to indicate price must come from live data
+        return None

@@ -9,6 +9,36 @@ export default function AgentLoginScreen({ onLogin }) {
   const [verificationCode, setVerificationCode] = useState("");
   const [step, setStep] = useState(1); 
   const [pendingSession, setPendingSession] = useState(null);
+  const [showPin, setShowPin] = useState(false);
+  const [forgotStep, setForgotStep] = useState(0); // 0=off, 1=phone, 2=code+newpin
+  const [forgotPhone, setForgotPhone] = useState("");
+  const [forgotOtp, setForgotOtp] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [showNewPin, setShowNewPin] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
+
+  async function handleForgotRequest(e) {
+    e.preventDefault(); setLoading(true); setError(""); setSuccessMsg("");
+    try {
+      let c = forgotPhone.replace(/\s/g, "");
+      if (c.startsWith("0")) c = c.substring(1);
+      const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
+      await fetch(`${API}/auth/forgot-password`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone_number: "+263" + c }) });
+      setForgotStep(2); setSuccessMsg("Reset code sent via WhatsApp.");
+    } catch (err) { setError(err.message); } finally { setLoading(false); }
+  }
+
+  async function handleForgotReset(e) {
+    e.preventDefault(); setLoading(true); setError("");
+    try {
+      let c = forgotPhone.replace(/\s/g, "");
+      if (c.startsWith("0")) c = c.substring(1);
+      const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
+      const res = await fetch(`${API}/auth/reset-password`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone_number: "+263" + c, otp: forgotOtp, new_password: newPin }) });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.detail || "Reset failed"); }
+      setSuccessMsg("PIN updated! You can now log in."); setForgotStep(0);
+    } catch (err) { setError(err.message); } finally { setLoading(false); }
+  }
 
   async function handleLoginSubmit(e) {
     if (e) e.preventDefault();
@@ -99,11 +129,11 @@ export default function AgentLoginScreen({ onLogin }) {
               <div className="v4-field">
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                       <label style={{ fontSize: '11px', fontWeight: 900, color: '#475569', textTransform: 'uppercase' }}>Security PIN</label>
-                      <span style={{ fontSize: '10px', color: '#20963D', fontWeight: 900, cursor: 'pointer' }}>PIN Recovery?</span>
+                      <span style={{ fontSize: '10px', color: '#20963D', fontWeight: 900, cursor: 'pointer' }} onClick={() => setForgotStep(1)}>PIN Recovery?</span>
                   </div>
                   <div className="v4-input-group">
                       <input 
-                          type="password" 
+                          type={showPin ? "text" : "password"}
                           inputMode="numeric"
                           pattern="[0-9]*"
                           placeholder="••••" 
@@ -112,7 +142,9 @@ export default function AgentLoginScreen({ onLogin }) {
                           required 
                           style={{ textAlign: "center", letterSpacing: "0.5em" }}
                       />
-                      <i className="fas fa-fingerprint" style={{ padding: "0 16px", color: "#20963D", opacity: 0.5 }}></i>
+                      <button type="button" className="v4-pw-toggle" onClick={() => setShowPin(v => !v)} tabIndex={-1} style={{ padding: '0 16px', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                        <i className={`fas ${showPin ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                      </button>
                   </div>
               </div>
 
@@ -159,6 +191,47 @@ export default function AgentLoginScreen({ onLogin }) {
           </div>
         </div>
       </div>
+
+      {/* ── Forgot PIN overlay ── */}
+      {forgotStep > 0 && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ background: '#fff', borderRadius: '24px', padding: '40px', width: '100%', maxWidth: '400px', boxShadow: '0 40px 80px rgba(0,0,0,0.4)' }}>
+            <h3 style={{ fontWeight: 900, color: '#000E2B', marginBottom: '8px' }}>🔑 Reset PIN</h3>
+            <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '24px' }}>
+              {forgotStep === 1 ? "Enter your registered phone number." : "Enter the code sent to your WhatsApp and set a new PIN."}
+            </p>
+            {successMsg && <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '12px', padding: '12px', marginBottom: '16px', fontSize: '13px', color: '#166534', fontWeight: 700 }}>{successMsg}</div>}
+            {error && <div style={{ background: '#fff1f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '12px', marginBottom: '16px', fontSize: '13px', color: '#be123c', fontWeight: 700 }}>{error}</div>}
+            {forgotStep === 1 ? (
+              <form onSubmit={handleForgotRequest}>
+                <div style={{ display: 'flex', border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', marginBottom: '16px' }}>
+                  <span style={{ padding: '0 14px', background: '#f8fafc', borderRight: '1px solid #e2e8f0', display: 'grid', placeItems: 'center', fontWeight: 800, color: '#94a3b8' }}>+263</span>
+                  <input type="tel" value={forgotPhone} onChange={e => setForgotPhone(e.target.value)} placeholder="771 000 001" required style={{ flex: 1, border: 'none', padding: '12px 16px', outline: 'none', fontSize: '15px' }} />
+                </div>
+                <button type="submit" disabled={loading} style={{ width: '100%', padding: '14px', background: '#20963D', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 900, cursor: 'pointer' }}>
+                  {loading ? 'Sending...' : 'Send Reset Code'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleForgotReset}>
+                <input type="text" inputMode="numeric" value={forgotOtp} onChange={e => setForgotOtp(e.target.value.replace(/\D/g, ''))} placeholder="6-digit code" maxLength={6} required style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '12px 16px', fontSize: '20px', textAlign: 'center', letterSpacing: '0.3em', marginBottom: '12px', outline: 'none', boxSizing: 'border-box' }} />
+                <div style={{ display: 'flex', border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', marginBottom: '16px' }}>
+                  <input type={showNewPin ? "text" : "password"} inputMode="numeric" value={newPin} onChange={e => setNewPin(e.target.value.replace(/[^0-9]/g, ''))} placeholder="New PIN" maxLength={6} required style={{ flex: 1, border: 'none', padding: '12px 16px', fontSize: '20px', textAlign: 'center', letterSpacing: '0.3em', outline: 'none' }} />
+                  <button type="button" onClick={() => setShowNewPin(v => !v)} style={{ padding: '0 14px', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                    <i className={`fas ${showNewPin ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                  </button>
+                </div>
+                <button type="submit" disabled={loading} style={{ width: '100%', padding: '14px', background: '#20963D', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 900, cursor: 'pointer' }}>
+                  {loading ? 'Saving...' : 'Set New PIN'}
+                </button>
+              </form>
+            )}
+            <button onClick={() => { setForgotStep(0); setError(""); setSuccessMsg(""); }} style={{ width: '100%', marginTop: '12px', padding: '12px', background: 'none', border: '1.5px solid #e2e8f0', borderRadius: '12px', fontWeight: 800, color: '#64748b', cursor: 'pointer' }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .v4-login-page {

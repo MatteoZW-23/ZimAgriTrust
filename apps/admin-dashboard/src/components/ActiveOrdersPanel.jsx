@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchListingOffers, acceptOffer, fetchMyListings, confirmDelivery, createDispute } from '../api';
+import { fetchListingOffers, acceptOffer, fetchMyListings, confirmDelivery, createDispute, submitReview, getOrderReviews } from '../api';
 
 export default function ActiveOrdersPanel({ profile, token, transactions = [], onRefresh }) {
   const [orders, setOrders] = useState([]);
@@ -15,7 +15,11 @@ export default function ActiveOrdersPanel({ profile, token, transactions = [], o
   const [showEcoCashModal, setShowEcoCashModal] = useState(false);
   const [showSettlementModal, setShowSettlementModal] = useState(false);
   const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
   const [activeOrder, setActiveOrder] = useState(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewsByOrder, setReviewsByOrder] = useState({});
   const [settlementPercent, setSettlementPercent] = useState(10);
   const [paymentStep, setPaymentStep] = useState('IDLE'); // 'IDLE','PUSHING','AWAITING_PIN','SUCCESS'
 
@@ -81,6 +85,36 @@ export default function ActiveOrdersPanel({ profile, token, transactions = [], o
       } catch(err) {
           setErrorMsg(err.message || 'Error confirming delivery');
       }
+  };
+
+  const loadOrderReviews = async (orderId) => {
+    try {
+      const reviews = await getOrderReviews(token, orderId);
+      setReviewsByOrder((prev) => ({ ...prev, [orderId]: reviews || [] }));
+    } catch {
+      // ignore per-order review fetch failures to avoid blocking order list UI
+    }
+  };
+
+  const openReviewModal = async (order) => {
+    setActiveOrder(order);
+    setReviewRating(5);
+    setReviewComment('');
+    setShowReviewModal(true);
+    await loadOrderReviews(order.id);
+  };
+
+  const handleSubmitReview = async () => {
+    if (!activeOrder) return;
+    try {
+      await submitReview(token, activeOrder.id, { rating: reviewRating, comment: reviewComment });
+      await loadOrderReviews(activeOrder.id);
+      setShowReviewModal(false);
+      alert("Review submitted successfully.");
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      setErrorMsg(err.message || "Failed to submit review");
+    }
   };
 
   return (
@@ -188,14 +222,14 @@ export default function ActiveOrdersPanel({ profile, token, transactions = [], o
                              {o.status === 'DELIVERED' && (
                                  <div className="v4-completion-logic" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
                                     <div className="v4-badge-outline sm success">GOVERNANCE CLEARANCE PENDING</div>
-                                    <div style={{ fontSize: '10px', color: '#16a34a', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <i className="fas fa-clock fa-spin"></i> AUTO-RELEASE IN 47:58:12
-                                    </div>
-                                    <div style={{ fontSize: '9px', color: '#94a3b8', fontWeight: 600 }}>Safety Net: Automatic fund release if no dispute raised.</div>
+                                    <div style={{ fontSize: '9px', color: '#94a3b8', fontWeight: 600 }}>Automatic fund release after inspection window.</div>
                                  </div>
                              )}
                              {o.status === 'COMPLETED' && (
-                                 <div className="v4-badge-outline sm success">TRANSACTION FINALIZED</div>
+                                 <div className="v4-btn-group">
+                                   <div className="v4-badge-outline sm success">TRANSACTION FINALIZED</div>
+                                   <button className="v4-btn sm primary" onClick={() => openReviewModal(o)}>RATE COUNTERPARTY</button>
+                                 </div>
                              )}
                          </div>
                      </div>
@@ -300,6 +334,59 @@ export default function ActiveOrdersPanel({ profile, token, transactions = [], o
                               </div>
                               <button className="v4-btn primary-glow full-width mt-32" onClick={() => setShowEcoCashModal(false)}>RETURN TO COMMAND CENTER</button>
                           </div>
+                      )}
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {showReviewModal && activeOrder && (
+          <div className="modal-overlay v3-glass">
+              <div className="v4-modal-content animate-rise">
+                  <div className="v4-modal-header">
+                       <div className="h-text">
+                          <h3><i className="fas fa-star"></i> Rate Counterparty</h3>
+                          <p>Submit a quality score and optional written review for this completed transaction.</p>
+                       </div>
+                       <button className="close-x" onClick={() => setShowReviewModal(false)}>✕</button>
+                  </div>
+                  <div className="v4-modal-body" style={{ padding: '24px' }}>
+                      <div className="v4-form-group">
+                          <label>RATING (1-5)</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="5"
+                            value={reviewRating}
+                            onChange={(e) => setReviewRating(Math.max(1, Math.min(5, Number(e.target.value) || 1)))}
+                            className="v4-input"
+                          />
+                      </div>
+                      <div className="v4-form-group" style={{ marginTop: '12px' }}>
+                          <label>REVIEW COMMENT (OPTIONAL)</label>
+                          <textarea
+                            className="v4-textarea"
+                            value={reviewComment}
+                            onChange={(e) => setReviewComment(e.target.value)}
+                            placeholder="Share feedback about delivery quality, communication, and fulfillment."
+                            style={{ minHeight: '100px' }}
+                          />
+                      </div>
+
+                      <button className="v4-btn primary full-width mt-24" onClick={handleSubmitReview}>SUBMIT REVIEW</button>
+
+                      {!!reviewsByOrder[activeOrder.id]?.length && (
+                        <div style={{ marginTop: '20px' }}>
+                          <label style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8' }}>EXISTING REVIEWS</label>
+                          <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {reviewsByOrder[activeOrder.id].map((r) => (
+                              <div key={r.id} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px 12px', borderRadius: '10px' }}>
+                                <div style={{ fontSize: '12px', fontWeight: 900 }}>Rating: {r.rating}/5</div>
+                                <div style={{ fontSize: '12px', color: '#64748b' }}>{r.comment || 'No comment'}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       )}
                   </div>
               </div>

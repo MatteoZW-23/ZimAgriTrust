@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
-from app.ml.risk_scorer import risk_engine
+from app.ml.risk_scorer import RiskScorer
 from app.services.price_service import get_price_prediction
 from typing import Dict, Any
 
@@ -17,7 +17,7 @@ def get_db():
 @router.get("/price")
 async def predict_price(crop: str, db: Session = Depends(get_db)):
     """
-    Sovereign AI: Real-time Price Intelligence Endpoint.
+    Real-time Price Intelligence Endpoint.
     """
     try:
         prediction = get_price_prediction(db, crop)
@@ -29,13 +29,14 @@ async def predict_price(crop: str, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/risk")
-async def evaluate_risk(features: Dict[str, Any]):
+@router.get("/risk/{user_id}")
+async def evaluate_risk(user_id: str, db: Session = Depends(get_db)):
     """
-    Sovereign AI: Transaction Risk Scoring Endpoint.
+    Transaction Risk Scoring Endpoint — evaluates a user's risk profile from live DB data.
     """
     try:
-        assessment = risk_engine.predict_risk(features)
+        scorer = RiskScorer(db=db)
+        assessment = scorer.calculate_risk_score(user_id)
         return assessment
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

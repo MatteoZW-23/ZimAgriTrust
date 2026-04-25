@@ -18,7 +18,8 @@ import {
   fetchMarketNews,
   proposeAdjustment,
   approveTerms,
-  fetchUsers
+  fetchUsers,
+  updateProfile
 } from './api';
 
 import './styles.css';
@@ -50,31 +51,14 @@ import WalletPanel from './components/WalletPanel';
 import { NationalMarketHub } from './components/NationalMarketHub';
 import SystemConfigPanel from './components/SystemConfigPanel';
 import NationalPulse from './components/NationalPulse';
+import AIModelPanel from './components/AIModelPanel';
+import DataPipelinePanel from './components/DataPipelinePanel';
+import { AdminCommandCenter } from './components/AdminCommandCenter';
+import IDVerificationQueuePanel from './components/IDVerificationQueuePanel';
 
 
 
 
-// System Configuration
-
-const RegionalLiquidityLog = React.memo(({ pulse }) => {
-  return (
-    <div className="v4-liquidity-banner-hardened">
-        <div className="banner-context">
-            <span style={{ fontSize: '9px', fontWeight: 800, color: 'var(--v4-text-dim)' }}>REGIONAL HUB: HARARE // <span style={{ color: '#20963D' }}>ONLINE</span></span>
-        </div>
-        <div className="banner-metrics">
-            <div className="metric-node"><label>MARKET LIQUIDITY</label><strong>$0.00</strong></div>
-            <div className="divider-v"></div>
-            <div className="metric-node"><label>VERIFIED LAND</label><strong>0 HA</strong></div>
-            <div className="divider-v"></div>
-            <div className="metric-node"><label>ESCROW UTILIZATION</label><strong>0.00%</strong></div>
-        </div>
-        <div className="banner-end">
-            <span style={{ fontSize: '9px', fontWeight: 800, color: 'var(--v4-text-dim)' }}>STATUS: OPTIMAL</span>
-        </div>
-    </div>
-  );
-});
 
 
 function App() {
@@ -87,7 +71,7 @@ function App() {
     }
   };
 
-  const [token, setToken] = useState(localStorage.getItem('agritrust_token'));
+  const [token, setToken] = useState(localStorage.getItem('agritrust_auth') === 'true' ? 'active_session' : null);
   const [profile, setProfile] = useState(safeJSONParse(localStorage.getItem('agritrust_user')));
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(localStorage.getItem('agritrust_terms_accepted') === 'true');
   const [currentView, setCurrentView] = useState('overview');
@@ -98,6 +82,13 @@ function App() {
   const [theme, setTheme] = useState(localStorage.getItem('v4_theme') || 'auto');
   const [isGuestMode, setIsGuestMode] = useState(false);
   const [language, setLanguage] = useState('EN'); // EN, SN, ND
+
+  const handleLanguageChange = (lang) => {
+    setLanguage(lang);
+    if (token) {
+      updateProfile(token, { preferred_language: lang.toLowerCase() }).catch(console.error);
+    }
+  };
   const [currency, setCurrency] = useState('USD'); // USD, ZIG
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -142,7 +133,7 @@ function App() {
   // Dynamic Greeting Logic (Time-Aware & Personal)
   const getGreeting = () => {
     const hour = new Date().getHours();
-    const name = profile.full_name ? profile.full_name.split(' ')[0] : 'there';
+    const name = profile?.full_name ? profile.full_name.split(' ')[0] : 'there';
     
     let baseGreeting = "";
     if (hour < 12) baseGreeting = `Good morning, ${name}!`;
@@ -200,18 +191,41 @@ function App() {
         return fallback;
       });
 
-      const [statsRes, listingRes, userRes, transRes, escrowRes, disputeRes, agentRes, marketRes, newsRes, pulseRes] = await Promise.all([
+      const role = profile?.role?.toUpperCase();
+      const isAdmin = role === 'ADMIN' || role === 'STAFF';
+      const isAgent = role === 'AGENT';
+
+      // Always fetch market data (available to all roles)
+      const marketDataPromises = [
+        secureFetch(fetchMarketActivities(token), { listings: [], offers: [], deals: [] }),
+        secureFetch(fetchMarketNews(token), []),
+        secureFetch(fetchNationalPulse(token), null),
+        secureFetch(fetchTransactions(token), [])
+      ];
+
+      // Admin-only endpoints
+      const adminDataPromises = isAdmin ? [
         secureFetch(fetchOverview(token), { stats: {} }),
         secureFetch(fetchReviewQueue(token), []),
         secureFetch(fetchUsers(token), []),
-        secureFetch(fetchTransactions(token), []),
         secureFetch(fetchEscrowStats(token), {}),
         secureFetch(fetchDisputes(token), []),
-        secureFetch(fetchAgentStats(token), []),
-        secureFetch(fetchMarketActivities(token), { listings: [], offers: [], deals: [] }),
-        secureFetch(fetchMarketNews(token), []),
-        secureFetch(fetchNationalPulse(token), null)
+        secureFetch(fetchAgentStats(token), [])
+      ] : [
+        { stats: {} }, // overview fallback
+        [], // reviewQueue fallback
+        [], // users fallback
+        {}, // escrowStats fallback
+        [], // disputes fallback
+        []  // agents fallback
+      ];
+
+      const [marketRes, newsRes, pulseRes, transRes, ...adminResults] = await Promise.all([
+        ...marketDataPromises,
+        ...adminDataPromises
       ]);
+
+      const [statsRes, listingRes, userRes, escrowRes, disputeRes, agentRes] = adminResults;
 
       setOverview(statsRes || { stats: {} });
       setReviewQueue(Array.isArray(listingRes) ? listingRes.filter(l => String(l.status).toUpperCase() === 'PENDING') : []);
@@ -250,12 +264,11 @@ function App() {
   };
 
   const handleLogin = (jwtOrData, userDataArg) => {
-    const jwt = jwtOrData?.access_token || jwtOrData;
     const userData = jwtOrData?.user || userDataArg || {};
 
-    setToken(jwt);
+    setToken("active_session");
     setProfile(userData);
-    localStorage.setItem('agritrust_token', jwt);
+    localStorage.setItem('agritrust_auth', 'true');
     localStorage.setItem('agritrust_user', JSON.stringify(userData));
   };
 
@@ -263,8 +276,16 @@ function App() {
     setToken(null);
     setProfile({});
     setIsGuestMode(false);
-    localStorage.removeItem('agritrust_token');
+    localStorage.removeItem('agritrust_auth');
+    localStorage.removeItem('agritrust_token'); // clear legacy
     localStorage.removeItem('agritrust_user');
+    
+    // Call backend to clear HttpOnly cookies and blacklist token
+    fetch('http://localhost:8080/api/v1/auth/logout', { 
+        method: 'POST', 
+        credentials: 'include',
+        headers: { "Content-Type": "application/json" }
+    }).catch(console.error);
   };
 
   const handleGuestMode = () => {
@@ -339,6 +360,28 @@ function App() {
 
   const role = profile?.role?.toUpperCase() || "USER";
 
+  // ENFORCE PORTAL SECURITY
+  if (token && !isGuestMode) {
+    if (isHQPortal && role !== 'ADMIN') {
+      return (
+        <div style={{ textAlign: 'center', padding: '50px', color: '#fff', background: '#0f172a', minHeight: '100vh' }}>
+          <h2><i className="fas fa-shield-halved" style={{ color: '#ef4444', marginRight: '10px' }}></i> Access Denied</h2>
+          <p>This portal is restricted to HQ Administrators. Your current role is {role}.</p>
+          <button onClick={handleLogout} style={{ padding: '10px 20px', marginTop: '20px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Log Out & Switch Account</button>
+        </div>
+      );
+    }
+    if (isAgentPortal && role !== 'AGENT' && role !== 'ADMIN') {
+      return (
+        <div style={{ textAlign: 'center', padding: '50px', color: '#fff', background: '#0f172a', minHeight: '100vh' }}>
+          <h2><i className="fas fa-shield-halved" style={{ color: '#ef4444', marginRight: '10px' }}></i> Access Denied</h2>
+          <p>This portal is restricted to Field Agents. Your current role is {role}.</p>
+          <button onClick={handleLogout} style={{ padding: '10px 20px', marginTop: '20px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Log Out & Switch Account</button>
+        </div>
+      );
+    }
+  }
+
   return (
     <main className={`shell-v4 theme-${role.toLowerCase()} ${isSidebarCollapsed ? 'sidebar-hidden' : ''}`}>
       {/* V4 SIDEBAR OVERLAY (Mobile) */}
@@ -392,6 +435,11 @@ function App() {
                 </div>
             )}
             {(role === 'ADMIN' || role === 'AGENT') && (
+                <div className={`nav-link-v4 ${currentView === 'id-verification' ? 'active' : ''}`} onClick={() => setCurrentView('id-verification')} title={isSidebarCollapsed ? 'ID Verification' : ''}>
+                    <i className="fas fa-id-card"></i> {!isSidebarCollapsed && <span>ID Verification</span>}
+                </div>
+            )}
+            {(role === 'ADMIN' || role === 'AGENT') && (
                 <div className={`nav-link-v4 ${currentView === 'market-monitor' ? 'active' : ''}`} onClick={() => setCurrentView('market-monitor')} title={isSidebarCollapsed ? 'Market Monitor' : ''}>
                     <i className="fas fa-tower-observation"></i> {!isSidebarCollapsed && <span>Regional Overview</span>}
                 </div>
@@ -413,6 +461,9 @@ function App() {
                     <div className={`nav-link-v4 ${currentView === 'network' ? 'active' : ''}`} onClick={() => setCurrentView('network')} title={isSidebarCollapsed ? 'Agent List' : ''}>
                         <i className="fas fa-handshake"></i> {!isSidebarCollapsed && <span>Agent List</span>}
                     </div>
+                    <div className={`nav-link-v4 ${currentView === 'id-verification' ? 'active' : ''}`} onClick={() => setCurrentView('id-verification')} title={isSidebarCollapsed ? 'ID Verification Queue' : ''}>
+                        <i className="fas fa-id-card"></i> {!isSidebarCollapsed && <span>ID Verification</span>}
+                    </div>
                     <div className={`nav-link-v4 ${currentView === 'logistics' ? 'active' : ''}`} onClick={() => setCurrentView('logistics')} title={isSidebarCollapsed ? 'Logistics & Freight' : ''}>
                         <i className="fas fa-truck-fast"></i> {!isSidebarCollapsed && <span>Logistics & Freight</span>}
                     </div>
@@ -423,6 +474,15 @@ function App() {
                         <i className="fas fa-user-tie"></i> {!isSidebarCollapsed && <span>Agent Recruitment</span>}
                     </div>
                     <div className="nav-group-label">{isSidebarCollapsed ? '---' : 'SYSTEM UTILITIES'}</div>
+                    <div className={`nav-link-v4 ${currentView === 'ai-models' ? 'active' : ''}`} onClick={() => setCurrentView('ai-models')} title={isSidebarCollapsed ? 'AI Model Training' : ''}>
+                        <i className="fas fa-brain"></i> {!isSidebarCollapsed && <span>AI Model Training</span>}
+                    </div>
+                    <div className={`nav-link-v4 ${currentView === 'data-pipeline' ? 'active' : ''}`} onClick={() => setCurrentView('data-pipeline')} title={isSidebarCollapsed ? 'Scraping & Data Pipeline' : ''}>
+                        <i className="fas fa-spider"></i> {!isSidebarCollapsed && <span>Data Pipeline</span>}
+                    </div>
+                    <div className={`nav-link-v4 ${currentView === 'command-center' ? 'active' : ''}`} onClick={() => setCurrentView('command-center')} title={isSidebarCollapsed ? 'Admin Command Center' : ''}>
+                        <i className="fas fa-terminal"></i> {!isSidebarCollapsed && <span>Command Center</span>}
+                    </div>
                     <div className={`nav-link-v4 ${currentView === 'logs' ? 'active' : ''}`} onClick={() => setCurrentView('logs')} title={isSidebarCollapsed ? 'Security & Audit Logs' : ''}>
                         <i className="fas fa-shield-halved"></i> {!isSidebarCollapsed && <span>Security & Audit Logs</span>}
                     </div>
@@ -490,7 +550,7 @@ function App() {
 
         <div className="v4-sidebar-footer">
               <div className="v4-user-mini">
-                  <div className="u-av">{profile.full_name?.charAt(0)}</div>
+                  <div className="u-av">{profile?.full_name?.charAt(0) || '?'}</div>
                   {!isSidebarCollapsed && (
                       <div className="u-meta">
                           <strong>{profile.full_name}</strong>
@@ -541,7 +601,9 @@ function App() {
                    </button>
 
                    <div className="v4-toggle-group" style={{ display: 'flex', gap: '4px', background: 'var(--v4-bg)', padding: '4px', borderRadius: '12px', border: '1px solid var(--v4-border)' }}>
-                       <button className={`v4-small-toggle ${language === 'EN' ? 'active' : ''}`} onClick={() => setLanguage('EN')} style={{ fontSize: '9px', fontWeight: 900, padding: '4px 8px', borderRadius: '8px', border: 'none', background: language === 'EN' ? 'var(--v4-primary)' : 'transparent', color: language === 'EN' ? '#fff' : 'var(--v4-text-dim)' }}>EN</button>
+                       <button className={`v4-small-toggle ${language === 'EN' ? 'active' : ''}`} onClick={() => handleLanguageChange('EN')} style={{ fontSize: '9px', fontWeight: 900, padding: '4px 8px', borderRadius: '8px', border: 'none', background: language === 'EN' ? 'var(--v4-primary)' : 'transparent', color: language === 'EN' ? '#fff' : 'var(--v4-text-dim)' }}>EN</button>
+                       <button className={`v4-small-toggle ${language === 'SN' ? 'active' : ''}`} onClick={() => handleLanguageChange('SN')} style={{ fontSize: '9px', fontWeight: 900, padding: '4px 8px', borderRadius: '8px', border: 'none', background: language === 'SN' ? 'var(--v4-primary)' : 'transparent', color: language === 'SN' ? '#fff' : 'var(--v4-text-dim)' }}>SN</button>
+                       <button className={`v4-small-toggle ${language === 'ND' ? 'active' : ''}`} onClick={() => handleLanguageChange('ND')} style={{ fontSize: '9px', fontWeight: 900, padding: '4px 8px', borderRadius: '8px', border: 'none', background: language === 'ND' ? 'var(--v4-primary)' : 'transparent', color: language === 'ND' ? '#fff' : 'var(--v4-text-dim)' }}>ND</button>
                    </div>
 
                    <div className="v4-toggle-group" style={{ display: 'flex', gap: '4px', background: 'var(--v4-bg)', padding: '4px', borderRadius: '12px', border: '1px solid var(--v4-border)' }}>
@@ -639,11 +701,15 @@ function App() {
                 />
             )}
             {currentView === "market-monitor" && <MarketAdvisory activities={marketActivities} loading={loading} />}
+            {currentView === "id-verification" && <IDVerificationQueuePanel token={token} />}
             {currentView === "transactions-admin" && <EscrowRevenuePanel token={token} onEscrowAction={handleGovernance} />}
             {currentView === "disputes" && <DisputeResolutionPanel disputes={disputes} onResolve={handleResolveDispute} />}
             {currentView === "network" && <AgentPerformancePanel agents={agents} onRefresh={handleSync} profile={profile} />}
             {currentView === "reports" && <NationalMarketHub token={token} />}
             {currentView === "system-config" && <SystemConfigPanel token={token} />}
+            {currentView === "ai-models" && <AIModelPanel token={token} />}
+            {currentView === "data-pipeline" && <DataPipelinePanel token={token} />}
+            {currentView === "command-center" && <AdminCommandCenter token={token} />}
 
             {/* FARMER VIEWS */}
             {currentView === "my-products" && <FarmerProductsPanel token={token} onRefresh={handleSync} profile={profile} />}
@@ -655,7 +721,7 @@ function App() {
             
             {/* AGENT & LOGISTICS VIEWS */}
             {currentView === "agent-ops" && <AgentOperationsHub profile={profile} token={token} users={users} onSync={handleSync} reviewQueue={reviewQueue} disputes={disputes} />}
-            {currentView === "logistics" && <LogisticsCommand token={token} role={role} />}
+            {currentView === "logistics" && <LogisticsCommand token={token} role={role} transactions={transactions} />}
             {currentView === "recruitment" && <AgentRecruitmentPanel token={token} />}
             
             {/* UNIVERSAL VIEWS */}

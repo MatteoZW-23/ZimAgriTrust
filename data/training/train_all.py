@@ -32,10 +32,11 @@ def main():
     
     # Order matters - dependencies first
     models = [
-        ("Risk Scorer", f"{scripts_dir}/train_risk_scorer.py"),
-        ("Fraud Detector", f"{scripts_dir}/train_fraud_detector.py"),
-        ("Price Forecaster", f"{scripts_dir}/train_price_forecaster.py"),
+        ("Risk Scorer",       f"{scripts_dir}/train_risk_scorer.py"),
+        ("Fraud Detector",    f"{scripts_dir}/train_fraud_detector.py"),
+        ("Price Forecaster",  f"{scripts_dir}/train_price_forecaster.py"),
         ("Demand Forecaster", f"{scripts_dir}/train_demand_forecaster.py"),
+        ("Crop Vision",       f"{scripts_dir}/train_crop_vision.py"),
     ]
     
     for name, script in models:

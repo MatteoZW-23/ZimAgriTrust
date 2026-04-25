@@ -1,68 +1,247 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  TextInput, ActivityIndicator, Alert, Platform
+} from 'react-native';
 import { theme } from '../styles';
+import { submitIdDocuments, getVerificationStatus } from '../api';
 
-export default function VerificationScreen({ navigation }) {
-  const [uploads, setUploads] = useState({ front: false, back: false, selfie: false });
+// Expo ImagePicker — gracefully falls back if not available
+let launchImageLibraryAsync, launchCameraAsync, MediaTypeOptions;
+try {
+  const ip = require('expo-image-picker');
+  launchImageLibraryAsync = ip.launchImageLibraryAsync;
+  launchCameraAsync = ip.launchCameraAsync;
+  MediaTypeOptions = ip.MediaTypeOptions;
+} catch {
+  launchImageLibraryAsync = null;
+}
 
-  const handleUpload = (type) => {
-    setUploads({ ...uploads, [type]: true });
+const STATUS_CONFIG = {
+  not_submitted: { color: '#94a3b8', icon: '📋', label: 'Not Submitted' },
+  pending:       { color: '#f59e0b', icon: '⏳', label: 'Under Review' },
+  approved:      { color: '#22c55e', icon: '✅', label: 'Verified' },
+  rejected:      { color: '#ef4444', icon: '❌', label: 'Rejected — Resubmit' },
+};
+
+export default function VerificationScreen({ navigation, route }) {
+  const { token } = route?.params || {};
+
+  const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const [nationalId, setNationalId] = useState('');
+  const [front, setFront] = useState(null);
+  const [back, setBack] = useState(null);
+  const [selfie, setSelfie] = useState(null);
+
+  useEffect(() => {
+    loadStatus();
+  }, []);
+
+  const loadStatus = async () => {
+    if (!token) { setLoading(false); return; }
+    try {
+      const data = await getVerificationStatus(token);
+      setStatus(data);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const pickImage = async (slot) => {
+    if (!launchImageLibraryAsync) {
+      Alert.alert('Not available', 'Image picker requires Expo. Please use the web upload instead.');
+      return;
+    }
+    Alert.alert(
+      'Choose Source',
+      'How would you like to add this photo?',
+      [
+        {
+          text: '📷 Camera',
+          onPress: async () => {
+            const result = await launchCameraAsync({ mediaTypes: MediaTypeOptions.Images, quality: 0.8, allowsEditing: true });
+            if (!result.canceled && result.assets?.[0]) {
+              const asset = result.assets[0];
+              const file = { uri: asset.uri, name: `${slot}.jpg`, type: 'image/jpeg' };
+              if (slot === 'front') setFront(file);
+              else if (slot === 'back') setBack(file);
+              else setSelfie(file);
+            }
+          }
+        },
+        {
+          text: '🖼️ Gallery',
+          onPress: async () => {
+            const result = await launchImageLibraryAsync({ mediaTypes: MediaTypeOptions.Images, quality: 0.8, allowsEditing: true });
+            if (!result.canceled && result.assets?.[0]) {
+              const asset = result.assets[0];
+              const file = { uri: asset.uri, name: `${slot}.jpg`, type: 'image/jpeg' };
+              if (slot === 'front') setFront(file);
+              else if (slot === 'back') setBack(file);
+              else setSelfie(file);
+            }
+          }
+        },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+
+  const handleSubmit = async () => {
+    if (!front) { setError('Front of ID is required.'); return; }
+    if (!token) { setError('You must be logged in.'); return; }
+    setSubmitting(true); setError(''); setSuccess('');
+    try {
+      await submitIdDocuments(token, { front, back, selfie, nationalIdNumber: nationalId });
+      setSuccess('Documents submitted! An agent will review within 24 hours. You will be notified via WhatsApp & SMS.');
+      await loadStatus();
+    } catch (e) {
+      setError(e.message || 'Upload failed. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const cfg = STATUS_CONFIG[status?.status || 'not_submitted'];
+  const canSubmit = status?.status !== 'pending' && status?.status !== 'approved';
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={theme.colors.green} />
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}><Text style={styles.backBtn}>← Back</Text></TouchableOpacity>
-        <Text style={styles.headerTitle}>Account Verification</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.backBtn}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>ID Verification</Text>
         <View style={{ width: 60 }} />
       </View>
 
+      {/* Status Banner */}
+      <View style={[styles.statusBanner, { borderColor: cfg.color, backgroundColor: cfg.color + '15' }]}>
+        <Text style={styles.statusIcon}>{cfg.icon}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.statusLabel, { color: cfg.color }]}>{cfg.label}</Text>
+          {status?.reviewer_note && (
+            <Text style={styles.statusNote}>{status.reviewer_note}</Text>
+          )}
+          {status?.status === 'approved' && (
+            <Text style={styles.statusNote}>Your identity is verified. Trust score +15 applied.</Text>
+          )}
+        </View>
+      </View>
+
+      {/* Info */}
       <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>📋 ID VERIFICATION</Text>
-          <Text style={styles.infoText}>To increase your trust score and unlock full platform features, please verify your identity.</Text>
-          <View style={styles.trustProgress}>
-              <View style={styles.trustScoreTrack}>
-                  <View style={[styles.trustScoreFill, { width: '45%' }]} />
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
-                  <Text style={styles.trustLabel}>Current: 45/100</Text>
-                  <Text style={[styles.trustLabel, { color: theme.colors.green }]}>Target: 65/100</Text>
-              </View>
-          </View>
+        <Text style={styles.infoTitle}>📋 Why verify?</Text>
+        <Text style={styles.infoText}>
+          Verified users unlock higher transaction limits, appear as trusted sellers, and get priority in the marketplace.
+          Your documents are reviewed by a certified AgriTrust agent within 24 hours.
+        </Text>
       </View>
 
-      <View style={styles.section}>
-          <Text style={styles.sectionTitle}>REQUIRED DOCUMENTS</Text>
-          
-          <View style={styles.uploadCard}>
-              <Text style={styles.uploadLabel}>National ID (Front)</Text>
-              <TouchableOpacity style={[styles.uploadBtn, uploads.front && styles.uploadBtnSuccess]} onPress={() => handleUpload('front')}>
-                  <Text style={styles.uploadBtnText}>{uploads.front ? '✅ Uploaded' : '📷 Take Photo / Upload'}</Text>
-              </TouchableOpacity>
+      {canSubmit && (
+        <>
+          {/* National ID Number */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>NATIONAL ID NUMBER</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 63-123456A78"
+              value={nationalId}
+              onChangeText={setNationalId}
+              autoCapitalize="characters"
+            />
           </View>
 
-          <View style={styles.uploadCard}>
-              <Text style={styles.uploadLabel}>National ID (Back)</Text>
-              <TouchableOpacity style={[styles.uploadBtn, uploads.back && styles.uploadBtnSuccess]} onPress={() => handleUpload('back')}>
-                  <Text style={styles.uploadBtnText}>{uploads.back ? '✅ Uploaded' : '📷 Take Photo / Upload'}</Text>
-              </TouchableOpacity>
+          {/* Document Uploads */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>REQUIRED DOCUMENTS</Text>
+
+            <UploadSlot
+              label="National ID — Front *"
+              hint="Clear photo of the front of your National ID card."
+              file={front}
+              onPick={() => pickImage('front')}
+              onClear={() => setFront(null)}
+            />
+            <UploadSlot
+              label="National ID — Back"
+              hint="Back of your ID card (optional but recommended)."
+              file={back}
+              onPick={() => pickImage('back')}
+              onClear={() => setBack(null)}
+            />
+            <UploadSlot
+              label="Selfie Holding ID"
+              hint="Hold your ID clearly next to your face."
+              file={selfie}
+              onPick={() => pickImage('selfie')}
+              onClear={() => setSelfie(null)}
+            />
           </View>
 
-          <View style={styles.uploadCard}>
-              <Text style={styles.uploadLabel}>Selfie with ID</Text>
-              <TouchableOpacity style={[styles.uploadBtn, uploads.selfie && styles.uploadBtnSuccess]} onPress={() => handleUpload('selfie')}>
-                  <Text style={styles.uploadBtnText}>{uploads.selfie ? '✅ Uploaded' : '📷 Take Photo / Upload'}</Text>
-              </TouchableOpacity>
-              <Text style={styles.hint}>Hold your ID clearly next to your face.</Text>
-          </View>
-      </View>
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {success ? <Text style={styles.successText}>{success}</Text> : null}
 
-      <TouchableOpacity style={styles.submitBtn} onPress={() => Alert.alert('Submitted', 'Verification documents received. Agents will review within 24 hours.')}>
-          <Text style={styles.submitBtnText}>Submit for Verification</Text>
-      </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.submitBtn, (!front || submitting) && { opacity: 0.5 }]}
+            onPress={handleSubmit}
+            disabled={!front || submitting}
+          >
+            {submitting
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.submitBtnText}>Submit for Verification</Text>
+            }
+          </TouchableOpacity>
+        </>
+      )}
 
-      <View style={{ height: 100 }} />
+      {status?.status === 'pending' && (
+        <View style={styles.pendingBox}>
+          <Text style={styles.pendingText}>
+            Your documents are being reviewed. You will receive a WhatsApp and SMS notification once the review is complete.
+          </Text>
+          <Text style={styles.pendingMeta}>
+            Submitted: {status.submitted_at ? new Date(status.submitted_at).toLocaleDateString('en-ZW', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+          </Text>
+        </View>
+      )}
     </ScrollView>
+  );
+}
+
+function UploadSlot({ label, hint, file, onPick, onClear }) {
+  return (
+    <View style={styles.uploadCard}>
+      <Text style={styles.uploadLabel}>{label}</Text>
+      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+      {file ? (
+        <View style={styles.uploadedRow}>
+          <Text style={styles.uploadedName} numberOfLines={1}>✅ {file.name}</Text>
+          <TouchableOpacity onPress={onClear} style={styles.clearBtn}>
+            <Text style={styles.clearBtnText}>Remove</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity style={styles.uploadBtn} onPress={onPick}>
+          <Text style={styles.uploadBtnText}>📷 Take Photo / Choose File</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 }
 
@@ -71,21 +250,38 @@ const styles = StyleSheet.create({
   header: { padding: 24, paddingTop: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backBtn: { fontSize: 16, fontWeight: '700', color: theme.colors.sky },
   headerTitle: { fontSize: 18, fontWeight: '800', color: theme.colors.black },
-  infoBox: { margin: 24, padding: 24, backgroundColor: '#F9F9F9', borderRadius: 20 },
+
+  statusBanner: { marginHorizontal: 24, marginBottom: 8, padding: 20, borderRadius: 16, borderWidth: 1.5, flexDirection: 'row', alignItems: 'center', gap: 16 },
+  statusIcon: { fontSize: 28 },
+  statusLabel: { fontSize: 16, fontWeight: '900' },
+  statusNote: { fontSize: 13, color: '#475569', fontWeight: '600', marginTop: 4 },
+
+  infoBox: { marginHorizontal: 24, marginVertical: 16, padding: 20, backgroundColor: '#f8fafc', borderRadius: 16 },
   infoTitle: { fontSize: 14, fontWeight: '800', color: theme.colors.black, marginBottom: 8 },
-  infoText: { fontSize: 14, color: '#666', lineHeight: 20 },
-  trustProgress: { marginTop: 24 },
-  trustScoreTrack: { height: 12, backgroundColor: '#EEE', borderRadius: 6, overflow: 'hidden' },
-  trustScoreFill: { height: '100%', backgroundColor: theme.colors.orange },
-  trustLabel: { fontSize: 12, fontWeight: '800', color: '#999' },
-  section: { paddingHorizontal: 24, marginTop: 12 },
-  sectionTitle: { fontSize: 12, fontWeight: '800', color: '#999', letterSpacing: 1.2, marginBottom: 16 },
-  uploadCard: { marginBottom: 24 },
-  uploadLabel: { fontSize: 14, fontWeight: '700', color: theme.colors.black, marginBottom: 12 },
-  uploadBtn: { height: 64, borderRadius: 16, borderStyle: 'dashed', borderWidth: 2, borderColor: '#DDD', justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9F9F9' },
-  uploadBtnSuccess: { borderColor: theme.colors.green, backgroundColor: '#E8F5E9', borderStyle: 'solid' },
-  uploadBtnText: { fontSize: 14, fontWeight: '700', color: '#666' },
-  hint: { fontSize: 12, color: '#999', fontStyle: 'italic', marginTop: 8 },
+  infoText: { fontSize: 13, color: '#64748b', lineHeight: 20 },
+
+  section: { paddingHorizontal: 24, marginTop: 8 },
+  sectionTitle: { fontSize: 11, fontWeight: '900', color: '#94a3b8', letterSpacing: 1.2, marginBottom: 12, textTransform: 'uppercase' },
+
+  input: { height: 56, borderRadius: 14, backgroundColor: '#f8fafc', borderWidth: 1.5, borderColor: '#e2e8f0', paddingHorizontal: 16, fontSize: 15, fontWeight: '700', color: theme.colors.black, marginBottom: 8 },
+
+  uploadCard: { marginBottom: 20 },
+  uploadLabel: { fontSize: 14, fontWeight: '800', color: theme.colors.black, marginBottom: 4 },
+  hint: { fontSize: 12, color: '#94a3b8', fontWeight: '600', marginBottom: 10 },
+  uploadBtn: { height: 64, borderRadius: 14, borderStyle: 'dashed', borderWidth: 2, borderColor: '#cbd5e1', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' },
+  uploadBtnText: { fontSize: 14, fontWeight: '700', color: '#64748b' },
+  uploadedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, backgroundColor: '#f0fdf4', borderRadius: 12, borderWidth: 1.5, borderColor: '#86efac' },
+  uploadedName: { flex: 1, fontSize: 13, fontWeight: '700', color: '#166534' },
+  clearBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#fee2e2', borderRadius: 8 },
+  clearBtnText: { fontSize: 12, fontWeight: '800', color: '#ef4444' },
+
+  errorText: { marginHorizontal: 24, marginTop: 8, color: '#ef4444', fontWeight: '700', fontSize: 13 },
+  successText: { marginHorizontal: 24, marginTop: 8, color: '#16a34a', fontWeight: '700', fontSize: 13, lineHeight: 20 },
+
   submitBtn: { margin: 24, height: 60, backgroundColor: theme.colors.black, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  submitBtnText: { color: '#FFF', fontSize: 16, fontWeight: '800' }
+  submitBtnText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
+
+  pendingBox: { marginHorizontal: 24, marginTop: 16, padding: 24, backgroundColor: '#fffbeb', borderRadius: 16, borderWidth: 1.5, borderColor: '#fde68a' },
+  pendingText: { fontSize: 14, color: '#92400e', fontWeight: '700', lineHeight: 22 },
+  pendingMeta: { fontSize: 12, color: '#b45309', fontWeight: '600', marginTop: 12 },
 });

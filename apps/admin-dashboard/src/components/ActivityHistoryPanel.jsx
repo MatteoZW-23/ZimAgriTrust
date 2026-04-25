@@ -40,8 +40,8 @@ export default function ActivityHistoryPanel({ activities = [] }) {
                                {a.type || 'LOG'}
                            </span>
                         </td>
-                        <td className="v4-ref-cell">#AG-TR-{i + 1042}</td>
-                        <td className="partner-cell">{a.partner || 'SYSTEM CORE'}</td>
+                        <td className="v4-ref-cell">#AG-{String(a.id || i + 1000).slice(0, 8).toUpperCase()}</td>
+                        <td className="partner-cell">{a.partner || a.user || '—'}</td>
                         <td className="amount-cell">{a.amount ? `$${a.amount.toLocaleString()}` : '—'}</td>
                         <td>
                            <div className="v4-status-group">

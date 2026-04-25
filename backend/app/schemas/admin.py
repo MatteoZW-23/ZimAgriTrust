@@ -14,6 +14,10 @@ class AdminOverviewResponse(BaseModel):
     suspended_listings: int
     open_disputes: int
     resolved_disputes: int
+    avg_trust_score: float = 0.0
+    escrow_total: float = 0.0
+    avg_settlement_hours: float | None = None
+    stats: dict = {}
     system_health: dict = {}
 
 

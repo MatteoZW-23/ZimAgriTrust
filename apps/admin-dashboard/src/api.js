@@ -6,14 +6,19 @@ export async function request(path, options = {}) {
     ...(options.headers || {}),
   };
 
-  // Strip Authorization if the token is null/undefined to allow Guest access
-  if (headers["Authorization"] === "Bearer null" || headers["Authorization"] === "Bearer undefined") {
+  // Strip Authorization if the token is null/undefined/fake to rely on HttpOnly cookie
+  if (
+    headers["Authorization"] === "Bearer null" ||
+    headers["Authorization"] === "Bearer undefined" ||
+    headers["Authorization"] === "Bearer active_session"
+  ) {
     delete headers["Authorization"];
   }
 
   const response = await fetch(`${API}${path}`, {
     ...options,
     headers,
+    credentials: "include",
   });
 
   const contentType = response.headers.get("content-type") || "";
@@ -82,6 +87,36 @@ export function refreshSession(refreshToken) {
 
 export function getProfile(token) {
   return request("/auth/me", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function updateProfile(token, payload) {
+  return request("/auth/profile", {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateNotificationPrefs(token, prefs) {
+  return request("/auth/notifications", {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(prefs),
+  });
+}
+
+export function deactivateAccount(token) {
+  return request("/auth/deactivate", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function deleteAccount(token) {
+  return request("/auth/account", {
+    method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
 }
@@ -301,6 +336,20 @@ export function fetchTransactions(token) {
   });
 }
 
+export function submitReview(token, orderId, payload) {
+  return request(`/transactions/${orderId}/review`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getOrderReviews(token, orderId) {
+  return request(`/transactions/${orderId}/reviews`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export function confirmDelivery(token, orderId) {
   return request(`/transactions/${orderId}/confirm-delivery`, {
     method: "POST",
@@ -425,8 +474,12 @@ export const fetchUsers = async (token) => {
 };
 
 export const listAdminTransactions = async (token, filters = {}) => {
-  const query = new URLSearchParams(filters).toString();
-  return request(`/admin/transactions?${query}`, {
+  // Strip undefined/null/empty values so they never reach the backend as "undefined"
+  const clean = Object.fromEntries(
+    Object.entries(filters).filter(([, v]) => v !== undefined && v !== null && v !== '' && v !== 'undefined')
+  );
+  const query = new URLSearchParams(clean).toString();
+  return request(`/admin/transactions${query ? `?${query}` : ''}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
 };
@@ -523,6 +576,16 @@ export function fetchNationalRevenue(token) {
   });
 }
 
+export function fetchRevenueBreakdown(token) {
+  return request("/admin/analytics/revenue-detailed", {
+    headers: { Authorization: `Bearer ${token}` }
+  }).catch(() => ({
+    total_earnings: 0,
+    gross_volume: 0,
+    platform_yield_pct: 0,
+    streams: {}
+  }));
+}
 
 // DASHBOARD SPECIFIC
 export function fetchEscrowStats(token) {
@@ -656,3 +719,289 @@ export function fetchOnboardingStatus(token, appId) {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
+
+// DELIVERY LIFECYCLE (Admin/Agent controls)
+export function assignDeliveryAgent(token, orderId, agentId) {
+  return request(`/logistics/orders/${orderId}/delivery/assign-agent`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ agent_id: agentId }),
+  });
+}
+
+export function assignDeliveryDriver(token, orderId, payload) {
+  return request(`/logistics/orders/${orderId}/delivery/assign-driver`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function markPickupInProgress(token, orderId) {
+  return request(`/logistics/orders/${orderId}/delivery/pickup-in-progress`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function confirmPickup(token, orderId, payload = {}) {
+  return request(`/logistics/orders/${orderId}/delivery/confirm-pickup`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function markDeliveryDelayed(token, orderId, newEta = null) {
+  return request(`/logistics/orders/${orderId}/delivery/delay`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ new_eta: newEta }),
+  });
+}
+
+export function markDeliveryArrived(token, orderId) {
+  return request(`/logistics/orders/${orderId}/delivery/arrived`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function confirmDeliveryByAgent(token, orderId, payload = {}) {
+  return request(`/logistics/orders/${orderId}/delivery/confirm-delivery`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getOrderDeliveryStatus(token, orderId) {
+  return request(`/logistics/orders/${orderId}/delivery`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+// DRIVER MANAGEMENT (Admin)
+export function listAllDrivers(token) {
+  return request('/drivers/admin/all', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function approveDriver(token, driverId) {
+  return request(`/drivers/admin/${driverId}/approve`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function suspendDriver(token, driverId) {
+  return request(`/drivers/admin/${driverId}/suspend`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function reactivateDriver(token, driverId) {
+  return request(`/drivers/admin/${driverId}/reactivate`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function adminAssignDriver(token, payload) {
+  return request('/drivers/admin/assign-driver', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getTransportQuote(token, payload) {
+  return request('/drivers/quote', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function recommendTransportScenario(token, payload) {
+  return request('/drivers/recommend-scenario', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+// RECRUITMENT — missing endpoints
+export function completePracticalAssessment(token, appId, score) {
+  return request(`/recruitment/${appId}/practical?score=${score}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function logSupervisedTask(token, appId) {
+  return request(`/recruitment/${appId}/supervised-task`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function completeTrainingModule(token, appId, moduleId) {
+  return request(`/recruitment/${appId}/training/module/${moduleId}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+// DISEASE DETECTION
+export function detectDisease(token, file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  return request('/ai/vision/detect-disease', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+}
+
+export function fullCropAnalysis(token, file, expectedCrop = null) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const qs = expectedCrop ? `?expected_crop=${encodeURIComponent(expectedCrop)}` : '';
+  return request(`/ai/vision/full-analysis${qs}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+}
+
+export function trainDiseaseModel(token) {
+  return request('/ai/train/disease', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+// AI MODEL MANAGEMENT
+export function fetchModelStatuses(token) {
+  return request('/ai/models/status', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function triggerModelTraining(token, modelId) {
+  return request(`/ai/train/${modelId}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+// SCRAPING & DATA PIPELINE
+export function fetchScraperStatus(token) {
+  return request('/admin/scraping/status', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function runScraper(token, target) {
+  // target: 'prices' | 'news' | 'weather' | 'all'
+  return request(`/admin/scraping/run/${target}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function runCleaningPipeline(token, target) {
+  // target: 'prices' | 'listings' | 'transactions' | 'all'
+  return request(`/admin/scraping/clean/${target}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function clearScraperCaches(token) {
+  return request('/admin/scraping/cache', {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function fetchDataSnapshots(token) {
+  return request('/admin/scraping/snapshots', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+
+// COMMAND CENTER
+export function fetchSystemHealth(token) {
+  return request("/admin/command-center/system/health", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function fetchSystemDiagnostics(token) {
+  return request("/admin/command-center/system/diagnostics", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function runSystemMaintenance(token, operation) {
+  return request(`/admin/command-center/system/maintenance?operation=${operation}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function fetchRealtimeStats(token) {
+  return request("/admin/command-center/system/stats/realtime", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function toggleEmergencyLockdown(token, enable, reason) {
+  return request(`/admin/command-center/system/emergency/lockdown?enable=${enable}&reason=${encodeURIComponent(reason)}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  }).catch(() => {
+    // Fallback to old endpoint if new one doesn't exist
+    return request(`/admin/system/lockdown?enable=${enable}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  });
+}
+
+export function fetchRecentLogs(token, limit = 50, level = "all") {
+  return request(`/admin/command-center/system/logs/recent?limit=${limit}&level=${level}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+// ID VERIFICATION
+export function fetchVerificationQueue(token, status = "pending") {
+  return request(`/verification/queue?status=${status}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function approveVerification(token, requestId, note = "Approved") {
+  return request(`/verification/${requestId}/approve?note=${encodeURIComponent(note)}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function rejectVerification(token, requestId, note) {
+  const form = new FormData();
+  form.append("note", note);
+  return request(`/verification/${requestId}/reject`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+}
+
+
