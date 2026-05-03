@@ -26,7 +26,7 @@ def verify_agent_public(agent_code: str, db: Session = Depends(get_db)):
     if not agent:
         return {
             "is_valid": False,
-            "message": "❌ Invalid Agent Code. This person is not a recognized AgriTrust representative."
+            "message": "❌ Invalid Agent Code. This person is not a recognized ZimAgritrust representative."
         }
     
     training = db.query(AgentTraining).filter(AgentTraining.agent_id == agent.id).first()
@@ -43,6 +43,6 @@ def verify_agent_public(agent_code: str, db: Session = Depends(get_db)):
         "expires_at": training.certification_expires_at if training else None,
         "region": f"{agent.province}, {agent.district}",
         "specialization": agent.specialization,
-        "message": "✅ Official AgriTrust Agent Verified." if is_certified else "⚠️ Trainee Agent / Pending Certification."
+        "message": "✅ Official ZimAgritrust Agent Verified." if is_certified else "⚠️ Trainee Agent / Pending Certification."
     }
 

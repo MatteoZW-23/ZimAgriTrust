@@ -1,8 +1,8 @@
-# AgriTrust: National Agricultural Marketplace & Logistics Hub
+# ZimAgritrust: National Agricultural Marketplace & Logistics Hub
 
-AgriTrust is a sovereign-grade digital infrastructure designed to modernize Zimbabwe's agricultural trade. It bridges the gap between rural smallholder farmers and institutional commercial buyers through a secure, multi-channel platform.
+ZimAgritrust is a sovereign-grade digital infrastructure designed to modernize Zimbabwe's agricultural trade. It bridges the gap between rural smallholder farmers and institutional commercial buyers through a secure, multi-channel platform.
 
-![AgriTrust Banner](https://placehold.co/1200x400/020617/white?text=AgriTrust+Infrastructure+v4.0)
+![ZimAgritrust Banner](https://placehold.co/1200x400/020617/white?text=ZimAgritrust+Infrastructure+v4.0)
 
 ## 🚀 Key Evolutionary Features
 
@@ -14,7 +14,7 @@ AgriTrust is a sovereign-grade digital infrastructure designed to modernize Zimb
 
 ## 🛠️ System Architecture
 
-The AgriTrust ecosystem is built as a series of integrated micro-services:
+The ZimAgritrust ecosystem is built as a series of integrated micro-services:
 
 *   **`backend/`**: High-concurrency FastAPI core managing the ledger, authentication, and service orchestration.
 *   **`apps/admin-dashboard/`**: A premium React 18 interface for HQ staff and Field Agents.
@@ -141,13 +141,13 @@ docker-compose up -d --build
 ### 🔐 Initial Access Credentials
 *   **Master Admin Phone**: `+263777777777`
 *   **Master Admin PIN**: `master`
-*   **Bootstrap Secret**: `agritrust-init-secret-2026` *(Required for new Staff/Agent registrations)*
+*   **Bootstrap Secret**: `ZimAgritrust-init-secret-2026` *(Required for new Staff/Agent registrations)*
 
 
 ## 📂 Project Structure
 
 ```text
-AgriTrust/
+ZimAgritrust/
 ├── apps/               # User-facing and supporting applications
 │   ├── admin-dashboard/ # HQ and Agent administrative interface
 │   ├── agent-portal/    # Agent academy and training environment
@@ -172,7 +172,7 @@ AgriTrust/
 
 ## 📱 USSD + SMS Channel Architecture
 
-AgriTrust is **USSD-first** — every core transaction works on a basic feature phone with zero data, zero app install.
+ZimAgritrust is **USSD-first** — every core transaction works on a basic feature phone with zero data, zero app install.
 
 ### Channel Strategy
 
@@ -185,7 +185,7 @@ AgriTrust is **USSD-first** — every core transaction works on a basic feature 
 ### USSD Menu Tree
 
 ```
-*123#  →  🌾 AGRITRUST
+*123#  →  🌾 ZimAgritrust
           1. Check Prices       →  Live ZAMACE/GMB prices per crop
           2. Sell Crops         →  Create listing (crop → qty → price → grade → location → confirm)
           3. My Listings        →  View active listings + incoming offers
@@ -204,7 +204,7 @@ AgriTrust is **USSD-first** — every core transaction works on a basic feature 
 sequenceDiagram
     participant F as Farmer (Feature Phone)
     participant T as Telco USSD Gateway
-    participant B as AgriTrust Backend
+    participant B as ZimAgritrust Backend
     participant S as SMS Gateway (AfricasTalking)
 
     F->>T: Dials *123#
@@ -253,7 +253,7 @@ sequenceDiagram
 
 **Recommended: [AfricasTalking](https://africastalking.com)** — cheapest Zimbabwe coverage, REST API, $0.02/SMS.
 
-Setup: create account → get API key → set sender ID `AgriTrust` → add `AT_API_KEY` to `.env`.
+Setup: create account → get API key → set sender ID `ZimAgritrust` → add `AT_API_KEY` to `.env`.
 
 ### Implementation Status
 
@@ -285,6 +285,6 @@ Live data sources: ZAMACE/GMB web scraping · Zimbabwe RSS news feeds · OpenWea
 
 ---
 
-*AgriTrust is engineered for economic resilience, market integrity, and the empowerment of the Zimbabwean farmer.*
+*ZimAgritrust is engineered for economic resilience, market integrity, and the empowerment of the Zimbabwean farmer.*
 
 🔗 **Lead Infrastructure Architect**: [Mathew Mabira](https://www.linkedin.com/in/mathew-mabira-24861632b)

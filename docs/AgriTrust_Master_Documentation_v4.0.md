@@ -1,7 +1,7 @@
-﻿# AgriTrust: National Agricultural Marketplace & Logistics Hub
+# ZimAgritrust: National Agricultural Marketplace & Logistics Hub
 ## Master System Documentation & Technical Reference v4.0
 
-![AgriTrust Banner](https://placehold.co/1200x400/020617/white?text=AgriTrust+Infrastructure+v4.0)
+![ZimAgritrust Banner](https://placehold.co/1200x400/020617/white?text=ZimAgritrust+Infrastructure+v4.0)
 
 > **Document Status**: Production Complete  
 > **Target Audience**: Technical Stakeholders, Government Regulators, System Administrators, and Investors.  
@@ -9,10 +9,10 @@
 
 ---
 
-## ðŸ“‘ Table of Contents
+## 📑 Table of Contents
 
 1.  **Chapter 1: Brief Description of the Model Built**
-    *   1.1. The AgriTrust Vision
+    *   1.1. The ZimAgritrust Vision
     *   1.2. High-Level Architecture
     *   1.3. Service Ecosystem Overview
 2.  **Chapter 2: Problem(s) Identified**
@@ -56,8 +56,8 @@
 
 ## 1. Brief Description of the Model Built
 
-### 1.1. The AgriTrust Vision
-AgriTrust is a **sovereign-grade digital infrastructure** designed to serve as the backbone of Zimbabwe's agricultural economy. It is not merely a "marketplace app" but a comprehensive trade, logistics, and financial settlement ecosystem. The system is engineered to bridge the digital and physical divide for rural smallholder farmers while providing institutional-grade tools for commercial buyers and government overseers.
+### 1.1. The ZimAgritrust Vision
+ZimAgritrust is a **sovereign-grade digital infrastructure** designed to serve as the backbone of Zimbabwe's agricultural economy. It is not merely a "marketplace app" but a comprehensive trade, logistics, and financial settlement ecosystem. The system is engineered to bridge the digital and physical divide for rural smallholder farmers while providing institutional-grade tools for commercial buyers and government overseers.
 
 ### 1.2. High-Level Architecture
 The system follows a modular, micro-service oriented architecture, ensuring high availability and fault tolerance.
@@ -68,7 +68,7 @@ The system follows a modular, micro-service oriented architecture, ensuring high
 *   **The Logistics Engine**: A decentralized network of verified Field Agents who facilitate physical handovers and verification.
 
 ### 1.3. Service Ecosystem Overview
-AgriTrust integrates multiple specialized services:
+ZimAgritrust integrates multiple specialized services:
 - **Escrow Service**: Guarantees financial security by locking funds during trade.
 - **Trust Service**: Computes behavioral scores for all participants based on transaction history.
 - **Intelligence Service**: Provides market price forecasting and demand-side analytics.
@@ -158,7 +158,7 @@ We identified four primary user groups:
 ## 6. Justification
 
 ### 6.1. Economic Viability
-AgriTrust generates revenue through a small % transaction fee (Tiered Commission). By removing inefficient middlemen, the farmer receives a HIGHER price, the buyer pays a LOWER price, and the system sustains itselfâ€”a "Win-Win-Win" scenario.
+ZimAgritrust generates revenue through a small % transaction fee (Tiered Commission). By removing inefficient middlemen, the farmer receives a HIGHER price, the buyer pays a LOWER price, and the system sustains itself—a "Win-Win-Win" scenario.
 
 ### 6.2. Scalability Rationale
 The micro-service architecture allows the system to scale horizontally. During the grain harvest season, the `Marketplace Service` can be scaled independently of the `Agent Enrollment Service`, ensuring resource efficiency.
@@ -192,7 +192,7 @@ Agents work primarily via the **Mobile Agent Hub**.
 ---
 
 *(Continuing to Deep Dive into Technical Implementation Details in Part 2...)*
-# AgriTrust: National Agricultural Marketplace & Logistics Hub
+# ZimAgritrust: National Agricultural Marketplace & Logistics Hub
 ## Master System Documentation & Technical Reference v4.0
 
 ---
@@ -218,7 +218,7 @@ The Admin Dashboard is the nerve center for national agricultural oversight. It 
 - **Fraud Detection Alerts**: Automated flags for suspicious transaction patterns or sudden trust score drops.
 
 ### 8.2. Field Agent Operations Handbook
-Agents are the "Verified Eyes" of the AgriTrust system. They operate primarily through the Agent Hub (Web/Mobile).
+Agents are the "Verified Eyes" of the ZimAgritrust system. They operate primarily through the Agent Hub (Web/Mobile).
 
 #### 8.2.1. Handling Assignments
 1.  **Notification**: Agents receive a push notification when a new listing in their region requires verification.
@@ -298,12 +298,12 @@ The core logic is distributed across specialized service classes.
 
 ---
 
-## ðŸ Conclusion
-AgriTrust represents a paradigm shift in how agricultural trade is conducted in emerging markets. By combining the accessibility of USSD with the power of AI-driven verification and secure financial escrow, the platform builds a foundation of "Digital Trust" where none existed before.
+## 🏁 Conclusion
+ZimAgritrust represents a paradigm shift in how agricultural trade is conducted in emerging markets. By combining the accessibility of USSD with the power of AI-driven verification and secure financial escrow, the platform builds a foundation of "Digital Trust" where none existed before.
 
 **Document End.**
 *(For full code listings and environment variables, refer to the Developer Deployment Guide).*
-# AgriTrust: National Agricultural Marketplace & Logistics Hub
+# ZimAgritrust: National Agricultural Marketplace & Logistics Hub
 ## Deep-Dive Evaluation & Economic Justification
 
 ---
@@ -313,7 +313,7 @@ AgriTrust represents a paradigm shift in how agricultural trade is conducted in 
 ### 6.1. Theoretical Framework: Solving Asymmetric Information
 In traditional agricultural markets, there is a fundamental imbalance of information. Farmers know the quality of their grain but don't know the national market price. Buyers know the market price but don't know the true quality of the grain in a remote silo. 
 
-**AgriTrust justifies its existence by acting as a "Trusted Third Party" that solves this asymmetry through:**
+**ZimAgritrust justifies its existence by acting as a "Trusted Third Party" that solves this asymmetry through:**
 1.  **Standardized Grading**: By using the `NationalCommodityService`, every bag of maize is graded into a known category (A, B, or C), removing the "Quality Gamble" for the buyer.
 2.  **Price Transparency**: The USSD and WhatsApp price bots ensure that no farmer sells below the national floor price simply because they are "out of the loop".
 
@@ -325,7 +325,7 @@ The use of an automated Escrow system is not just a technical feature; it is a b
 
 ### 6.3. Infrastructure Resilience as a Sovereign Grade Requirement
 Zimbabwe's digital infrastructure requires a "Low Connectivity, High Reliability" design. 
-- **The Justification for USSD**: While the world moves to 5G, the "Last Mile" farmer in Zimbabwe relies on GSM. AgriTrust is justified by its commitment to leave no farmer behind, providing 100% of marketplace functionality over simple 2G signaling.
+- **The Justification for USSD**: While the world moves to 5G, the "Last Mile" farmer in Zimbabwe relies on GSM. ZimAgritrust is justified by its commitment to leave no farmer behind, providing 100% of marketplace functionality over simple 2G signaling.
 
 ---
 
@@ -340,7 +340,7 @@ Every tool in our stack was chosen to solve a specific African infrastructure ch
 ### 7.2. Evaluation of System Security (KYC & AML)
 The system is evaluated against regional Anti-Money Laundering (AML) standards.
 - **Identity Integrity**: Every user is mapped to a verified phone number and NRC (National ID).
-- **Audit Trails**: Every "Debit" and "Credit" in the AgriTrust ledger is immutable. No balance can be altered without a corresponding transaction record, ensuring total financial auditability.
+- **Audit Trails**: Every "Debit" and "Credit" in the ZimAgritrust ledger is immutable. No balance can be altered without a corresponding transaction record, ensuring total financial auditability.
 
 ### 7.3. Performance Evaluation (Response Times)
 - **API Latency**: Average <50ms for marketplace queries.
@@ -352,18 +352,18 @@ The system is evaluated against regional Anti-Money Laundering (AML) standards.
 ## 11. Socio-Economic Impact Statement
 
 ### 11.1. Financial Inclusion (The 'Agri-Credit' Path)
-By building a digital transaction history for farmers, AgriTrust creates "Shadow Credit Scores". A farmer who has successfully sold 50 tonnes of maize through the platform over 2 years has a "Trust Score" that can be used as collateral for input loans (seeds/fertilizer).
+By building a digital transaction history for farmers, ZimAgritrust creates "Shadow Credit Scores". A farmer who has successfully sold 50 tonnes of maize through the platform over 2 years has a "Trust Score" that can be used as collateral for input loans (seeds/fertilizer).
 
 ### 11.2. Rural Development
-AgriTrust creates a new class of professional rural workers: **The Certified Field Agent**. This decentralizes economic opportunity from the cities back into the farming communities.
+ZimAgritrust creates a new class of professional rural workers: **The Certified Field Agent**. This decentralizes economic opportunity from the cities back into the farming communities.
 
 ---
 
-**Final Technical Verdict**: The AgriTrust system is a robust, justified, and high-performance solution that addresses the root causes of agricultural stagnation. It is technologically advanced yet culturally and infrastructure-adapted for the Southern African context.
-# AgriTrust: National Agricultural Marketplace & Logistics Hub
+**Final Technical Verdict**: The ZimAgritrust system is a robust, justified, and high-performance solution that addresses the root causes of agricultural stagnation. It is technologically advanced yet culturally and infrastructure-adapted for the Southern African context.
+# ZimAgritrust: National Agricultural Marketplace & Logistics Hub
 ## System Architecture Flowcharts & Logic Diagrams
 
-This document provides a comprehensive visual reference for the operational flows within the AgriTrust ecosystem.
+This document provides a comprehensive visual reference for the operational flows within the ZimAgritrust ecosystem.
 
 ---
 
@@ -417,7 +417,7 @@ The lifecycle of a trade from listing to final settlement.
 ```mermaid
 sequenceDiagram
     participant F as Farmer
-    participant S as AgriTrust Core
+    participant S as ZimAgritrust Core
     participant B as Buyer
     participant A as Field Agent
 
@@ -439,7 +439,7 @@ sequenceDiagram
 ---
 
 ## 3. Hybrid AI Dispute Triage Flow
-AgriTrust uses a specialized logic engine to handle conflicts, balancing automation with human expertise.
+ZimAgritrust uses a specialized logic engine to handle conflicts, balancing automation with human expertise.
 
 ```mermaid
 flowchart TD
@@ -537,17 +537,17 @@ flowchart LR
 
 **End of Diagrams Reference.**
 *(These diagrams are compatible with Mermaid-ready Markdown viewers and can be exported for technical presentations).*
-# AgriTrust: National Agricultural Marketplace & Logistics Hub
+# ZimAgritrust: National Agricultural Marketplace & Logistics Hub
 ## Visual Reference Suite & System Interface Overview
 
-This document presents a high-fidelity visual walkthrough of the AgriTrust ecosystem's primary operational interfaces. These visualizations represent the production-grade frontend systems currently deployed or simulated for technical validation.
+This document presents a high-fidelity visual walkthrough of the ZimAgritrust ecosystem's primary operational interfaces. These visualizations represent the production-grade frontend systems currently deployed or simulated for technical validation.
 
 ---
 
 ## 1. The National Command Center (Admin HQ)
 The primary interface for government regulators and national system administrators oversees the health and economic vitality of the marketplace.
 
-![AgriTrust Admin Dashboard](assets/admin_dashboard.png)
+![ZimAgritrust Admin Dashboard](assets/admin_dashboard.png)
 
 ### Functional Breakdown:
 - **National Pulse Telemetry**: Real-time Gross Merchandise Value (GMV) and transaction volume monitoring.
@@ -560,7 +560,7 @@ The primary interface for government regulators and national system administrato
 ## 2. Logistics Command Hub (Agent View)
 The localized interface for managing the decentralized workforce of Field Agents and verifying commodity quality in real-time.
 
-![AgriTrust Logistics Hub](assets/logistics_hub.png)
+![ZimAgritrust Logistics Hub](assets/logistics_hub.png)
 
 ### Functional Breakdown:
 - **Intelligent Routing**: Agents are assigned to verify listings based on their physical proximity and historical verification accuracy.
@@ -572,7 +572,7 @@ The localized interface for managing the decentralized workforce of Field Agents
 ## 3. Mobile Farmer Interface (USSD *123#)
 The primary point of access for rural smallholders, designed for maximum accessibility on feature phones without data connectivity.
 
-![AgriTrust USSD Simulator](assets/ussd_simulator.png)
+![ZimAgritrust USSD Simulator](assets/ussd_simulator.png)
 
 ### Functional Breakdown:
 - **Zero-Data Listing Wizard**: A stateful hierarchical menu system for creating crop listings in under 60 seconds.
@@ -584,7 +584,7 @@ The primary point of access for rural smallholders, designed for maximum accessi
 ## 4. WhatsApp AI Trade Assistant
 A conversational bridge and notification engine for high-engagement marketplace interactions.
 
-![AgriTrust WhatsApp Interface](assets/whatsapp_interface.png)
+![ZimAgritrust WhatsApp Interface](assets/whatsapp_interface.png)
 
 ### Functional Breakdown:
 - **Automated Deal Alerts**: Sellers receive instant WhatsApp notifications when a buyer makes an offer on their grain.
@@ -593,4 +593,4 @@ A conversational bridge and notification engine for high-engagement marketplace 
 
 ---
 
-*This visual suite provides the human-centric perspective of the AgriTrust technology stack, ensuring that complex backend logic is translated into intuitive, life-improving interfaces for all users.*
+*This visual suite provides the human-centric perspective of the ZimAgritrust technology stack, ensuring that complex backend logic is translated into intuitive, life-improving interfaces for all users.*

@@ -94,7 +94,7 @@ export default function WalletPanel({ token, profile }) {
                                     <div className="f-icon"><i className="fas fa-building-columns"></i></div>
                                     <div className="f-info">
                                         <label>Settlement Gateway</label>
-                                        <strong>AgriTrust Trust Account</strong>
+                                        <strong>ZimAgritrust Trust Account</strong>
                                         <span className="v4-status-pill ghost green small">ACTIVE</span>
                                     </div>
                                 </div>
@@ -153,7 +153,7 @@ export default function WalletPanel({ token, profile }) {
                     <div className="v5-ultra-glass-modal animate-rise" style={{ background: '#020617', maxWidth: '500px' }}>
                         <div style={{ padding: '40px' }}>
                             <h2 style={{ color: '#fff', fontSize: '24px', fontWeight: 1000, marginBottom: '8px' }}>Request <span>Payout</span>.</h2>
-                            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginBottom: '32px' }}>Initiating transfer from AgriTrust Vault to your personal settlement channel.</p>
+                            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginBottom: '32px' }}>Initiating transfer from ZimAgritrust Vault to your personal settlement channel.</p>
                             
                             <form onSubmit={handleWithdraw}>
                                 <div className="v4-form-group" style={{ marginBottom: '24px' }}>

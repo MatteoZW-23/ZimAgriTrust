@@ -128,7 +128,7 @@ export default function StaffLoginScreen({ onLogin }) {
           <div className="v4-login-header">
             <div className="v4-brand">
               <i className="fas fa-shield-halved" style={{ color: "#3b82f6" }}></i>
-              <span style={{ color: "#fff" }}>AgriTrust HQ</span>
+              <span style={{ color: "#fff" }}>ZimAgritrust HQ</span>
             </div>
             <h1 style={{ color: "#fff" }}>{step === 1 ? (mode === 'login' ? 'Personnel Auth' : 'Unit Initialization') : 'Security Handshake'}</h1>
             <p className="v4-subtitle" style={{ color: "#94a3b8" }}>

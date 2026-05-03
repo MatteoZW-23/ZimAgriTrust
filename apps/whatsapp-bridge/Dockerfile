@@ -29,9 +29,7 @@ COPY . .
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-RUN chmod +x start.sh
-
 EXPOSE 3006
 
-CMD ["./start.sh"]
+CMD ["sh", "-c", "find /app/.wwebjs_auth -name 'Singleton*' -delete 2>/dev/null || true && npm start"]
 

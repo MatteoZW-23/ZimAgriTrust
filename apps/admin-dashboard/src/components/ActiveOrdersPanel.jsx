@@ -304,7 +304,7 @@ export default function ActiveOrdersPanel({ profile, token, transactions = [], o
                               <h3>Initiating Secured Order Payment...</h3>
                               <p>Connecting to Cassava Smartech Gateway for Order {activeOrder?.id}</p>
                               <div className="ec-meta-box">
-                                  <span>Merchant: <strong>AGRITRUST HQ</strong></span>
+                                  <span>Merchant: <strong>ZIMAGRITRUST HQ</strong></span>
                                   <span>Amount: <strong>${activeOrder?.total_amount}</strong></span>
                               </div>
                               <button className="v4-btn ghost sm mt-24" onClick={() => setPaymentStep('AWAITING_PIN')}>Simulate Handset Response</button>
@@ -317,7 +317,7 @@ export default function ActiveOrdersPanel({ profile, token, transactions = [], o
                               <h3>Check Your Phone</h3>
                               <p>A message has been sent to your Econet number ending in <strong>077X...</strong></p>
                               <div className="pin-notice">
-                                  "Do you want to pay $${activeOrder?.total_amount} to AgriTrust? Enter PIN to confirm."
+                                  "Do you want to pay $${activeOrder?.total_amount} to ZimAgritrust? Enter PIN to confirm."
                               </div>
                               <button className="v4-btn primary-glow full-width mt-32" onClick={() => setPaymentStep('SUCCESS')}>I Have Entered My PIN</button>
                           </div>
@@ -330,7 +330,7 @@ export default function ActiveOrdersPanel({ profile, token, transactions = [], o
                               <p>Transaction ID: <strong>SIM-ECO-ID-FINAL</strong></p>
 
                               <div className="success-footer mt-24">
-                                  Funds are now safely held in AgriTrust Escrow. You can now track your shipment transit.
+                                  Funds are now safely held in ZimAgritrust Escrow. You can now track your shipment transit.
                               </div>
                               <button className="v4-btn primary-glow full-width mt-32" onClick={() => setShowEcoCashModal(false)}>RETURN TO COMMAND CENTER</button>
                           </div>

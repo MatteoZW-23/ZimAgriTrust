@@ -187,7 +187,7 @@ class TestLanguageSupport:
     async def test_message_translation(self):
         """Test message translation"""
         translated = await whatsapp_enhanced.translate_message(
-            "Hello, welcome to AgriTrust",
+            "Hello, welcome to ZimAgritrust",
             target_language="sn"
         )
         # Should return translated text (placeholder for now)

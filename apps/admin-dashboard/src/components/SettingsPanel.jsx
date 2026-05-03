@@ -8,7 +8,7 @@ export function TermsOfService({ onClose }) {
         <p className="eyebrow">Legal Operations</p>
         <h2>Terms of Service</h2>
         <div className="modal-body scrollable">
-          <p>This operational framework governs the professional conduct of all AgriTrust Marketplace Operations Leads and Agents:</p>
+          <p>This operational framework governs the professional conduct of all ZimAgritrust Marketplace Operations Leads and Agents:</p>
           <div className="divider" style={{ margin: "24px 0" }}></div>
           <section className="legal-section">
             <h3>1. Fair Market Conduct & Operational Integrity</h3>
@@ -28,7 +28,7 @@ export function TermsOfService({ onClose }) {
           </section>
           <section className="legal-section" style={{ borderTop: '1.5px solid rgba(239, 68, 68, 0.1)', paddingTop: '20px', marginTop: '20px' }}>
             <h3 style={{ color: '#ef4444' }}>5. Account Suspension & Platform Revocation</h3>
-            <p>AgriTrust maintains a zero-tolerance policy for system-wide trust erosion. Accounts may be suspended or permanently revoked under the following conditions:</p>
+            <p>ZimAgritrust maintains a zero-tolerance policy for system-wide trust erosion. Accounts may be suspended or permanently revoked under the following conditions:</p>
             <ul className="legal-list" style={{ color: '#475569', fontSize: '13px', lineHeight: '1.6' }}>
                 <li><strong>Trust Score Degradation:</strong> Any account whose National Trust Index falls below the 40% critical threshold is subject to immediate algorithmic suspension.</li>
                 <li><strong>Synthetic Listing Fraud:</strong> Broadcasting non-existent inventory or falsifying grade certificates results in permanent identity revocation and blacklisting from the National Registry.</li>
@@ -52,7 +52,7 @@ export function PrivacyPolicy({ onClose }) {
         <p className="eyebrow">Data Governance</p>
         <h2>Privacy Policy</h2>
         <div className="modal-body scrollable">
-          <p>AgriTrust is committed to protecting the privacy of the agricultural community:</p>
+          <p>ZimAgritrust is committed to protecting the privacy of the agricultural community:</p>
           <ul className="legal-list">
             <li><strong>Data Collection:</strong> We collect phone numbers and National ID numbers via encrypted channels.</li>
             <li><strong>KYC Validation:</strong> Identity data is validated via authorized telecom network partners and banking APIs.</li>
@@ -712,16 +712,16 @@ export function TermsModal({ onAccept }) {
         <p className="eyebrow">Onboarding</p>
         <h2>Terms & Conditions</h2>
         <div className="modal-body scrollable">
-          <p>Welcome to the <strong>AgriTrust Marketplace Command Center</strong>. Before you proceed to manage regional agricultural trade, please review our core operational principles:</p>
+          <p>Welcome to the <strong>ZimAgritrust Marketplace Command Center</strong>. Before you proceed to manage regional agricultural trade, please review our core operational principles:</p>
           <ol className="legal-list">
             <li><strong>Market Verification:</strong> Verify listings using the official price guides and quality certificates. Ensure market stability by detecting unrealistic price deviations.</li>
-            <li><strong>Escrow Neutrality:</strong> All settlement decisions must be evidence-based. AgriTrust operates as a trusted third party; partiality is prohibited.</li>
+            <li><strong>Escrow Neutrality:</strong> All settlement decisions must be evidence-based. ZimAgritrust operates as a trusted third party; partiality is prohibited.</li>
             <li><strong>Data Privacy:</strong> Participant identity data is strictly for system-driven trust scoring and fulfillment verification. Unauthorized data harvesting is a security breach.</li>
             <li><strong>Security Responsibility:</strong> Use the risk-scoring and fraud detection tools to proactively identify suspicious behavior before it affects the marketplace trust profile.</li>
             <li><strong>Suspension Mandate:</strong> Understand that platform access is a privilege. Suspicion of multi-identity fraud, price manipulation, or escrow collision will lead to immediate, irreversible account suspension and police referral.</li>
           </ol>
           <div className="divider" style={{ margin: "24px 0" }}></div>
-          <p className="muted" style={{ fontSize: '13px', fontStyle: 'italic' }}>By clicking "Accept and Start", you affirm your commitment to the AgriTrust Code of Ethics.</p>
+          <p className="muted" style={{ fontSize: '13px', fontStyle: 'italic' }}>By clicking "Accept and Start", you affirm your commitment to the ZimAgritrust Code of Ethics.</p>
         </div>
         <div className="modal-actions">
           <button className="q-btn primary-btn full-width" onClick={onAccept}>Accept and Start Operations</button>

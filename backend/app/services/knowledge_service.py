@@ -3,7 +3,7 @@ import random
 
 class KnowledgeService:
     """
-    AgriTrust Knowledge Authority.
+    ZimAgritrust Knowledge Authority.
     Provides regional farming advice. Tips are informational only — no fake market data.
     """
     

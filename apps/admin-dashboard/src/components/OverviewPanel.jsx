@@ -3,10 +3,10 @@ import { fetchPriceTrends, fetchRegionalInsights } from '../api';
 import LineChart from './LineChart';
 
 const HERO_CONTENT = {
-    FARMER: { title: "Welcome to Your Farm Hub", sub: "Manage your success, connect with buyers, and watch your business grow." },
-    BUYER: { title: "Find the Best Harvest", sub: "Discover fresh, local produce from Zimbabwe's most trusted farmers." },
-    AGENT: { title: "Helping Our Farmers Thrive", sub: "Supporting the community, managing deliveries, and building trust." },
-    ADMIN: { title: "AgriTrust Community Overview", sub: "Helping Zimbabwe's agricultural network grow stronger every day." }
+    FARMER: { title: "Welcome to Your Farm Hub", sub: "Manage your listings, connect directly with buyers, and get paid securely through escrow." },
+    BUYER: { title: "Find the Best Harvest", sub: "Discover fresh, verified produce from Zimbabwe's most trusted farmers — no middlemen." },
+    AGENT: { title: "Field Operations Center", sub: "Verify crops, resolve disputes, and support Zimbabwe's farming community." },
+    ADMIN: { title: "ZimAgritrust Platform Overview", sub: "Empowering Zimbabwe's agricultural network — connecting farmers, buyers, agents, and drivers." }
 };
 
 function TickerTape({ pulse }) {

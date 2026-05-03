@@ -13,10 +13,10 @@ async def enforce_rate_limit(
 
 async def ensure_login_not_locked(phone: str) -> None:
     failures = await get_counter(f"auth:failures:{phone}")
-    if failures >= 100:
+    if failures >= 5:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many failed login attempts. Try again later.",
+            detail="Account locked due to too many failed login attempts. Try again after 30 minutes.",
         )
 
 

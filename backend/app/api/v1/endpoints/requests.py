@@ -20,7 +20,7 @@ def create_request(
     buyer: User = Depends(require_roles(UserRole.BUYER, UserRole.ADMIN)),
 ) -> BuyerRequest:
     """
-    AgriTrust Spec: Buyer posts what they want.
+    ZimAgritrust Spec: Buyer posts what they want.
     """
     return marketplace_core.create_buyer_request(db, buyer, payload)
 

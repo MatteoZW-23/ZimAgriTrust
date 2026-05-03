@@ -160,7 +160,7 @@ export default function UserDirectoryPanel({ users = [], token, onGovernance, pr
      // Mapping from specific RiskWatch backend API fields to frontend layout fields
      id: String(u.id || '').split('-')[0], // visually shorten UUIDs
      raw_id: u.id,
-     name: u.full_name || 'AgriTrust Stakeholder',
+     name: u.full_name || 'ZimAgritrust Stakeholder',
      role: u.role || 'USER',
      phone: u.phone_number || '+263 ---',
      trust: u.trust_score || 0,
@@ -171,7 +171,7 @@ export default function UserDirectoryPanel({ users = [], token, onGovernance, pr
   }));
 
   const handleExport = () => {
-      exportToCSV(displayUsers, `agritrust_stakeholders_${new Date().toISOString().split('T')[0]}.csv`);
+      exportToCSV(displayUsers, `ZimAgritrust_stakeholders_${new Date().toISOString().split('T')[0]}.csv`);
   };
 
   const onImportFile = (e) => {
@@ -187,7 +187,7 @@ export default function UserDirectoryPanel({ users = [], token, onGovernance, pr
   const handleEnroll = async () => {
       try {
           const { enrollUser } = await import('../api');
-          await enrollUser(enrollData.name, enrollData.phone, enrollData.role, "AgriTrust2026!", token); 
+          await enrollUser(enrollData.name, enrollData.phone, enrollData.role, "ZimAgritrust2026!", token); 
           alert(`SUCCESS: ${enrollData.name} has been enrolled as a verified ${enrollData.role} in ${enrollData.region}. Credentials issued.`);
           setShowEnrollModal(false);
           setEnrollData({ name: '', phone: '', region: 'Harare Hub', role: 'AGENT' });

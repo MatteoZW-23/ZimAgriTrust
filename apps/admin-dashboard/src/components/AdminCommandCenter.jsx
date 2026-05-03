@@ -171,7 +171,7 @@ export function AdminCommandCenter({ token }) {
         addToHistory(cmd, uptime, 'info');
       }
       else if (trimmed === 'version') {
-        addToHistory(cmd, 'AgriTrust Platform v4.0.0\nCommand Center v1.0.0', 'info');
+        addToHistory(cmd, 'ZimAgritrust Platform v4.0.0\nCommand Center v1.0.0', 'info');
       }
       
       else {
@@ -194,7 +194,7 @@ export function AdminCommandCenter({ token }) {
   const getHelpText = () => {
     return `
 ╔════════════════════════════════════════════════════════════╗
-║           AGRITRUST ADMIN COMMAND CENTER v1.0              ║
+║           ZIMAGRITRUST ADMIN COMMAND CENTER v1.0           ║
 ╚════════════════════════════════════════════════════════════╝
 
 SYSTEM COMMANDS:
@@ -420,7 +420,7 @@ Timestamp:             ${new Date(stats.timestamp).toLocaleString()}
             <div className="cc-terminal-header">
               <span className="cc-terminal-title">
                 <i className="fas fa-circle" style={{ color: '#10b981' }}></i>
-                AgriTrust Command Terminal
+                ZimAgritrust Command Terminal
               </span>
               <span className="cc-terminal-info">
                 {new Date().toLocaleString()} | Session Active
@@ -432,7 +432,7 @@ Timestamp:             ${new Date(stats.timestamp).toLocaleString()}
                 <div className="cc-welcome">
                   <pre>{`
 ╔════════════════════════════════════════════════════════════╗
-║     Welcome to AgriTrust Admin Command Center v1.0        ║
+║     Welcome to ZimAgritrust Admin Command Center v1.0     ║
 ║                                                            ║
 ║  Type 'help' for available commands                       ║
 ║  Type 'status' to view system health                      ║
@@ -445,7 +445,7 @@ Timestamp:             ${new Date(stats.timestamp).toLocaleString()}
               {commandHistory.map((entry, idx) => (
                 <div key={idx} className={`cc-entry cc-entry-${entry.type}`}>
                   <div className="cc-command-line">
-                    <span className="cc-prompt">admin@agritrust:~$</span>
+                    <span className="cc-prompt">admin@zimagritrust:~$</span>
                     <span className="cc-command">{entry.command}</span>
                     <span className="cc-timestamp">{new Date(entry.timestamp).toLocaleTimeString()}</span>
                   </div>
@@ -461,7 +461,7 @@ Timestamp:             ${new Date(stats.timestamp).toLocaleString()}
             </div>
 
             <div className="cc-input-line">
-              <span className="cc-prompt">admin@agritrust:~$</span>
+              <span className="cc-prompt">admin@zimagritrust:~$</span>
               <input
                 type="text"
                 className="cc-input"

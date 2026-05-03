@@ -73,7 +73,7 @@ export default function FarmerProductsPanel({ token, onRefresh, profile }) {
         Grade: p.grade,
         Location: p.location_district
     }));
-    exportToCSV(dataToExport, `agritrust_${isBuyer ? 'inventory' : 'portfolio'}_${new Date().toISOString().split('T')[0]}.csv`);
+    exportToCSV(dataToExport, `zimagritrust_${isBuyer ? 'inventory' : 'portfolio'}_${new Date().toISOString().split('T')[0]}.csv`);
   };
 
   const handleImportData = (e) => {

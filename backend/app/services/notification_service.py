@@ -31,7 +31,7 @@ class NotificationService:
     def notify_agent_assignment(agent_name, phone, task_type, location):
         """SMS notification for field agents"""
         message = (
-            f"AgriTrust Assignment: Hello {agent_name}, you have a new {task_type} task "
+            f"ZimAgritrust Assignment: Hello {agent_name}, you have a new {task_type} task "
             f"in {location}. Please check your dashboard for details."
         )
         return NotificationService._send_sms(phone, message)
@@ -40,30 +40,30 @@ class NotificationService:
     def notify_farmer_on_verification(phone, crop, approved):
         """Notification for farmer list verification"""
         status = "APPROVED" if approved else "REJECTED"
-        message = f"AgriTrust: Your {crop} listing was {status} by the quality team."
+        message = f"ZimAgritrust: Your {crop} listing was {status} by the quality team."
         return NotificationService._send_sms(phone, message)
 
     @staticmethod
     def notify_transaction_update(phone, tx_id, status):
         """Notification for transaction/escrow state changes"""
-        message = f"AgriTrust Transaction #{tx_id}: Status updated to {status}."
+        message = f"ZimAgritrust Transaction #{tx_id}: Status updated to {status}."
         return NotificationService._send_sms(phone, message)
 
     # --- AGENT ONBOARDING TEMPLATES ---
 
     @staticmethod
     def notify_onboarding_documentation(phone, name, portal_url):
-        message = f"Welcome {name}! You've been screened for the AgriTrust Agent role. Sign your digital contract here: {portal_url}. Success, HQ."
+        message = f"Welcome {name}! You've been screened for the ZimAgritrust Agent role. Sign your digital contract here: {portal_url}. Success, HQ."
         return NotificationService._send_sms(phone, message)
 
     @staticmethod
     def notify_training_milestone(phone, progress):
-        message = f"AgriTrust: Great work! You are now {progress}% through your training. Complete the next module to unlock shadowing: http://agritrust.app/academy"
+        message = f"ZimAgritrust: Great work! You are now {progress}% through your training. Complete the next module to unlock shadowing: http://ZimAgritrust.app/academy"
         return NotificationService._send_sms(phone, message)
 
     @staticmethod
     def notify_certification_ready(phone, name):
-        message = f"Congratulations {name}! You are now a Certified AgriTrust Agent. Your credentials have been activated. Welcome to the field!"
+        message = f"Congratulations {name}! You are now a Certified ZimAgritrust Agent. Your credentials have been activated. Welcome to the field!"
         return NotificationService._send_sms(phone, message)
 
     @staticmethod
@@ -81,7 +81,7 @@ class NotificationService:
             from app.services.whatsapp_service import whatsapp_service
             await whatsapp_service.send_whatsapp_message(
                 phone,
-                f"\U0001f510 *AgriTrust Security Code*\n\nYour 2-step verification code is: *{code}*\n\nThis code expires in 5 minutes. If you did not request this, please contact support."
+                f"\U0001f510 *ZimAgritrust Security Code*\n\nYour 2-step verification code is: *{code}*\n\nThis code expires in 5 minutes. If you did not request this, please contact support."
             )
         except Exception as e:
             logger.error(f"Failed to send 2FA via WhatsApp: {e}")
@@ -184,7 +184,7 @@ class NotificationService:
         """Notify agent of certification completion."""
         msg = (
             f"🎉 *Congratulations!*\n\n"
-            f"You are now a certified AgriTrust Agent!\n\n"
+            f"You are now a certified ZimAgritrust Agent!\n\n"
             f"Trust Score: {trust_score}/100\n\n"
             f"Your credentials have been activated. Welcome to the field!"
         )
@@ -343,7 +343,7 @@ class NotificationService:
         grade = result.get("grade", {}).get("grade", "Standard")
         
         message = (
-            f"{status_emoji} *AgriTrust AI Analysis Complete*\n\n"
+            f"{status_emoji} *ZimAgritrust AI Analysis Complete*\n\n"
             f"🌿 *Produce:* {crop_name}\n"
             f"⭐ *Grade Estimate:* {grade}\n"
             f"📊 *AI Confidence:* {int(result.get('crop', {}).get('confidence', 0)*100)}%\n\n"

@@ -1,5 +1,5 @@
 """
-AgriTrust Delivery Service
+ZimAgritrust Delivery Service
 Full 9-state lifecycle: PENDING_PICKUP → AUTO_CONFIRMED
 Handles method selection, status transitions, notifications, and auto-confirm.
 """
@@ -272,7 +272,7 @@ def _sms(phone: Optional[str], msg: str):
 
 def _notify_method_confirmed(db: Session, order_id: uuid.UUID, method: DeliveryMethod):
     farmer, buyer, order = _get_parties(db, order_id)
-    msg = f"AgriTrust Order #{order.order_number}: Delivery method confirmed ({method.value.replace('_', ' ')}). Arrange within 48 hours."
+    msg = f"ZimAgritrust Order #{order.order_number}: Delivery method confirmed ({method.value.replace('_', ' ')}). Arrange within 48 hours."
     _sms(farmer, msg)
     _sms(buyer, msg)
 
@@ -282,59 +282,59 @@ def _notify_agent_assigned(db: Session, order_id: uuid.UUID, agent_id: uuid.UUID
     agent = db.query(User).filter(User.id == agent_id).first()
     agent_name = agent.full_name if agent else "An agent"
     farmer, buyer, order = _get_parties(db, order_id)
-    msg = f"AgriTrust Order #{order.order_number}: {agent_name} has been assigned to witness your delivery."
+    msg = f"ZimAgritrust Order #{order.order_number}: {agent_name} has been assigned to witness your delivery."
     _sms(farmer, msg)
     _sms(buyer, msg)
     if agent:
-        _sms(agent.phone_number, f"AgriTrust: You have been assigned to Order #{order.order_number}. Check your dashboard.")
+        _sms(agent.phone_number, f"ZimAgritrust: You have been assigned to Order #{order.order_number}. Check your dashboard.")
 
 
 def _notify_driver_assigned(db: Session, order_id: uuid.UUID):
     farmer, buyer, order = _get_parties(db, order_id)
     delivery = _get_delivery(db, order_id)
-    msg = f"AgriTrust Order #{order.order_number}: Driver {delivery.driver_name or 'assigned'} ({delivery.vehicle_reg or 'N/A'}) will handle transport."
+    msg = f"ZimAgritrust Order #{order.order_number}: Driver {delivery.driver_name or 'assigned'} ({delivery.vehicle_reg or 'N/A'}) will handle transport."
     _sms(farmer, msg)
     _sms(buyer, msg)
 
 
 def _notify_pickup_in_progress(db: Session, order_id: uuid.UUID):
     _, buyer, order = _get_parties(db, order_id)
-    _sms(buyer, f"AgriTrust Order #{order.order_number}: Pickup is in progress at the farm.")
+    _sms(buyer, f"ZimAgritrust Order #{order.order_number}: Pickup is in progress at the farm.")
 
 
 def _notify_pickup_completed(db: Session, order_id: uuid.UUID, eta: Optional[datetime]):
     farmer, buyer, order = _get_parties(db, order_id)
     eta_str = eta.strftime("%d %b %H:%M") if eta else "TBD"
-    _sms(farmer, f"AgriTrust Order #{order.order_number}: Goods picked up successfully.")
-    _sms(buyer,  f"AgriTrust Order #{order.order_number}: Goods picked up. ETA: {eta_str}.")
+    _sms(farmer, f"ZimAgritrust Order #{order.order_number}: Goods picked up successfully.")
+    _sms(buyer,  f"ZimAgritrust Order #{order.order_number}: Goods picked up. ETA: {eta_str}.")
 
 
 def _notify_delay(db: Session, order_id: uuid.UUID, new_eta: Optional[datetime]):
     _, buyer, order = _get_parties(db, order_id)
     eta_str = new_eta.strftime("%d %b %H:%M") if new_eta else "TBD"
-    _sms(buyer, f"AgriTrust Order #{order.order_number}: ⚠️ Delivery delayed. New ETA: {eta_str}.")
+    _sms(buyer, f"ZimAgritrust Order #{order.order_number}: ⚠️ Delivery delayed. New ETA: {eta_str}.")
 
 
 def _notify_arrival(db: Session, order_id: uuid.UUID):
     farmer, buyer, order = _get_parties(db, order_id)
-    _sms(buyer,  f"AgriTrust Order #{order.order_number}: 🚚 Driver has arrived at your location.")
-    _sms(farmer, f"AgriTrust Order #{order.order_number}: Goods delivered to buyer.")
+    _sms(buyer,  f"ZimAgritrust Order #{order.order_number}: 🚚 Driver has arrived at your location.")
+    _sms(farmer, f"ZimAgritrust Order #{order.order_number}: Goods delivered to buyer.")
 
 
 def _notify_delivery_completed(db: Session, order_id: uuid.UUID, deadline: Optional[datetime]):
     farmer, buyer, order = _get_parties(db, order_id)
     deadline_str = deadline.strftime("%d %b %H:%M") if deadline else "24 hours"
-    _sms(farmer, f"AgriTrust Order #{order.order_number}: Goods handed over. Awaiting buyer confirmation.")
-    _sms(buyer,  f"AgriTrust Order #{order.order_number}: Goods delivered. You have until {deadline_str} to inspect and confirm or raise a dispute.")
+    _sms(farmer, f"ZimAgritrust Order #{order.order_number}: Goods handed over. Awaiting buyer confirmation.")
+    _sms(buyer,  f"ZimAgritrust Order #{order.order_number}: Goods delivered. You have until {deadline_str} to inspect and confirm or raise a dispute.")
 
 
 def _notify_buyer_confirmed(db: Session, order_id: uuid.UUID):
     farmer, buyer, order = _get_parties(db, order_id)
-    _sms(farmer, f"AgriTrust Order #{order.order_number}: ✅ Buyer confirmed receipt. Payment is being released to your wallet.")
-    _sms(buyer,  f"AgriTrust Order #{order.order_number}: ✅ Transaction complete. Thank you!")
+    _sms(farmer, f"ZimAgritrust Order #{order.order_number}: ✅ Buyer confirmed receipt. Payment is being released to your wallet.")
+    _sms(buyer,  f"ZimAgritrust Order #{order.order_number}: ✅ Transaction complete. Thank you!")
 
 
 def _notify_auto_confirmed(db: Session, order_id: uuid.UUID):
     farmer, buyer, order = _get_parties(db, order_id)
-    _sms(farmer, f"AgriTrust Order #{order.order_number}: ✅ Delivery auto-confirmed (24h window passed). Payment released.")
-    _sms(buyer,  f"AgriTrust Order #{order.order_number}: ✅ Delivery auto-confirmed. Transaction complete.")
+    _sms(farmer, f"ZimAgritrust Order #{order.order_number}: ✅ Delivery auto-confirmed (24h window passed). Payment released.")
+    _sms(buyer,  f"ZimAgritrust Order #{order.order_number}: ✅ Delivery auto-confirmed. Transaction complete.")

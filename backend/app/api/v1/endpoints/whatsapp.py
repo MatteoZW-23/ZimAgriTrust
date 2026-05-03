@@ -105,7 +105,7 @@ async def whatsapp_webhook(data: Dict[str, Any] = Body(...), db: Session = Depen
     user = db.query(User).filter(User.phone_number.in_(candidates)).first()
     
     if not user:
-        return {"reply": "Welcome to AgriTrust! I see you're not registered yet. Please register via our USSD (*232#) or visit our website to get started."}
+        return {"reply": "Welcome to ZimAgritrust! I see you're not registered yet. Please register via our USSD (*232#) or visit our website to get started."}
 
     reply_text = await whatsapp_service.process_message(db, user, body, has_media, media)
     return {"reply": reply_text}
@@ -119,7 +119,7 @@ async def verify_webhook(request: Request):
     token = params.get("hub.verify_token")
     challenge = params.get("hub.challenge")
     
-    if mode == "subscribe" and token == "AGRITRUST_SOVEREIGN_TOKEN":
+    if mode == "subscribe" and token == "ZimAgritrust_SOVEREIGN_TOKEN":
         return int(challenge)
     raise HTTPException(status_code=403, detail="Verification Failed")
 

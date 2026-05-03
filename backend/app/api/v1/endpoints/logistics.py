@@ -1,5 +1,5 @@
 """
-AgriTrust Logistics & Delivery API
+ZimAgritrust Logistics & Delivery API
 Covers: trip marketplace, delivery lifecycle (9 states), agent/driver assignment.
 """
 import uuid

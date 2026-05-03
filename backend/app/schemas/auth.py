@@ -60,6 +60,7 @@ class Token(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user: Optional[UserResponse] = None
+    must_change_password: bool = False
 
 
 class TokenRefresh(BaseModel):

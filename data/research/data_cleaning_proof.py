@@ -13,7 +13,7 @@ def prove_data_cleaning():
     Demonstrates how we handle 'Garbage' agricultural data.
     """
     print("==================================================")
-    print("AGRITRUST: DATA CLEANING & INTEGRITY PROOF")
+    print("ZimAgritrust: DATA CLEANING & INTEGRITY PROOF")
     print("==================================================")
 
     # 1. CREATE 'DIRTY' DATASET

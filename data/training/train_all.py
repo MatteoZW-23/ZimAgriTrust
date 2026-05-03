@@ -24,7 +24,7 @@ def run_script(script_path):
     return result.returncode == 0
 
 def main():
-    print_header("AGRITRUST MODEL TRAINING PIPELINE")
+    print_header("ZimAgritrust MODEL TRAINING PIPELINE")
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     scripts_dir = "scripts"

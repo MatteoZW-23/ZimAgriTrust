@@ -85,7 +85,7 @@ export default function AgentRecruitmentPanel({ token }) {
                         <span>RECRUITMENT PIPELINE ACTIVE</span>
                     </div>
                     <h1>Agent <span>Onboarding</span> Center.</h1>
-                    <p>Qualifying, equipping, and certifying regional agents for the AgriTrust ecosystem. <strong>{applications.length}</strong> candidates in progress.</p>
+                    <p>Qualifying, equipping, and certifying regional agents for the ZimAgritrust ecosystem. <strong>{applications.length}</strong> candidates in progress.</p>
                     <div className="hero-actions" style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
                         {/* Interactive operational controls will appear during live recruitment drives. */}
                     </div>

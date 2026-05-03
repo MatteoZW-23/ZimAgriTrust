@@ -1,0 +1,230 @@
+# Production Docker Compose Configuration
+# Enterprise-grade deployment with monitoring, SSL, and security
+
+version: '3.8'
+
+services:
+  # Nginx Reverse Proxy with SSL
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - public-website
+      - admin-dashboard
+      - agent-portal
+      - app-portal
+      - backend
+    restart: always
+    networks:
+      - agric-network
+
+  # PostgreSQL Database with Backup
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agri_trust}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - agric-network
+
+  # Redis Cache with Persistence
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - agric-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-agri_trust}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+      FORCE_HTTPS: "true"
+      # Security Configuration
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_REQUESTS: "100"
+      RATE_LIMIT_WINDOW_SECONDS: "60"
+      ADMIN_RATE_LIMIT_REQUESTS: "30"
+      ADMIN_RATE_LIMIT_WINDOW_SECONDS: "60"
+      ADMIN_IP_WHITELIST: ${ADMIN_IP_WHITELIST:-}
+      ADMIN_SESSION_TIMEOUT_MINUTES: "30"
+      ADMIN_MFA_ENABLED: ${ADMIN_MFA_ENABLED:-true}
+      ADMIN_AUDIT_LOGGING: "true"
+      ACCOUNT_LOCKOUT_ENABLED: "true"
+      ACCOUNT_LOCKOUT_ATTEMPTS: "5"
+      ACCOUNT_LOCKOUT_DURATION_MINUTES: "30"
+      PASSWORD_MIN_LENGTH: "8"
+      PASSWORD_REQUIRE_UPPERCASE: "true"
+      PASSWORD_REQUIRE_LOWERCASE: "true"
+      PASSWORD_REQUIRE_DIGIT: "true"
+      PASSWORD_REQUIRE_SPECIAL: "true"
+      # Monitoring
+      SENTRY_DSN: ${SENTRY_DSN}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+    networks:
+      - agric-network
+
+  # Public Website
+  public-website:
+    build:
+      context: ./apps/public-website
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_URL: ${API_URL:-https://api.agritrust.com}
+      NODE_ENV: production
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - agric-network
+
+  # Admin Dashboard
+  admin-dashboard:
+    build:
+      context: ./apps/admin-dashboard
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_URL: ${API_URL:-https://api.agritrust.com}
+      NODE_ENV: production
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - agric-network
+
+  # Agent Portal
+  agent-portal:
+    build:
+      context: ./apps/agent-portal
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_URL: ${API_URL:-https://api.agritrust.com}
+      NODE_ENV: production
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - agric-network
+
+  # App Portal (Farmer/Buyer Dashboard)
+  app-portal:
+    build:
+      context: ./apps/app-portal
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_URL: ${API_URL:-https://api.agritrust.com}
+      NODE_ENV: production
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - agric-network
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    restart: always
+    networks:
+      - agric-network
+
+  # Grafana Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./infra/monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    restart: always
+    networks:
+      - agric-network
+
+  # Database Backup Service
+  db-backup:
+    image: prodrigestivill/postgres-backup-local:15
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-agri_trust}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 6
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      - postgres
+    restart: always
+    networks:
+      - agric-network
+
+networks:
+  agric-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  nginx_logs:
+    driver: local

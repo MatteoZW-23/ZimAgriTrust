@@ -50,7 +50,7 @@ export default function USSDSimulator({ profile }) {
             setIsEndScreen(false);
         }
     } catch(err) {
-        setDisplayMessage("END Handshake Failed. AgriTrust Core Unreachable.");
+        setDisplayMessage("END Handshake Failed. ZimAgritrust Core Unreachable.");
         setIsEndScreen(true);
     }
     
@@ -97,7 +97,7 @@ export default function USSDSimulator({ profile }) {
                     {isProcessing ? (
                         <div className="ussd-loading">
                             <div className="spinner"></div>
-                            <p>Connecting to AgriTrust Escrow...</p>
+                            <p>Connecting to ZimAgritrust Escrow...</p>
                         </div>
                     ) : (
                         <>

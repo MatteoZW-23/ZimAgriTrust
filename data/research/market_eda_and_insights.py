@@ -10,7 +10,7 @@ def perform_agri_eda():
     Proves the 'Discovery' phase of the Data Science Lifecycle.
     """
     print("==================================================")
-    print("AGRITRUST: EXPLORATORY DATA ANALYSIS (EDA)")
+    print("ZimAgritrust: EXPLORATORY DATA ANALYSIS (EDA)")
     print("==================================================")
 
     # 1. SYNTHETIC DATA GENERATION (Simulating 2 years of market history)

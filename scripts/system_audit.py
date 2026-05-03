@@ -4,7 +4,7 @@ import time
 
 def audit():
     print("="*60)
-    print("AGRITRUST SOVEREIGN SYSTEM AUDIT")
+    print("ZimAgritrust SOVEREIGN SYSTEM AUDIT")
     print("="*60)
     
     # 1. Directory Checks

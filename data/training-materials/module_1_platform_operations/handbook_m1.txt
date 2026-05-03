@@ -1,20 +1,20 @@
-AgriTrust Module 1: Platform Operations (Core)
+ZimAgritrust Module 1: Platform Operations (Core)
 ========================================
 
-Welcome to the AgriTrust Academy. This handbook provides the core operational protocols required for all Field Agents.
+Welcome to the ZimAgritrust Academy. This handbook provides the core operational protocols required for all Field Agents.
 
 1.1 Mission: Sovereign Trust in Agricultural Trade
 --------------------------------------------------
 Our mission is to eliminate the 'trust deficit' that plagues rural agricultural markets. In most developing regions, farmers lack access to fair markets and finance because there is no reliable way to verify their yield or quality without expensive intermediaries.
 
-AgriTrust solves this through:
+ZimAgritrust solves this through:
 * Sovereign Identity: Giving every farmer a verified digital twin.
 * Verifiable Proof: Using field agents (you) to provide ground-truth data.
 * Smart Escrow: Ensuring payment is only released when quality is confirmed.
 
-1.2 The AgriTrust Tech Stack
+1.2 The ZimAgritrust Tech Stack
 ----------------------------
-AgriTrust is a multi-layered infrastructure designed for low-connectivity environments:
+ZimAgritrust is a multi-layered infrastructure designed for low-connectivity environments:
 1. Core Backend: A FastAPI-driven engine that handles the ledger, escrow, and user management.
 2. Agent Portal (Your Interface): A high-performance web application designed for mobile devices in the field.
 3. Farmer Interface: Primarily USSD and WhatsApp-based.
@@ -28,7 +28,7 @@ AgriTrust is a multi-layered infrastructure designed for low-connectivity enviro
 * Buyers: Wholesalers who purchase listed crops.
 * Administrators: Global monitors who handle disputes.
 
-1.4 The 6 Steps of an AgriTrust Trade
+1.4 The 6 Steps of an ZimAgritrust Trade
 -------------------------------------
 1. Listing: Farmer lists crops via WhatsApp.
 2. Commitment: Buyer deposits 100% of the value into the Sovereign Escrow Pool.
@@ -90,6 +90,6 @@ The bot uses AI to understand user messages across Shona, Ndebele, and English. 
 
 FINAL SUMMARY
 -------------
-Field Agents are the 'Ground Truth' for AgriTrust. You are responsible for ensuring that the digital records in our cloud match the physical reality on the farm. By mastering the platform operations, adhering to the code of conduct, and leveraging your WhatsApp AI assistant, you ensure the success and integrity of Zimbabwe's agricultural marketplace.
+Field Agents are the 'Ground Truth' for ZimAgritrust. You are responsible for ensuring that the digital records in our cloud match the physical reality on the farm. By mastering the platform operations, adhering to the code of conduct, and leveraging your WhatsApp AI assistant, you ensure the success and integrity of Zimbabwe's agricultural marketplace.
 
-Copyright 2026 AgriTrust Sovereign Ledger Group. All Rights Reserved.
+Copyright 2026 ZimAgritrust Sovereign Ledger Group. All Rights Reserved.

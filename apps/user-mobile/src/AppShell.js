@@ -1,0 +1,279 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
+import { Home, ShoppingBag, Package, Wallet, User, PlusCircle } from 'lucide-react-native';
+import { theme } from './styles';
+import { saveSession, getSession, clearSession, setOnboarded, hasOnboarded } from './utils/auth';
+import { setupNotificationHandler, registerForPushNotifications } from './utils/notifications';
+
+// Screens
+import OnboardingScreen from './screens/OnboardingScreen';
+import { LoginScreen } from './screens/LoginScreen';
+import HomeScreen from './screens/HomeScreen';
+import MarketplaceScreen from './screens/MarketplaceScreen';
+import CreateListingScreen from './screens/CreateListingScreen';
+import OrderDetailsScreen from './screens/OrderDetailsScreen';
+import MakeOfferScreen from './screens/MakeOfferScreen';
+import ConfirmationScreen from './screens/ConfirmationScreen';
+import WalletScreen from './screens/WalletScreen';
+import MyListingsScreen from './screens/MyListingsScreen';
+import MyOrdersScreen from './screens/MyOrdersScreen';
+import RateUserScreen from './screens/RateUserScreen';
+import WithdrawScreen from './screens/WithdrawScreen';
+import PaymentScreen from './screens/PaymentScreen';
+import ProfileScreen from './screens/ProfileScreen';
+
+const Stack = createStackNavigator();
+const Tab = createBottomTabNavigator();
+
+function MainTabs({ route }) {
+  const { role = 'buyer', token, profile = {}, onLogout } = route.params || {};
+
+  if (role === 'driver' || role === 'transporter') {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 10 }}>Wrong App</Text>
+        <Text style={{ fontSize: 16, textAlign: 'center', color: '#666' }}>
+          Drivers should use the ZimAgriTrust Driver App
+        </Text>
+        <Text style={{ fontSize: 14, marginTop: 20, color: '#999' }}>
+          Please download the driver app from the app store
+        </Text>
+      </View>
+    );
+  }
+
+  const accent = role === 'farmer' ? theme.colors.green : theme.colors.sky;
+
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: styles.tabBar,
+        tabBarActiveTintColor: accent,
+        tabBarInactiveTintColor: '#999',
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '700', marginTop: -4 },
+      }}
+    >
+      {role === 'farmer' ? (
+        <Tab.Screen
+          name="FarmerDash"
+          component={HomeScreen}
+          initialParams={{ role, token, profile }}
+          options={{
+            tabBarLabel: 'Home',
+            tabBarIcon: ({ color, size }) => <Home size={size || 22} color={color} />,
+          }}
+        />
+      ) : (
+        <Tab.Screen
+          name="Marketplace"
+          component={MarketplaceScreen}
+          initialParams={{ token }}
+          options={{
+            tabBarLabel: 'Market',
+            tabBarIcon: ({ color, size }) => <ShoppingBag size={size || 22} color={color} />,
+          }}
+        />
+      )}
+
+      <Tab.Screen
+        name="MyOrders"
+        component={MyOrdersScreen}
+        initialParams={{ role, token }}
+        options={{
+          tabBarLabel: 'Orders',
+          tabBarIcon: ({ color, size }) => <Package size={size || 22} color={color} />,
+        }}
+      />
+
+      {role === 'farmer' && (
+        <Tab.Screen
+          name="AddListing"
+          component={CreateListingScreen}
+          initialParams={{ token }}
+          options={{
+            tabBarLabel: 'Sell',
+            tabBarIcon: () => (
+              <View style={[styles.addBtn, { backgroundColor: accent }]}>
+                <PlusCircle size={28} color="#FFF" />
+              </View>
+            ),
+          }}
+        />
+      )}
+
+      <Tab.Screen
+        name="WalletTab"
+        component={WalletScreen}
+        initialParams={{ token }}
+        options={{
+          tabBarLabel: 'Wallet',
+          tabBarIcon: ({ color, size }) => <Wallet size={size || 22} color={color} />,
+        }}
+      />
+
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        initialParams={{ role, token, profile, onLogout }}
+        options={{
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({ color, size }) => <User size={size || 22} color={color} />,
+        }}
+      />
+    </Tab.Navigator>
+  );
+}
+
+export default function AppShell() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSplashing, setIsSplashing] = useState(true);
+  const [onboardedState, setOnboardedState] = useState(false);
+  const [role, setRole] = useState(null);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [session, setSession] = useState(null);
+
+  // Restore session on mount
+  useEffect(() => {
+    setupNotificationHandler();
+    (async () => {
+      try {
+        const wasOnboarded = await hasOnboarded();
+        const savedSession = await getSession();
+
+        if (wasOnboarded) setOnboardedState(true);
+        if (savedSession?.access_token) {
+          setSession(savedSession);
+          setRole(savedSession.role || savedSession.profile?.role?.toLowerCase() || 'farmer');
+          setAuthenticated(true);
+        }
+      } catch (e) {
+        console.warn('Session restore failed:', e);
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, []);
+
+  // Splash timer
+  useEffect(() => {
+    const timer = setTimeout(() => setIsSplashing(false), 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleOnboardingComplete = useCallback(async (selectedRole) => {
+    setRole(selectedRole);
+    setOnboardedState(true);
+    await setOnboarded(true);
+  }, []);
+
+  const handleAuth = useCallback(async (authData) => {
+    setSession(authData);
+    setAuthenticated(true);
+    await saveSession(authData.access_token, authData.profile, role);
+    registerForPushNotifications().catch(() => {});
+  }, [role]);
+
+  const handleLogout = useCallback(async () => {
+    await clearSession();
+    setSession(null);
+    setAuthenticated(false);
+    setRole(null);
+    setOnboardedState(false);
+  }, []);
+
+  if (isLoading || isSplashing) {
+    return (
+      <View style={styles.splash}>
+        <View style={styles.splashLogoContainer}>
+          <Text style={styles.splashLogo}>🌾</Text>
+        </View>
+        <Text style={styles.splashBrand}>ZIMAGRITRUST</Text>
+        <Text style={styles.splashMarket}>AGRICULTURAL MARKETPLACE</Text>
+        <ActivityIndicator size="large" color="rgba(255,255,255,0.7)" style={{ marginTop: 32 }} />
+        <View style={styles.onboardBox}>
+          <Text style={styles.onboardText}>Connecting Zimbabwe's Agricultural Value Chain</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!onboardedState) {
+    return <OnboardingScreen onComplete={handleOnboardingComplete} />;
+  }
+
+  if (!authenticated) {
+    return <LoginScreen role={role} onAuthenticated={handleAuth} />;
+  }
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen
+          name="Main"
+          component={MainTabs}
+          initialParams={{
+            role,
+            token: session?.access_token,
+            profile: session?.profile,
+            onLogout: handleLogout,
+          }}
+        />
+        <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} />
+        <Stack.Screen name="MakeOffer" component={MakeOfferScreen} />
+        <Stack.Screen name="ConfirmDelivery" component={ConfirmationScreen} />
+        <Stack.Screen name="Wallet" component={WalletScreen} />
+        <Stack.Screen name="MyListings" component={MyListingsScreen} />
+        <Stack.Screen name="MyOrders" component={MyOrdersScreen} />
+        <Stack.Screen name="RateUser" component={RateUserScreen} />
+        <Stack.Screen name="Withdraw" component={WithdrawScreen} />
+        <Stack.Screen name="CreateListing" component={CreateListingScreen} />
+        <Stack.Screen name="Payment" component={PaymentScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+const styles = StyleSheet.create({
+  tabBar: {
+    height: 80,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#EEEEEE',
+    paddingBottom: 25,
+    paddingTop: 10,
+    position: 'absolute',
+    bottom: 25,
+    left: 20,
+    right: 20,
+    borderRadius: 25,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+  },
+  addBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    bottom: 12,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  splash: { flex: 1, backgroundColor: theme.colors.green, justifyContent: 'center', alignItems: 'center' },
+  splashLogoContainer: { width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', marginBottom: 24, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)' },
+  splashLogo: { fontSize: 52 },
+  splashBrand: { fontSize: 28, fontWeight: '800', color: '#FFF', letterSpacing: 3, textTransform: 'uppercase' },
+  splashMarket: { fontSize: 16, fontWeight: '600', color: theme.colors.gold, letterSpacing: 2, textTransform: 'uppercase', marginTop: 8 },
+  onboardBox: { position: 'absolute', bottom: 100, paddingHorizontal: 40, alignItems: 'center' },
+  onboardText: { color: '#FFF', fontSize: 16, textAlign: 'center', marginBottom: 40, lineHeight: 24, fontWeight: '500', letterSpacing: 0.5 },
+});

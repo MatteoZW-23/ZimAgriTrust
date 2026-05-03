@@ -98,8 +98,8 @@ class OTPService:
         
         # Build WhatsApp message
         wa_message = (
-            f"🔐 *AgriTrust Verification*\n\n"
-            f"Welcome to AgriTrust! Please verify your phone number.\n\n"
+            f"🔐 *ZimAgritrust Verification*\n\n"
+            f"Welcome to ZimAgritrust! Please verify your phone number.\n\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"Your OTP code is: *{otp}*\n\n"
             f"Valid for: *5 minutes*\n"
@@ -129,7 +129,7 @@ class OTPService:
         
         # Fallback to SMS
         try:
-            sms_message = f"AgriTrust OTP: {otp}. Valid for 5 minutes. Never share this code."
+            sms_message = f"ZimAgritrust OTP: {otp}. Valid for 5 minutes. Never share this code."
             notification_service._send_sms(phone_number, sms_message)
             await self._increment_rate_limit(phone_number)
             logger.info(f"OTP sent via SMS to {phone_number}")

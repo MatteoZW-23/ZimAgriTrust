@@ -8,6 +8,8 @@ class Role(str, Enum):
     SUPPORT = "support"
     AGENT = "agent"
     FARMER = "farmer"
+    BUYER = "buyer"
+    TRANSPORTER = "transporter"
 
 # Role-Based Access Control (RBAC) mapping
 PERMISSIONS: Dict[Role, List[str]] = {
@@ -17,7 +19,8 @@ PERMISSIONS: Dict[Role, List[str]] = {
         "manage_agents",
         "manage_listings",
         "override_disputes",
-        "view_system_health"
+        "view_system_health",
+        "manage_users"
     ],
     Role.AUDITOR: [
         "view_audit_logs",
@@ -36,8 +39,24 @@ PERMISSIONS: Dict[Role, List[str]] = {
     ],
     Role.FARMER: [
         "create_listing",
-        "buy_produce",
-        "view_market_data"
+        "manage_listings",
+        "view_market_data",
+        "respond_to_offers",
+        "manage_wallet"
+    ],
+    Role.BUYER: [
+        "browse_marketplace",
+        "make_offers",
+        "view_orders",
+        "manage_wallet",
+        "rate_sellers"
+    ],
+    Role.TRANSPORTER: [
+        "view_delivery_jobs",
+        "accept_delivery_jobs",
+        "update_delivery_status",
+        "view_earnings",
+        "manage_vehicle_info"
     ]
 }
 

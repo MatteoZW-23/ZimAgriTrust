@@ -16,7 +16,7 @@ class USSDLanguage:
         # Root Menu
         "root_menu": {
             "en": (
-                "CON 🇿🇼 AgriTrust Marketplace\n"
+                "CON 🇿🇼 ZimAgritrust Marketplace\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "1. Sell Product\n"
                 "2. Buy Products\n"
@@ -30,7 +30,7 @@ class USSDLanguage:
                 "0. Change Language"
             ),
             "sn": (
-                "CON 🇿🇼 Musika weAgriTrust\n"
+                "CON 🇿🇼 Musika weZimAgritrust\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "1. Tengesa Zvinhu\n"
                 "2. Tenga Zvinhu\n"
@@ -44,7 +44,7 @@ class USSDLanguage:
                 "0. Chinja Mutauro"
             ),
             "nd": (
-                "CON 🇿🇼 Imakethe ye-AgriTrust\n"
+                "CON 🇿🇼 Imakethe ye-ZimAgritrust\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "1. Thengisa Impahla\n"
                 "2. Thenga Impahla\n"

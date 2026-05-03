@@ -6,7 +6,7 @@
 
 set -e
 
-echo "🚀 Starting AgriTrust deployment..."
+echo "🚀 Starting Agritrust deployment..."
 
 # Load environment variables
 source .env.production

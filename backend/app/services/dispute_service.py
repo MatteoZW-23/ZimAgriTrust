@@ -33,11 +33,11 @@ def create_dispute(db: Session, payload: DisputeCreate, actor: User) -> Dispute:
     from app.services.notification_service import notification_service
     notification_service._send_sms(
         order.buyer.phone_number,
-        f"AgriTrust: A dispute has been opened for transaction #{order.id}. Your trust score is temporarily impacted pending resolution."
+        f"ZimAgritrust: A dispute has been opened for transaction #{order.id}. Your trust score is temporarily impacted pending resolution."
     )
     notification_service._send_sms(
         order.seller.phone_number,
-        f"AgriTrust: A dispute has been opened for transaction #{order.id}. Your trust score is temporarily impacted pending resolution."
+        f"ZimAgritrust: A dispute has been opened for transaction #{order.id}. Your trust score is temporarily impacted pending resolution."
     )
 
     # Hybrid AI Triage: Auto-resolve or Assign Agent
@@ -99,11 +99,11 @@ def resolve_dispute(db: Session, dispute: Dispute, payload: DisputeResolve) -> D
     outcome = "released to farmer" if payload.release_to_farmer else "refunded to buyer"
     notification_service._send_sms(
         order.buyer.phone_number,
-        f"AgriTrust: Dispute for transaction #{order.id} resolved. Outcome: {outcome}."
+        f"ZimAgritrust: Dispute for transaction #{order.id} resolved. Outcome: {outcome}."
     )
     notification_service._send_sms(
         order.seller.phone_number,
-        f"AgriTrust: Dispute for transaction #{order.id} resolved. Outcome: {outcome}."
+        f"ZimAgritrust: Dispute for transaction #{order.id} resolved. Outcome: {outcome}."
     )
 
     db.commit()
@@ -162,7 +162,7 @@ def accept_settlement(db: Session, dispute: Dispute, user: User) -> Dispute:
         buyer_refund = dispute.proposed_refund_amount
         seller_payout = dispute.order.total_amount - buyer_refund
         
-        # AgriTrust standard: Platform fee is taken from the total escrow if released, 
+        # ZimAgritrust standard: Platform fee is taken from the total escrow if released, 
         # but in partial disputes, we often adjust it proportionally.
         # For simplicity, we use the original platform fee capped by seller payout.
         fee = min(dispute.order.platform_fee, seller_payout * 0.05) 

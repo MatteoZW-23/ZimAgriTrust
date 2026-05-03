@@ -28,7 +28,7 @@ def academy_login(payload: TraineeLogin, db: Session = Depends(get_db)):
     if not agent or not agent.user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="INVALID_AGENT_CODE: Profile not discovered in the AgriTrust ledger."
+            detail="INVALID_AGENT_CODE: Profile not discovered in the ZimAgritrust ledger."
         )
     
     if agent.status == AgentStatus.SUSPENDED:
@@ -459,7 +459,7 @@ def submit_final_exam(
         agent.status = AgentStatus.ACTIVE
         db.commit()
         
-        return {"passed": True, "score": score, "message": "🎉 CONGRATULATIONS! You are now a Certified AgriTrust Field Agent."}
+        return {"passed": True, "score": score, "message": "🎉 CONGRATULATIONS! You are now a Certified ZimAgritrust Field Agent."}
     else:
         # If this was the last attempt, permanently fail the trainee
         if training.final_exam_attempts >= 2:

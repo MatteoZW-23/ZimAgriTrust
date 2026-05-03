@@ -36,7 +36,7 @@ In Zimbabwe, holding money for third parties (escrow) requires specific legal ar
 When a seller or agent "withdraws" money from their virtual wallet:
 1. The system checks the virtual ledger balance.
 2. The system instructs the bank or EcoCash to transfer REAL money from the pooled Trust Account to the user's personal account.
-3. The money officially leaves the AgriTrust ecosystem.
+3. The money officially leaves the ZimAgritrust ecosystem.
 
 ---
 
@@ -44,7 +44,7 @@ When a seller or agent "withdraws" money from their virtual wallet:
 
 2.2 Payment Methods
 ------------------
-AgriTrust supports nationwide mobile money networks (EcoCash, OneMoney, Innbucks) and traditional bank transfers for urban settlements. All payments are strictly digital.
+ZimAgritrust supports nationwide mobile money networks (EcoCash, OneMoney, Innbucks) and traditional bank transfers for urban settlements. All payments are strictly digital.
 
 ---
 
@@ -61,7 +61,7 @@ AgriTrust supports nationwide mobile money networks (EcoCash, OneMoney, Innbucks
 
 # 💰 HOW AGENTS GET PAID – Complete Payment Structure
 
-Here is the **complete breakdown** of how agents earn money on the AgriTrust platform.
+Here is the **complete breakdown** of how agents earn money on the ZimAgritrust platform.
 
 ---
 
@@ -230,4 +230,4 @@ Monthly Total (4 weeks) = $936
 
 Agents get paid through a combination of per-task commissions ($2-$25), performance bonuses ($15-$150), travel reimbursement, and one-time bonuses. Payments are processed weekly for tasks and monthly for bonuses, primarily via EcoCash and OneMoney.
 
-Copyright 2026 AgriTrust Sovereign Ledger Group. All Rights Reserved.
+Copyright 2026 ZimAgritrust Sovereign Ledger Group. All Rights Reserved.

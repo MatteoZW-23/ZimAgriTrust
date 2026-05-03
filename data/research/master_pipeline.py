@@ -147,7 +147,7 @@ class NotebookOrchestrator:
         subprocess.run(["python", "production_pipeline_run.py", "--export-all"])
 
 def main():
-    parser = argparse.ArgumentParser(description='Run AgriTrust ML Pipeline')
+    parser = argparse.ArgumentParser(description='Run ZimAgritrust ML Pipeline')
     parser.add_argument('--all', action='store_true', help='Run all notebooks')
     parser.add_argument('--clean-only', action='store_true', help='Run only data cleaning')
     parser.add_argument('--train-risk', action='store_true', help='Train risk model only')

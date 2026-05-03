@@ -1,7 +1,7 @@
-# AgriTrust: National Agricultural Marketplace & Logistics Hub
+# ZimAgritrust: National Agricultural Marketplace & Logistics Hub
 ## Comprehensive System Documentation v4.0
 
-![AgriTrust Banner](https://placehold.co/1200x400/020617/white?text=AgriTrust+Infrastructure+v4.0)
+![ZimAgritrust Banner](https://placehold.co/1200x400/020617/white?text=ZimAgritrust+Infrastructure+v4.0)
 
 > **"Economically Resilient. Market Integrated. Farmer Empowered."**
 
@@ -25,7 +25,7 @@
 ---
 
 ## 1. Executive Summary
-AgriTrust is a sovereign-grade digital infrastructure designed to modernize Zimbabwe's agricultural trade. It bridges the gap between rural smallholder farmers and institutional commercial buyers through a secure, multi-channel platform.
+ZimAgritrust is a sovereign-grade digital infrastructure designed to modernize Zimbabwe's agricultural trade. It bridges the gap between rural smallholder farmers and institutional commercial buyers through a secure, multi-channel platform.
 
 ### Core Value Propositions
 - **Market Access**: Connects farmers directly to national buyers.
@@ -36,7 +36,7 @@ AgriTrust is a sovereign-grade digital infrastructure designed to modernize Zimb
 ---
 
 ## 2. System Architecture
-The AgriTrust ecosystem is built as a series of integrated micro-services orchestrated via Docker.
+The ZimAgritrust ecosystem is built as a series of integrated micro-services orchestrated via Docker.
 
 ### High-Level Component Map
 ```mermaid
@@ -66,18 +66,18 @@ stateDiagram-v2
 ---
 
 ## 3. Visual Walkthrough
-These screens represent the operational interfaces of the AgriTrust platform.
+These screens represent the operational interfaces of the ZimAgritrust platform.
 
 **Note: High-fidelity visualizations generated for this documentation.**
 
-![Admin Dashboard](file:///C:/Users/MJ/.gemini/antigravity/brain/32bdc7a3-2ce4-4546-a389-a09d579b1d26/agritrust_admin_dashboard_1776643685016.png)
-![Logistics Command](file:///C:/Users/MJ/.gemini/antigravity/brain/32bdc7a3-2ce4-4546-a389-a09d579b1d26/agritrust_logistics_hub_1776643727796.png)
-![USSD Simulator](file:///C:/Users/MJ/.gemini/antigravity/brain/32bdc7a3-2ce4-4546-a389-a09d579b1d26/agritrust_ussd_simulator_1776643705608.png)
+![Admin Dashboard](file:///C:/Users/MJ/.gemini/antigravity/brain/32bdc7a3-2ce4-4546-a389-a09d579b1d26/ZimAgritrust_admin_dashboard_1776643685016.png)
+![Logistics Command](file:///C:/Users/MJ/.gemini/antigravity/brain/32bdc7a3-2ce4-4546-a389-a09d579b1d26/ZimAgritrust_logistics_hub_1776643727796.png)
+![USSD Simulator](file:///C:/Users/MJ/.gemini/antigravity/brain/32bdc7a3-2ce4-4546-a389-a09d579b1d26/ZimAgritrust_ussd_simulator_1776643705608.png)
 
 ---
 
 ## 4. Database Schema & Entity Models
-The AgriTrust database is a highly relational PostgreSQL instance optimized for financial integrity and KYC compliance.
+The ZimAgritrust database is a highly relational PostgreSQL instance optimized for financial integrity and KYC compliance.
 
 ### 4.1. Entity Relationship Diagram (ERD)
 ```mermaid
@@ -193,4 +193,4 @@ Automated notifications and transaction alerts via the WhatsApp Graph API.
 
 ---
 
-*This document is the official Technical Reference for the AgriTrust Infrastructure. It contains the logic signatures for every critical system operation.*
+*This document is the official Technical Reference for the ZimAgritrust Infrastructure. It contains the logic signatures for every critical system operation.*

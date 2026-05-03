@@ -5,7 +5,7 @@ from app.models.listing import Listing
 
 class AdminRevenueService:
     """
-    Financial engine for the Agritrust Founders/Admins.
+    Financial engine for the ZimAgritrust Founders/Admins.
     Aggregates all system-level inflows including royalties, boosts, and surcharges.
     """
 

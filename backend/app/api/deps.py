@@ -46,15 +46,29 @@ async def get_current_user(
         user_id: str | None = payload.get("sub")
         token_type: str | None = payload.get("type")
         jti: str | None = payload.get("jti")
-        
+
         if user_id is None or token_type != "access":
             raise credentials_exception
-            
-        # Check Redis blacklist
+
+        # Check Redis blacklist (immediate revocation)
         is_blacklisted = await cache_service.get(f"blacklist_{jti}")
         if is_blacklisted:
             raise credentials_exception
-            
+
+        # Check session table validity (session revocation, expiry)
+        from app.models.session import UserSession
+        session_valid = (
+            db.query(UserSession)
+            .filter(
+                UserSession.user_id == user_id,
+                UserSession.access_token_jti == jti,
+                UserSession.is_active == True,
+            )
+            .first()
+        )
+        if not session_valid:
+            raise credentials_exception
+
     except JWTError as exc:
         raise credentials_exception from exc
 

@@ -239,8 +239,8 @@ export default function BuyerMarketplacePanel({ token, onPurchase, profile }){
       return;
     }
     if(type==="share"){
-      const text = `Check out this listing on AgriTrust: ${item.crop||item.product_type} — $${item.price_per_unit}/kg in ${item.location_province||"Zimbabwe"}`;
-      if(navigator.share){ navigator.share({title:"AgriTrust Listing",text}); }
+      const text = `Check out this listing on ZimAgritrust: ${item.crop||item.product_type} — $${item.price_per_unit}/kg in ${item.location_province||"Zimbabwe"}`;
+      if(navigator.share){ navigator.share({title:"ZimAgritrust Listing",text}); }
       else{ navigator.clipboard?.writeText(text); }
       return;
     }

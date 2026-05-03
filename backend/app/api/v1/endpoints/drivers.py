@@ -1,17 +1,21 @@
 """
-AgriTrust Driver API
+ZimAgritrust Driver API
 Covers: registration, job management, rating, admin controls.
 """
 import uuid
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_roles
 from app.models.driver import Driver, DriverJob, DriverStatus
 from app.models.listing import LogisticsType
+from app.models.logistics import OrderDelivery, DeliveryStatus
+from app.models.transaction import Order, OrderStatus
 from app.models.user import User, UserRole
 from app.services import transport_service
 
@@ -53,6 +57,19 @@ class RateDriverPayload(BaseModel):
     job_id: uuid.UUID
     rating: int = Field(..., ge=1, le=5)
     note: Optional[str] = None
+
+
+class UpdateDeliveryStatusPayload(BaseModel):
+    status: str
+
+
+# ── Helper: resolve Driver from current user ────────────────────────────────
+
+def _get_driver(db: Session, user: User) -> Driver:
+    driver = db.query(Driver).filter(Driver.user_id == user.id).first()
+    if not driver:
+        raise HTTPException(status_code=404, detail="Not registered as a driver")
+    return driver
 
 
 # ── Driver registration ────────────────────────────────────────────────────────
@@ -179,6 +196,210 @@ def recommend_scenario(payload: DecisionTreePayload):
     )
     fee = transport_service.calculate_transport_fee(scenario=scenario)
     return {"recommended_scenario": scenario, "fee_breakdown": fee}
+
+
+# ── Mobile App Endpoints ───────────────────────────────────────────────────────
+
+@router.get("/profile")
+def get_driver_profile(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Full driver profile for mobile app (alias for /me with extra user info)."""
+    driver = _get_driver(db, current_user)
+    return {
+        "id": str(driver.id),
+        "full_name": current_user.full_name,
+        "phone_number": current_user.phone_number,
+        "status": driver.status,
+        "vehicle_reg": driver.vehicle_reg,
+        "vehicle_type": driver.vehicle_type,
+        "carrying_capacity_kg": driver.vehicle_capacity_kg,
+        "operating_district": driver.current_district,
+        "rating": driver.avg_rating,
+        "total_deliveries": driver.total_deliveries,
+        "successful_deliveries": driver.successful_deliveries,
+        "license_verified": driver.license_verified,
+        "insurance_verified": driver.insurance_verified,
+        "background_cleared": driver.background_cleared,
+        "created_at": driver.created_at.isoformat() if driver.created_at else None,
+    }
+
+
+@router.get("/jobs/available")
+def get_available_jobs(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List jobs available for this driver to accept (PENDING status, not yet assigned)."""
+    driver = _get_driver(db, current_user)
+    if driver.status != DriverStatus.ACTIVE:
+        raise HTTPException(status_code=403, detail="Driver account is not active")
+
+    jobs = (
+        db.query(DriverJob)
+        .filter(DriverJob.status == "PENDING", DriverJob.driver_id.is_(None))
+        .order_by(DriverJob.created_at.desc())
+        .limit(50)
+        .all()
+    )
+
+    result = []
+    for j in jobs:
+        order = j.order
+        listing = order.listing if order else None
+        result.append({
+            "id": str(j.id),
+            "order_id": str(j.order_id),
+            "pickup_location": listing.location_district if listing else (order.seller.district if order and order.seller else "Unknown"),
+            "delivery_location": order.buyer.district if order and order.buyer else "Unknown",
+            "distance_km": j.distance_km or 0,
+            "weight_kg": order.quantity * 1000 if order else 0,
+            "crop_type": listing.product_type if listing else "Cargo",
+            "payment_amount": round(j.driver_payout or j.total_transport_fee or 0, 2),
+            "currency": order.currency if order else "USD",
+            "status": "available",
+            "created_at": j.created_at.isoformat() if j.created_at else None,
+        })
+    return result
+
+
+@router.get("/deliveries")
+def get_my_deliveries(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List all deliveries assigned to this driver."""
+    driver = _get_driver(db, current_user)
+
+    jobs = (
+        db.query(DriverJob)
+        .filter(DriverJob.driver_id == driver.id)
+        .order_by(DriverJob.created_at.desc())
+        .all()
+    )
+
+    result = []
+    for j in jobs:
+        order = j.order
+        listing = order.listing if order else None
+
+        delivery = db.query(OrderDelivery).filter(OrderDelivery.order_id == j.order_id).first()
+
+        status_map = {
+            "PENDING": "pending",
+            "ACCEPTED": "pending",
+            "PICKUP_DONE": "picked_up",
+            "IN_TRANSIT": "in_transit",
+            "DELIVERED": "delivered",
+            "PAID": "completed",
+        }
+
+        result.append({
+            "id": str(j.id),
+            "order_id": str(j.order_id),
+            "pickup_location": delivery.pickup_address if delivery else (listing.location_district if listing else "Unknown"),
+            "delivery_location": delivery.delivery_address if delivery else "Unknown",
+            "status": status_map.get(j.status, "pending"),
+            "crop_type": listing.product_type if listing else "Cargo",
+            "weight_kg": order.quantity * 1000 if order else 0,
+            "payment_amount": round(j.driver_payout or j.total_transport_fee or 0, 2),
+            "distance_km": j.distance_km or 0,
+            "created_at": j.created_at.isoformat() if j.created_at else None,
+        })
+    return result
+
+
+@router.patch("/deliveries/{delivery_id}/status")
+def update_delivery_status(
+    delivery_id: uuid.UUID,
+    payload: UpdateDeliveryStatusPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update a delivery's status (called from driver mobile app)."""
+    driver = _get_driver(db, current_user)
+
+    job = db.query(DriverJob).filter(
+        DriverJob.id == delivery_id,
+        DriverJob.driver_id == driver.id,
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Delivery not found")
+
+    VALID_TRANSITIONS = {
+        "ACCEPTED": ["PICKUP_DONE"],
+        "PICKUP_DONE": ["IN_TRANSIT"],
+        "IN_TRANSIT": ["DELIVERED"],
+    }
+    allowed = VALID_TRANSITIONS.get(job.status, [])
+    new_status = payload.status.upper()
+    if new_status not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot transition from {job.status} to {new_status}. Allowed: {allowed}",
+        )
+
+    job.status = new_status
+    if new_status == "DELIVERED":
+        job.completed_at = datetime.utcnow()
+
+    delivery = db.query(OrderDelivery).filter(OrderDelivery.order_id == job.order_id).first()
+    if delivery:
+        delivery_status_map = {
+            "PICKUP_DONE": DeliveryStatus.PICKUP_COMPLETED,
+            "IN_TRANSIT": DeliveryStatus.IN_TRANSIT,
+            "DELIVERED": DeliveryStatus.DELIVERED,
+        }
+        if new_status in delivery_status_map:
+            delivery.status = delivery_status_map[new_status]
+            if new_status == "DELIVERED":
+                delivery.delivered_at = datetime.utcnow()
+
+    db.commit()
+    return {"status": job.status, "updated": True}
+
+
+@router.get("/earnings")
+def get_driver_earnings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Earnings summary for the driver mobile app."""
+    driver = _get_driver(db, current_user)
+
+    all_jobs = db.query(DriverJob).filter(DriverJob.driver_id == driver.id).all()
+
+    total = sum(j.driver_payout or 0 for j in all_jobs if j.status in ("DELIVERED", "PAID"))
+    pending = sum(j.driver_payout or 0 for j in all_jobs if j.status in ("ACCEPTED", "PICKUP_DONE", "IN_TRANSIT"))
+
+    now = datetime.utcnow()
+    this_week = sum(
+        j.driver_payout or 0 for j in all_jobs
+        if j.status in ("DELIVERED", "PAID") and j.completed_at and (now - j.completed_at).days <= 7
+    )
+    this_month = sum(
+        j.driver_payout or 0 for j in all_jobs
+        if j.status in ("DELIVERED", "PAID") and j.completed_at and j.completed_at.month == now.month and j.completed_at.year == now.year
+    )
+    today = sum(
+        j.driver_payout or 0 for j in all_jobs
+        if j.status in ("DELIVERED", "PAID") and j.completed_at and j.completed_at.date() == now.date()
+    )
+
+    paid_out = sum(j.driver_payout or 0 for j in all_jobs if j.status == "PAID")
+    available = total - paid_out
+
+    return {
+        "total": round(total, 2),
+        "available": round(available, 2),
+        "pending": round(pending, 2),
+        "this_week": round(this_week, 2),
+        "this_month": round(this_month, 2),
+        "today": round(today, 2),
+        "completed_deliveries": driver.total_deliveries,
+        "currency": "USD",
+    }
 
 
 # ── Rating ─────────────────────────────────────────────────────────────────────

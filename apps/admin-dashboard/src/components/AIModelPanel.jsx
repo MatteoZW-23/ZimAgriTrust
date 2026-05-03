@@ -171,7 +171,7 @@ export default function AIModelPanel({ token }) {
             Sovereign <span style={{ color: '#818cf8' }}>AI Engine</span>.
           </h1>
           <p style={{ fontSize: '15px', opacity: 0.7, maxWidth: '560px', lineHeight: 1.7, fontWeight: 600, margin: 0 }}>
-            Train, calibrate and monitor every machine learning model powering the AgriTrust platform — from crop disease detection to fraud prevention.
+            Train, calibrate and monitor every machine learning model powering the ZimAgritrust platform — from crop disease detection to fraud prevention.
           </p>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(255,255,255,0.1)', borderRadius: '24px', padding: '32px', minWidth: '200px', textAlign: 'center' }}>

@@ -267,7 +267,7 @@ export default function SystemConfigPanel({ token }) {
             Platform Management Console
           </h1>
           <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, maxWidth: 520 }}>
-            Manage economic parameters, regional node configurations, and secondary market liquidity rules for the AgriTrust ecosystem.
+            Manage economic parameters, regional node configurations, and secondary market liquidity rules for the ZimAgritrust ecosystem.
           </p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20, alignItems: 'flex-end' }}>

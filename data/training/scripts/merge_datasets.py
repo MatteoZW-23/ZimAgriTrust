@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgriTrust Dataset Merger
+ZimAgritrust Dataset Merger
 Combines two image datasets into one unified train/val split:
   1. Local dataset  — data/training/data/local_crops/   (30 classes, flat layout)
   2. Kaggle dataset — data/training/data/kaggle_crops/  (run download_kaggle_dataset.py first)
@@ -169,7 +169,7 @@ def main():
     parser.add_argument("--local-only", action="store_true", help="Use only the local dataset")
     args = parser.parse_args()
 
-    logger.info("=== AgriTrust Dataset Merger ===")
+    logger.info("=== ZimAgritrust Dataset Merger ===")
     logger.info("Local  : %s", LOCAL_SRC)
     logger.info("Kaggle : %s", KAGGLE_SRC)
     logger.info("Output : %s", MERGED_ROOT)

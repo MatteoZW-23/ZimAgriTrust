@@ -8,7 +8,7 @@ class AuditService:
     @staticmethod
     def run_reconciliation(db: Session):
         """
-        AgriTrust Spec: Daily Financial Integrity Audit.
+        ZimAgritrust Spec: Daily Financial Integrity Audit.
         Ensures Virtual Ledger == Physical Expectation.
         """
         logging.info("[AUDIT] INITIATING DAILY RECONCILIATION...")

@@ -298,7 +298,7 @@ class WhatsAppService:
 
             if any(k in body_clean for k in ["earn", "commission"]):
                 commission = user.trust_score * 2.25
-                return (f"💰 *AgriTrust Agent Earnings*\n\n"
+                return (f"💰 *ZimAgritrust Agent Earnings*\n\n"
                         f"Current Balance: ${user.balance_usd:.2f}\n"
                         f"Unpaid Commission: ${commission:.2f}\n"
                         f"Total Life Earnings: ${user.balance_usd + 1450.00:.2f}\n\n"
@@ -522,7 +522,7 @@ class WhatsAppService:
                     step_num += 1
                     steps.append(f"{step_num}️⃣ `sell` - List your first crop")
                 
-                return (f"👋 *Welcome to AgriTrust, {user.full_name.split(' ')[0]}!*\n\n"
+                return (f"👋 *Welcome to ZimAgritrust, {user.full_name.split(' ')[0]}!*\n\n"
                         f"You're a {user.role.title()} on our platform.\n\n"
                         f"━━━━━━━━━━━━━━━━━━━━\n"
                         f"✅ *Get started:*\n"
@@ -537,7 +537,7 @@ class WhatsAppService:
                 from app.models.listing import Listing
                 pending_count = db.query(func.count(Listing.id)).filter(Listing.status == ListingStatus.PENDING).scalar()
                 
-                return (f"👨‍💼 *AgriTrust Agent Menu*\n\n"
+                return (f"👨‍💼 *ZimAgritrust Agent Menu*\n\n"
                         f"📋 *Field Operations*\n"
                         f"• `tasks` - Pending verifications ({pending_count})\n"
                         f"• `map` - Target locations\n"
@@ -558,7 +558,7 @@ class WhatsAppService:
                 from app.models.listing import Listing
                 active_listings = db.query(func.count(Listing.id)).filter(Listing.seller_id == user.id, Listing.status == ListingStatus.ACTIVE).scalar()
                 
-                return (f"👨‍🌾 *AgriTrust Farmer Menu*\n\n"
+                return (f"👨‍🌾 *ZimAgritrust Farmer Menu*\n\n"
                         f"🌱 *Farming*\n"
                         f"• `sell` - List crops for sale\n"
                         f"• `my listings` - View/manage listings ({active_listings})\n"
@@ -581,7 +581,7 @@ class WhatsAppService:
                         f"*Reply with any command above* 👆")
 
             if user.role == UserRole.BUYER:
-                return (f"� *AgriTrust Buyer Menu*\n\n"
+                return (f"� *ZimAgritrust Buyer Menu*\n\n"
                         f"� *Procurement*\n"
                         f"• `buy` - Search for crops\n"
                         f"• `my orders` - Track purchases\n"
@@ -602,11 +602,11 @@ class WhatsAppService:
                         f"• `dispute` - Report issues\n\n"
                         f"*Reply with any command above* 👆")
 
-            return "Welcome to AgriTrust! Type your request and I'll assist you."
+            return "Welcome to ZimAgritrust! Type your request and I'll assist you."
 
         if body_clean == "stop":
             # Missing Function #152 Opt-out
-            return "🚫 *Messaging Opt-out Confirmed*\n\nYou will no longer receive proactive alerts from AgriTrust. To resume, reply 'START' at any time."
+            return "🚫 *Messaging Opt-out Confirmed*\n\nYou will no longer receive proactive alerts from ZimAgritrust. To resume, reply 'START' at any time."
 
         if body_clean == "start":
             # Missing Function #153 Opt-in
@@ -697,13 +697,13 @@ class WhatsAppService:
         if "feedback" in body_clean:
             msg = body_clean.replace("feedback", "").strip()
             if msg:
-                return f"🙏 *Thank you for your feedback!*\n\n_{msg}_\n\nYour input helps us improve AgriTrust."
+                return f"🙏 *Thank you for your feedback!*\n\n_{msg}_\n\nYour input helps us improve ZimAgritrust."
             return "🙏 *Submit Feedback*\n\nType your feedback after the word:\n`feedback [your message]`"
 
         # ── apply agent ──────────────────────────────────────────────────────────
         if any(k in body_clean for k in ["apply agent", "become agent", "join agent"]):
             return (f"👨‍💼 *Agent Application*\n\n"
-                    f"To become an AgriTrust field agent:\n\n"
+                    f"To become an ZimAgritrust field agent:\n\n"
                     f"1️⃣ Visit our portal to complete the application\n"
                     f"2️⃣ Complete background verification\n"
                     f"3️⃣ Pass the online training modules\n"
@@ -712,11 +712,11 @@ class WhatsAppService:
                     f"• Valid National ID\n"
                     f"• Smartphone with camera\n"
                     f"• Trust Score ≥ 60\n\n"
-                    f"Apply at: *agritrust.co.zw/agents*")
+                    f"Apply at: *ZimAgritrust.co.zw/agents*")
 
         # ── news / trending ──────────────────────────────────────────────────────
         if any(k in body_clean for k in ["news", "trending", "popular"]):
-            return (f"📰 *AgriTrust Market News*\n\n"
+            return (f"📰 *ZimAgritrust Market News*\n\n"
                     f"• Maize prices up 8% this week — strong export demand\n"
                     f"• Soybean harvest forecast revised upward for Mashonaland\n"
                     f"• New GMB floor prices effective May 2026\n"
@@ -775,7 +775,7 @@ class WhatsAppService:
                     f"• EcoCash\n"
                     f"• OneMoney\n"
                     f"• Bank Transfer (USD)\n\n"
-                    f"To add or change your payment method, visit the web portal at *agritrust.co.zw*")
+                    f"To add or change your payment method, visit the web portal at *ZimAgritrust.co.zw*")
 
         # ── UNRECOGNIZED COMMAND ─────────────────────────────────────────────────
         return (f"🤔 *I didn't understand '{body}'*\n\n"
@@ -897,7 +897,7 @@ class WhatsAppService:
         
         # Build profile message
         profile_msg = (
-            f"{role_info['emoji']} *AgriTrust Profile*\n\n"
+            f"{role_info['emoji']} *ZimAgritrust Profile*\n\n"
             f"*Name:* {user.full_name}\n"
             f"*Role:* {role_info['label']}\n"
             f"*Phone:* {user.phone_number}\n"
@@ -1264,7 +1264,7 @@ class WhatsAppService:
         grade = analysis["grade"]["grade"]
         health = analysis["health"]["status"]
         
-        response = (f"🔬 *AgriTrust AI Vision Analysis*\n\n"
+        response = (f"🔬 *ZimAgritrust AI Vision Analysis*\n\n"
                     f"🌿 **Detected Crop:** {crop_name}\n"
                     f"📊 **Confidence:** {confidence_pct}%\n"
                     f"⭐ **Estimated Grade:** {grade}\n"
@@ -1449,7 +1449,7 @@ class WhatsAppService:
         balance = wallet_service.get_balance(db, user.id)
         bal_str = f"${float(balance):.2f}" if balance is not None else "$0.00"
         return (
-            f"💰 *AgriTrust Wallet*\n\n"
+            f"💰 *ZimAgritrust Wallet*\n\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"Available Balance: *{bal_str}*\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -1601,7 +1601,7 @@ class WhatsAppService:
             return await WhatsAppService._handle_profile_view(db, user)
         if any(k in body_clean for k in ["help", "menu", "hi", "hello", "start"]):
             status = await WhatsAppService.get_status()
-            return (f"👨‍💻 *AgriTrust Admin Menu*\n\n"
+            return (f"👨‍💻 *ZimAgritrust Admin Menu*\n\n"
                     f"🛡️ *System*\n"
                     f"• `sys health` - Full system status\n"
                     f"• `logs` - Recent system events\n"
@@ -2002,7 +2002,7 @@ class WhatsAppService:
         return (f"{star_display} *Rating Submitted*\n\n"
                 f"Order: `{order_id}`\n"
                 f"Rating: {star_count}/5\n\n"
-                f"Thank you for helping build trust in the AgriTrust marketplace!")
+                f"Thank you for helping build trust in the ZimAgritrust marketplace!")
 
     @staticmethod
     async def _handle_agent_performance(db, user):
@@ -2138,7 +2138,7 @@ class WhatsAppService:
             f"📋 *Quick Checklist:*\n"
             f"✅ Check market prices\n"
             f"✅ Prepare storage\n"
-            f"✅ List on AgriTrust\n"
+            f"✅ List on ZimAgritrust\n"
             f"✅ Contact buyers early\n\n"
             f"Reply 'prices' to check current rates\n"
             f"Reply 'sell' to list your harvest"
@@ -2252,7 +2252,7 @@ class WhatsAppService:
             f"To: {recipient}\n"
             f"Date: {timestamp.strftime('%d %b %Y %H:%M')}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"Thank you for using AgriTrust! 🌾\n\n"
+            f"Thank you for using ZimAgritrust! 🌾\n\n"
             f"Reply 'wallethist' to view all transactions"
         )
         

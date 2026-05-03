@@ -33,7 +33,7 @@ class AcademyService:
         },
         {
             "id": 4,
-            "question": "The AgriTrust app prevents verification if your GPS is more than how far from the listing location?",
+            "question": "The ZimAgritrust app prevents verification if your GPS is more than how far from the listing location?",
             "options": ["10m", "50m", "100m", "500m"],
             "correct": 1
         },
@@ -50,7 +50,7 @@ class AcademyService:
         },
         {
             "id": 6,
-            "question": "In the AgriTrust ecosystem, what does ZiG represent?",
+            "question": "In the ZimAgritrust ecosystem, what does ZiG represent?",
             "options": ["Zimbabwe Gold (Local Currency)", "Zimbabwe Grain", "Zone Intelligence Gate", "Zero Internal Growth"],
             "correct": 0
         },
@@ -100,7 +100,7 @@ class AcademyService:
         },
         {
             "id": 11,
-            "question": "ZIMBABWE LAWS: Which act governs the protection of personal farmer data collected by AgriTrust agents?",
+            "question": "ZIMBABWE LAWS: Which act governs the protection of personal farmer data collected by ZimAgritrust agents?",
             "options": [
                 "Agricultural Marketing Authority Act",
                 "Data Protection Act [Chapter 11:12]",

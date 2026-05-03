@@ -12,7 +12,7 @@ class CertificateService:
     @staticmethod
     def generate_agent_certificate(agent_name: str, agent_id: uuid.UUID, agent_code: str, issue_date: datetime, expiry_date: datetime):
         """
-        Generates a secure PDF certificate for a newly certified AgriTrust Agent.
+        Generates a secure PDF certificate for a newly certified ZimAgritrust Agent.
         In the field, this PDF can be verified via the embedded QR code.
         """
         output_dir = "certificates"
@@ -32,7 +32,7 @@ class CertificateService:
         
         # --- Header ---
         c.setFont("Helvetica-Bold", 40)
-        c.drawCentredString(width/2, height - 1.5*inch, "AGRITRUST ACADEMY")
+        c.drawCentredString(width/2, height - 1.5*inch, "ZimAgritrust ACADEMY")
         c.setFont("Helvetica", 20)
         c.drawCentredString(width/2, height - 2*inch, "OFFICIAL FIELD AGENT CERTIFICATION")
         
@@ -45,7 +45,7 @@ class CertificateService:
         
         c.setFont("Helvetica", 16)
         c.drawCentredString(width/2, height - 5*inch, f"has successfully completed the 10-module training curriculum")
-        c.drawCentredString(width/2, height - 5.3*inch, "and is hereby recognized as a Certified AgriTrust Agent.")
+        c.drawCentredString(width/2, height - 5.3*inch, "and is hereby recognized as a Certified ZimAgritrust Agent.")
         
         # --- Details ---
         c.setFont("Helvetica-Bold", 12)
@@ -54,7 +54,7 @@ class CertificateService:
         c.drawString(1*inch, 0.9*inch, f"EXPIRES: {expiry_date.strftime('%Y-%m-%d')}")
         
         # --- QR Code (Verification) ---
-        qr_data = f"AgriTrust:AgentCert:{agent_id}:{agent_code}"
+        qr_data = f"ZimAgritrust:AgentCert:{agent_id}:{agent_code}"
         qr = qrcode.QRCode(version=1, box_size=10, border=1)
         qr.add_data(qr_data)
         qr.make(fit=True)

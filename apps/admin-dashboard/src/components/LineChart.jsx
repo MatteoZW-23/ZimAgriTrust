@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 
 /**
- * Robust SVG LineChart for AgriTrust Financial Dashboards.
+ * Robust SVG LineChart for ZimAgritrust Financial Dashboards.
  * Designed to handle small time series without external dependencies like Chart.js or D3.
  */
 

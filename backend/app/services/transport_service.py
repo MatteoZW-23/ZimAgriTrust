@@ -1,5 +1,5 @@
 """
-AgriTrust Transport Service
+ZimAgritrust Transport Service
 Implements the full decision tree from the spec:
   - Scenario selection (5 types)
   - Transport fee calculation
@@ -362,7 +362,7 @@ def _sms(phone: Optional[str], msg: str):
 def _notify_driver_new_job(driver: Driver, order: Order, fee: dict):
     phone = driver.user.phone_number if driver.user else None
     _sms(phone, (
-        f"AgriTrust: 📋 New delivery job available. "
+        f"ZimAgritrust: 📋 New delivery job available. "
         f"Order #{order.order_number}. "
         f"Distance: {fee.get('distance_fee', 0) / 0.5:.0f}km. "
         f"Fee: ${fee['driver_payout']:.2f}. "
@@ -379,19 +379,19 @@ def _notify_job_confirmed(db: Session, job: DriverJob):
     driver_name  = job.driver.user.full_name if job.driver and job.driver.user else "Driver"
     vehicle      = job.driver.vehicle_reg    if job.driver else "N/A"
 
-    _sms(farmer_phone, f"AgriTrust Order #{order.order_number}: Driver {driver_name} ({vehicle}) will collect your goods.")
-    _sms(buyer_phone,  f"AgriTrust Order #{order.order_number}: Driver {driver_name} ({vehicle}) assigned. License: {job.driver.license_number if job.driver else 'N/A'}.")
+    _sms(farmer_phone, f"ZimAgritrust Order #{order.order_number}: Driver {driver_name} ({vehicle}) will collect your goods.")
+    _sms(buyer_phone,  f"ZimAgritrust Order #{order.order_number}: Driver {driver_name} ({vehicle}) assigned. License: {job.driver.license_number if job.driver else 'N/A'}.")
 
 
 def _notify_driver_paid(driver: Driver, job: DriverJob):
     phone = driver.user.phone_number if driver.user else None
-    _sms(phone, f"AgriTrust: 💰 ${job.driver_payout:.2f} added to your wallet for Job #{job.id}.")
+    _sms(phone, f"ZimAgritrust: 💰 ${job.driver_payout:.2f} added to your wallet for Job #{job.id}.")
 
 
 def _notify_driver_warning(driver: Driver, job: DriverJob):
     phone = driver.user.phone_number if driver.user else None
     _sms(phone, (
-        f"AgriTrust: ⚠️ Warning #{driver.warning_count} issued for low rating on Job #{job.id}. "
+        f"ZimAgritrust: ⚠️ Warning #{driver.warning_count} issued for low rating on Job #{job.id}. "
         f"Your fee is held for 24 hours. Improve service to avoid suspension."
     ))
 
@@ -399,6 +399,6 @@ def _notify_driver_warning(driver: Driver, job: DriverJob):
 def _notify_driver_suspended(driver: Driver):
     phone = driver.user.phone_number if driver.user else None
     _sms(phone, (
-        "AgriTrust: 🚨 Your driver account has been suspended due to repeated low ratings. "
+        "ZimAgritrust: 🚨 Your driver account has been suspended due to repeated low ratings. "
         "Complete retraining to reactivate. Contact support for details."
     ))

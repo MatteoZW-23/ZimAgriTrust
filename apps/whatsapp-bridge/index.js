@@ -78,13 +78,13 @@ app.get('/qr', async (req, res) => {
         res.send(`
             <html>
                 <head>
-                    <title>AgriTrust WhatsApp Login</title>
+                    <title>ZimAgritrust WhatsApp Login</title>
                     <meta http-equiv="refresh" content="20">
                 </head>
                 <body style="background: #111; color: #eee; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; margin: 0;">
                     <div style="background: #222; padding: 2rem; border-radius: 1rem; box-shadow: 0 10px 50px rgba(0,0,0,0.8); text-align: center; border: 1px solid #333;">
                         <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" width="60" style="margin-bottom: 1rem;">
-                        <h1 style="margin: 0 0 0.5rem 0; color: #25D366;">AgriTrust Bridge</h1>
+                        <h1 style="margin: 0 0 0.5rem 0; color: #25D366;">ZimAgritrust Bridge</h1>
                         <p style="color: #888; margin-bottom: 2rem;">Scan this QR code with your WhatsApp app <br/> (Settings > Linked Devices > Link a Device)</p>
                         
                         <div style="background: white; padding: 1.5rem; border-radius: 0.5rem; display: inline-block;">

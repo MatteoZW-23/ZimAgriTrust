@@ -95,7 +95,7 @@ export default function AgentLoginScreen({ onLogin }) {
           <div className="v4-login-header">
             <div className="v4-brand">
               <i className="fas fa-clipboard-check" style={{ color: "#20963D" }}></i>
-              <span>AgriTrust Agent</span>
+              <span>ZimAgritrust Agent</span>
             </div>
             <h1>{step === 1 ? 'Agent Portal' : 'Security Verification'}</h1>
             <p className="v4-subtitle">
@@ -187,7 +187,7 @@ export default function AgentLoginScreen({ onLogin }) {
           )}
 
           <div className="v4-card-footer">
-            <p>AgriTrust v1.0 • Regional Node</p>
+            <p>ZimAgritrust v1.0 • Agent Portal</p>
           </div>
         </div>
       </div>

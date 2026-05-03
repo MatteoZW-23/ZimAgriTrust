@@ -50,7 +50,7 @@ class USSDService:
             if not user or not user.ussd_pin_hash:
                 await delete_key(session_key)
                 return USSDResponse(
-                    message="END Phone not registered or no PIN set.\nDownload AgriTrust app to register.",
+                    message="END Phone not registered or no PIN set.\nDownload ZimAgritrust app to register.",
                     end_session=True,
                 )
             from app.core.security import verify_password
@@ -218,7 +218,7 @@ class USSDService:
             if listing.seller and listing.seller.phone_number:
                 NotificationService._send_sms(
                     listing.seller.phone_number,
-                    f"AgriTrust: New offer for {listing.product_type} {qty:.0f}kg "
+                    f"ZimAgritrust: New offer for {listing.product_type} {qty:.0f}kg "
                     f"from {user.full_name}. Check your dashboard.",
                 )
 
@@ -271,7 +271,7 @@ class USSDService:
                 await set_json(session_key, sess)
                 return USSDResponse(message=self.root_menu())
             await delete_key(session_key)
-            return USSDResponse(message="END Open the AgriTrust app for full history.", end_session=True)
+            return USSDResponse(message="END Open the ZimAgritrust app for full history.", end_session=True)
 
         # ── DISPUTE FLOW ──────────────────────────────────────────────────────
         if state == "DISPUTE_SELECT":
@@ -314,7 +314,7 @@ class USSDService:
 
             NotificationService._send_sms(
                 payload.phone_number,
-                f"AgriTrust: Dispute #{str(dispute.id)[:8].upper()} created. "
+                f"ZimAgritrust: Dispute #{str(dispute.id)[:8].upper()} created. "
                 f"An agent will contact you within 24 hours.",
             )
             await delete_key(session_key)
@@ -528,7 +528,7 @@ class USSDService:
             await delete_key(session_key)
             return USSDResponse(
                 message=(
-                    "END AgriTrust Help:\n"
+                    "END ZimAgritrust Help:\n"
                     "1-Sell  2-Buy  3-Prices\n"
                     "4-Profile  5-Wallet\n"
                     "6-Dispute  7-PIN  8-History\n"
@@ -551,7 +551,7 @@ class USSDService:
     @staticmethod
     def root_menu() -> str:
         return (
-            "CON AgriTrust *123#\n"
+            "CON ZimAgritrust *123#\n"
             "1. Sell Product\n"
             "2. Buy Products\n"
             "3. AI Price Intel\n"

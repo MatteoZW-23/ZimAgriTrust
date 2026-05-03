@@ -21,10 +21,18 @@ from app.models.user import User, UserRole, UserStatus, FarmerProfile, BuyerProf
 from app.core.security import get_password_hash
 from app.services.startup_scraper import run_startup_scrape, start_scheduler
 from app.db.schema_patch import apply_schema_patches
+from app.core.security_middleware import SecurityMiddleware, AuditLoggingMiddleware
+from app.models.session import UserSession  # noqa: F401 — registers session table
+from app.core.health import router as health_router
+from app.core.error_tracking import init_sentry
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("SYSLOG | Initializing Strategic Database Schema...")
+    
+    # Initialize Sentry error tracking
+    init_sentry()
+    
     try:
         Base.metadata.create_all(bind=engine)
         print(f"SYSLOG | Tables Confirmed: {list(Base.metadata.tables.keys())}")
@@ -39,6 +47,9 @@ async def lifespan(app: FastAPI):
 
     except Exception as e:
         print(f"BOOT_ERROR | Managed startup failure: {str(e)}")
+        # Capture startup errors in Sentry
+        from app.core.error_tracking import capture_exception
+        capture_exception(e, {"context": "startup"})
 
     # ── SCRAPING STARTUP ──────────────────────────────────────────────────
     import asyncio
@@ -63,6 +74,13 @@ if settings.ALLOWED_HOSTS.strip() != "*":
 if settings.FORCE_HTTPS:
     app.add_middleware(HTTPSRedirectMiddleware)
 
+# Add security middleware
+app.add_middleware(SecurityMiddleware)
+
+# Add audit logging for admin routes
+if settings.ADMIN_AUDIT_LOGGING:
+    app.add_middleware(AuditLoggingMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
@@ -72,6 +90,7 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
+app.include_router(health_router, prefix="/health", tags=["health"])
 
 # --- INDUSTRIAL STRENGTH MIDDLEWARE ---
 

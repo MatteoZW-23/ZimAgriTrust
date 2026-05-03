@@ -18,7 +18,7 @@ class ReceiptService:
 
     def generate_receipt_pdf(self, order: Order) -> str:
         """
-        Generates a professional, tamper-proof PDF receipt for an AgriTrust transaction.
+        Generates a professional, tamper-proof PDF receipt for an ZimAgritrust transaction.
         """
         filename = f"RECEIPT_{order.order_number}.pdf"
         filepath = os.path.join(self.output_dir, filename)
@@ -32,10 +32,10 @@ class ReceiptService:
             'TitleStyle',
             parent=styles['Heading1'],
             fontSize=24,
-            textColor=colors.HexColor("#2E7D32"), # AgriTrust Green
+            textColor=colors.HexColor("#2E7D32"), # ZimAgritrust Green
             spaceAfter=20
         )
-        elements.append(Paragraph("AgriTrust Transaction Receipt", title_style))
+        elements.append(Paragraph("ZimAgritrust Transaction Receipt", title_style))
         elements.append(Paragraph(f"Date Issued: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
         elements.append(Spacer(1, 1*cm))
 
@@ -66,7 +66,7 @@ class ReceiptService:
 
         # 3. VERIFICATION QR CODE
         # We encode a verification URL (simulated)
-        verification_data = f"https://agritrust.zw/verify/{order.id}"
+        verification_data = f"https://ZimAgritrust.zw/verify/{order.id}"
         qr = qrcode.QRCode(version=1, box_size=10, border=5)
         qr.add_data(verification_data)
         qr.make(fit=True)
@@ -81,7 +81,7 @@ class ReceiptService:
         elements.append(qr_img)
         
         # 4. FOOTER
-        footer_text = "This is a digitally generated document by the AgriTrust Sovereign AI Network. No signature required."
+        footer_text = "This is a digitally generated document by the ZimAgritrust Sovereign AI Network. No signature required."
         elements.append(Spacer(1, 2*cm))
         elements.append(Paragraph(footer_text, styles['Italic']))
 

@@ -20,7 +20,6 @@ services:
   redis:
     image: redis:7
     ports:
-    
       - "6380:6379"
 
   backend:
@@ -31,39 +30,124 @@ services:
       DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/agri_trust
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: test-key-replace-in-prod
-      CORS_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:5000,http://localhost:5173,http://localhost:19006
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:5000,http://localhost:19006,http://localhost:19000,http://localhost:19002,http://localhost:5173
       ALLOWED_HOSTS: "*"
       # Limit watchfiles to only the app source — prevents inotify exhaustion
       WATCHFILES_FORCE_POLLING: "false"
+      # Security Configuration
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_REQUESTS: "100"
+      RATE_LIMIT_WINDOW_SECONDS: "60"
+      ADMIN_RATE_LIMIT_REQUESTS: "30"
+      ADMIN_RATE_LIMIT_WINDOW_SECONDS: "60"
+      ADMIN_IP_WHITELIST: ""
+      ADMIN_SESSION_TIMEOUT_MINUTES: "30"
+      ADMIN_MFA_ENABLED: "false"
+      ADMIN_AUDIT_LOGGING: "true"
+      ACCOUNT_LOCKOUT_ENABLED: "true"
+      ACCOUNT_LOCKOUT_ATTEMPTS: "5"
+      ACCOUNT_LOCKOUT_DURATION_MINUTES: "30"
+      PASSWORD_MIN_LENGTH: "8"
+      PASSWORD_REQUIRE_UPPERCASE: "true"
+      PASSWORD_REQUIRE_LOWERCASE: "true"
+      PASSWORD_REQUIRE_DIGIT: "true"
+      PASSWORD_REQUIRE_SPECIAL: "true"
     volumes:
       - ./backend:/app
       - ./data/ml-weights:/app/ml_weights
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
-    sysctls:
-      - fs.inotify.max_user_watches=524288
-      - fs.inotify.max_user_instances=512
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
 
-  node-gateway:
-    build: ./apps/iot-gateway
+  public-website:
+    build: ./apps/public-website
     ports:
-      - "3005:3005"
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8080/api/v1
+      - VITE_ADMIN_URL=http://localhost:3001
+      - VITE_AGENT_URL=http://localhost:3002
+      - VITE_APP_PORTAL_URL=http://localhost:3003
+    volumes:
+      - ./apps/public-website:/app
+      - /app/node_modules
     depends_on:
       - backend
 
-  agent-dashboard:
+  admin-dashboard:
     build: ./apps/admin-dashboard
     ports:
-      - "3001:3000"
+      - "3001:3001"
     environment:
       - VITE_API_URL=http://localhost:8080/api/v1
     volumes:
       - ./apps/admin-dashboard:/app
       - /app/node_modules
+    depends_on:
+      - backend
+
+  agent-portal:
+    build: ./apps/agent-portal
+    ports:
+      - "3002:3002"
+    environment:
+      - VITE_API_URL=http://localhost:8080/api/v1
+    volumes:
+      - ./apps/agent-portal:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+  app-portal:
+    build: ./apps/app-portal
+    ports:
+      - "3003:3003"
+    environment:
+      - VITE_API_URL=http://localhost:8080/api/v1
+    volumes:
+      - ./apps/app-portal:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+  # User Mobile App (Farmer + Buyer) - Development only
+  # Mobile apps typically run with Expo outside Docker for development
+  # Use: cd apps/user-mobile && npm start
+  user-mobile:
+    build: ./apps/user-mobile
+    ports:
+      - "19000:19000"
+      - "19001:19001"
+    environment:
+      - EXPO_PUBLIC_API_URL=http://localhost:8080/api/v1
+    volumes:
+      - ./apps/user-mobile:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+  # Driver Mobile App (Driver Only) - Development only
+  # Mobile apps typically run with Expo outside Docker for development
+  # Use: cd apps/driver-mobile && npm start
+  driver-mobile:
+    build: ./apps/driver-mobile
+    ports:
+      - "19002:19006"
+    environment:
+      - EXPO_PUBLIC_API_URL=http://localhost:8080/api/v1
+    volumes:
+      - ./apps/driver-mobile:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+  node-gateway:
+    build: ./apps/iot-gateway
+    ports:
+      - "3005:3005"
     depends_on:
       - backend
 
@@ -98,7 +182,7 @@ services:
   notebook-scheduler:
     build:
       context: .
-      dockerfile: Dockerfile.scheduler
+      dockerfile: config/Dockerfile.scheduler
     volumes:
       - ./data/research:/research
       - ./data/ml-weights:/backend/ml_weights

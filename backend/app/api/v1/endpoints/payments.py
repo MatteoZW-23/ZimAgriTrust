@@ -177,7 +177,7 @@ def initiate_payment(
     elif method == "bank":
         instructions = {
             "method": "bank",
-            "bank_name": "AgriTrust Trust Account — CBZ Bank",
+            "bank_name": "ZimAgritrust Trust Account — CBZ Bank",
             "account_number": os.getenv("BANK_ACCOUNT_NUMBER", "1234567890"),
             "branch_code": os.getenv("BANK_BRANCH_CODE", "001"),
             "reference": merchant_ref,
@@ -200,7 +200,7 @@ def initiate_payment(
             "amount": order.total_amount,
             "currency": order.currency,
             "steps": [
-                "Visit your nearest AgriTrust agent",
+                "Visit your nearest ZimAgritrust agent",
                 f"Provide reference: {payment_ref}",
                 f"Pay: {order.currency} {order.total_amount:.2f} in cash",
                 "Agent will confirm payment on the platform",

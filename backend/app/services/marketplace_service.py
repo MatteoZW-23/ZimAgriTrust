@@ -24,7 +24,7 @@ def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
 
 def calculate_seller_settlement(amount: float, trust_score: float, currency: str = "USD"):
     """
-    AgriTrust Fee Structure:
+    ZimAgritrust Fee Structure:
     - Standardfee: 1.0% (0.01)
     - High Trust Discount: 0.5% if trust_score > 90
     """
@@ -147,7 +147,7 @@ def reject_offer(db: Session, offer: Offer) -> Offer:
 
 def counter_offer(db: Session, offer: Offer, counter_price: float, actor: User) -> Offer:
     """
-    AgriTrust Spec (Diagram 5): Negotiation Flow.
+    ZimAgritrust Spec (Diagram 5): Negotiation Flow.
     Allows a party to suggest a new price.
     """
     if offer.status not in {OfferStatus.PENDING, OfferStatus.COUNTERED}:

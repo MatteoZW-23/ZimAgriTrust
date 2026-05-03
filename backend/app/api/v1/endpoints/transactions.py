@@ -148,7 +148,7 @@ def download_order_receipt(
     current_user: User = Depends(get_current_user)
 ):
     """
-    AgriTrust Spec: Digital Receipt Engine.
+    ZimAgritrust Spec: Digital Receipt Engine.
     Generates and downloads a formal PDF receipt.
     """
     order = db.query(Order).filter(Order.id == order_id).first()
@@ -166,7 +166,7 @@ def download_order_receipt(
         pdf_path = receipt_service.generate_receipt_pdf(order)
         return FileResponse(
             path=pdf_path, 
-            filename=f"AgriTrust_Receipt_{order.order_number}.pdf",
+            filename=f"ZimAgritrust_Receipt_{order.order_number}.pdf",
             media_type="application/pdf"
         )
     except Exception as e:

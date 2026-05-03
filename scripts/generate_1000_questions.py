@@ -57,7 +57,7 @@ def generate_pool():
 
     output = {
         "exam_id": "MASTER-POOL-1000-2026",
-        "title": "AgriTrust Certified Agent - Master Question Pool (1000 Items)",
+        "title": "ZimAgritrust Certified Agent - Master Question Pool (1000 Items)",
         "total_pool_size": len(pool),
         "questions": pool
     }

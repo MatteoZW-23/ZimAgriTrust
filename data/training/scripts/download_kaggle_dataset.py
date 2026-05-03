@@ -156,7 +156,7 @@ def write_class_map(class_names: list[str]) -> None:
 
 
 def main():
-    logger.info("=== AgriTrust Kaggle Dataset Preprocessor ===")
+    logger.info("=== ZimAgritrust Kaggle Dataset Preprocessor ===")
 
     dataset_path = download_dataset()
 

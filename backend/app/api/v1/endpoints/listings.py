@@ -157,7 +157,7 @@ def counter_listing_offer(
     lockdown: bool = Depends(check_lockdown)
 ) -> Offer:
     """
-    AgriTrust Spec: Negotiation Lifecycle.
+    ZimAgritrust Spec: Negotiation Lifecycle.
     """
     offer = db.query(Offer).filter(Offer.id == offer_id, Offer.listing_id == listing_id).first()
     if not offer:

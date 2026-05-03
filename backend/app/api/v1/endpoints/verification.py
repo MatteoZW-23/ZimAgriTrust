@@ -22,14 +22,36 @@ from app.models.user import User, UserRole
 from app.models.system_audit import SystemAudit
 from app.services.notification_service import NotificationService
 from app.db.base import Base
+from app.core.config import settings
 
 router = APIRouter()
 
-UPLOAD_DIR = "uploads/id_documents"
+UPLOAD_DIR = settings.SECURE_UPLOAD_DIR if hasattr(settings, "SECURE_UPLOAD_DIR") else "uploads/id_documents"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
-MAX_SIZE_MB = 10
+ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
+MAX_SIZE_MB = 5
+
+# Magic bytes for deep file type validation
+MAGIC_BYTES = {
+    b'\xff\xd8\xff': "image/jpeg",
+    b'\x89PNG\r\n\x1a\n': "image/png",
+    b'RIFF': "image/webp",  # RIFF....WEBP
+    b'%PDF': "application/pdf",
+}
+
+
+def _validate_file_magic(file: UploadFile) -> str:
+    """Validate actual file content via magic bytes to prevent extension spoofing."""
+    header = file.file.read(16)
+    file.file.seek(0)
+    for magic, mime in MAGIC_BYTES.items():
+        if header.startswith(magic):
+            # WebP has secondary check
+            if mime == "image/webp" and b"WEBP" not in header[:12]:
+                continue
+            return mime
+    return ""
 
 
 # ── Model ────────────────────────────────────────────────────────────────────
@@ -61,13 +83,35 @@ class IDVerificationRequest(Base):
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _save_file(file: UploadFile, user_id: str, slot: str) -> str:
-    """Save uploaded file and return relative path."""
-    if file.content_type not in ALLOWED_TYPES:
+    """Save uploaded file with deep validation (magic bytes, extension, size)."""
+    if not file.content_type or file.content_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(status_code=400, detail=f"File type {file.content_type} not allowed. Use JPEG, PNG, WebP or PDF.")
 
-    ext = file.filename.rsplit(".", 1)[-1] if "." in file.filename else "jpg"
-    filename = f"{user_id}_{slot}_{uuid.uuid4().hex[:8]}.{ext}"
+    # Deep magic bytes validation prevents extension spoofing
+    detected = _validate_file_magic(file)
+    if detected != file.content_type:
+        raise HTTPException(status_code=400, detail="File content does not match declared type. Possible spoofing attempt.")
+
+    # Validate extension matches content type
+    ext_map = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "application/pdf": "pdf"}
+    expected_ext = ext_map.get(file.content_type, "bin")
+    actual_ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if actual_ext != expected_ext:
+        raise HTTPException(status_code=400, detail=f"File extension .{actual_ext} does not match content type.")
+
+    # Check filename for path traversal / null bytes
+    safe_name = os.path.basename(file.filename)
+    if "\x00" in safe_name or ".." in safe_name or "/" in safe_name or "\\" in safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename.")
+
+    filename = f"{user_id}_{slot}_{uuid.uuid4().hex[:16]}.{expected_ext}"
     dest = os.path.join(UPLOAD_DIR, filename)
+
+    # Ensure destination is within UPLOAD_DIR (path traversal defense)
+    real_dest = os.path.realpath(dest)
+    real_upload = os.path.realpath(UPLOAD_DIR)
+    if not real_dest.startswith(real_upload):
+        raise HTTPException(status_code=400, detail="Invalid upload path.")
 
     with open(dest, "wb") as f:
         shutil.copyfileobj(file.file, f)
@@ -279,7 +323,7 @@ async def approve_verification(
             f"✅ *Identity Verified*\n\n"
             f"Hello {user.full_name}, your ID documents have been reviewed and approved.\n\n"
             f"🏆 Trust Score +15 — you now have full platform access.\n\n"
-            f"Thank you for verifying with AgriTrust!"
+            f"Thank you for verifying with ZimAgritrust!"
         )
 
     return {"status": "approved", "request_id": str(request_id)}

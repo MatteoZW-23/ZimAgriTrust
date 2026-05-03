@@ -238,7 +238,7 @@ def run_maintenance(
             
         elif operation == "reindex":
             # Reindex database tables
-            db.execute(text("REINDEX DATABASE agritrust"))
+            db.execute(text("REINDEX DATABASE ZimAgritrust"))
             result["status"] = "success"
             result["message"] = "Reindex completed"
             

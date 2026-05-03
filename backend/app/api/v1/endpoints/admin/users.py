@@ -19,13 +19,13 @@ async def _notify_user(user: User, action: str, reason: str):
     messages = {
         "SUSPENDED": (
             f"🚨 *Account Suspended*\n\n"
-            f"Hello {name}, your AgriTrust account has been suspended.\n\n"
+            f"Hello {name}, your ZimAgritrust account has been suspended.\n\n"
             f"*Reason:* {reason}\n\n"
             f"Contact support to appeal this decision."
         ),
         "ACTIVE": (
             f"✅ *Account Reinstated*\n\n"
-            f"Hello {name}, your AgriTrust account has been reactivated.\n\n"
+            f"Hello {name}, your ZimAgritrust account has been reactivated.\n\n"
             f"*Reason:* {reason}\n\n"
             f"You can now log in and resume trading."
         ),
@@ -37,13 +37,13 @@ async def _notify_user(user: User, action: str, reason: str):
         ),
         "CLOSED": (
             f"🔒 *Account Closed*\n\n"
-            f"Hello {name}, your AgriTrust account has been permanently closed.\n\n"
+            f"Hello {name}, your ZimAgritrust account has been permanently closed.\n\n"
             f"*Reason:* {reason}\n\n"
             f"Contact support if you believe this is an error."
         ),
         "VERIFIED": (
             f"✅ *Identity Verified*\n\n"
-            f"Hello {name}, your identity has been verified by AgriTrust.\n\n"
+            f"Hello {name}, your identity has been verified by ZimAgritrust.\n\n"
             f"Your trust score has been updated. You now have full platform access."
         ),
         "VERIFY_REJECTED": (
@@ -72,13 +72,13 @@ async def _notify_user(user: User, action: str, reason: str):
         ),
         "DELETED": (
             f"🗑️ *Account Removed*\n\n"
-            f"Hello {name}, your AgriTrust account has been permanently removed.\n\n"
+            f"Hello {name}, your ZimAgritrust account has been permanently removed.\n\n"
             f"*Reason:* {reason}\n\n"
             f"Contact support if you believe this is an error."
         ),
     }
 
-    msg = messages.get(action, f"AgriTrust: Your account has been updated. Reason: {reason}")
+    msg = messages.get(action, f"ZimAgritrust: Your account has been updated. Reason: {reason}")
     await NotificationService._notify_both_channels(phone, msg)
 
 @router.get("", response_model=list[UserResponse])

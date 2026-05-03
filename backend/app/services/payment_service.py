@@ -38,7 +38,7 @@ def process_ecocash_callback(db: Session, request_id: str, status: str, merchant
             # 1. Move to Escrow
             order.status = OrderStatus.ESCROW_HELD
             
-            # 2. Update Buyer Wallet (AgriTrust Spec: Funds enter escrow immediately)
+            # 2. Update Buyer Wallet (ZimAgritrust Spec: Funds enter escrow immediately)
             # Since the money came from an external source, we conceptually "deposit and hold"
             buyer = db.query(User).filter(User.id == order.buyer_id).first()
             if order.currency == "USD":

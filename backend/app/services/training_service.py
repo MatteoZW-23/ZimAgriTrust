@@ -10,7 +10,7 @@ from app.models.academy import AcademyModule, AgentTraining, ModuleStatus, ExamA
 
 class TrainingService:
     """
-    AgriTrust Agent Academy Service.
+    ZimAgritrust Agent Academy Service.
     Manages the 10-module training curriculum and certification exams.
     """
     def __init__(self):
@@ -63,7 +63,7 @@ class TrainingService:
 
     def log_to_ledger(self, action: str, data: Dict):
         """
-        Simulates writing a record to the AgriTrust Sovereign Ledger (Blockchain).
+        Simulates writing a record to the ZimAgritrust Sovereign Ledger (Blockchain).
         In production, this would interface with a distributed ledger (e.g. Hyperledger Fabric).
         """
         ledger_path = "sovereign_ledger.json"

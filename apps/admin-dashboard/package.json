@@ -1,12 +1,13 @@
 {
-  "name": "agent-dashboard",
+  "name": "zimagritrust-admin-dashboard",
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port 3001",
     "build": "vite build"
   },
   "dependencies": {
+    "@agritrust/shared": "file:../../packages/shared",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

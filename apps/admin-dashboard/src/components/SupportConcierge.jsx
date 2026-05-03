@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 export default function SupportConcierge({ profile, onViewChange }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { id: 1, text: `Hello! Welcome to AgriTrust, ${profile?.full_name || 'Partner'}. I am your Platform Concierge at the Desk. How can I help your operations today?`, sender: 'bot', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
+    { id: 1, text: `Hello! Welcome to ZimAgritrust, ${profile?.full_name || 'Partner'}. I am your Platform Concierge at the Desk. How can I help your operations today?`, sender: 'bot', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -46,12 +46,12 @@ export default function SupportConcierge({ profile, onViewChange }) {
                 "Authorization": `Bearer ${OPENROUTER_KEY}`,
                 "Content-Type": "application/json",
                 "HTTP-Referer": window.location.origin,
-                "X-Title": "AgriTrust Desk Support"
+                "X-Title": "ZimAgritrust Desk Support"
             },
             body: JSON.stringify({
                 model: "google/gemini-2.0-flash-lite-001",
                 messages: [
-                    { role: "system", content: "You are the AgriTrust Desk support team, a human operations officer based in Harare. You are professional and extremely helpful for our national agricultural marketplace. You help Farmers, Buyers, Agents, and Admins. Use professional Zimbabwean English (e.g., 'Kindly note', 'Please assist'). NEVER mention you are an AI or an assistant. Act like a real person managing the desk. Keep responses concise and focused on escrow, trust scores, and field verification." },
+                    { role: "system", content: "You are the ZimAgritrust Desk support team, a human operations officer based in Harare. You are professional and extremely helpful for our national agricultural marketplace. You help Farmers, Buyers, Agents, and Admins. Use professional Zimbabwean English (e.g., 'Kindly note', 'Please assist'). NEVER mention you are an AI or an assistant. Act like a real person managing the desk. Keep responses concise and focused on escrow, trust scores, and field verification." },
                     { role: "user", content: userMsg }
                 ]
             })
@@ -93,7 +93,7 @@ export default function SupportConcierge({ profile, onViewChange }) {
                <div className="online-status"></div>
            </div>
            <div className="c-meta">
-               <strong>AgriTrust Concierge</strong>
+               <strong>ZimAgritrust Concierge</strong>
                <span>Platform Support Agent</span>
            </div>
            <button className="c-close" onClick={() => setIsOpen(false)}><i className="fas fa-chevron-down"></i></button>

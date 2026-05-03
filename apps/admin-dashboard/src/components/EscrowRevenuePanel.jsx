@@ -118,7 +118,7 @@ export default function EscrowRevenuePanel({ token, onEscrowAction }) {
     setBusy(true);
     try {
       const data = await fetchTransactions(token);
-      exportToCSV(data, `AgriTrust_Ledger_${Date.now()}.csv`);
+      exportToCSV(data, `ZimAgritrust_Ledger_${Date.now()}.csv`);
     } catch (e) { alert(e.message); }
     finally { setBusy(false); }
   };
@@ -127,7 +127,7 @@ export default function EscrowRevenuePanel({ token, onEscrowAction }) {
     setBusy(true);
     try {
       const data = await fetchAuditLogs(token);
-      exportToCSV(data, `AgriTrust_Audit_${Date.now()}.csv`);
+      exportToCSV(data, `ZimAgritrust_Audit_${Date.now()}.csv`);
     } catch (e) { alert(e.message); }
     finally { setBusy(false); }
   };

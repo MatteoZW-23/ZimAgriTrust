@@ -371,11 +371,11 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
             <div className="v4-login-header">
               <div className="v4-brand">
                 <i className="fas fa-shield-halved" style={{ color: '#000E2B' }}></i>
-                <span style={{ color: '#000E2B', fontWeight: 1000, letterSpacing: '2px' }}>AGRITRUST CORE</span>
+                <span style={{ color: '#000E2B', fontWeight: 1000, letterSpacing: '2px' }}>ZIMAGRITRUST CORE</span>
               </div>
               <h1 className="v4-institutional-title">{tab === 'login' ? 'System Authentication' : 'Account Provisioning'}</h1>
               <p className="v4-subtitle">
-                {tab === 'login' ? 'Secure gateway for authorized AgriTrust network nodes.' : 'Establishing new infrastructure for regional transparency.'}
+                {tab === 'login' ? 'Secure gateway for authorized ZimAgritrust network nodes.' : 'Establishing new infrastructure for regional transparency.'}
               </p>
             </div>
           )}
@@ -543,7 +543,7 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
             <div className="v4-form animate-fade-in">
               <div style={{ marginBottom: '24px', padding: '16px', background: '#ecfdf5', borderRadius: '16px', border: '1px solid #10b98122' }}>
                 <h4 style={{ margin: 0, color: '#065f46', fontSize: '14px', fontWeight: 950 }}>Agent Recruitment Active</h4>
-                <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#065f46', opacity: 0.8 }}>Join the 6-Phase Pipeline to become a certified AgriTrust regional node.</p>
+                <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#065f46', opacity: 0.8 }}>Join the 6-Phase Pipeline to become a certified ZimAgritrust regional agent.</p>
               </div>
 
               <form onSubmit={async (e) => {
@@ -821,7 +821,7 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                         <div className="academy-portal-content slide-down">
                             <div className="academy-header-flex">
                                 <div className="academy-brand">
-                                    <h1 className="academy-title">AGRITRUST ACADEMY</h1>
+                                    <h1 className="academy-title">ZIMAGRITRUST ACADEMY</h1>
                                     <p className="academy-subtitle">Curriculum & Field Training Portal</p>
                                 </div>
                                 <div className="academy-actions">
@@ -847,7 +847,7 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                                             <div className={certificationLevel === 'certified' ? 'pulse-dot' : 'pulse-dot warning'}></div>
                                             <strong style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px', color: '#000E2B' }}>{certificationLevel} AGENT</strong>
                                         </div>
-                                        <p style={{ margin: '8px 0 0', fontSize: '11px', color: '#64748b', lineHeight: 1.4 }}>{certificationLevel === 'certified' ? 'You are a fully authorized node in the AgriTrust network.' : 'Complete your 10 modules to unlock full farm verification powers.'}</p>
+                                        <p style={{ margin: '8px 0 0', fontSize: '11px', color: '#64748b', lineHeight: 1.4 }}>{certificationLevel === 'certified' ? 'You are a fully authorized agent in the ZimAgritrust network.' : 'Complete your 10 modules to unlock full farm verification powers.'}</p>
                                     </div>
 
                                     <div className="module-nav" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1039,7 +1039,7 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                     </p>
                 </div>
             )}
-            <p>© 2026 AgriTrust Marketplace • Infrastructure v4.3</p>
+            <p>© 2026 ZimAgritrust Marketplace • Platform v4.3</p>
           </div>
         </div>
       </div>
@@ -1095,7 +1095,7 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
         .v4-login-background {
           position: absolute;
           inset: 0;
-          background-image: url('/agritrust_professional_hero_1775945205140.png');
+          background-image: url('/ZimAgritrust_professional_hero_1775945205140.png');
           background-size: cover;
           background-position: center;
           filter: brightness(0.4) saturate(1.2) blur(2px);

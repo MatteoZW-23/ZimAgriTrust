@@ -350,7 +350,7 @@ export default function AgentOperationsHub({ profile, token, onSync, users = [],
                   
                   <div style={{ padding: '40px', textAlign: 'center' }}>
                       <div className="v4-brand" style={{ color: '#fff', fontSize: '14px', fontWeight: 900, letterSpacing: '0.2em', marginBottom: '32px' }}>
-                          <i className="fas fa-leaf" style={{ color: '#5eead4' }}></i> AGRITRUST
+                          <i className="fas fa-leaf" style={{ color: '#5eead4' }}></i> ZIMAGRITRUST
                       </div>
 
                       <div className="id-photo" style={{ width: '120px', height: '120px', borderRadius: '50%', background: 'var(--v4-primary-gradient)', margin: '0 auto 24px', border: '4px solid #fff', display: 'grid', placeItems: 'center', fontSize: '48px', color: '#fff', fontWeight: 950, position: 'relative' }}>
@@ -380,7 +380,7 @@ export default function AgentOperationsHub({ profile, token, onSync, users = [],
 
                       <div style={{ marginTop: '32px' }}>
                           <div className="qr-sim" style={{ width: '80px', height: '80px', background: '#fff', borderRadius: '12px', margin: '0 auto', padding: '8px' }}>
-                             <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=AgriTrustAgent-1002" style={{ width: '100%', height: '100%' }} alt="QR Auth" />
+                             <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ZimAgritrustAgent-1002" style={{ width: '100%', height: '100%' }} alt="QR Auth" />
                           </div>
                           <p style={{ fontSize: '8px', color: 'rgba(255,255,255,0.3)', marginTop: '12px', fontWeight: 800 }}>SCAN TO VERIFY CREDENTIALS</p>
                       </div>

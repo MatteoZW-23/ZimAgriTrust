@@ -23,7 +23,7 @@ def fake_seller_detected(user: User) -> bool:
 
 def check_transaction_risk(amount: float, currency: str, user: User) -> bool:
     """
-    AgriTrust Spec: Fraud Detection & Security
+    ZimAgritrust Spec: Fraud Detection & Security
     Flag suspicious transactions for manual review.
     """
     # 1. High-Value Transaction Threshold

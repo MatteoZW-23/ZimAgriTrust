@@ -19,7 +19,7 @@ class TripStatus(str, enum.Enum):
 
 
 class DeliveryStatus(str, enum.Enum):
-    """Full 9-state delivery lifecycle per AgriTrust spec."""
+    """Full 9-state delivery lifecycle per ZimAgritrust spec."""
     PENDING_PICKUP          = "PENDING_PICKUP"
     PICKUP_SCHEDULED        = "PICKUP_SCHEDULED"
     PICKUP_IN_PROGRESS      = "PICKUP_IN_PROGRESS"

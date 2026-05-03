@@ -1,6 +1,6 @@
 {
   "exam_id": "CERT-FINAL-2026",
-  "title": "AgriTrust Certified Field Agent Examination",
+  "title": "ZimAgritrust Certified Field Agent Examination",
   "total_questions": 200,
   "passing_score": 160,
   "modules_covered": 10,
@@ -8,28 +8,28 @@
     {
       "id": 1,
       "module": 1,
-      "text": "What is the primary mission of the AgriTrust platform in the Zimbabwean agricultural value chain?",
+      "text": "What is the primary mission of the ZimAgritrust platform in the Zimbabwean agricultural value chain?",
       "options": [
         "A) To provide free fertilizers to all farmers",
-        "B) To build a sovereign, high-trust digital marketplace for fair trade",
+        "B) To connect farmers directly to buyers with secure escrow and agent verification",
         "C) To manage government grain reserves",
         "D) To sell mobile phones to rural communities"
       ],
       "answer": "B",
-      "rational": "AgriTrust focuses on sovereignty and trust-building."
+      "rational": "ZimAgritrust eliminates middlemen and secures payments through escrow."
     },
     {
       "id": 2,
       "module": 2,
-      "text": "When is the buyer's payment released to the seller in the AgriTrust Escrow system?",
+      "text": "When is the buyer's payment released to the seller in the ZimAgritrust Escrow system?",
       "options": [
         "A) As soon as the buyer places the order",
         "B) When the agent confirms the crop is in transit",
-        "C) Only after the buyer confirms receipt and quality matches the digital certificate",
+        "C) Only after both buyer and farmer confirm delivery",
         "D) 30 days after the harvest"
       ],
       "answer": "C",
-      "rational": "Escrow ensures both parties are satisfied before funds move."
+      "rational": "Escrow ensures both parties confirm delivery before funds are released."
     },
     {
       "id": 50,
@@ -63,7 +63,7 @@
       "text": "Under the Agricultural Marketing Authority (AMA) Act, what is the mandatory requirement for agents handling tobacco contracts?",
       "options": [
         "A) Personal bank account and 5 years experience",
-        "B) Registration with the AMA and a valid AgriTrust Certification",
+        "B) Registration with the AMA and a valid ZimAgritrust Certification",
         "C) A commercial truck and warehouse access",
         "D) Proof of land ownership"
       ],

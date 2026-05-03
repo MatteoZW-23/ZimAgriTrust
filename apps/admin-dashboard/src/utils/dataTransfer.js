@@ -1,9 +1,9 @@
 /**
- * Institutional Data Transfer Utility for AgriTrust National Network
+ * Institutional Data Transfer Utility for ZimAgritrust National Network
  * Handles high-fidelity export to CSV/JSON and secure data ingestion (Import).
  */
 
-export const exportToCSV = (data, filename = 'agritrust_export.csv') => {
+export const exportToCSV = (data, filename = 'ZimAgritrust_export.csv') => {
   if (!data || !data.length) return;
 
   const headers = Object.keys(data[0]);
@@ -29,7 +29,7 @@ export const exportToCSV = (data, filename = 'agritrust_export.csv') => {
   document.body.removeChild(link);
 };
 
-export const exportToJSON = (data, filename = 'agritrust_export.json') => {
+export const exportToJSON = (data, filename = 'ZimAgritrust_export.json') => {
   const jsonContent = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
   const link = document.createElement("a");
   link.setAttribute("href", jsonContent);

@@ -191,7 +191,7 @@ def manual_reconciliation(
     admin: User = Depends(require_roles(UserRole.ADMIN)),
 ):
     """
-    AgriTrust Spec: Manual Financial Audit Trigger.
+    ZimAgritrust Spec: Manual Financial Audit Trigger.
     """
     from app.services.audit_service import audit_service
     results = audit_service.run_reconciliation(db)

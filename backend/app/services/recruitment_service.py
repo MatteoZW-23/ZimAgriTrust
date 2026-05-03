@@ -106,7 +106,7 @@ class RecruitmentService:
 
         # Notify Applicant (WhatsApp Bridge) - Resilient to bridge downtime
         msg = (
-            f"✅ *AgriTrust Documentation Approved*\n\n"
+            f"✅ *ZimAgritrust Documentation Approved*\n\n"
             f"Welcome to the pipeline, {application.full_name}. Your documentation has been verified.\n\n"
             f"Your Trainee Account is ready:\n"
             f"🆔 *Agent Code:* {agent.agent_code}\n"
@@ -256,7 +256,7 @@ class RecruitmentService:
         # 3. WhatsApp Notification
         msg = (
             f"🎓 *Congratulations, Agent!*\n\n"
-            f"You are now a certified AgriTrust Regional Node.\n\n"
+            f"You are now a certified ZimAgritrust Regional Node.\n\n"
             f"🆔 *Agent Code:* {agent.agent_code}\n\n"
             f"You have full access to the Field Portal."
         )

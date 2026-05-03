@@ -1,5 +1,5 @@
 """
-AgriTrust Crop Vision Model Trainer
+ZimAgritrust Crop Vision Model Trainer
 Trains a YOLOv8 classification model using the Kaggle agriculture-crops-dataset.
 
 Dataset must be preprocessed first:

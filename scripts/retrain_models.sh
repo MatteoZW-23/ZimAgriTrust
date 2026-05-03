@@ -1,6 +1,6 @@
 #!/bin/bash
 # Sovereign Model Retraining Script
-echo "Starting AgriTrust Model Retraining Pipeline..."
+echo "Starting Agritrust Model Retraining Pipeline..."
 
 # 1. Export Clean Data from DB
 echo "Exporting production data..."

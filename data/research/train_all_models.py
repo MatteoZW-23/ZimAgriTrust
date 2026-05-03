@@ -14,10 +14,10 @@ from app.db.session import SessionLocal
 def orchestrate_training():
     """
     Sovereign Training Pipeline Orchestrator.
-    Trains and saves all Data Science cores for the AgriTrust platform.
+    Trains and saves all Data Science cores for the ZimAgritrust platform.
     """
     print("==================================================")
-    print("AGRITRUST: SYSTEM-WIDE MODEL TRAINING")
+    print("ZimAgritrust: SYSTEM-WIDE MODEL TRAINING")
     print("==================================================")
 
     # 1. DEEP FORECASTER (MLP Training)

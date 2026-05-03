@@ -1,5 +1,5 @@
 """
-AgriTrust Driver Model
+ZimAgritrust Driver Model
 Covers: driver registration, vehicle details, ratings, penalties, suspension.
 """
 import enum

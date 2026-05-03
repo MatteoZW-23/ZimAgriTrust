@@ -17,11 +17,11 @@ except ImportError:
 
 def run_integration_audit():
     """
-    AgriTrust Integration Audit.
+    ZimAgritrust Integration Audit.
     Proves actual system performance and eliminates redundancy.
     """
     print("==================================================")
-    print("AGRITRUST RESEARCH & DEVELOPMENT: INTEGRATION LOG")
+    print("ZimAgritrust RESEARCH & DEVELOPMENT: INTEGRATION LOG")
     print(f"Timestamp: {datetime.now().isoformat()}")
     print("==================================================")
 

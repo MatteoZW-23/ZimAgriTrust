@@ -8,7 +8,7 @@ def check_and_install_jupyter():
     Isolates Jupyter dependencies and ensures the kernel is ready.
     """
     print("==================================================")
-    print("AGRITRUST: AI RESEARCH LAB CONFIGURATOR")
+    print("ZimAgritrust: AI RESEARCH LAB CONFIGURATOR")
     print("==================================================")
 
     # 1. DEFINE REQUIREMENTS
@@ -33,20 +33,20 @@ def check_and_install_jupyter():
         subprocess.check_call([sys.executable, "-m", "pip", "install", *ds_requirements])
 
     # 2. CONFIGURE KERNEL
-    print("\n[STEP 2] Configuring AgriTrust Research Kernel...")
+    print("\n[STEP 2] Configuring ZimAgritrust Research Kernel...")
     subprocess.check_call([
         sys.executable, "-m", "ipykernel", "install", 
-        "--user", "--name", "agritrust_env", 
-        "--display-name", "AgriTrust AI Core (Scientific)"
+        "--user", "--name", "ZimAgritrust_env", 
+        "--display-name", "ZimAgritrust AI Core (Scientific)"
     ])
 
     # 3. LAUNCH LAB
     print("\n[STEP 3] Initializing Sovereign AI Laboratory...")
-    print("Target: research/labs/agritrust_ai_lab.ipynb")
+    print("Target: research/labs/ZimAgritrust_ai_lab.ipynb")
     print("-" * 50)
     
     # We use subprocess.Popen to let it run in the background
-    lab_path = os.path.join("research", "labs", "agritrust_ai_lab.ipynb")
+    lab_path = os.path.join("research", "labs", "ZimAgritrust_ai_lab.ipynb")
     
     try:
         # Launching with specific browser-less flag first just to check, 

@@ -55,6 +55,16 @@ class User(Base):
     # Phone Verification
     is_phone_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     phone_verified_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Email Verification
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    email_verified_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    email_verification_token: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Password Security
+    password_changed_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    password_history: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)  # list of previous hashes
+    must_change_password_reason: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # 'expired', 'breached', 'admin_reset'
     
     # Location Data (Verified via GPS)
     province: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)

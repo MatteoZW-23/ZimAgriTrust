@@ -73,5 +73,5 @@ const server = http.createServer((req, res) => {
 
 const PORT = process.env.PORT || 3005;
 server.listen(PORT, () => {
-    console.log(`[AgriTrust SYNC] Node.js Gateway running on Port ${PORT}`);
+    console.log(`[ZimAgritrust SYNC] Node.js Gateway running on Port ${PORT}`);
 });

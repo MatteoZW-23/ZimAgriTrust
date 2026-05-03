@@ -39,7 +39,7 @@ class AgentApplication(Base):
     status = Column(String, default=ApplicationStatus.APPLIED)
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    # Progress tracking (AgriTrust 10-Step Pipeline)
+    # Progress tracking (ZimAgritrust 10-Step Pipeline)
     has_signed_contract = Column(Boolean, default=False)
     id_verified = Column(Boolean, default=False)
     

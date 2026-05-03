@@ -1,5 +1,5 @@
 """
-AgriTrust Platform Policy Engine
+ZimAgritrust Platform Policy Engine
 Unified fee calculation covering:
   - Standard / premium / rural goods fee
   - On-platform transport incentive (reduced goods fee)

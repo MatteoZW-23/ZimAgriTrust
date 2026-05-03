@@ -2,7 +2,7 @@ import os
 import json
 
 def seed():
-    print("🚀 Seeding AgriTrust Sovereign Agent Academy...")
+    print("🚀 Seeding ZimAgritrust Sovereign Agent Academy...")
     
     base_dir = "agent_training_materials"
     modules = [
@@ -17,7 +17,7 @@ def seed():
         
         # Create Handbook Stub
         with open(os.path.join(module_dir, f"handbook_m{i}.txt"), "w") as f:
-            f.write(f"AgriTrust Module {i}: {name}\n" + "="*40 + "\n\nThis document contains 64 pages of proprietary operational protocol...")
+            f.write(f"ZimAgritrust Module {i}: {name}\n" + "="*40 + "\n\nThis document contains 64 pages of proprietary operational protocol...")
 
         # Create Module Quiz
         quiz = {

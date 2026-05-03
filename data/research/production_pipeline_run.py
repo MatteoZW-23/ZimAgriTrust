@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-AgriTrust Master Training & Deployment Script
+ZimAgritrust Master Training & Deployment Script
 Exports validated models from research to production
 """
 
@@ -63,7 +63,7 @@ def generate_manifest():
 
 def run_master_pipeline():
     print("=" * 60)
-    print("🚀 AGRITRUST: MASTER DEPLOYMENT PIPELINE")
+    print("🚀 ZimAgritrust: MASTER DEPLOYMENT PIPELINE")
     print("=" * 60)
     
     risk_ok = export_risk_model()

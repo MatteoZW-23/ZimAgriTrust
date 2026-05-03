@@ -1,4 +1,4 @@
-AgriTrust Module 4: Dispute Resolution
+ZimAgritrust Module 4: Dispute Resolution
 ====================================
 
 This handbook covers the protocols for investigating disagreements between buyers and farmers, with a focus on the Negotiation Hub and conversation encryption.
@@ -11,7 +11,7 @@ This handbook covers the protocols for investigating disagreements between buyer
 > **FINAL ANSWER (For Defense):** The Negotiation Hub is fully end-to-end encrypted. Agents CANNOT see any buyer-farmer conversations during normal operations. ONLY during an active dispute, and ONLY after an admin explicitly grants access, can an agent view the conversation history for investigation.
 
 ### 📋 SYSTEM OVERVIEW
-The Hub connects Buyers and Farmers through E2E Encrypted channels. AgriTrust maintains privacy as a default state; neither Agents nor Admins can read chat logs during standard trade.
+The Hub connects Buyers and Farmers through E2E Encrypted channels. ZimAgritrust maintains privacy as a default state; neither Agents nor Admins can read chat logs during standard trade.
 
 ### 👤 AGENT'S ROLE IN NEGOTIATIONS
 * **Normal Mode**: You verified quality/quantity. You DO NOT see or interfere with chat or pricing.
@@ -47,4 +47,4 @@ Once evidence is reviewed, you must recommend a resolution:
 * **Release to Farmer**: If the buyer is making a frivolous claim or if the delivery matches the verified listing.
 * **Partial Settlement**: If both parties agree to a compromise based on minor defects.
 
-Copyright 2026 AgriTrust Sovereign Ledger Group. All Rights Reserved.
+Copyright 2026 ZimAgritrust Sovereign Ledger Group. All Rights Reserved.

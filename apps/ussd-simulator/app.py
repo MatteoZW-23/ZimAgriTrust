@@ -30,7 +30,7 @@ TEMPLATE = """
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AgriTrust USSD Simulator</title>
+    <title>ZimAgritrust USSD Simulator</title>
     <style>
       :root {
         --bg: #f0eadb;
@@ -248,8 +248,8 @@ TEMPLATE = """
   <body>
     <main class="shell">
       <section class="hero">
-        <div class="eyebrow">AgriTrust Telecom</div>
-        <h1>AgriTrust telecom console</h1>
+        <div class="eyebrow">ZimAgritrust Telecom</div>
+        <h1>ZimAgritrust telecom console</h1>
         <p>Manage and monitor active USSD sessions, test platform flows, and verify response logic exactly as a gateway would process it.</p>
       </section>
 

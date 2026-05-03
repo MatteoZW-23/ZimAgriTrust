@@ -23,7 +23,7 @@ export default function DisputeResolutionPanel({ disputes, onResolve }) {
                 </div>
              </div>
              <h1>System <span style={{ color: '#f43f5e' }}>Adjudication</span>.</h1>
-             <p>Neutral financial arbitration for the AgriTrust marketplace. Review cross-party evidence and execute institutional settlement overrides.</p>
+             <p>Neutral financial arbitration for the ZimAgritrust marketplace. Review cross-party evidence and execute institutional settlement overrides.</p>
              
              <div className="hero-actions" style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
                  <button className="q-btn primary-btn small" style={{ background: '#fff', color: '#1e293b', padding: '10px 20px', fontSize: '12px' }}>

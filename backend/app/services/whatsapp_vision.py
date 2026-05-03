@@ -60,7 +60,7 @@ class WhatsAppVisionAdapter:
         crop = analysis["crop"]
         grade = analysis["grade"]
         
-        message = (f"🔬 *AgriTrust AI Analysis*\n\n"
+        message = (f"🔬 *ZimAgritrust AI Analysis*\n\n"
                    f"🌿 **Crop:** {crop['crop_name']}\n"
                    f"📊 **Confidence:** {int(crop['confidence']*100)}%\n"
                    f"⭐ **Grade:** {grade['grade']}\n"

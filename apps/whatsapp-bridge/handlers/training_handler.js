@@ -1,5 +1,5 @@
 /**
- * AgriTrust Sovereign WhatsApp Academy Handler
+ * ZimAgritrust WhatsApp Academy Handler
  * Manages interactive learning sessions via WhatsApp for field agents.
  */
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgriTrust Crop Vision Model Trainer
+ZimAgritrust Crop Vision Model Trainer
 Trains a YOLOv8 classification model on the merged crop dataset.
 
 Prerequisites:
@@ -132,7 +132,7 @@ def export_onnx(model_path: Path = FINAL_WEIGHTS):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train AgriTrust crop vision model")
+    parser = argparse.ArgumentParser(description="Train ZimAgritrust crop vision model")
     parser.add_argument("--data",          type=str,   default="merged_crops", help="Dataset folder name under data/training/data/")
     parser.add_argument("--epochs",        type=int,   default=50)
     parser.add_argument("--imgsz",         type=int,   default=224)
