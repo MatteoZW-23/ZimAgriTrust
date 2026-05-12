@@ -58,7 +58,7 @@ function AuthScreen({ onLogin }) {
     <div className="auth-screen">
       <div className="auth-card">
         <div className="auth-brand">
-          <div className="logo"><i className="fas fa-user-shield"></i></div>
+          <img src="/logo.png" alt="ZimAgriTrust" style={{ height: '48px', width: 'auto' }} />
           <h1>ZimAgritrust</h1><p>Agent Portal</p>
         </div>
         {err && <div className="alert alert-error">{err}</div>}
@@ -72,14 +72,14 @@ function AuthScreen({ onLogin }) {
             <span>Apply</span>
           </button>
           <button type="button" className={`auth-mode ${mode==="status"?"active":""}`} onClick={()=>{setMode("status");setErr("");}}>
-            <i className="fas fa-route"></i>
+            <i className="fas fa-search"></i>
             <span>Status</span>
           </button>
         </div>
         {mode === "apply" ? (
           <div>
             <div className="pipeline-card">
-              <div className="pipeline-icon"><i className="fas fa-seedling"></i></div>
+              <div className="pipeline-icon"><i className="fas fa-road"></i></div>
               <div>
                 <h3>Start your field agent journey</h3>
                 <p>Submit your application first. After documentation approval, you will receive your trainee code and PIN by WhatsApp/SMS.</p>
@@ -161,7 +161,7 @@ function ApplicationStatusCard({ application }) {
       <div className="status-timeline">
         {steps.map(([key,label], index)=>(
           <div key={key} className={`status-step ${index<=currentIndex?"done":""}`}>
-            <i className={`fas ${index<=currentIndex?"fa-check-circle":"fa-circle"}`}></i>
+            <i className="fas fa-check-circle"></i>
             <span>{label}</span>
           </div>
         ))}
@@ -237,7 +237,7 @@ function KYCPanel() {
         ))}
       </div>
       {queue===null ? <p>Loading...</p> : queue.length===0 ? (
-        <div className="empty-state"><div className="empty-icon"><i className="fas fa-id-card"></i></div><h3>No {tab} requests</h3></div>
+        <div className="empty-state"><div className="empty-icon"><i className="fas fa-inbox"></i></div><h3>No {tab} requests</h3></div>
       ) : (
         <div className="card"><div className="table-wrap"><table>
           <thead><tr><th>User</th><th>Phone</th><th>Role</th><th>ID Number</th><th>Documents</th><th>Date</th><th>Actions</th></tr></thead>
@@ -289,7 +289,7 @@ function ListingReviewPanel() {
       <p className="page-sub">Approve farmer crop listings before they go live</p>
       {msg && <div className="alert alert-info" onClick={()=>setMsg("")}>{msg}</div>}
       {queue===null ? <p>Loading...</p> : queue.length===0 ? (
-        <div className="empty-state"><div className="empty-icon"><i className="fas fa-check-circle"></i></div><h3>No listings pending review</h3></div>
+        <div className="empty-state"><div className="empty-icon"><i className="fas fa-clipboard-list"></i></div><h3>No listings pending review</h3></div>
       ) : (
         <div className="listing-grid">
           {queue.map(l=>(
@@ -336,7 +336,7 @@ function DisputesPanel() {
       <p className="page-sub">Investigate and mediate buyer-farmer disputes</p>
       {msg && <div className="alert alert-info" onClick={()=>setMsg("")}>{msg}</div>}
       {disputes===null ? <p>Loading...</p> : disputes.length===0 ? (
-        <div className="empty-state"><div className="empty-icon"><i className="fas fa-handshake"></i></div><h3>No disputes assigned</h3></div>
+        <div className="empty-state"><div className="empty-icon"><i className="fas fa-balance-scale"></i></div><h3>No disputes assigned</h3></div>
       ) : (
         <div className="card"><div className="table-wrap"><table>
           <thead><tr><th>ID</th><th>Reason</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
@@ -356,7 +356,7 @@ function DisputesPanel() {
       {selected&&(
         <div className="modal-overlay" onClick={()=>setSelected(null)}>
           <div className="modal-box" onClick={e=>e.stopPropagation()}>
-            <button className="modal-close" onClick={()=>setSelected(null)}><i className="fas fa-times"></i></button>
+            <button className="modal-close" onClick={()=>setSelected(null)}>&times;</button>
             <div className="modal-title">Mediation Recommendation</div>
             <form onSubmit={handleSubmit}>
               <div className="form-group"><label className="form-label">Outcome</label>
@@ -468,7 +468,7 @@ function AcademyPanel() {
           <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
             {certs.map((c,i)=>(
               <div key={i} style={{background:"var(--surface2)",borderRadius:8,padding:"8px 16px",border:"1px solid var(--primary)",fontSize:13}}>
-                <i className="fas fa-award" style={{color:"var(--primary)",marginRight:6}}></i>{c.module_name||c.name}
+                <i className="fas fa-award" style={{marginRight:6}}></i>{c.module_name||c.name}
               </div>
             ))}
           </div>
@@ -493,7 +493,7 @@ function AcademyPanel() {
             {(m.topics||[]).map(t=>(
               <div key={t.id} className="academy-topic-row">
                 <button type="button" className="academy-topic-open" onClick={()=>handleOpenTopic(m.module_number,t.id)} disabled={m.is_locked}>
-                  <i className={`fas ${t.is_completed?"fa-check-circle":"fa-circle"}`}></i>
+                  <i className="fas fa-book-open"></i>
                   {t.title}
                 </button>
                 {!m.is_locked&&!t.is_completed&&<button className="btn btn-sm btn-outline" onClick={()=>handleComplete(m.module_number,t.id)}>Complete</button>}
@@ -505,7 +505,7 @@ function AcademyPanel() {
       {activeTopic&&(
         <div className="modal-overlay" onClick={()=>setActiveTopic(null)}>
           <div className="modal-box" onClick={e=>e.stopPropagation()} style={{maxWidth:720}}>
-            <button className="modal-close" onClick={()=>setActiveTopic(null)}><i className="fas fa-times"></i></button>
+            <button className="modal-close" onClick={()=>setActiveTopic(null)}>&times;</button>
             <div className="modal-title">{activeTopic.title}</div>
             <div className="modal-sub">Module {activeTopic.module_number} · Topic {activeTopic.topic_id}</div>
             <p style={{whiteSpace:"pre-wrap",lineHeight:1.7,color:"var(--text)",marginTop:16}}>{activeTopic.content}</p>
@@ -526,7 +526,7 @@ function TrainingPortalShell({ user, progress, onLogout }) {
     <div className="training-portal">
       <header className="training-header">
         <div className="training-brand">
-          <div className="training-logo"><i className="fas fa-graduation-cap"></i></div>
+          <img src="/logo.png" alt="ZimAgriTrust" style={{ height: '48px', width: 'auto' }} />
           <div>
             <span className="eyebrow">ZimAgritrust Academy</span>
             <h1>Agent Training Portal</h1>
@@ -592,7 +592,7 @@ function DeliveryPanel() {
                 <td>{o.crop_type||o.crop||"�"}</td>
                 <td style={{fontWeight:700}}>${Number(o.total_amount||o.amount||0).toFixed(2)}</td>
                 <td><span className="badge badge-yellow">{o.status}</span></td>
-                <td><button className="btn btn-sm btn-ghost" onClick={()=>openTrack(o.id)} disabled={loading}><i className="fas fa-shipping-fast"></i> Manage</button></td>
+                <td><button className="btn btn-sm btn-ghost" onClick={()=>openTrack(o.id)} disabled={loading}><i className="fas fa-cog"></i> Manage</button></td>
               </tr>
             ))}
           </tbody>
@@ -601,7 +601,7 @@ function DeliveryPanel() {
       {tracking&&(
         <div className="modal-overlay" onClick={()=>setTracking(null)}>
           <div className="modal-box" onClick={e=>e.stopPropagation()} style={{maxWidth:480}}>
-            <button className="modal-close" onClick={()=>setTracking(null)}><i className="fas fa-times"></i></button>
+            <button className="modal-close" onClick={()=>setTracking(null)}>&times;</button>
             <div className="modal-title">Delivery Management</div>
             <div className="modal-sub">Status: <strong>{tracking.status}</strong></div>
             <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:16}}>
@@ -842,7 +842,7 @@ export default function App() {
     <div className="app-container">
       <nav className="sidebar">
         <div className="sidebar-brand">
-          <div className="logo"><i className="fas fa-user-shield"></i></div>
+          <img src="/logo.png" alt="ZimAgriTrust" style={{ height: '32px', width: 'auto' }} />
           <span>Agent Portal</span>
         </div>
         <div className="sidebar-menu">

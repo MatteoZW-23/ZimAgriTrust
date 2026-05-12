@@ -70,10 +70,8 @@ export default function InvitationAcceptScreen({ onComplete }) {
       });
       // Backend returns the resolved role on success (added in service)
       setAcceptedRole(res?.role || res?.ROLE || "");
-      const requiresMFA = ["SUPER_ADMIN", "SYSTEM_ADMIN", "FINANCE_ADMIN", "REGIONAL_ADMIN"].includes(
-        (res?.role || "").toUpperCase(),
-      );
-      setStage(requiresMFA ? "mfa" : "done");
+      // MFA setup requires authentication — prompt on first login instead
+      setStage("done");
     } catch (err) {
       setError(err.message || "Invitation acceptance failed.");
     } finally {

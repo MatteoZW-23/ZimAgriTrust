@@ -43,12 +43,9 @@ outputs/
 fastapi-import-fixer.agent.md
 data/research/
 
-# Training datasets (never push raw data)
+# Training datasets (never push raw data/images)
 jupyter/data/
 jupyter/exports/
-*.jpg
-*.jpeg
-*.png
 *.csv
 *.parquet
 *.h5
