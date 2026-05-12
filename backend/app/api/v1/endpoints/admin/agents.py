@@ -7,8 +7,120 @@ from app.models.user import User, UserRole
 from app.models.agent import Agent, AgentAssignment, AgentStatus
 from app.models.system_audit import SystemAudit
 from app.schemas.admin import AgentSummaryResponse, AgentDetailResponse, AgentAssignmentResponse
+from app.services.agent_service import AgentService
 
 router = APIRouter()
+
+
+@router.post("/{agent_id}/evaluate-promotion")
+def evaluate_agent_promotion(
+    agent_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(UserRole.ADMIN)),
+):
+    """
+    Re-evaluate an agent's certification level (Trainee → Senior → Master)
+    based on current tenure, task volume, accuracy, and rating.
+    Idempotent and only ever promotes upward.
+    """
+    return AgentService.evaluate_promotion(db, agent_id)
+
+
+@router.get("/{agent_id}/practical-results")
+def admin_view_practical_results(
+    agent_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(UserRole.ADMIN)),
+):
+    """Admin view of an agent's practical assessment results (4 sub-tests)."""
+    from app.models.academy import PracticalAssessment, PracticalTestType
+    rows = db.query(PracticalAssessment).filter(PracticalAssessment.agent_id == agent_id).all()
+    by_type = {}
+    for r in rows:
+        key = r.test_type.value if hasattr(r.test_type, "value") else str(r.test_type)
+        by_type[key] = {
+            "test_type": key,
+            "score": r.score,
+            "passing_score": r.passing_score,
+            "passed": r.passed,
+            "attempts": r.attempts,
+            "evaluator_notes": r.evaluator_notes,
+            "submitted_at": r.submitted_at.isoformat() if r.submitted_at else None,
+        }
+    all_passed = all(by_type.get(t.value, {}).get("passed") for t in PracticalTestType)
+    return {"tests": by_type, "all_passed": all_passed}
+
+
+@router.get("/{agent_id}/shadowing")
+def admin_view_shadowing(
+    agent_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(UserRole.ADMIN)),
+):
+    """Admin view of an agent's shadowing logs."""
+    from app.models.academy import ShadowingLog, ShadowingStatus
+    rows = (
+        db.query(ShadowingLog)
+        .filter(ShadowingLog.agent_id == agent_id)
+        .order_by(ShadowingLog.created_at.desc())
+        .all()
+    )
+    approved = sum(1 for r in rows if r.status == ShadowingStatus.APPROVED)
+    return {
+        "logs": [
+            {
+                "id": str(r.id),
+                "senior_agent_id": str(r.senior_agent_id),
+                "task_type": r.task_type,
+                "status": r.status.value if hasattr(r.status, "value") else r.status,
+                "observation_notes": r.observation_notes,
+                "agent_actions": r.agent_actions,
+                "senior_feedback": r.senior_feedback,
+                "approved_at": r.approved_at.isoformat() if r.approved_at else None,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ],
+        "approved_count": approved,
+        "required": 10,
+    }
+
+
+@router.get("/{agent_id}/supervised")
+def admin_view_supervised(
+    agent_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(UserRole.ADMIN)),
+):
+    """Admin view of an agent's supervised independent reviews."""
+    from app.models.academy import SupervisedTaskReview
+    rows = (
+        db.query(SupervisedTaskReview)
+        .filter(SupervisedTaskReview.agent_id == agent_id)
+        .order_by(SupervisedTaskReview.created_at.desc())
+        .all()
+    )
+    approved = [r for r in rows if r.is_approved]
+    avg_acc = (sum(r.accuracy_score or 0 for r in approved) / len(approved)) if approved else 0
+    return {
+        "reviews": [
+            {
+                "id": str(r.id),
+                "reviewer_agent_id": str(r.reviewer_agent_id) if r.reviewer_agent_id else None,
+                "submission": r.submission,
+                "review_notes": r.review_notes,
+                "accuracy_score": r.accuracy_score,
+                "is_approved": r.is_approved,
+                "reviewed_at": r.reviewed_at.isoformat() if r.reviewed_at else None,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ],
+        "approved_count": len(approved),
+        "required": 20,
+        "average_accuracy": round(avg_acc, 2),
+        "min_accuracy_required": 95.0,
+    }
 
 @router.get("", response_model=list[AgentSummaryResponse])
 def list_agents(

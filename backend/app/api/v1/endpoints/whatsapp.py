@@ -24,6 +24,20 @@ logger = logging.getLogger(__name__)
 WHATSAPP_BRIDGE_URL = os.getenv("WHATSAPP_BRIDGE_URL", "http://whatsapp-bridge:3006/send")
 
 
+def _whatsapp_lookup_candidates(data: Dict[str, Any]) -> set[str]:
+    candidates: set[str] = set()
+    for key in ("phone", "contactNumber", "contactId", "from"):
+        value = data.get(key)
+        if not value:
+            continue
+        raw = str(value).strip()
+        if raw.endswith("@lid"):
+            continue
+        clean = raw.split("@")[0]
+        candidates.update(build_phone_lookup_candidates(clean))
+    return candidates
+
+
 def get_db():
     db = SessionLocal()
     try:
@@ -100,9 +114,17 @@ async def whatsapp_webhook(data: Dict[str, Any] = Body(...), db: Session = Depen
     has_media = data.get("hasMedia", False)
     media = data.get("media")
     
-    clean_phone = sender_phone.split("@")[0]
-    candidates = build_phone_lookup_candidates(clean_phone)
-    user = db.query(User).filter(User.phone_number.in_(candidates)).first()
+    candidates = _whatsapp_lookup_candidates(data)
+    user = db.query(User).filter(User.phone_number.in_(candidates)).first() if candidates else None
+    if not user:
+        logger.warning(
+            "WhatsApp user lookup failed from=%s phone=%s contactNumber=%s contactId=%s candidates=%s",
+            data.get("from"),
+            data.get("phone"),
+            data.get("contactNumber"),
+            data.get("contactId"),
+            sorted(candidates),
+        )
     
     if not user:
         return {"reply": "Welcome to ZimAgritrust! I see you're not registered yet. Please register via our USSD (*232#) or visit our website to get started."}

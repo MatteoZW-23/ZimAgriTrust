@@ -54,6 +54,10 @@
         "INTERNET"
       ]
     },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
     "plugins": [
       "expo-secure-store",
       "expo-camera",

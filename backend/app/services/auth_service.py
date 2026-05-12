@@ -1,3 +1,5 @@
+import logging
+
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -5,19 +7,79 @@ from app.core.security import get_password_hash, verify_password
 from app.models.user import User, UserRole
 from app.schemas.auth import UserRegister
 
+logger = logging.getLogger(__name__)
+
 
 def register_user(db: Session, payload: UserRegister) -> User:
-    hashed_pin = get_password_hash(payload.password)
-    user = User(
-        full_name=payload.full_name,
-        phone_number=payload.phone_number,
-        password_hash=hashed_pin,
-        ussd_pin_hash=hashed_pin,  # Same PIN for both app and USSD
-        role=payload.role,
-    )
+    from app.models.user import UserStatus
+
+    public_roles = {UserRole.FARMER, UserRole.BUYER, UserRole.TRANSPORTER}
+    initial_status = UserStatus.ACTIVE if payload.role in public_roles else UserStatus.PENDING_VERIFICATION
+
+    if payload.role in {UserRole.ADMIN, UserRole.AGENT, UserRole.SUPER_ADMIN, UserRole.REGIONAL_MANAGER}:
+        # Staff: Set password_hash only (for password + MFA login)
+        hashed_password = get_password_hash(payload.password)
+        user = User(
+            full_name=payload.full_name,
+            phone_number=payload.phone_number,
+            email=getattr(payload, "email", None),
+            password_hash=hashed_password,
+            role=payload.role,
+            status=initial_status,
+            is_active=True # Legacy flag
+        )
+    else:
+        # Farmers/Buyers: Set ussd_pin_hash only (for PIN-only login)
+        hashed_pin = get_password_hash(payload.password)
+        user = User(
+            full_name=payload.full_name,
+            phone_number=payload.phone_number,
+            email=getattr(payload, "email", None),
+            ussd_pin_hash=hashed_pin,
+            password_hash=hashed_pin,
+            role=payload.role,
+            status=initial_status,
+            is_active=True
+        )
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    # NEW: Send Bootstrap Secret for Staff
+    if payload.role in {UserRole.ADMIN, UserRole.AGENT, UserRole.REGIONAL_MANAGER}:
+        try:
+            from app.services.notification_service import NotificationService
+            import asyncio
+            
+            # Since notification_service.send_bootstrap_secret is async, 
+            # and we are in a sync function, we use a simple background task or just run it.
+            # In a real app, this would be a Celery task.
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(NotificationService().send_bootstrap_secret(user.phone_number, payload.password))
+            loop.close()
+            
+            logger.info(f"Bootstrap secret dispatched to {user.phone_number}")
+        except Exception as e:
+            logger.error(f"Failed to send bootstrap secret: {e}")
+
+    # F#246 / F#278 — welcome notification.
+    # Email is best-effort (does not block registration on failure).
+    if user.email:
+        try:
+            from app.services.email_service import email_service
+
+            email_service.send_template(
+                "email.welcome",
+                to=user.email,
+                context={
+                    "name": user.full_name,
+                    "role": user.role.value if hasattr(user.role, "value") else str(user.role),
+                },
+            )
+        except Exception as exc:  # noqa: BLE001 — never let email kill registration
+            logger.warning("welcome email failed user=%s err=%s", user.id, exc)
+
     return user
 
 
@@ -63,8 +125,23 @@ def build_phone_lookup_candidates(phone_number: str) -> set[str]:
 
 
 def authenticate_user(db: Session, phone_number: str, password: str) -> User | None:
+    """
+    Authenticate user with password (for staff login with MFA).
+    For PIN-based login (farmers/buyers), use authenticate_user_pin instead.
+    """
     candidates = build_phone_lookup_candidates(phone_number)
     user = db.query(User).filter(User.phone_number.in_(candidates)).first()
-    if not user or not verify_password(password, user.password_hash):
+    if not user or not user.password_hash or not verify_password(password, user.password_hash):
+        return None
+    return user
+
+
+def authenticate_user_pin(db: Session, phone_number: str, pin: str) -> User | None:
+    """
+    Authenticate user with PIN (for farmers/buyers - no MFA).
+    """
+    candidates = build_phone_lookup_candidates(phone_number)
+    user = db.query(User).filter(User.phone_number.in_(candidates)).first()
+    if not user or not user.ussd_pin_hash or not verify_password(pin, user.ussd_pin_hash):
         return None
     return user

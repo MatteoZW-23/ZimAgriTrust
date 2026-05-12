@@ -1,0 +1,45 @@
+ZimAgritrust Module 10: Premium Customer Excellence
+==================================================
+
+Purpose
+-------
+This module trains agents to deliver respectful, transparent and professional service to farmers, buyers and communities.
+
+10.1 The Golden Service Rule
+----------------------------
+Agents are not only verifiers. They are trusted agricultural service professionals.
+
+Rules:
+- Greet farmers and village elders respectfully.
+- Arrive on time or communicate delays early.
+- Explain readings and grading decisions clearly.
+- Leave the farmer understanding what happens next.
+
+10.2 Conflict De-escalation
+---------------------------
+Farmers may be disappointed by grades. Stay calm and use evidence.
+
+Three-step method:
+1. Acknowledge: "I understand you expected Grade A."
+2. Show evidence: display moisture reading, sample defects, photos or standards.
+3. Propose action: drying, cleaning, re-verification or escalation.
+
+Never argue or insult. Technical evidence should carry the decision.
+
+10.3 Community Leadership
+-------------------------
+Agents are technology ambassadors.
+
+You may support communities by:
+- Teaching USSD and WhatsApp listing steps.
+- Sharing current regional crop prices.
+- Explaining escrow and safe payments.
+- Demonstrating integrity by refusing bribes.
+
+10.4 Premium Service Habits
+---------------------------
+Professional agents document clearly, communicate early, maintain clean equipment, and close every visit with a summary of next steps.
+
+Final Summary
+-------------
+A trusted agent builds a trusted marketplace. Professional service increases adoption, loyalty and farmer income.

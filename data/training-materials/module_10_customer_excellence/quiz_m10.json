@@ -1,0 +1,118 @@
+{
+  "module_id": 10,
+  "module_title": "Premium Customer Excellence",
+  "source_handbook": "handbook_m10.txt",
+  "passing_score": 90.0,
+  "questions": [
+    {
+      "id": "q10_1",
+      "text": "What is the primary goal of an Agent during a farm visit?",
+      "options": [
+        "Getting paid",
+        "Building trust and delivering professional verification service",
+        "Talking to neighbors",
+        "Taking photos only"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q10_2",
+      "text": "What is the first step in the 3-Step De-escalation technique?",
+      "options": [
+        "Show evidence",
+        "Acknowledge the farmer's expectations",
+        "Propose action",
+        "Change the subject"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q10_3",
+      "text": "Why should an Agent show the moisture meter reading to the farmer?",
+      "options": [
+        "To prove the Agent is smarter",
+        "To maintain transparency and build trust",
+        "It is required by law",
+        "To embarrass the farmer"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q10_4",
+      "text": "What is the best way to teach farmers how to use USSD?",
+      "options": [
+        "Give them a long manual",
+        "Demonstrate it step-by-step on their own phone",
+        "Tell them to figure it out",
+        "Only teach the village chief"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q10_5",
+      "text": "What should an Agent do when a farmer disputes a Grade B classification?",
+      "options": [
+        "Argue loudly",
+        "Show the moisture meter evidence and propose a re-verification after drying",
+        "Change the grade to please the farmer",
+        "Leave immediately"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q10_6",
+      "text": "Why is greeting village elders respectfully important during a farm visit?",
+      "options": [
+        "It is just politeness",
+        "It builds community trust and smooths future verification access",
+        "They control the GPS signal",
+        "It is required by the app"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q10_7",
+      "text": "What kind of market intelligence should an Agent share with farmers?",
+      "options": [
+        "Stock market trends",
+        "Current regional crop prices",
+        "Bitcoin prices",
+        "Weather forecasts only"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q10_8",
+      "text": "What does it mean to be an 'ambassador of technology in the village'?",
+      "options": [
+        "Selling gadgets",
+        "Teaching and demonstrating digital tools like USSD to improve farmer livelihoods",
+        "Installing WiFi towers",
+        "Posting on social media"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q10_9",
+      "text": "In the 3-Step De-escalation, what comes AFTER acknowledging the farmer's expectations?",
+      "options": [
+        "Walk away",
+        "Show Evidence with technical data",
+        "Offer a bribe",
+        "Call the police"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q10_10",
+      "text": "What is the passing score for Module 10?",
+      "options": [
+        "80%",
+        "85%",
+        "90%",
+        "95%"
+      ],
+      "correct_index": 2
+    }
+  ]
+}

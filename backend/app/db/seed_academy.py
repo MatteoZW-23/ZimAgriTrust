@@ -1,8 +1,42 @@
 import uuid
 import os
+import json
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models.academy import AcademyModule
+
+TRAINING_MATERIALS_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "training-materials")
+)
+
+MODULE_MATERIAL_DIRS = {
+    1: "module_1_platform_operations",
+    2: "module_2_escrow_and_payment",
+    3: "module_3_crop_verification_quality",
+    4: "module_4_dispute_resolution",
+    5: "module_5_trust_reputation",
+    6: "module_6_ethics_integrity",
+    7: "module_7_rural_finance_credit",
+    8: "module_8_legal_regulatory",
+    9: "module_9_agtech_iot",
+    10: "module_10_customer_excellence",
+}
+
+
+def _module_material_paths(module_number: int) -> tuple[str, str]:
+    module_dir = MODULE_MATERIAL_DIRS[module_number]
+    handbook_path = os.path.join(TRAINING_MATERIALS_DIR, module_dir, f"handbook_m{module_number}.txt")
+    quiz_path = os.path.join(TRAINING_MATERIALS_DIR, module_dir, f"quiz_m{module_number}.json")
+    return handbook_path, quiz_path
+
+
+def _load_module_quiz(module_number: int) -> dict | None:
+    _, quiz_path = _module_material_paths(module_number)
+    if not os.path.exists(quiz_path):
+        return None
+    with open(quiz_path, "r", encoding="utf-8") as quiz_file:
+        quiz_data = json.load(quiz_file)
+    return {"questions": quiz_data.get("questions", [])}
 
 def seed_academy_modules():
     db = SessionLocal()
@@ -291,6 +325,16 @@ def seed_academy_modules():
     ]
 
     for m_data in modules:
+        handbook_path, _ = _module_material_paths(m_data["module_number"])
+        if os.path.exists(handbook_path):
+            m_data["content_url"] = os.path.relpath(handbook_path, os.getcwd())
+            for topic in m_data.get("topics", []):
+                topic["study_source"] = m_data["content_url"]
+
+        quiz_from_materials = _load_module_quiz(m_data["module_number"])
+        if quiz_from_materials and quiz_from_materials["questions"]:
+            m_data["quiz_questions"] = quiz_from_materials
+
         # Check if we need to auto-generate questions for modules that are missing them
         if not m_data["quiz_questions"]["questions"] or len(m_data["quiz_questions"]["questions"]) < 10:
             current_questions = m_data["quiz_questions"]["questions"]

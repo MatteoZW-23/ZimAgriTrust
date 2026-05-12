@@ -101,7 +101,44 @@ def release_payment(db: Session, order: Order, handover_code: str = None) -> Ord
     # Trigger trust updates
     from app.services.trust_service import update_scores_after_success
     update_scores_after_success(db, order)
+
+    # F#281, F#297 — email transaction receipt to buyer and seller (best-effort)
+    _send_receipt_emails(db, order)
     return order
+
+
+def _send_receipt_emails(db: Session, order: Order) -> None:
+    """Send transaction-receipt emails to buyer and seller. Failures are swallowed."""
+    try:
+        from app.models.user import User
+        from app.services.email_service import email_service
+
+        order_ref = getattr(order, "order_number", None) or str(order.id)
+        date_str = (order.updated_at or order.created_at).strftime("%Y-%m-%d %H:%M") if hasattr(order, "updated_at") else ""
+
+        for user_id, role_amount in (
+            (order.buyer_id, order.total_amount),
+            (order.seller_id, getattr(order, "seller_payout", order.total_amount)),
+        ):
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user or not user.email:
+                continue
+            try:
+                email_service.send_template(
+                    "email.transaction_receipt",
+                    to=user.email,
+                    context={
+                        "name": user.full_name,
+                        "order_ref": order_ref,
+                        "amount": f"{role_amount:.2f}",
+                        "currency": order.currency,
+                        "date": date_str,
+                    },
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("receipt email failed user=%s order=%s err=%s", user.id, order.id, exc)
+    except Exception as exc:  # noqa: BLE001 — never break settlement
+        logger.warning("receipt email pipeline error order=%s err=%s", order.id, exc)
 
 
 def refund_payment(db: Session, order: Order) -> Order:

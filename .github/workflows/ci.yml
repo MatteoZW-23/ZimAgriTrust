@@ -167,8 +167,45 @@ jobs:
           push: true
           tags: agritrust/driver-mobile:latest,agritrust/driver-mobile:${{ github.sha }}
 
-  deploy-production:
+      - name: Build and push whatsapp-service
+        uses: docker/build-push-action@v4
+        with:
+          context: ./apps/whatsapp-service
+          push: true
+          tags: agritrust/whatsapp-service:latest,agritrust/whatsapp-service:${{ github.sha }}
+
+  deploy-staging:
     needs: [build-and-push]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.agritrust.com
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Deploy to staging
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/agritrust-staging
+            git pull origin main
+            docker-compose -f docker-compose.prod.yml pull
+            docker-compose -f docker-compose.prod.yml up -d
+            docker-compose -f docker-compose.prod.yml exec backend alembic upgrade head
+
+      - name: Staging smoke tests
+        run: |
+          sleep 30
+          curl -f https://staging-api.agritrust.com/health || exit 1
+          curl -f https://staging-api.agritrust.com/health/ready || exit 1
+          curl -f https://staging.agritrust.com/ || exit 1
+
+  deploy-production:
+    needs: [deploy-staging]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:

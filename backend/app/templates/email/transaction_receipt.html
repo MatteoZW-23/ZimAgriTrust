@@ -1,0 +1,14 @@
+{% extends "_base.html" %}
+{% block title %}Receipt — order {{ order_ref }}{% endblock %}
+{% block body %}
+<h2 style="margin-top:0;color:#0f5132;">Receipt</h2>
+<p>Hi {{ name }}, your transaction has been completed.</p>
+
+<table role="presentation" width="100%" cellpadding="6" cellspacing="0" style="border-collapse:collapse;margin:16px 0;">
+  <tr><td style="color:#6b7280;">Order</td><td style="text-align:right;font-weight:bold;">{{ order_ref }}</td></tr>
+  <tr><td style="color:#6b7280;">Date</td><td style="text-align:right;">{{ date }}</td></tr>
+  <tr><td style="color:#6b7280;">Amount</td><td style="text-align:right;font-weight:bold;">{{ amount }} {{ currency }}</td></tr>
+</table>
+
+<p>A signed PDF receipt is attached for your records.</p>
+{% endblock %}

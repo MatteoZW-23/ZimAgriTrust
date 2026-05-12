@@ -1,0 +1,10 @@
+{% extends "_base.html" %}
+{% block title %}What's new on ZimAgriTrust{% endblock %}
+{% block body %}
+<h2 style="margin-top:0;color:#0f5132;">Release {{ version }}</h2>
+<p>Here's what's new on ZimAgriTrust:</p>
+<ul>
+  {% for h in highlights %}<li>{{ h }}</li>{% endfor %}
+</ul>
+<p>Open the app or visit <a href="https://zimagritrust.co.zw" style="color:#0f5132;">zimagritrust.co.zw</a> to try them out.</p>
+{% endblock %}

@@ -10,7 +10,7 @@ from app.core.security import (
     generate_email_verification_token,
 )
 from app.services.session_service import create_session, revoke_all_user_sessions
-from app.models.user import User, UserRole
+from app.models.user import User, UserRole, UserStatus
 from app.schemas.auth import (
     Token, TokenRefresh, UserLogin, UserRegister, UserResponse,
     PasswordResetRequest, PasswordResetConfirm, Login2FA,
@@ -24,7 +24,10 @@ from app.services.rate_limit_service import (
     record_login_failure,
 )
 from app.services.notification_service import NotificationService
-from app.services.auth_service import authenticate_user, register_user
+from app.services.auth_service import authenticate_user, register_user, build_phone_lookup_candidates
+from app.services.portal_auth_service import PUBLIC_MOBILE_ROLES
+from app.services.invitation_service import InvitationService
+from app.services.security_service import PasswordHasher
 
 router = APIRouter()
 
@@ -66,7 +69,9 @@ async def forgot_password(payload: PasswordResetRequest, db: Session = Depends(g
 @router.post("/reset-password")
 async def reset_password(payload: PasswordResetConfirm, db: Session = Depends(get_db)):
     """
-    Confirms the OTP and updates the password.
+    Confirms the OTP and updates the password/PIN.
+    Staff (Admin/Agent): Updates password_hash (for password + MFA login)
+    Farmers/Buyers: Updates ussd_pin_hash (for PIN-only login)
     """
     cached_otp = await _get_otp(payload.phone_number)
     
@@ -77,34 +82,44 @@ async def reset_password(payload: PasswordResetConfirm, db: Session = Depends(ge
     if not user:
         raise HTTPException(status_code=404, detail="User accounts not found.")
     
-    # Validate password strength
-    password_check = check_password_strength(payload.new_password)
-    if not password_check["valid"]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Password does not meet requirements: {', '.join(password_check['issues'])}"
-        )
+    public_pin_roles = {UserRole.FARMER, UserRole.BUYER, UserRole.TRANSPORTER}
+    if user.role in public_pin_roles:
+        if not payload.new_password.isdigit() or not 4 <= len(payload.new_password) <= 6:
+            raise HTTPException(status_code=400, detail="PIN must be 4-6 numeric digits.")
+    else:
+        password_check = check_password_strength(payload.new_password)
+        if not password_check["valid"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Password does not meet requirements: {', '.join(password_check['issues'])}"
+            )
 
-    # Check if password is common
-    if is_common_password(payload.new_password):
-        raise HTTPException(
-            status_code=400,
-            detail="Password is too common. Please choose a stronger password."
-        )
+        if is_common_password(payload.new_password):
+            raise HTTPException(
+                status_code=400,
+                detail="Password is too common. Please choose a stronger password."
+            )
 
-    # Enforce password history
-    history = user.password_history or []
-    if not check_password_history(payload.new_password, history, settings.PASSWORD_HISTORY_COUNT):
-        raise HTTPException(
-            status_code=400,
-            detail="You cannot reuse a recent password. Please choose a new one."
-        )
+    # Enforce password history (for staff only)
+    if user.role in {UserRole.ADMIN, UserRole.AGENT}:
+        history = user.password_history or []
+        if not check_password_history(payload.new_password, history, settings.PASSWORD_HISTORY_COUNT):
+            raise HTTPException(
+                status_code=400,
+                detail="You cannot reuse a recent password. Please choose a new one."
+            )
+        # Store previous hash in history
+        history.append(user.password_hash)
+        user.password_history = history[-settings.PASSWORD_HISTORY_COUNT:]
 
     hashed_pin = get_password_hash(payload.new_password)
-    history.append(user.password_hash)
-    user.password_history = history[-settings.PASSWORD_HISTORY_COUNT:]
-    user.password_hash = hashed_pin
-    user.ussd_pin_hash = hashed_pin
+
+    # Update appropriate credential field based on role
+    if user.role in {UserRole.ADMIN, UserRole.AGENT}:
+        user.password_hash = hashed_pin
+    else:
+        user.ussd_pin_hash = hashed_pin
+
     user.must_change_password = False
     user.must_change_password_reason = None
     from datetime import datetime, timezone
@@ -114,6 +129,23 @@ async def reset_password(payload: PasswordResetConfirm, db: Session = Depends(ge
 
     # Revoke all sessions for security after password reset
     await revoke_all_user_sessions(db, user.id, reason="password_reset")
+
+    # F#287 — security alert email after password reset (best-effort).
+    if user.email:
+        try:
+            from app.services.email_service import email_service
+            email_service.send_template(
+                "email.security_alert",
+                to=user.email,
+                context={
+                    "name": user.full_name,
+                    "event": "Password reset completed",
+                    "ip": "unknown",
+                    "reset_link": "https://zimagritrust.co.zw/login",
+                },
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     return {"message": "Password updated successfully. All other sessions have been logged out for security."}
 
@@ -138,6 +170,11 @@ async def register(
     existing = db.query(User).filter(User.phone_number == payload.phone_number).first()
     if existing:
         raise HTTPException(status_code=400, detail="Phone number already registered")
+    if payload.role not in PUBLIC_MOBILE_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Privileged accounts must be created from the isolated admin portal.",
+        )
     return register_user(db, payload)
 
 
@@ -146,8 +183,12 @@ async def login(
     payload: UserLogin, request: Request, db: Session = Depends(get_db)
 ):
     """
-    Step 1 of Login: Verify credentials and send 2FA code.
+    Deprecated shared staff login.
     """
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Shared staff login is disabled. Use /admin/login or /agent/login.",
+    )
     client_host = request.client.host if request.client else "unknown"
     await enforce_rate_limit(
         f"auth:login:ip:{client_host}",
@@ -170,6 +211,20 @@ async def login(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect phone or password"
         )
         
+    # Ensure only staff use this endpoint
+    if user.role not in {UserRole.ADMIN, UserRole.AGENT}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Farmers and buyers should use PIN login. Please use the mobile app or USSD."
+        )
+        
+    from app.models.user import UserStatus
+    if user.status != UserStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail=f"ACCOUNT_PENDING: Your profile status is '{user.status}'. Access restricted until Super Admin verification."
+        )
+        
     if not user.is_active:
          raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
     if user.is_suspended:
@@ -188,11 +243,125 @@ async def login(
     }
 
 
+@router.post("/login-pin")
+async def login_pin(
+    payload: UserLogin, request: Request, response: Response, db: Session = Depends(get_db)
+):
+    """
+    PIN Login for Farmers and Buyers: PIN-only authentication (no MFA).
+    Admins and Agents should use /login endpoint instead.
+    """
+    client_host = request.client.host if request.client else "unknown"
+    await enforce_rate_limit(
+        f"auth:login-pin:ip:{client_host}",
+        limit=20,
+        window_seconds=300,
+        detail="Too many login attempts from this origin",
+    )
+    
+    await ensure_login_not_locked(payload.phone_number)
+    
+    # Find user
+    candidates = build_phone_lookup_candidates(payload.phone_number)
+    user = db.query(User).filter(User.phone_number.in_(candidates)).first()
+    
+    if not user:
+        failures = await record_login_failure(payload.phone_number)
+        if failures >= 5:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many failed login attempts. Try again later.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect phone or PIN"
+        )
+    
+    # Ensure only farmers/buyers use this endpoint
+    if user.role in {UserRole.ADMIN, UserRole.AGENT}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Staff should use password login with MFA. Please use the admin dashboard."
+        )
+    
+    # Verify PIN
+    if not user.ussd_pin_hash:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="No PIN set. Please register via mobile app."
+        )
+    
+    if not verify_password(payload.password, user.ussd_pin_hash):
+        failures = await record_login_failure(payload.phone_number)
+        if failures >= 5:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many failed login attempts. Try again later.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect PIN"
+        )
+        
+    from app.models.user import UserStatus
+    if user.status != UserStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail=f"ACCOUNT_PENDING: Your profile status is '{user.status}'. Access restricted until Super Admin verification."
+        )
+        
+    if not user.is_active:
+         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
+    if user.is_suspended:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account suspended")
+
+    await clear_login_failures(payload.phone_number)
+
+    # Create tokens directly (no MFA for PIN login)
+    access_token = create_access_token(str(user.id), user.role.value)
+    refresh_token = create_refresh_token(str(user.id))
+
+    # Decode to get JTI for session tracking
+    access_payload = decode_token(access_token)
+    refresh_payload = decode_token(refresh_token)
+
+    # Create tracked session
+    client_ip = request.client.host if request.client else "unknown"
+    headers = dict(request.headers)
+    await create_session(
+        db=db,
+        user_id=user.id,
+        access_token_jti=access_payload.get("jti"),
+        refresh_token_jti=refresh_payload.get("jti"),
+        request_headers=headers,
+        ip_address=client_ip,
+    )
+
+    # Set cookies
+    cookie_secure = bool(settings.FORCE_HTTPS)
+    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=cookie_secure, samesite="lax", max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+    response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=cookie_secure, samesite="lax", max_age=settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60)
+
+    # Set CSRF token
+    import secrets as _secrets
+    csrf_token = _secrets.token_urlsafe(32)
+    response.set_cookie(key="csrf_token", value=csrf_token, httponly=False, secure=cookie_secure, samesite="lax", max_age=settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60)
+    response.headers["X-CSRF-Token"] = csrf_token
+
+    return Token(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=UserResponse.model_validate(user),
+        must_change_password=False,
+    )
+
+
 @router.post("/verify-login-2fa", response_model=Token)
 async def verify_login_2fa(payload: "Login2FA", request: Request, response: Response, db: Session = Depends(get_db)):
     """
-    Step 2 of Login: Verify 2FA code, create tracked session, return tokens.
+    Deprecated shared MFA verification.
     """
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Shared MFA verification is disabled. Use /admin/verify-mfa or /agent/verify-mfa.",
+    )
     cached_otp = await _get_otp(f"login_2fa:{payload.phone_number}")
 
     if not cached_otp or payload.otp != cached_otp:
@@ -202,12 +371,12 @@ async def verify_login_2fa(payload: "Login2FA", request: Request, response: Resp
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
 
-    # Admin MFA enforcement
-    if user.role == UserRole.ADMIN and settings.REQUIRE_MFA_ADMIN and not user.is_phone_verified:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin accounts require verified phone number. Contact system administrator."
-        )
+    # Mark phone as verified upon successful OTP validation for Admins/Staff
+    if user.role in {UserRole.ADMIN, UserRole.AGENT} and not user.is_phone_verified:
+        from datetime import datetime, timezone
+        user.is_phone_verified = True
+        user.phone_verified_at = datetime.now(timezone.utc)
+        db.commit()
 
     await clear_login_failures(payload.phone_number)
     await _clear_otp(f"login_2fa:{payload.phone_number}")
@@ -232,13 +401,14 @@ async def verify_login_2fa(payload: "Login2FA", request: Request, response: Resp
     )
 
     # Set cookies
-    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite="lax", max_age=15 * 60)
-    response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite="lax", max_age=7 * 24 * 60 * 60)
+    cookie_secure = bool(settings.FORCE_HTTPS)
+    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=cookie_secure, samesite="lax", max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+    response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=cookie_secure, samesite="lax", max_age=settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60)
 
     # Set CSRF token cookie for subsequent state-changing requests
     import secrets as _secrets
     csrf_token = _secrets.token_urlsafe(32)
-    response.set_cookie(key="csrf_token", value=csrf_token, httponly=False, secure=True, samesite="lax", max_age=7 * 24 * 60 * 60)
+    response.set_cookie(key="csrf_token", value=csrf_token, httponly=False, secure=cookie_secure, samesite="lax", max_age=settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60)
     response.headers["X-CSRF-Token"] = csrf_token
 
     # Check password expiry
@@ -297,8 +467,9 @@ async def refresh(request: Request, response: Response, payload: TokenRefresh = 
         access_token = create_access_token(str(user.id), user.role.value)
         refresh_token = create_refresh_token(str(user.id))
         
-        response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite="lax", max_age=15 * 60)
-        response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite="lax", max_age=7 * 24 * 60 * 60)
+        cookie_secure = bool(settings.FORCE_HTTPS)
+        response.set_cookie(key="access_token", value=access_token, httponly=True, secure=cookie_secure, samesite="lax", max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+        response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=cookie_secure, samesite="lax", max_age=settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60)
         
         return Token(access_token=access_token, refresh_token=refresh_token)
     except Exception as e:
@@ -426,37 +597,54 @@ async def change_pin(
     current_user: User = Depends(get_current_user),
 ) -> User:
     """
-    Change PIN — required on first login when must_change_password=True.
-    Also available any time a user wants to update their PIN.
-    Enforces password history and revokes all other sessions.
+    Change PIN/PASSWORD — role-based credential update.
+    Staff (Admin/Agent): Updates password_hash (for password + MFA login)
+    Farmers/Buyers: Updates ussd_pin_hash (for PIN-only login)
     """
-    if not verify_password(payload.current_pin, current_user.password_hash):
-        raise HTTPException(status_code=400, detail="Current PIN is incorrect.")
+    # Verify current credential based on role
+    if current_user.role in {UserRole.ADMIN, UserRole.AGENT}:
+        # Staff: Verify against password_hash
+        if not verify_password(payload.current_pin, current_user.password_hash):
+            raise HTTPException(status_code=400, detail="Current password is incorrect.")
+        credential_field = "password_hash"
+    else:
+        # Farmers/Buyers: Verify against ussd_pin_hash
+        if not current_user.ussd_pin_hash or not verify_password(payload.current_pin, current_user.ussd_pin_hash):
+            raise HTTPException(status_code=400, detail="Current PIN is incorrect.")
+        credential_field = "ussd_pin_hash"
 
     if payload.current_pin == payload.new_pin:
         raise HTTPException(status_code=400, detail="New PIN must be different from the current PIN.")
 
-    # Check password strength
-    pw_check = check_password_strength(payload.new_pin)
-    if not pw_check["valid"]:
-        raise HTTPException(status_code=400, detail=f"Password too weak: {', '.join(pw_check['issues'])}")
+    public_pin_roles = {UserRole.FARMER, UserRole.BUYER, UserRole.TRANSPORTER}
+    if current_user.role in public_pin_roles:
+        if not payload.new_pin.isdigit() or not 4 <= len(payload.new_pin) <= 6:
+            raise HTTPException(status_code=400, detail="PIN must be 4-6 numeric digits.")
+    else:
+        pw_check = check_password_strength(payload.new_pin)
+        if not pw_check["valid"]:
+            raise HTTPException(status_code=400, detail=f"Password too weak: {', '.join(pw_check['issues'])}")
 
-    if is_common_password(payload.new_pin):
-        raise HTTPException(status_code=400, detail="Password is too common. Choose a stronger one.")
+        if is_common_password(payload.new_pin):
+            raise HTTPException(status_code=400, detail="Password is too common. Choose a stronger one.")
 
-    # Enforce password history
-    history = current_user.password_history or []
-    if not check_password_history(payload.new_pin, history, settings.PASSWORD_HISTORY_COUNT):
-        raise HTTPException(status_code=400, detail="You cannot reuse a recent password. Please choose a new one.")
+    # Enforce password history (for staff only)
+    if current_user.role in {UserRole.ADMIN, UserRole.AGENT}:
+        history = current_user.password_history or []
+        if not check_password_history(payload.new_pin, history, settings.PASSWORD_HISTORY_COUNT):
+            raise HTTPException(status_code=400, detail="You cannot reuse a recent password. Please choose a new one.")
+        # Store previous hash in history
+        history.append(current_user.password_hash)
+        current_user.password_history = history[-settings.PASSWORD_HISTORY_COUNT:]
 
     hashed = get_password_hash(payload.new_pin)
 
-    # Store previous hash in history
-    history.append(current_user.password_hash)
-    current_user.password_history = history[-settings.PASSWORD_HISTORY_COUNT:]
+    # Update appropriate credential field based on role
+    if current_user.role in {UserRole.ADMIN, UserRole.AGENT}:
+        current_user.password_hash = hashed
+    else:
+        current_user.ussd_pin_hash = hashed
 
-    current_user.password_hash = hashed
-    current_user.ussd_pin_hash = hashed
     current_user.must_change_password = False
     current_user.must_change_password_reason = None
     from datetime import datetime, timezone
@@ -479,6 +667,14 @@ def update_profile(
 ) -> User:
     """Update the current user's profile fields."""
     update_data = payload.model_dump(exclude_none=True)
+    new_email = update_data.get("email")
+    if new_email and new_email != current_user.email:
+        existing = db.query(User).filter(User.email == new_email, User.id != current_user.id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email address is already in use")
+        current_user.email_verified = False
+        current_user.email_verified_at = None
+        current_user.email_verification_token = None
     for field, value in update_data.items():
         setattr(current_user, field, value)
     db.commit()
@@ -502,8 +698,43 @@ def update_notification_prefs(
     return current_user
 
 
+@router.get("/data-export")
+def export_personal_data(
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Export the current user's personal account data in portable JSON format."""
+    return {
+        "account": {
+            "id": str(current_user.id),
+            "full_name": current_user.full_name,
+            "phone_number": current_user.phone_number,
+            "email": current_user.email,
+            "role": current_user.role.value if hasattr(current_user.role, "value") else current_user.role,
+            "status": current_user.status.value if hasattr(current_user.status, "value") else current_user.status,
+            "is_active": current_user.is_active,
+            "is_phone_verified": current_user.is_phone_verified,
+            "trust_score": current_user.trust_score,
+            "preferred_language": current_user.preferred_language,
+            "province": current_user.province,
+            "district": current_user.district,
+            "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
+            "updated_at": current_user.updated_at.isoformat() if getattr(current_user, "updated_at", None) else None,
+        },
+        "privacy": {
+            "notification_prefs": current_user.notification_prefs or {},
+            "email_verified": current_user.email_verified,
+            "phone_verified_at": current_user.phone_verified_at.isoformat() if current_user.phone_verified_at else None,
+        },
+        "security": {
+            "mfa_enabled": current_user.mfa_enabled,
+            "password_changed_at": current_user.password_changed_at.isoformat() if current_user.password_changed_at else None,
+            "must_change_password": current_user.must_change_password,
+        },
+    }
+
+
 @router.post("/deactivate", response_model=UserResponse)
-def deactivate_account(
+async def deactivate_account(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> User:
@@ -511,11 +742,12 @@ def deactivate_account(
     current_user.is_active = False
     db.commit()
     db.refresh(current_user)
+    await revoke_all_user_sessions(db, current_user.id, reason="account_deactivated")
     return current_user
 
 
 @router.delete("/account", response_model=UserResponse)
-def delete_account(
+async def delete_account(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> User:
@@ -524,11 +756,99 @@ def delete_account(
     from app.models.user import UserStatus
 
     current_user.full_name = "DELETED_USER"
-    current_user.phone_number = f"DELETED_{str(_uuid.uuid4())[:8]}"
+    current_user.phone_number = f"DEL{_uuid.uuid4().hex[:12]}"
     current_user.email = None
     current_user.national_id = None
+    current_user.id_document_url = None
+    current_user.email_verified = False
+    current_user.email_verified_at = None
+    current_user.email_verification_token = None
+    current_user.mfa_enabled = False
+    current_user.mfa_secret = None
+    current_user.notification_prefs = {}
+    current_user.province = None
+    current_user.district = None
+    current_user.ward = None
+    current_user.latitude = None
+    current_user.longitude = None
     current_user.status = UserStatus.CLOSED
     current_user.is_active = False
     db.commit()
     db.refresh(current_user)
+    await revoke_all_user_sessions(db, current_user.id, reason="account_deleted")
     return current_user
+
+
+# ============================================================================
+# INVITATION ACCEPTANCE
+# ============================================================================
+
+from pydantic import BaseModel as _BaseModel
+
+class InvitationAcceptRequest(_BaseModel):
+    """Accept invitation request"""
+    email: str
+    token: str
+    password: str
+    full_name: str = ""
+    phone_number: str = ""
+
+
+@router.post("/invitation/accept")
+async def accept_invitation(
+    request: InvitationAcceptRequest,
+    db: Session = Depends(get_db),
+):
+    """Accept invitation to join as admin/staff"""
+
+    # Verify invitation
+    is_valid, error, invitation = InvitationService.verify_invitation(
+        db,
+        request.email,
+        request.token,
+    )
+
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error,
+        )
+
+    # Check if user already exists
+    user = db.query(User).filter(User.email == request.email).first()
+
+    if not user:
+        pw_hasher = PasswordHasher()
+        # Map invitation RBAC role name to UserRole enum
+        role_name = invitation.role.name.upper() if invitation.role else "ADMIN"
+        role_map = {v.name: v for v in UserRole}
+        user_role = role_map.get(role_name, UserRole.ADMIN)
+
+        user = User(
+            email=request.email,
+            full_name=request.full_name or '',
+            phone_number=request.phone_number or '',
+            password_hash=pw_hasher.hash_password(request.password),
+            status=UserStatus.PENDING_VERIFICATION,
+            role=user_role,
+            role_id=invitation.role_id,
+        )
+        db.add(user)
+        db.flush()
+    else:
+        pw_hasher = PasswordHasher()
+        user.password_hash = pw_hasher.hash_password(request.password)
+
+    # Accept invitation
+    success, error = InvitationService.accept_invitation(db, invitation, user)
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error,
+        )
+
+    return {
+        "message": "Invitation accepted. You can now login.",
+        "role": invitation.role.name if invitation.role else "",
+    }

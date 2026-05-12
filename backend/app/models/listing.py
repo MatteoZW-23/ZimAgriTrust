@@ -114,9 +114,20 @@ class Listing(Base):
     
     is_boosted: Mapped[bool] = mapped_column(Boolean, default=False)
     boost_fee: Mapped[float] = mapped_column(Float, default=0.0)
-    
+    boosted_until: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # F#56 — listing stats (view tracking)
+    view_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    # F#52 — listing photos (URLs of uploaded images)
+    photo_urls: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+
+    # F#58 — auto-expire support
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
     # Metadata
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Agricultural Details & Quality Logistics
     is_perishable: Mapped[bool] = mapped_column(Boolean, default=False)

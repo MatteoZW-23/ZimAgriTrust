@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Alert, Platform } from 'react-native';
-import { User, MapPin, Phone, Shield, Star, LogOut, ChevronRight, Bell, HelpCircle, FileText, Settings } from 'lucide-react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Alert, Platform, Share } from 'react-native';
+import { User, MapPin, Phone, Shield, Star, LogOut, ChevronRight, Bell, HelpCircle, FileText, Settings, Briefcase, Download, Trash2, PowerOff } from 'lucide-react-native';
 import { theme } from '../styles';
-import { getProfile } from '../api';
+import { deactivateAccount, deleteAccount, exportPersonalData, getProfile } from '../api';
 import { clearSession } from '../utils/auth';
 
-export default function ProfileScreen({ route }) {
+export default function ProfileScreen({ route, navigation }) {
   const { role = 'farmer', token, profile: initialProfile = {}, onLogout } = route.params || {};
   const [profile, setProfile] = useState(initialProfile);
   const [loading, setLoading] = useState(false);
@@ -38,6 +38,72 @@ export default function ProfileScreen({ route }) {
         },
       },
     ]);
+  };
+
+  const handleExportData = async () => {
+    try {
+      const data = await exportPersonalData(token);
+      const text = JSON.stringify(data, null, 2);
+      if (Platform.OS === 'web') {
+        const blob = new Blob([text], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'zimagritrust-personal-data.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+      await Share.share({ title: 'ZimAgriTrust Personal Data', message: text });
+    } catch (err) {
+      Alert.alert('Export failed', err.message || 'Could not export your data.');
+    }
+  };
+
+  const handleDeactivateAccount = () => {
+    Alert.alert('Deactivate account', 'Your account will be disabled and you will be signed out. You can contact support to reactivate it.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Deactivate',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deactivateAccount(token);
+            await clearSession();
+            if (onLogout) onLogout();
+          } catch (err) {
+            Alert.alert('Deactivate failed', err.message || 'Could not deactivate your account.');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert('Delete account permanently?', 'This will anonymize your personal details and close your account. This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteAccount(token);
+            await clearSession();
+            if (onLogout) onLogout();
+          } catch (err) {
+            Alert.alert('Delete failed', err.message || 'Could not delete your account.');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleEditProfile = () => {
+    navigation.navigate('EditProfile', {
+      token,
+      profile,
+      onProfileUpdated: setProfile,
+    });
   };
 
   const trustScore = profile.trust_score || 50;
@@ -118,15 +184,29 @@ export default function ProfileScreen({ route }) {
         {/* Menu Items */}
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>Account</Text>
-          <MenuItem icon={<Settings size={20} color={accent} />} label="Account Settings" />
+          <MenuItem icon={<Settings size={20} color={accent} />} label="Account Settings" onPress={handleEditProfile} />
           <MenuItem icon={<Bell size={20} color={accent} />} label="Notifications" />
           <MenuItem icon={<Shield size={20} color={accent} />} label="Verification" />
+          <MenuItem icon={<Download size={20} color={accent} />} label="Export My Data" onPress={handleExportData} />
+          {role !== 'agent' && (
+            <MenuItem
+              icon={<Briefcase size={20} color={accent} />}
+              label="Become an Agent"
+              onPress={() => navigation.navigate('AgentApplication', { profile })}
+            />
+          )}
         </View>
 
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>Support</Text>
           <MenuItem icon={<HelpCircle size={20} color={accent} />} label="Help Center" />
           <MenuItem icon={<FileText size={20} color={accent} />} label="Terms & Privacy" />
+        </View>
+
+        <View style={styles.menuSection}>
+          <Text style={styles.sectionTitle}>Data & Account Control</Text>
+          <MenuItem icon={<PowerOff size={20} color="#D97706" />} label="Deactivate Account" onPress={handleDeactivateAccount} />
+          <MenuItem icon={<Trash2 size={20} color="#D32F2F" />} label="Delete My Account" onPress={handleDeleteAccount} />
         </View>
 
         {/* Logout */}

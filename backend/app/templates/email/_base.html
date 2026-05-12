@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{% block title %}ZimAgriTrust{% endblock %}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f6f5;font-family:Arial,Helvetica,sans-serif;color:#1f2a37;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f5;padding:24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+          <tr>
+            <td style="background:#0f5132;padding:20px 28px;color:#ffffff;font-size:20px;font-weight:bold;">
+              🌾 ZimAgriTrust
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px;">
+              {% block body %}{% endblock %}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 28px;background:#f9fafb;font-size:12px;color:#6b7280;">
+              ZimAgriTrust · Harare, Zimbabwe<br/>
+              Need help? Reply to this email or visit
+              <a href="https://zimagritrust.co.zw/help" style="color:#0f5132;">zimagritrust.co.zw/help</a>.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

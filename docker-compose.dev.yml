@@ -1,0 +1,281 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ZimAgriTrust – Full Development Stack
+# Usage: docker compose -f docker-compose.dev.yml up
+# Access:
+#   API          → http://localhost:8080
+#   Public site  → http://localhost:3001
+#   App portal   → http://localhost:3002
+#   Admin dash   → http://localhost:3003
+#   Agent portal → http://localhost:3004
+#   WhatsApp svc → http://localhost:8001
+#   Prometheus   → http://localhost:9090
+#   Grafana      → http://localhost:3000  (admin / admin)
+#   Loki         → http://localhost:3100
+#   Flower       → http://localhost:5555
+#   pgAdmin      → http://localhost:5050
+# ─────────────────────────────────────────────────────────────────────────────
+
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql://postgres:postgres@postgres:5432/agritrust_dev
+  REDIS_URL: redis://redis:6379/0
+  SECRET_KEY: dev-secret-key-change-in-production-min-32-chars
+  ENVIRONMENT: development
+  DEBUG: "true"
+  LOG_LEVEL: DEBUG
+  ALLOWED_HOSTS: "*"
+  CORS_ORIGINS: "http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004"
+  FORCE_HTTPS: "false"
+  ADMIN_AUDIT_LOGGING: "false"
+  AFRICAS_TALKING_API_KEY: ${AFRICAS_TALKING_API_KEY:-sandbox-key}
+  AFRICAS_TALKING_USERNAME: ${AFRICAS_TALKING_USERNAME:-sandbox}
+  ECOCASH_MERCHANT_CODE: ${ECOCASH_MERCHANT_CODE:-test-merchant}
+  SENDGRID_API_KEY: ${SENDGRID_API_KEY:-SG.placeholder}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minio}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minio123}
+  AWS_S3_BUCKET: ${AWS_S3_BUCKET:-agritrust-dev}
+  AWS_S3_ENDPOINT_URL: http://minio:9000
+  SENTRY_DSN: ""
+
+services:
+  # ── Data stores ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: agritrust_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d agritrust_dev"]
+      interval: 5s
+      retries: 10
+      timeout: 5s
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_dev_data:/data
+
+  # ── Backend ──────────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      target: development
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level debug
+    ports:
+      - "8080:8000"
+    environment:
+      <<: *backend-env
+    volumes:
+      - ./backend:/app
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Alembic migrations (run-once) ─────────────────────────────────────────
+  migrations:
+    build:
+      context: ./backend
+      target: development
+    command: alembic upgrade head
+    environment:
+      <<: *backend-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # ── Celery worker ────────────────────────────────────────────────────────────
+  celery-worker:
+    build:
+      context: ./backend
+      target: development
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2 -Q default,notifications,payments
+    environment:
+      <<: *backend-env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
+
+  # ── Celery Beat ───────────────────────────────────────────────────────────
+  celery-beat:
+    build:
+      context: ./backend
+      target: development
+    command: celery -A app.celery_app beat --loglevel=info
+    environment:
+      <<: *backend-env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # ── Celery Flower (monitoring) ────────────────────────────────────────────
+  flower:
+    build:
+      context: ./backend
+      target: development
+    command: celery -A app.celery_app flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      <<: *backend-env
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # ── WhatsApp service ──────────────────────────────────────────────────────
+  whatsapp-service:
+    build: ./apps/whatsapp-service
+    ports:
+      - "8001:8001"
+    environment:
+      REDIS_URL: redis://redis:6379/1
+      MAIN_BACKEND_URL: http://backend:8000
+      LOG_LEVEL: INFO
+      PORT: "8001"
+    depends_on:
+      - redis
+      - backend
+    restart: unless-stopped
+
+  # ── Frontend apps (Vite dev servers) ─────────────────────────────────────
+  public-website:
+    build:
+      context: ./apps/public-website
+      target: development
+    command: npm run dev -- --host 0.0.0.0 --port 3001
+    ports:
+      - "3001:3001"
+    environment:
+      VITE_API_URL: http://localhost:8080/api/v1
+    volumes:
+      - ./apps/public-website/src:/app/src
+    restart: unless-stopped
+
+  app-portal:
+    build:
+      context: ./apps/app-portal
+      target: development
+    command: npm run dev -- --host 0.0.0.0 --port 3002
+    ports:
+      - "3002:3002"
+    environment:
+      VITE_API_URL: http://localhost:8080/api/v1
+    volumes:
+      - ./apps/app-portal/src:/app/src
+    restart: unless-stopped
+
+  admin-dashboard:
+    build:
+      context: ./apps/admin-dashboard
+      target: development
+    command: npm run dev -- --host 0.0.0.0 --port 3003
+    ports:
+      - "3003:3003"
+    environment:
+      VITE_API_URL: http://localhost:8080/api/v1
+    volumes:
+      - ./apps/admin-dashboard/src:/app/src
+    restart: unless-stopped
+
+  agent-portal:
+    build:
+      context: .
+      dockerfile: apps/agent-portal/Dockerfile
+    command: npm run dev -- --host 0.0.0.0 --port 3004
+    ports:
+      - "3004:3004"
+    environment:
+      VITE_API_URL: http://localhost:8080/api/v1
+    volumes:
+      - ./apps/agent-portal/src:/app/src
+    restart: unless-stopped
+
+  # ── Monitoring ────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_dev_data:/prometheus
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - grafana_dev_data:/var/lib/grafana
+      - ./infra/monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
+
+  loki:
+    image: grafana/loki:2.9.0
+    command: -config.file=/etc/loki/loki.yaml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./infra/monitoring/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki_dev_data:/loki
+
+  # ── pgAdmin (dev DB browser) ─────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@agritrust.dev
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    profiles:
+      - tools
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+  minio_dev_data:
+  prometheus_dev_data:
+  grafana_dev_data:
+  loki_dev_data:

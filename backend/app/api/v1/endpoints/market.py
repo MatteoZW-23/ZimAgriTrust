@@ -41,7 +41,7 @@ def get_regional_insights(
     """
     Regional market updates. Restricted to PREMIUM.
     """
-    if user.role not in [UserRole.ADMIN, UserRole.AGENT] and user.subscription_tier == SubscriptionTier.BASIC:
+    if user.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.AGENT] and user.subscription_tier == SubscriptionTier.BASIC:
         return {"error": "SUBSCRIPTION_REQUIRED", "message": "Regional analytics require a PREMIUM subscription."}
 
     from sqlalchemy import func
@@ -162,7 +162,7 @@ def get_national_pulse(
     """
     Exposes the National Agri-Pulse Economic Indicator. Restricted to PREMIUM.
     """
-    if user.role not in [UserRole.ADMIN, UserRole.AGENT] and user.subscription_tier == SubscriptionTier.BASIC:
+    if user.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.AGENT] and user.subscription_tier == SubscriptionTier.BASIC:
         return {"error": "SUBSCRIPTION_REQUIRED", "message": "The National Pulse is a PREMIUM feature."}
 
     from app.services.revenue_service import AdminRevenueService

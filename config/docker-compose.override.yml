@@ -6,7 +6,7 @@ services:
     environment:
       - ENVIRONMENT=development
       - DEBUG=true
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app --reload-dir alembic
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
 
   agent-dashboard:
     volumes:
@@ -27,3 +27,4 @@ services:
   redis:
     ports:
       - "6379:6379"
+

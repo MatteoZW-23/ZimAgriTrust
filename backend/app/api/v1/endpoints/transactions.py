@@ -1,5 +1,5 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -11,7 +11,40 @@ from app.models.review import TradeReview
 from app.schemas.review import TradeReviewCreate, TradeReviewResponse
 from app.schemas.transaction import DeliveryConfirmRequest, OrderResponse, TransactionResponse
 
+# --- Clean architecture (v2) wiring ----------------------------------------
+from app.api.v1.dependencies import get_confirm_delivery, get_get_order
+from app.application.orders import (
+    ConfirmDelivery,
+    ConfirmDeliveryCommand,
+    GetOrder,
+    GetOrderQuery,
+    OrderView,
+)
+from app.application.orders.confirm_delivery import OrderNotFound as ConfirmOrderNotFound
+from app.application.orders.get_order import OrderNotFound as GetOrderNotFound
+from app.domain.orders.exceptions import (
+    InvalidHandoverCode,
+    InvalidStatusTransition,
+    NotEscrowed,
+    OrderDomainError,
+    UnauthorizedActor,
+)
+# ---------------------------------------------------------------------------
+
 router = APIRouter()
+
+
+# --- Domain-error -> HTTP translator (single place) -------------------------
+def _raise_http_for_domain_error(exc: OrderDomainError) -> None:
+    if isinstance(exc, UnauthorizedActor):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc))
+    if isinstance(exc, NotEscrowed):
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc))
+    if isinstance(exc, InvalidHandoverCode):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    if isinstance(exc, InvalidStatusTransition):
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc))
+    raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 
 @router.get("", response_model=List[OrderResponse])
@@ -36,7 +69,7 @@ def get_order_details(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    if current_user.role != UserRole.ADMIN and order.buyer_id != current_user.id and order.seller_id != current_user.id:
+    if current_user.role not in {UserRole.ADMIN, UserRole.SUPER_ADMIN} and order.buyer_id != current_user.id and order.seller_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     return order
@@ -135,7 +168,7 @@ def list_order_reviews(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    if current_user.role != UserRole.ADMIN and current_user.id not in {order.buyer_id, order.seller_id}:
+    if current_user.role not in {UserRole.ADMIN, UserRole.SUPER_ADMIN} and current_user.id not in {order.buyer_id, order.seller_id}:
         raise HTTPException(status_code=403, detail="Access denied")
 
     return db.query(TradeReview).filter(TradeReview.order_id == order_id).order_by(TradeReview.created_at.desc()).all()
@@ -156,7 +189,7 @@ def download_order_receipt(
         raise HTTPException(status_code=404, detail="Order not found")
     
     # Check authorization
-    if current_user.role != UserRole.ADMIN and order.buyer_id != current_user.id and order.seller_id != current_user.id:
+    if current_user.role not in {UserRole.ADMIN, UserRole.SUPER_ADMIN} and order.buyer_id != current_user.id and order.seller_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
 
     from app.services.receipt_service import receipt_service
@@ -225,3 +258,85 @@ def submit_transport_survey(
     db.add(survey)
     db.commit()
     return {"message": "Survey submitted. Thank you for your feedback.", "order_id": str(order_id)}
+
+
+# =============================================================================
+# v2 endpoints — clean architecture (use cases + ports + adapters)
+# These run alongside the legacy endpoints above. Once parity is verified
+# and clients migrate, the legacy ones will be deleted.
+# =============================================================================
+
+class OrderViewResponse(BaseModel):
+    id: uuid.UUID
+    order_number: str
+    buyer_id: uuid.UUID
+    seller_id: uuid.UUID
+    status: str
+    total_amount_cents: int
+    seller_payout_cents: int
+    currency: str
+    logistics_type: str
+    handover_code_visible: Optional[str] = None
+    created_at: str
+
+    @classmethod
+    def from_view(cls, v: OrderView) -> "OrderViewResponse":
+        return cls(
+            id=v.id,
+            order_number=v.order_number,
+            buyer_id=v.buyer_id,
+            seller_id=v.seller_id,
+            status=v.status,
+            total_amount_cents=v.total_amount_cents,
+            seller_payout_cents=v.seller_payout_cents,
+            currency=v.currency,
+            logistics_type=v.logistics_type,
+            handover_code_visible=v.handover_code_visible,
+            created_at=v.created_at.isoformat(),
+        )
+
+
+@router.get("/v2/{order_id}", response_model=OrderViewResponse)
+def get_order_v2(
+    order_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    use_case: GetOrder = Depends(get_get_order),
+) -> OrderViewResponse:
+    try:
+        view = use_case(GetOrderQuery(
+            order_id=order_id,
+            actor_id=current_user.id,
+            actor_is_admin=(current_user.role in {UserRole.ADMIN, UserRole.SUPER_ADMIN}),
+        ))
+    except GetOrderNotFound:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Order not found")
+    except OrderDomainError as exc:
+        _raise_http_for_domain_error(exc)
+    return OrderViewResponse.from_view(view)
+
+
+@router.post("/v2/{order_id}/confirm-delivery", response_model=OrderViewResponse)
+def confirm_delivery_v2(
+    order_id: uuid.UUID,
+    payload: DeliveryConfirmRequest,
+    current_user: User = Depends(get_current_user),
+    confirm: ConfirmDelivery = Depends(get_confirm_delivery),
+    get_view: GetOrder = Depends(get_get_order),
+) -> OrderViewResponse:
+    try:
+        confirm(ConfirmDeliveryCommand(
+            order_id=order_id,
+            actor_id=current_user.id,
+            handover_code=payload.handover_code,
+        ))
+    except ConfirmOrderNotFound:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Order not found")
+    except OrderDomainError as exc:
+        _raise_http_for_domain_error(exc)
+
+    view = get_view(GetOrderQuery(
+        order_id=order_id,
+        actor_id=current_user.id,
+        actor_is_admin=(current_user.role in {UserRole.ADMIN, UserRole.SUPER_ADMIN}),
+    ))
+    return OrderViewResponse.from_view(view)

@@ -63,7 +63,7 @@ def send_trade_message(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    if current_user.id not in [session.buyer_id, session.seller_id] and current_user.role != UserRole.ADMIN:
+    if current_user.id not in [session.buyer_id, session.seller_id] and current_user.role not in {UserRole.ADMIN, UserRole.SUPER_ADMIN}:
         raise HTTPException(status_code=403, detail="Not authorized to participate in this trade")
 
     # Security Masking
@@ -105,7 +105,7 @@ def get_session_messages(
     if current_user.id in [session.buyer_id, session.seller_id]:
         return session.messages
         
-    if current_user.role == UserRole.ADMIN:
+    if current_user.role in {UserRole.ADMIN, UserRole.SUPER_ADMIN}:
         return session.messages
 
     if current_user.role == UserRole.AGENT:

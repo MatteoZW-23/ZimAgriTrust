@@ -61,6 +61,9 @@ class Token(BaseModel):
     token_type: str = "bearer"
     user: Optional[UserResponse] = None
     must_change_password: bool = False
+    portal: Optional[str] = None
+    portal_path: Optional[str] = None
+    allowed_portals: list[str] = Field(default_factory=list)
 
 
 class TokenRefresh(BaseModel):
@@ -70,7 +73,7 @@ class TokenRefresh(BaseModel):
 class UserRegister(BaseModel):
     full_name: str = Field(min_length=2, max_length=100)
     phone_number: str = Field(min_length=7, max_length=15)
-    password: str = Field(min_length=4, max_length=6, description="4–6 digit PIN for app and USSD access")
+    password: str = Field(min_length=4, max_length=100, description="Secure password or 4–6 digit PIN")
     admin_secret: Optional[str] = None
     role: UserRole
 
@@ -124,19 +127,11 @@ class PasswordResetRequest(BaseModel):
 class PasswordResetConfirm(BaseModel):
     phone_number: str
     otp: str
-    new_password: str = Field(min_length=4, max_length=6, description="4–6 digit PIN")
+    new_password: str = Field(min_length=4, max_length=100, description="Secure password or 4–6 digit PIN")
 
 
 class ChangePinRequest(BaseModel):
     """Used when must_change_password=True — user sets their own PIN after first login."""
-    current_pin: str = Field(min_length=4, max_length=6)
-    new_pin: str = Field(min_length=4, max_length=6)
-
-    @field_validator("new_pin")
-    @classmethod
-    def pin_must_be_digits(cls, v: str) -> str:
-        if not v.isdigit():
-            raise ValueError("PIN must be numeric digits only")
-        return v
-
+    current_pin: str = Field(min_length=4, max_length=100)
+    new_pin: str = Field(min_length=4, max_length=100)
 

@@ -1,0 +1,118 @@
+{
+  "module_id": 6,
+  "module_title": "Marketplace Ethics & Integrity",
+  "source_handbook": "handbook_m6.txt",
+  "passing_score": 80.0,
+  "questions": [
+    {
+      "id": "q6_1",
+      "text": "What is the 'Zero-Bribe' policy?",
+      "options": [
+        "Small gifts are okay",
+        "Strict prohibition of any gifts or payments to influence grading",
+        "Payment for speed is allowed",
+        "Only cash is forbidden"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q6_2",
+      "text": "What constitutes a 'Conflict of Interest' for an Agent?",
+      "options": [
+        "Knowing the farmer",
+        "Verifying a crop owned by the Agent's own family business without disclosure",
+        "Working on weekends",
+        "Using a personal phone"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q6_3",
+      "text": "What happens if an Agent is caught in collusion to inflate a grade?",
+      "options": [
+        "A warning",
+        "Temporary suspension",
+        "It is recorded on the blockchain and shared with the National Credit Bureau",
+        "A small fine"
+      ],
+      "correct_index": 2
+    },
+    {
+      "id": "q6_4",
+      "text": "What is 'poaching' in the ZimAgritrust context?",
+      "options": [
+        "Hunting wildlife on farms",
+        "Encouraging farmers to trade off-platform to avoid fees",
+        "Stealing crops",
+        "Taking competitor agents"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q6_5",
+      "text": "Which of the following is a violation of the 'Need to Know' data privacy rule?",
+      "options": [
+        "Sharing a farmer's warehouse photo on social media",
+        "Reporting crop quality to the platform",
+        "Sending a WhatsApp update to the farmer",
+        "Uploading verification photos to the app"
+      ],
+      "correct_index": 0
+    },
+    {
+      "id": "q6_6",
+      "text": "What should an Agent do if they suspect a conflict of interest?",
+      "options": [
+        "Continue with the verification",
+        "Click 'Recuse' in the app and let the task be reassigned",
+        "Ask the farmer to hide the relationship",
+        "Complete the task quickly"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q6_7",
+      "text": "Why must your verification device always be PIN-protected?",
+      "options": [
+        "To prevent theft",
+        "It contains sensitive farmer data including GPS locations and financial earnings",
+        "It looks more professional",
+        "Company policy only"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q6_8",
+      "text": "Can an Agent act as a Buyer for a crop they previously verified?",
+      "options": [
+        "Yes, after 30 days",
+        "Yes, with Admin approval",
+        "No, this is a side-trade conflict of interest",
+        "Only if the price is fair"
+      ],
+      "correct_index": 2
+    },
+    {
+      "id": "q6_9",
+      "text": "Is disclosure required if an Agent works for another ag-tech firm?",
+      "options": [
+        "No, it is private",
+        "Yes, it must be disclosed to avoid conflicts of interest",
+        "Only if asked directly",
+        "Only for full-time jobs"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q6_10",
+      "text": "What is the passing score for Module 6?",
+      "options": [
+        "70%",
+        "75%",
+        "80%",
+        "85%"
+      ],
+      "correct_index": 2
+    }
+  ]
+}

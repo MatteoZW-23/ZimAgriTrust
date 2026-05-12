@@ -1,10 +1,15 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import admin, audit, auth, disputes, listings, market, payments, transactions, ussd, agents, logistics, ai, whatsapp, trades, recruitment, onboarding, requests, academy, vision, public, drivers, verification
+from app.api.v1.endpoints import admin, audit, auth, disputes, listings, market, payments, transactions, ussd, agents, logistics, ai, whatsapp, trades, recruitment, onboarding, requests, academy, vision, public, drivers, verification, loans, portal_auth, agent_portal, super_admin, admin_approvals, deposits, inputs, browse, wallet, agent_practical, agent_shadowing, ml
 from app.api.v1.endpoints.webhooks import vision_webhook
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_router.include_router(portal_auth.app_auth_router, prefix="/auth/app", tags=["app-auth"])
+api_router.include_router(portal_auth.driver_auth_router, prefix="/auth/driver", tags=["driver-auth"])
+api_router.include_router(portal_auth.admin_auth_router, prefix="/admin", tags=["admin-auth"])
+api_router.include_router(portal_auth.agent_auth_router, prefix="/agent", tags=["agent-auth"])
+api_router.include_router(agent_portal.router, prefix="/agent", tags=["agent-portal"])
 api_router.include_router(whatsapp.router, prefix="/whatsapp", tags=["whatsapp"])
 api_router.include_router(market.router, prefix="/market", tags=["market"])
 api_router.include_router(listings.router, prefix="/listings", tags=["listings"])
@@ -22,10 +27,20 @@ api_router.include_router(academy.router, prefix="/academy", tags=["academy"])
 api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
 api_router.include_router(audit.router, prefix="/audit", tags=["audit"])
 api_router.include_router(agents.router, prefix="/agents", tags=["agents"])
+api_router.include_router(agent_practical.router, prefix="/agents/practical", tags=["agent-practical"])
+api_router.include_router(agent_shadowing.router, prefix="/agents", tags=["agent-shadowing"])
 api_router.include_router(ai.router, prefix="/ai", tags=["ai"])
 api_router.include_router(vision.router)
 api_router.include_router(vision_webhook.router)
 api_router.include_router(public.router, prefix="/public", tags=["public"])
 api_router.include_router(verification.router, prefix="/verification", tags=["verification"])
+api_router.include_router(loans.router, prefix="/loans", tags=["loans"])
+api_router.include_router(admin_approvals.router, prefix="/admin/approvals", tags=["admin-approvals"])
+api_router.include_router(super_admin.router, prefix="/super-admin", tags=["super-admin"])
+api_router.include_router(deposits.router, prefix="/deposits", tags=["deposits"])
+api_router.include_router(inputs.router, prefix="/inputs", tags=["inputs"])
+api_router.include_router(browse.router, prefix="/browse", tags=["browse"])
+api_router.include_router(wallet.router, prefix="/wallet", tags=["wallet"])
+api_router.include_router(ml.router)
 
 

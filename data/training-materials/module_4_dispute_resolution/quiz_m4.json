@@ -1,0 +1,118 @@
+{
+  "module_id": 4,
+  "module_title": "Dispute Resolution",
+  "source_handbook": "handbook_m4.txt",
+  "passing_score": 85.0,
+  "questions": [
+    {
+      "id": "q4_1",
+      "text": "Who is a 'Neutral Auditor' in a resolution case?",
+      "options": [
+        "The Farmer's relative",
+        "An independent certified professional appointed by the platform",
+        "The original Field Agent",
+        "The Buyer's employee"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q4_2",
+      "text": "What triggers a 'Dispute' status on an order?",
+      "options": [
+        "A formal disagreement logged by either Buyer or Farmer via the portal",
+        "A late payment only",
+        "A bad weather report",
+        "The Agent being busy"
+      ],
+      "correct_index": 0
+    },
+    {
+      "id": "q4_3",
+      "text": "What is the 'Cooling-off Period'?",
+      "options": [
+        "24 hours after a dispute is logged for parties to settle privately",
+        "Time to wait for rain",
+        "The Agent's vacation",
+        "A server maintenance window"
+      ],
+      "correct_index": 0
+    },
+    {
+      "id": "q4_4",
+      "text": "How long is a temporary decryption access key valid during a dispute?",
+      "options": [
+        "24 hours",
+        "3 days",
+        "7 days",
+        "30 days"
+      ],
+      "correct_index": 2
+    },
+    {
+      "id": "q4_5",
+      "text": "Which of the following is NOT a valid resolution decision?",
+      "options": [
+        "Refund to Buyer",
+        "Release to Farmer",
+        "Partial Settlement",
+        "Destroy the crop"
+      ],
+      "correct_index": 3
+    },
+    {
+      "id": "q4_6",
+      "text": "What type of encryption is used in the Negotiation Hub by default?",
+      "options": [
+        "AES-128",
+        "End-to-End Encryption (E2EE)",
+        "SSL only",
+        "No encryption"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q4_7",
+      "text": "During an investigation, which evidence should you review first?",
+      "options": [
+        "Social media posts",
+        "Chat history, media, verification reports, and tracking data",
+        "News articles about the farmer",
+        "Your personal notes from memory"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q4_8",
+      "text": "When is an Agent granted access to encrypted negotiation chats?",
+      "options": [
+        "Always",
+        "Only during an active dispute with Admin approval",
+        "When the Agent requests it",
+        "Every Monday"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q4_9",
+      "text": "What happens to decryption access once a dispute case is resolved?",
+      "options": [
+        "It remains active for future reference",
+        "It is automatically revoked",
+        "The Agent keeps it permanently",
+        "It expires after 30 days"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q4_10",
+      "text": "What is the passing score for Module 4?",
+      "options": [
+        "70%",
+        "75%",
+        "80%",
+        "85%"
+      ],
+      "correct_index": 3
+    }
+  ]
+}

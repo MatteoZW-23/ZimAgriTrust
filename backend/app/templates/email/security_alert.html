@@ -1,0 +1,18 @@
+{% extends "_base.html" %}
+{% block title %}Security alert on your ZimAgriTrust account{% endblock %}
+{% block body %}
+<h2 style="margin-top:0;color:#b91c1c;">Security alert</h2>
+<p>Hi {{ name }},</p>
+<p>We detected the following event on your account:</p>
+
+<table role="presentation" width="100%" cellpadding="6" cellspacing="0" style="border-collapse:collapse;margin:16px 0;">
+  <tr><td style="color:#6b7280;">Event</td><td style="text-align:right;font-weight:bold;">{{ event }}</td></tr>
+  <tr><td style="color:#6b7280;">Source IP</td><td style="text-align:right;">{{ ip }}</td></tr>
+</table>
+
+<p>If this was you, no action is needed. If <b>not</b>, reset your password immediately:</p>
+
+<p style="margin-top:24px;">
+  <a href="{{ reset_link }}" style="background:#b91c1c;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px;display:inline-block;">Reset password</a>
+</p>
+{% endblock %}

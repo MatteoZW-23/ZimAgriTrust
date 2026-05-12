@@ -68,6 +68,15 @@ export default function AgentRecruitmentPanel({ token }) {
         return weights[status] || 0;
     };
 
+    const openDocument = (doc) => {
+        if (!doc?.data_url) return alert("Document file was not uploaded with this application.");
+        const win = window.open();
+        if (win) {
+            win.document.write(`<iframe src="${doc.data_url}" style="width:100%;height:100%;border:0"></iframe>`);
+            win.document.title = doc.name || "Application Document";
+        }
+    };
+
     if (loading) return (
         <div className="v4-loading-shimmer-full">
             <div className="shimmer-line heading"></div>
@@ -143,6 +152,23 @@ export default function AgentRecruitmentPanel({ token }) {
                         </div>
 
                         <div className="progress-details">
+                            <div className="p-item" style={{ marginBottom: 14 }}>
+                                <label>IDENTITY & DOCUMENTS</label>
+                                <span className="p-count">National ID: {app.national_id || 'Not supplied'}</span>
+                                <div className="doc-chip-row">
+                                    {[
+                                        ['ID Front', app.documents?.id_front],
+                                        ['ID Back', app.documents?.id_back],
+                                        ['Proof of Address', app.documents?.proof_of_address],
+                                        ['CV', app.documents?.cv],
+                                    ].map(([label, doc]) => (
+                                        <button key={label} type="button" className={`doc-chip ${doc?.data_url ? 'ready' : ''}`} onClick={() => openDocument(doc)}>
+                                            <i className={`fas ${doc?.data_url ? 'fa-eye' : 'fa-triangle-exclamation'}`}></i>
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                             <div className="p-item">
                                 <label>TRAINING CURRICULUM</label>
                                 <div className="p-bar-v4">
@@ -245,6 +271,10 @@ export default function AgentRecruitmentPanel({ token }) {
                 .p-bar-v4 { height: 6px; background: var(--v4-border); border-radius: 3px; overflow: hidden; margin-bottom: 6px; }
                 .p-fill { height: 100%; background: var(--v4-primary-gradient); transition: width 1s ease-in-out; }
                 .p-count { font-size: 10px; font-weight: 900; color: var(--v4-text); }
+                .doc-chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+                .doc-chip { border: 1.5px solid var(--v4-border); background: var(--v4-card-bg); color: var(--v4-text-dim); border-radius: 999px; padding: 7px 10px; font-size: 10px; font-weight: 900; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+                .doc-chip.ready { color: #10b981; border-color: #10b98155; background: #ecfdf5; }
+                .doc-chip:hover { transform: translateY(-1px); border-color: var(--v4-primary); }
 
                 .card-actions { display: flex; gap: 12px; }
                 .v4-action-btn { flex: 1; padding: 12px; border-radius: 12px; border: none; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; font-weight: 800; cursor: pointer; transition: all 0.2s; }

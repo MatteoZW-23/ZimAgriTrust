@@ -1,0 +1,19 @@
+{% extends "_base.html" %}
+{% block title %}Welcome to ZimAgriTrust{% endblock %}
+{% block body %}
+<h2 style="margin-top:0;color:#0f5132;">Welcome, {{ name }}!</h2>
+<p>Your ZimAgriTrust <b>{{ role }}</b> account is ready.</p>
+
+<h3>Get started</h3>
+<ol>
+  <li>Verify your phone (we already sent an OTP).</li>
+  <li>Upload your National ID front and back.</li>
+  <li>{% if role == 'farmer' or role == 'FARMER' %}List your first crop and start receiving offers.
+      {% elif role == 'buyer' or role == 'BUYER' %}Browse the marketplace and make your first offer.
+      {% else %}Open your dashboard to see your next steps.{% endif %}</li>
+</ol>
+
+<p style="margin-top:24px;">
+  <a href="https://zimagritrust.co.zw/login" style="background:#0f5132;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px;display:inline-block;">Open ZimAgriTrust</a>
+</p>
+{% endblock %}

@@ -43,8 +43,16 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Request blocked by security policy."}
             )
 
-        # 2. Admin IP whitelist
-        if self._is_admin_route(request):
+        # 2. Super-admin IP whitelist (stricter, evaluated first)
+        if self._is_super_admin_route(request):
+            if settings.SUPER_ADMIN_IP_WHITELIST and not self._is_super_admin_ip_whitelisted(client_ip):
+                logger.warning(f"SECURITY | Super-admin IP blocked | ip={client_ip} | path={path}")
+                return JSONResponse(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    content={"detail": "Access denied from this IP address"}
+                )
+        # 2b. Regular admin IP whitelist
+        elif self._is_admin_route(request):
             if settings.ADMIN_IP_WHITELIST and not self._is_ip_whitelisted(client_ip):
                 logger.warning(f"SECURITY | Admin IP blocked | ip={client_ip} | path={path}")
                 return JSONResponse(
@@ -128,13 +136,27 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         return request.client.host if request.client else "unknown"
 
     def _is_admin_route(self, request: Request) -> bool:
-        """Check if request is to an admin endpoint"""
-        return "/admin" in request.url.path or request.url.path.startswith("/api/v1/admin")
+        """Check if request is to an admin endpoint (excluding super-admin)."""
+        path = request.url.path
+        if self._is_super_admin_route(request):
+            return False
+        return "/admin" in path or path.startswith("/api/v1/admin")
+
+    def _is_super_admin_route(self, request: Request) -> bool:
+        """Check if request targets the super-admin namespace."""
+        path = request.url.path
+        return path.startswith("/api/v1/super-admin") or path.startswith("/super-admin")
 
     def _is_ip_whitelisted(self, ip: str) -> bool:
         """Check if IP is in admin whitelist"""
         whitelist = settings.admin_ip_whitelist_list
         return ip in whitelist or "127.0.0.1" in whitelist or "localhost" in whitelist
+
+    def _is_super_admin_ip_whitelisted(self, ip: str) -> bool:
+        whitelist = settings.super_admin_ip_whitelist_list
+        if not whitelist:
+            return True  # not configured → off
+        return ip in whitelist
 
     def _add_security_headers(self, response):
         """Add comprehensive security headers."""
@@ -167,10 +189,10 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         
         # Use stricter limits for admin routes
         if self._is_admin_route(request):
-            limit = settings.ADMIN_RATE_LIMIT_REQUESTS
-            window = settings.ADMIN_RATE_LIMIT_WINDOW_SECONDS
+            limit = settings.RATE_LIMIT_API_GENERAL // 2  # Stricter for admin
+            window = settings.RATE_LIMIT_WINDOW_SECONDS
         else:
-            limit = settings.RATE_LIMIT_REQUESTS
+            limit = settings.RATE_LIMIT_API_GENERAL
         
         # Get or create rate limit entry
         key = f"{client_ip}:{request.url.path}"
@@ -227,9 +249,15 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
         return response
     
     def _is_admin_route(self, request: Request) -> bool:
-        """Check if request is to an admin endpoint"""
-        return "/admin" in request.url.path or request.url.path.startswith("/api/v1/admin")
-    
+        """Audit logs both /admin and /super-admin endpoints."""
+        path = request.url.path
+        return (
+            "/admin" in path
+            or path.startswith("/api/v1/admin")
+            or path.startswith("/api/v1/super-admin")
+            or path.startswith("/super-admin")
+        )
+
     def _get_user_info(self, request: Request) -> str:
         """Extract user information from request"""
         auth_header = request.headers.get("Authorization")

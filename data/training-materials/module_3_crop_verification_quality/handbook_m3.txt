@@ -1,0 +1,65 @@
+ZimAgritrust Module 3: Crop Verification & Quality Standards
+=============================================================
+
+Purpose
+-------
+This module trains agents to become reliable ground-truth verifiers for crop quality, quantity, disease risk, and batch integrity.
+
+3.1 Crop Grading Standards
+--------------------------
+Agents must apply consistent grading rules across all districts. The agent grade becomes the platform's field truth and affects escrow release, buyer confidence, farmer trust score, and future finance access.
+
+Maize grading reference:
+- Grade A: moisture below 12.5%, broken grains below 2%, foreign matter below 0.5%, no infestation.
+- Grade B: moisture 12.5-14%, broken grains 2-5%, foreign matter 0.5-1.5%, no active infestation.
+- Grade C: moisture 14.1-15.5%, broken grains 5-10%, foreign matter 1.5-3%, trace infestation only.
+- Reject: aflatoxin signs, chemical contamination, internal heat, severe infestation, or unsafe storage condition.
+
+3.2 Sampling Techniques
+-----------------------
+Representative sampling prevents fraud and protects all parties.
+
+Use the 5-point probe method:
+1. Probe bottom-left to base.
+2. Probe top-right diagonally.
+3. Take centre core sample.
+4. Probe opposite corners.
+5. Mix samples in a clean bucket and test from the composite.
+
+Never sample only the top layer because poor-quality grain may be hidden underneath.
+
+3.3 Visual Disease Detection
+----------------------------
+Agents use visual inspection first, then the app AI lens for confirmation.
+
+Common risks:
+- Aflatoxin: yellow-green mold; quarantine immediately.
+- Maize lethal necrosis: streaked leaves and shriveled cobs.
+- Large grain borer: visible holes and powder/flour in bags.
+
+If disease is suspected, take at least three clear macro photos and flag for senior audit.
+
+3.4 Verification Hardware
+-------------------------
+The verification kit may include a digital moisture meter, Bluetooth platform scale, phone/tablet camera, GPS geotagger, and QR batch tools.
+
+Operational rules:
+- Calibrate moisture meters every 30 days.
+- Sync scale readings directly where possible.
+- Confirm GPS before submitting field reports.
+- Low battery can cause inaccurate readings; check device health before work.
+
+3.5 Batch Tagging & Sealing
+---------------------------
+Once verified, the crop batch must be protected from tampering.
+
+Process:
+1. Generate a unique batch ID.
+2. Attach QR/tamper-evident tag.
+3. Photograph the seal on the actual bags.
+4. Record quantity, grade, GPS and timestamp.
+5. Driver scans QR code during handover.
+
+Final Summary
+-------------
+Accurate crop verification protects buyers, rewards honest farmers, and makes the ZimAgritrust ledger credible. Verify with evidence, not assumptions.

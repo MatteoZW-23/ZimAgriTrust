@@ -15,6 +15,7 @@ from . import (
     academy,
     scraping,
     command_center,
+    invitations,
 )
 
 router = APIRouter()
@@ -34,4 +35,5 @@ router.include_router(notifications.router, prefix="/notifications", tags=["admi
 router.include_router(permissions.router, prefix="/permissions", tags=["admin-permissions"])
 router.include_router(scraping.router, prefix="/scraping", tags=["admin-scraping"])
 router.include_router(command_center.router, prefix="/command-center", tags=["admin-command-center"])
+router.include_router(invitations.router, prefix="/invitations", tags=["admin-invitations"])
 

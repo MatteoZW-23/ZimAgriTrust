@@ -1,0 +1,44 @@
+ZimAgritrust Module 9: Advanced Ag-Tech & IoT
+=============================================
+
+Purpose
+-------
+This module introduces the technologies that support agent verification, including sensors, imagery, AI tools and immutable ledgers.
+
+9.1 IoT and Smart Sensors
+-------------------------
+IoT devices collect field and warehouse data in real time.
+
+Examples:
+- Bluetooth moisture probes.
+- Smart scales.
+- Soil nutrient sensors.
+- Warehouse temperature and humidity monitors.
+
+If a sensor appears faulty, use a secondary tool and flag the report.
+
+9.2 Drone and Satellite Imagery
+-------------------------------
+Satellite imagery can verify field size, crop health and vegetation changes.
+
+NDVI maps show plant health and may reveal disease, drought stress or false acreage claims. Agents interpret imagery but do not need to fly drones unless specifically trained.
+
+9.3 AI and Photo Verification
+-----------------------------
+The platform may use AI to classify crops, detect disease, identify quality risks and flag fraud.
+
+Agent rule:
+AI supports your judgement but does not replace physical verification. If AI and field evidence disagree, escalate with photos and notes.
+
+9.4 Blockchain-Inspired Immutability
+------------------------------------
+Signed reports cannot be silently changed or deleted. Corrections are appended as new records.
+
+Why it matters:
+- Buyers trust the evidence.
+- Audits can reconstruct events.
+- Agent accountability is preserved.
+
+Final Summary
+-------------
+Technology increases accuracy, but agents remain responsible for field truth. Use tools carefully and document every decision.

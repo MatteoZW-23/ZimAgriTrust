@@ -62,11 +62,12 @@ services:
     networks:
       - agric-network
 
-  # Backend API
+  # Backend API — production-slim image (<500MB, NO PyTorch/TensorFlow/Ultralytics)
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: production-slim
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-agri_trust}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
@@ -95,6 +96,9 @@ services:
       # Monitoring
       SENTRY_DSN: ${SENTRY_DSN}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      MODELS_PATH: /app/models
+    volumes:
+      - shared_models:/app/models:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -227,4 +231,6 @@ volumes:
   grafana_data:
     driver: local
   nginx_logs:
+    driver: local
+  shared_models:
     driver: local

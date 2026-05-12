@@ -163,3 +163,91 @@ class AgentService:
         # Give a small bounty for support tasks if they are assigned (optional)
         db.commit()
         return {"status": "activity logged"}
+
+    # ────────────────────────────────────────────────────────────────────────
+    # Certification level auto-promotion
+    # ────────────────────────────────────────────────────────────────────────
+    @staticmethod
+    def evaluate_promotion(db: Session, agent_id: uuid.UUID) -> dict:
+        """
+        Re-evaluate an agent's certification level based on tenure, task volume,
+        accuracy, and rating. Idempotent — only ever promotes upward.
+
+        Promotion rules (per spec Part 1.1):
+          • SENIOR : 6 months tenure + 200 successful tasks + 95% accuracy + 4.5 rating
+          • MASTER : 12 months tenure + 500 successful tasks + 98% accuracy + 4.8 rating
+
+        Returns a dict describing the action taken.
+        """
+        from datetime import datetime, timezone, timedelta
+        from app.models.agent import Agent
+        from app.models.academy import AgentTraining, CertificationLevel
+
+        agent = db.query(Agent).filter(Agent.id == agent_id).first()
+        if not agent:
+            return {"promoted": False, "reason": "agent not found"}
+
+        training = db.query(AgentTraining).filter(AgentTraining.agent_id == agent.id).first()
+        if not training or training.certification_level == CertificationLevel.TRAINEE:
+            return {"promoted": False, "reason": "agent not certified yet"}
+
+        # Tenure
+        certified_at = training.certified_at
+        if not certified_at:
+            return {"promoted": False, "reason": "no certification date"}
+        if certified_at.tzinfo is None:
+            certified_at = certified_at.replace(tzinfo=timezone.utc)
+        tenure = datetime.now(timezone.utc) - certified_at
+
+        # Successful tasks + accuracy from agent_assignments
+        successful_tasks = db.query(AgentAssignment).filter(
+            AgentAssignment.agent_id == agent.id,
+            AgentAssignment.status == "completed",
+        ).count()
+        total_tasks = db.query(AgentAssignment).filter(
+            AgentAssignment.agent_id == agent.id,
+            AgentAssignment.status.in_(["completed", "rejected", "failed"]),
+        ).count()
+        accuracy = (successful_tasks / total_tasks * 100) if total_tasks else 0
+        rating = agent.rating or 0
+
+        target_level = training.certification_level
+        if (
+            tenure >= timedelta(days=365)
+            and successful_tasks >= 500
+            and accuracy >= 98
+            and rating >= 4.8
+        ):
+            target_level = CertificationLevel.MASTER
+        elif (
+            tenure >= timedelta(days=180)
+            and successful_tasks >= 200
+            and accuracy >= 95
+            and rating >= 4.5
+        ):
+            # Only promote upward — do not demote MASTER back to SENIOR
+            if training.certification_level != CertificationLevel.MASTER:
+                target_level = CertificationLevel.SENIOR
+
+        if target_level == training.certification_level:
+            return {
+                "promoted": False,
+                "current_level": training.certification_level.value,
+                "tenure_days": tenure.days,
+                "successful_tasks": successful_tasks,
+                "accuracy": round(accuracy, 2),
+                "rating": rating,
+            }
+
+        prior = training.certification_level
+        training.certification_level = target_level
+        db.commit()
+        return {
+            "promoted": True,
+            "from": prior.value,
+            "to": target_level.value,
+            "tenure_days": tenure.days,
+            "successful_tasks": successful_tasks,
+            "accuracy": round(accuracy, 2),
+            "rating": rating,
+        }

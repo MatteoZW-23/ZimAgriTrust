@@ -340,7 +340,56 @@ def start_scheduler() -> None:
         name="Delivery auto-confirm (24h window)",
     )
 
+    # ---------------- Recurring deposits (daily 06:00 UTC) ----------------
+    def _job_recurring_deposits():
+        _db = None
+        try:
+            from app.db.session import SessionLocal
+            from app.services.deposit_automation_service import run_due_schedules
+            _db = SessionLocal()
+            count = run_due_schedules(_db)
+            if count:
+                logger.info("SCHEDULER | Recurring deposits processed: %d", count)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("SCHEDULER | Recurring deposit job failed: %s", exc)
+        finally:
+            if _db:
+                _db.close()
+
+    scheduler.add_job(
+        _job_recurring_deposits, trigger="cron", hour=6, minute=0,
+        id="recurring_deposits", replace_existing=True, max_instances=1,
+        coalesce=True, misfire_grace_time=3600,
+        name="Recurring deposits (daily 06:00 UTC)",
+    )
+
+    # ---------------- Input listing expiry sweep + warnings (daily 08:00) ----
+    def _job_input_expiry():
+        _db = None
+        try:
+            from app.db.session import SessionLocal
+            from app.services.input_marketplace_service import sweep_expired, warn_expiring
+            _db = SessionLocal()
+            expired = sweep_expired(_db)
+            warned = warn_expiring(_db, days_ahead=7)
+            if expired or warned:
+                logger.info("SCHEDULER | Input listings expired=%d warned=%d", expired, warned)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("SCHEDULER | Input expiry job failed: %s", exc)
+        finally:
+            if _db:
+                _db.close()
+
+    scheduler.add_job(
+        _job_input_expiry, trigger="cron", hour=8, minute=0,
+        id="input_expiry_sweep", replace_existing=True, max_instances=1,
+        coalesce=True, misfire_grace_time=3600,
+        name="Input listing expiry sweep + 7-day warning (daily 08:00 UTC)",
+    )
+
     scheduler.start()
     logger.info(
-        "SCRAPER | Scheduler started — prices/news every 60 min, weather every 6 h, delivery auto-confirm every 30 min"
+        "SCRAPER | Scheduler started — prices/news every 60 min, weather every 6 h, "
+        "delivery auto-confirm every 30 min, recurring deposits @06:00 UTC, "
+        "input expiry sweep @08:00 UTC"
     )

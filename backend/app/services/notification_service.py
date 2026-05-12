@@ -1,52 +1,288 @@
+"""
+Multi-channel notification service for ZimAgriTrust
+Sends notifications via SMS, WhatsApp, and Email
+"""
+import asyncio
+import uuid
 import logging
+from datetime import datetime
+from typing import Optional, Dict, List
+
+from sqlalchemy.orm import Session
+from sqlalchemy import and_
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+
+# ============================================================================
+# NOTIFICATION TEMPLATES (All 48+ types defined in template registry)
+# ============================================================================
+
+NOTIFICATION_TEMPLATES = {
+    # Authentication & Security
+    "otp_verification": {
+        "title": "Verification Code",
+        "sms": "Your verification code is {CODE}. Valid 5 minutes. Do not share with anyone.",
+        "whatsapp": "🔐 Your verification code is: *{CODE}*\n\nValid for 5 minutes. Never share this code.",
+        "email": "<h2>Verification Code</h2><p>Your code: <strong>{CODE}</strong></p><p>Valid 5 minutes.</p>"
+    },
+    "pin_changed": {
+        "title": "PIN Changed",
+        "sms": "Your PIN was changed. If not you, contact support immediately.",
+        "whatsapp": "⚠️ Your PIN was recently changed.\n\nIf not you, contact support NOW.",
+        "email": "<h2>PIN Changed</h2><p>Your PIN has been updated. If not you, reset immediately.</p>"
+    },
+    "password_changed": {
+        "title": "Password Changed",
+        "sms": "Your password was changed. If not you, reset immediately.",
+        "whatsapp": "🔐 Password changed.\n\nIf not you, reset it immediately.",
+        "email": "<h2>Password Changed</h2><p>Your password updated. If not you, reset now.</p>"
+    },
+    "new_login_detected": {
+        "title": "New Login Detected",
+        "sms": "New login from {LOCATION} at {TIME}. Was this you?",
+        "whatsapp": "🔍 New login detected!\n\nLocation: {LOCATION}\nTime: {TIME}\n\nWas this you?",
+        "email": "<h2>New Login</h2><p>Location: {LOCATION}</p><p>Time: {TIME}</p><p>If not you, change password now.</p>"
+    },
+    "account_locked": {
+        "title": "Account Locked",
+        "sms": "Account locked. Try again in 15 minutes.",
+        "whatsapp": "🔒 Account locked for security.\n\nTry in 15 minutes.",
+        "email": "<h2>Account Locked</h2><p>Locked due to failed attempts. Try in 15 minutes.</p>"
+    },
+    "mfa_enabled": {
+        "title": "2FA Enabled",
+        "sms": "Two-factor authentication enabled on your account.",
+        "whatsapp": "✅ Two-factor authentication is now enabled.",
+        "email": "<h2>2FA Enabled</h2><p>Your account is now more secure.</p>"
+    },
+    "suspicious_activity": {
+        "title": "Suspicious Activity",
+        "sms": "⚠️ Suspicious activity detected. Review: {LINK}",
+        "whatsapp": "🚨 Suspicious activity!\n\nReview now: {LINK}",
+        "email": "<h2>Alert</h2><p><a href='{LINK}'>Review account security</a></p>"
+    },
+    
+    # Transaction & Payment
+    "offer_received": {
+        "title": "New Offer",
+        "sms": "New offer: {PRICE}/kg for {CROP}. Total: {TOTAL}",
+        "whatsapp": "💰 New offer!\n\n{CROP}: {PRICE}/kg\nTotal: {TOTAL}",
+        "email": "<h2>Offer</h2><p>Crop: {CROP}</p><p>Price: {PRICE}/kg</p><p>Total: {TOTAL}</p>"
+    },
+    "offer_accepted": {
+        "title": "Offer Accepted",
+        "sms": "✅ Your offer accepted! Order #{ORDER_ID}",
+        "whatsapp": "✅ Offer accepted!\n\nOrder: #{ORDER_ID}",
+        "email": "<h2>Accepted</h2><p>Order: {ORDER_ID}</p>"
+    },
+    "offer_rejected": {
+        "title": "Offer Rejected",
+        "sms": "Your offer for {CROP} was rejected.",
+        "whatsapp": "❌ Offer rejected for {CROP}",
+        "email": "<h2>Rejected</h2><p>Your offer was not accepted.</p>"
+    },
+    "payment_initiated": {
+        "title": "Payment Processing",
+        "sms": "Payment {AMOUNT} initiated. Ref: {REF}",
+        "whatsapp": "💳 Payment {AMOUNT} processing.\n\nRef: {REF}",
+        "email": "<h2>Payment</h2><p>Amount: {AMOUNT}</p><p>Ref: {REF}</p>"
+    },
+    "payment_confirmed": {
+        "title": "Payment Confirmed",
+        "sms": "✅ Payment {AMOUNT} confirmed! Ref: {REF}",
+        "whatsapp": "✅ Payment confirmed!\n\n{AMOUNT} in escrow",
+        "email": "<h2>Confirmed</h2><p>Amount: {AMOUNT}</p>"
+    },
+    "payment_released": {
+        "title": "Payment Released",
+        "sms": "💰 {AMOUNT} released to wallet. Ref: {REF}",
+        "whatsapp": "💰 Payment released!\n\n{AMOUNT} available",
+        "email": "<h2>Released</h2><p>Amount: {AMOUNT}</p>"
+    },
+    "withdrawal_requested": {
+        "title": "Withdrawal Submitted",
+        "sms": "Withdrawal {AMOUNT} submitted. Ref: {REF}",
+        "whatsapp": "💸 Withdrawal {AMOUNT} submitted",
+        "email": "<h2>Withdrawal</h2><p>Amount: {AMOUNT}</p>"
+    },
+    "withdrawal_completed": {
+        "title": "Withdrawal Complete",
+        "sms": "💸 {AMOUNT} to {METHOD}. Ref: {REF}",
+        "whatsapp": "✅ {AMOUNT} withdrawn",
+        "email": "<h2>Complete</h2><p>Amount: {AMOUNT}</p>"
+    },
+    "deposit_confirmed": {
+        "title": "Deposit Confirmed",
+        "sms": "{AMOUNT} added. Balance: {BALANCE}",
+        "whatsapp": "✅ {AMOUNT} received",
+        "email": "<h2>Deposit</h2><p>Amount: {AMOUNT}</p>"
+    },
+    "low_balance": {
+        "title": "Low Balance",
+        "sms": "⚠️ Balance low: {BALANCE}",
+        "whatsapp": "⚠️ Low balance: {BALANCE}",
+        "email": "<h2>Alert</h2><p>Balance: {BALANCE}</p>"
+    },
+    
+    # Delivery & Logistics
+    "delivery_arranged": {
+        "title": "Delivery Arranged",
+        "sms": "Pickup: {DATE} {TIME}. Tracking: {LINK}",
+        "whatsapp": "📦 Pickup arranged\n\n{DATE} {TIME}",
+        "email": "<h2>Delivery</h2><p>Date: {DATE} {TIME}</p>"
+    },
+    "driver_assigned": {
+        "title": "Driver Assigned",
+        "sms": "Driver {NAME} ({PHONE}) assigned to delivery",
+        "whatsapp": "🚚 Driver: {NAME}\nPhone: {PHONE}",
+        "email": "<h2>Driver</h2><p>Name: {NAME}</p><p>Phone: {PHONE}</p>"
+    },
+    "delivery_in_transit": {
+        "title": "In Transit",
+        "sms": "Order in transit. ETA: {ETA}. Track: {LINK}",
+        "whatsapp": "🚚 In transit!\n\nETA: {ETA}",
+        "email": "<h2>Transit</h2><p>ETA: {ETA}</p>"
+    },
+    "delivery_confirmed": {
+        "title": "Delivered",
+        "sms": "✅ Delivery confirmed. Rate experience.",
+        "whatsapp": "✅ Delivered!",
+        "email": "<h2>Delivered</h2><p>Rate your experience.</p>"
+    },
+    
+    # Verification & KYC
+    "id_approved": {
+        "title": "ID Verified",
+        "sms": "✅ Your ID verified. Trust +15",
+        "whatsapp": "✅ ID verified!",
+        "email": "<h2>Verified</h2><p>Your identity is confirmed.</p>"
+    },
+    "id_rejected": {
+        "title": "ID Rejected",
+        "sms": "ID rejected: {REASON}. Resubmit please.",
+        "whatsapp": "❌ ID rejected\n\nReason: {REASON}",
+        "email": "<h2>Rejected</h2><p>Reason: {REASON}</p>"
+    },
+    "farm_verified": {
+        "title": "Farm Verified",
+        "sms": "✅ Farm verified. Trust +20",
+        "whatsapp": "✅ Farm verified!",
+        "email": "<h2>Verified</h2><p>Farm verification complete.</p>"
+    },
+    
+    # Admin & System
+    "admin_invitation": {
+        "title": "Invitation",
+        "sms": "You're invited to join as {ROLE}. Accept: {LINK}",
+        "whatsapp": "📨 Invited as {ROLE}\n\n{LINK}",
+        "email": "<h2>Invitation</h2><p>Role: {ROLE}</p><p><a href='{LINK}'>Accept</a></p>"
+    },
+    "account_approved": {
+        "title": "Account Approved",
+        "sms": "✅ Account approved. Login to access.",
+        "whatsapp": "✅ Approved!",
+        "email": "<h2>Approved</h2><p>Your account is ready.</p>"
+    },
+}
+
+
 class NotificationService:
+    """Multi-channel notification service"""
+    
     @staticmethod
     def _send_sms(phone: str, message: str) -> bool:
-        """Delegate to sms_service which handles AfricasTalking + simulation."""
-        from app.services.sms_service import _send_sms
-        return _send_sms(phone, message)
+        """Delegate to SMS service"""
+        try:
+            from app.services.sms_service import _send_sms
+            return _send_sms(phone, message)
+        except Exception as e:
+            logger.error(f"SMS failed to {phone}: {e}")
+            return False
 
     @staticmethod
     async def _send_whatsapp(phone: str, message: str):
-        """Send WhatsApp message via WhatsApp bridge."""
+        """Send WhatsApp message"""
         try:
             from app.services.whatsapp_service import WhatsAppService
             await WhatsAppService.send_whatsapp_message(phone, message)
             return True
         except Exception as e:
-            logger.error(f"Failed to send WhatsApp to {phone}: {e}")
+            logger.error(f"WhatsApp failed to {phone}: {e}")
             return False
 
     @staticmethod
     async def _notify_both_channels(phone: str, message: str):
-        """Send to WhatsApp (primary) and SMS (fallback)."""
-        wa_sent = await NotificationService._send_whatsapp(phone, message)
-        if not wa_sent:
-            NotificationService._send_sms(phone, message)
+        """Send notification via both SMS and WhatsApp"""
+        NotificationService._send_sms(phone, message)
+        await NotificationService._send_whatsapp(phone, message)
 
+    @staticmethod
+    async def _send_email(email: str, subject: str, body: str):
+        """Send email"""
+        try:
+            from app.services.email_service import EmailService
+            await EmailService.send_email(email, subject, body)
+            return True
+        except Exception as e:
+            logger.error(f"Email failed to {email}: {e}")
+            return False
+    
+    @staticmethod
+    async def send_notification(
+        db: Session,
+        user,
+        template_key: str,
+        **template_vars
+    ) -> Dict:
+        """Send notification via all channels"""
+        
+        if template_key not in NOTIFICATION_TEMPLATES:
+            logger.warning(f"Unknown template: {template_key}")
+            return {}
+        
+        template = NOTIFICATION_TEMPLATES[template_key]
+        results = {}
+        
+        # Render messages
+        sms_msg = template["sms"].format(**template_vars)
+        wa_msg = template["whatsapp"].format(**template_vars)
+        email_msg = template["email"].format(**template_vars)
+        
+        # Send via all channels
+        if user.phone_number:
+            results["sms"] = NotificationService._send_sms(user.phone_number, sms_msg)
+            results["whatsapp"] = await NotificationService._send_whatsapp(user.phone_number, wa_msg)
+        
+        if user.email:
+            results["email"] = await NotificationService._send_email(
+                user.email,
+                template["title"],
+                email_msg
+            )
+        
+        return results
+    
+    # Legacy method signatures maintained for compatibility
     @staticmethod
     def notify_agent_assignment(agent_name, phone, task_type, location):
         """SMS notification for field agents"""
-        message = (
-            f"ZimAgritrust Assignment: Hello {agent_name}, you have a new {task_type} task "
-            f"in {location}. Please check your dashboard for details."
-        )
+        message = f"ZimAgritrust: {agent_name}, new {task_type} task in {location}."
         return NotificationService._send_sms(phone, message)
 
     @staticmethod
     def notify_farmer_on_verification(phone, crop, approved):
         """Notification for farmer list verification"""
         status = "APPROVED" if approved else "REJECTED"
-        message = f"ZimAgritrust: Your {crop} listing was {status} by the quality team."
+        message = f"ZimAgritrust: Your {crop} listing was {status}."
         return NotificationService._send_sms(phone, message)
 
     @staticmethod
     def notify_transaction_update(phone, tx_id, status):
         """Notification for transaction/escrow state changes"""
-        message = f"ZimAgritrust Transaction #{tx_id}: Status updated to {status}."
+        message = f"ZimAgritrust: Transaction #{tx_id} is now {status}."
         return NotificationService._send_sms(phone, message)
 
     # --- AGENT ONBOARDING TEMPLATES ---
@@ -352,6 +588,19 @@ class NotificationService:
         )
         
         return await whatsapp_service.send_whatsapp_message(phone, message)
+
+
+    @staticmethod
+    async def send_bootstrap_secret(phone: str, secret: str):
+        """Notify staff of their initial bootstrap secret."""
+        msg = (
+            f"🔐 *ZimAgritrust Secure Entry*\n\n"
+            f"You have been enrolled as an authorized platform node.\n\n"
+            f"Your one-time bootstrap secret is: *{secret}*\n\n"
+            f"Please use this for your first login at the HQ Command Portal. "
+            f"You will be required to change this immediately upon entry."
+        )
+        await NotificationService._notify_both_channels(phone, msg)
 
 
 notification_service = NotificationService()

@@ -1,0 +1,15 @@
+{% extends "_base.html" %}
+{% block title %}Dispute {{ case_ref }} resolved{% endblock %}
+{% block body %}
+<h2 style="margin-top:0;color:#0f5132;">Dispute {{ case_ref }} — Resolved</h2>
+<p>Hi {{ name }},</p>
+<p>The dispute on your transaction has been resolved.</p>
+
+<table role="presentation" width="100%" cellpadding="6" cellspacing="0" style="border-collapse:collapse;margin:16px 0;">
+  <tr><td style="color:#6b7280;">Case</td><td style="text-align:right;font-weight:bold;">{{ case_ref }}</td></tr>
+  <tr><td style="color:#6b7280;">Decision</td><td style="text-align:right;">{{ decision }}</td></tr>
+  <tr><td style="color:#6b7280;">Settlement</td><td style="text-align:right;font-weight:bold;">{{ amount }} {{ currency }}</td></tr>
+</table>
+
+<p>The full resolution report is attached as PDF.</p>
+{% endblock %}

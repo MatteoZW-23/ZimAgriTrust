@@ -1,0 +1,17 @@
+{% extends "_base.html" %}
+{% block title %}You are now a certified ZimAgriTrust agent{% endblock %}
+{% block body %}
+<h2 style="margin-top:0;color:#0f5132;">Congratulations, {{ name }}!</h2>
+<p>You passed the ZimAgriTrust agent final exam.</p>
+
+<table role="presentation" width="100%" cellpadding="6" cellspacing="0" style="border-collapse:collapse;margin:16px 0;">
+  <tr><td style="color:#6b7280;">Agent code</td><td style="text-align:right;font-weight:bold;">{{ agent_code }}</td></tr>
+  <tr><td style="color:#6b7280;">Certified at</td><td style="text-align:right;">{{ certified_at }}</td></tr>
+</table>
+
+<p>Your certificate is attached. Open the agent portal to start receiving tasks.</p>
+
+<p style="margin-top:24px;">
+  <a href="https://agent.zimagritrust.co.zw" style="background:#0f5132;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px;display:inline-block;">Open Agent Portal</a>
+</p>
+{% endblock %}

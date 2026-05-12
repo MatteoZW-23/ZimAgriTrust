@@ -1,0 +1,134 @@
+name: ML Export Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_training:
+        description: "Skip training, only run export/validation (use existing weights)"
+        required: false
+        default: "false"
+  push:
+    paths:
+      - "jupyter/notebooks/0[4-8]_*.ipynb"
+      - "jupyter/scripts/export_to_production.py"
+
+jobs:
+  ml-export:
+    name: Train, Export & Validate ML Models
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Jupyter ML dependencies
+        run: |
+          pip install --upgrade pip
+          pip install torch==2.2.2 torchvision==0.17.2 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r jupyter/requirements.txt
+          pip install nbconvert papermill
+
+      - name: Create export directories
+        run: |
+          mkdir -p shared_volumes/models
+          mkdir -p jupyter/data/crops
+          mkdir -p jupyter/data/diseases
+          mkdir -p jupyter/data/prices
+          mkdir -p jupyter/data/transactions
+          mkdir -p /tmp/workspace/exports/models
+
+      - name: Run notebook 06 — Price Predictor (no dataset required)
+        if: ${{ github.event.inputs.skip_training != 'true' }}
+        run: |
+          papermill \
+            jupyter/notebooks/06_train_price_predictor.ipynb \
+            /tmp/nb_output_06.ipynb \
+            --kernel python3 \
+            -p EXPORTS_DIR /tmp/workspace/exports/models
+        continue-on-error: false
+
+      - name: Run notebook 07 — Fraud Detector (no dataset required)
+        if: ${{ github.event.inputs.skip_training != 'true' }}
+        run: |
+          papermill \
+            jupyter/notebooks/07_train_fraud_detector.ipynb \
+            /tmp/nb_output_07.ipynb \
+            --kernel python3 \
+            -p EXPORTS_DIR /tmp/workspace/exports/models
+        continue-on-error: false
+
+      - name: Run notebook 04 — Crop Classifier (skipped if no dataset)
+        if: ${{ github.event.inputs.skip_training != 'true' }}
+        run: |
+          if [ -d "jupyter/data/crops/train" ]; then
+            papermill \
+              jupyter/notebooks/04_train_crop_classifier.ipynb \
+              /tmp/nb_output_04.ipynb \
+              --kernel python3
+          else
+            echo "No crop dataset found at jupyter/data/crops — skipping ONNX training"
+            echo "Copy an existing crop_classifier_v1.onnx to shared_volumes/models/ to enable inference"
+          fi
+
+      - name: Run notebook 05 — Disease Detector (skipped if no dataset)
+        if: ${{ github.event.inputs.skip_training != 'true' }}
+        run: |
+          if [ -d "jupyter/data/diseases/train" ]; then
+            papermill \
+              jupyter/notebooks/05_train_disease_detector.ipynb \
+              /tmp/nb_output_05.ipynb \
+              --kernel python3
+          else
+            echo "No disease dataset found at jupyter/data/diseases — skipping ONNX training"
+          fi
+
+      - name: Run export validation script
+        run: |
+          python jupyter/scripts/export_to_production.py \
+            --exports-dir /tmp/workspace/exports/models \
+            --prod-dir shared_volumes/models
+
+      - name: Validate manifest.json
+        run: |
+          python - <<'EOF'
+          import json, sys
+          from pathlib import Path
+          manifest = json.loads(Path('shared_volumes/models/manifest.json').read_text())
+          ready = [k for k, v in manifest['models'].items() if v.get('status') == 'ready']
+          missing = [k for k, v in manifest['models'].items() if v.get('status') != 'ready']
+          print(f"Ready: {len(ready)} | Missing: {len(missing)}")
+          if missing:
+              print("Missing models:", missing)
+          print("Manifest:", json.dumps(manifest, indent=2))
+          EOF
+
+      - name: Upload model artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ml-models-${{ github.sha }}
+          path: shared_volumes/models/
+          retention-days: 30
+
+      - name: Commit model files and manifest
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add shared_volumes/models/
+          git diff --cached --quiet || \
+            git commit -m "chore(ml): export models $(date -u '+%Y-%m-%dT%H:%M:%SZ') [skip ci]"
+          git push
+
+      - name: Tag release
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+        run: |
+          TAG="ml-export-$(date -u '+%Y%m%d-%H%M%S')"
+          git tag "$TAG"
+          git push origin "$TAG"

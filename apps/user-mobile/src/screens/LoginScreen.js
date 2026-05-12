@@ -3,9 +3,10 @@ import { Text, TextInput, TouchableOpacity, View, ScrollView, StyleSheet } from 
 import { theme } from "../styles";
 import { getProfile, login, register, forgotPassword, resetPassword } from "../api";
 
-export function LoginScreen({ role, onAuthenticated }) {
+export function LoginScreen({ role, onAuthenticated, onGuest }) {
   const [subStep, setSubStep] = useState('phone'); // 'phone', 'otp', 'profile', 'forgot', 'forgot-reset'
   const [phone, setPhone] = useState("");
+  const [loginPin, setLoginPin] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [profileForm, setProfileForm] = useState({ name: "", location: "", additional: "" });
   const [loading, setLoading] = useState(false);
@@ -59,6 +60,22 @@ export function LoginScreen({ role, onAuthenticated }) {
     }, 1000);
   };
 
+  const handleSecureLogin = async () => {
+    if (phone.length < 9 || loginPin.length < 4) return;
+    setLoading(true);
+    setError("");
+    try {
+      const fullPhone = phone.startsWith('+') ? phone : `+263${phone.replace(/^0/, '')}`;
+      const data = await login(fullPhone, loginPin);
+      const loadedProfile = await getProfile(data.access_token);
+      onAuthenticated({ ...data, profile: loadedProfile });
+    } catch (e) {
+      setError(e.message || "Login failed. Check your phone and PIN.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleVerify = async () => {
     if (otp.join('').length < 6) return;
     setLoading(true);
@@ -75,8 +92,7 @@ export function LoginScreen({ role, onAuthenticated }) {
             full_name: profileForm.name,
             phone_number: phone.startsWith('+') ? phone : `+263${phone}`,
             password: otp.join(''),
-            role: role?.toUpperCase() || "FARMER",
-            location: profileForm.location || undefined,
+            role: role?.toLowerCase() || "farmer",
         };
         await register(payload);
         const data = await login(payload.phone_number, payload.password);
@@ -155,10 +171,11 @@ export function LoginScreen({ role, onAuthenticated }) {
             <View style={styles.iconContainer}>
               <Text style={styles.iconText}>PHONE</Text>
             </View>
-            <Text style={styles.title}>Enter your mobile number</Text>
-            <Text style={styles.subTitle}>We'll send you a verification code</Text>
+            <Text style={styles.title}>Secure Login</Text>
+            <Text style={styles.subTitle}>Use your phone and PIN, or browse public listings as a guest.</Text>
         </View>
         <View style={styles.form}>
+            {error ? <Text style={{ color: '#ef4444', fontWeight: '700', marginBottom: 16, textAlign: 'center' }}>{error}</Text> : null}
             <View style={styles.phoneInputRow}>
                 <View style={styles.countryCode}><Text style={styles.codeText}>+263</Text></View>
                 <TextInput 
@@ -169,12 +186,32 @@ export function LoginScreen({ role, onAuthenticated }) {
                     onChangeText={setPhone}
                 />
             </View>
+            <Text style={styles.label}>Security PIN</Text>
+            <TextInput
+                style={styles.input}
+                placeholder="4-6 digit PIN"
+                keyboardType="number-pad"
+                maxLength={6}
+                secureTextEntry
+                value={loginPin}
+                onChangeText={v => setLoginPin(v.replace(/[^0-9]/g, ''))}
+            />
             <TouchableOpacity 
-                style={[styles.primaryBtn, phone.length < 9 && { backgroundColor: '#CCC' }]} 
+                style={[styles.primaryBtn, (phone.length < 9 || loginPin.length < 4) && { backgroundColor: '#CCC' }, { marginTop: 20 }]} 
+                onPress={handleSecureLogin}
+                disabled={phone.length < 9 || loginPin.length < 4 || loading}
+            >
+                <Text style={styles.primaryBtnText}>{loading ? "Checking..." : "Secure Login"}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+                style={[styles.secondaryBtn, phone.length < 9 && { opacity: 0.5 }]} 
                 onPress={handleSendCode}
                 disabled={phone.length < 9 || loading}
             >
-                <Text style={styles.primaryBtnText}>{loading ? "Sending..." : "Send Code"}</Text>
+                <Text style={styles.secondaryBtnText}>Create New Account</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.guestBtn} onPress={onGuest}>
+              <Text style={styles.guestBtnText}>Browse as Guest</Text>
             </TouchableOpacity>
             <TouchableOpacity style={{ marginTop: 16, alignItems: 'center' }} onPress={() => { setSubStep('forgot'); setError(""); }}>
               <Text style={{ color: '#64748b', fontSize: 13, fontWeight: '700' }}>Forgot PIN? Reset via WhatsApp</Text>
@@ -279,6 +316,10 @@ const styles = StyleSheet.create({
   phoneInput: { flex: 1, paddingHorizontal: 16, fontSize: 16, fontWeight: '500' },
   primaryBtn: { backgroundColor: theme.colors.green, paddingVertical: 18, borderRadius: 12, alignItems: 'center', shadowColor: theme.colors.green, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
   primaryBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700', letterSpacing: 1 },
+  secondaryBtn: { marginTop: 12, paddingVertical: 16, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#DDE5D8', backgroundColor: '#FFF' },
+  secondaryBtnText: { color: theme.colors.green, fontSize: 15, fontWeight: '800' },
+  guestBtn: { marginTop: 12, paddingVertical: 14, borderRadius: 12, alignItems: 'center', backgroundColor: '#F8FAFC' },
+  guestBtnText: { color: '#475569', fontSize: 14, fontWeight: '800' },
   otpRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
   otpBox: { width: 48, height: 56, borderRadius: 12, borderWidth: 2, borderColor: '#E0E0E0', justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF' },
   otpInput: { fontSize: 24, fontWeight: '800', textAlign: 'center' },

@@ -1,0 +1,48 @@
+ZimAgritrust Module 5: Trust & Reputation System
+================================================
+
+Purpose
+-------
+This module explains how agent behaviour, accuracy, timeliness, and user feedback affect reputation and work eligibility.
+
+5.1 Trust Score Algorithm
+-------------------------
+The trust score is a live measure of professional reliability. It affects task assignment, audit priority, suspension risk, and promotion eligibility.
+
+Typical weighting:
+- Grading accuracy: 40%
+- Response time: 30%
+- User feedback: 20%
+- System integrity: 10%
+
+Critical thresholds:
+- Below 70/100: temporary suspension or review.
+- Below 40/100: permanent ban or serious disciplinary action.
+
+5.2 Review & Rating Management
+------------------------------
+Farmers and buyers may rate agent professionalism after transactions. Good ratings come from punctuality, respectful communication, transparent evidence, and clear explanations.
+
+Best practice:
+- Explain the grade with visible readings.
+- Send updates if delayed.
+- Help farmers understand next actions.
+- Keep evidence for bad-faith complaints.
+
+5.3 Career Progression Levels
+-----------------------------
+ZimAgritrust field work is a career path.
+
+Levels:
+- Field Trainee: supervised verification only.
+- Certified Agent: independent standard verifications.
+- Senior Agent: high-value listings, audits, MFI loan verification.
+- Lead Auditor: dispute reviews and agent quality investigations.
+
+5.4 Audit and Appeals
+---------------------
+If a rating or audit is disputed, the agent must submit GPS logs, timestamped photos, readings, chat references where permitted, and supervisor notes.
+
+Final Summary
+-------------
+Your reputation is built through accuracy, speed, fairness, and evidence. High trust unlocks better tasks and leadership opportunities.

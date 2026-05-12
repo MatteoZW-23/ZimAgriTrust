@@ -35,6 +35,9 @@ class AgentApplication(Base):
     transport_type = Column(String(50), nullable=True)
     agri_experience_years = Column(Integer, default=0)
     specializations = Column(JSON, default=[])
+    email = Column(String(255), nullable=True)
+    documents = Column(JSON, default={})
+    applicant_references = Column(JSON, default=[])
 
     status = Column(String, default=ApplicationStatus.APPLIED)
     created_at = Column(DateTime, default=datetime.utcnow)

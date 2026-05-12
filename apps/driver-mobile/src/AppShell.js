@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Platform, TouchableOpacity, Image } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MapPin, Truck, DollarSign, User } from 'lucide-react-native';
@@ -9,6 +9,7 @@ import { setupNotificationHandler, registerForPushNotifications } from './utils/
 
 // Screens
 import LoginScreen from './screens/LoginScreen';
+import RegistrationScreen from './screens/RegistrationScreen';
 import JobsScreen from './screens/JobsScreen';
 import DeliveriesScreen from './screens/DeliveriesScreen';
 import EarningsScreen from './screens/EarningsScreen';
@@ -117,6 +118,8 @@ export default function AppShell() {
   const [authenticated, setAuthenticated] = useState(false);
   const [session, setSession] = useState(null);
   const [webTab, setWebTab] = useState('Jobs');
+  const [showRegister, setShowRegister] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState(false);
 
   // Restore session on mount
   useEffect(() => {
@@ -145,7 +148,7 @@ export default function AppShell() {
   const handleAuth = useCallback(async (authData) => {
     setSession(authData);
     setAuthenticated(true);
-    await saveSession(authData.access_token, authData.profile);
+    await saveSession(authData.access_token, authData.profile || authData.user, authData.refresh_token);
     registerForPushNotifications().catch(() => {});
   }, []);
 
@@ -159,7 +162,7 @@ export default function AppShell() {
     return (
       <View style={styles.splash}>
         <View style={styles.splashLogoContainer}>
-          <Text style={styles.splashLogo}>🚚</Text>
+          <Image source={require('../assets/logo.png')} style={{ width: 100, height: 100, resizeMode: 'contain' }} />
         </View>
         <Text style={styles.splashBrand}>ZIMAGRITRUST</Text>
         <Text style={styles.splashMarket}>DRIVER PORTAL</Text>
@@ -172,7 +175,40 @@ export default function AppShell() {
   }
 
   if (!authenticated) {
-    return <LoginScreen onAuthenticated={handleAuth} />;
+    if (pendingApproval) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, backgroundColor: '#f8f9fa' }}>
+          <Text style={{ fontSize: 48, marginBottom: 16 }}>⏳</Text>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: '#1a1a1a', marginBottom: 8, textAlign: 'center' }}>Application Submitted</Text>
+          <Text style={{ fontSize: 14, color: '#666', textAlign: 'center', lineHeight: 22 }}>
+            Your driver application is under review. An admin will verify your documents within 24–48 hours.{`\n\n`}You will be notified via SMS and WhatsApp once approved.
+          </Text>
+          <TouchableOpacity
+            style={{ marginTop: 24, paddingVertical: 12, paddingHorizontal: 32, backgroundColor: '#0ea5e9', borderRadius: 10 }}
+            onPress={() => setPendingApproval(false)}>
+            <Text style={{ color: '#fff', fontWeight: '700' }}>Back to Login</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    if (showRegister) {
+      return (
+        <RegistrationScreen
+          onRegistered={(data) => {
+            setShowRegister(false);
+            if (data?.status === 'PENDING_APPROVAL') { setPendingApproval(true); return; }
+            handleAuth(data);
+          }}
+          onBack={() => setShowRegister(false)}
+        />
+      );
+    }
+    return (
+      <LoginScreen
+        onAuthenticated={handleAuth}
+        onRegister={() => setShowRegister(true)}
+      />
+    );
   }
 
   // Web: simple tab rendering without Stack navigator

@@ -1,290 +1,307 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import {
+  ShieldAlert,
+  Scale,
+  FileSearch,
+  Gavel,
+  MessageSquare,
+  CheckCircle2,
+} from "lucide-react";
+
+const disputeLevels = [
+  {
+    title: "Level 1: Direct Negotiation",
+    time: "24 Hours",
+    description:
+      "Users attempt to resolve issues directly through platform chat before escalation.",
+  },
+  {
+    title: "Level 2: Agent Mediation",
+    time: "48 Hours",
+    description:
+      "Certified agents collect evidence, interview parties, and recommend resolutions.",
+  },
+  {
+    title: "Level 3: Admin Review",
+    time: "7 Days",
+    description:
+      "Admin reviews all case notes and may uphold or overturn decisions.",
+  },
+  {
+    title: "Level 4: Legal Arbitration",
+    time: "Over $1,000",
+    description:
+      "Binding arbitration under Zimbabwean law for major disputes.",
+  },
+];
+
+const disputeTypes = [
+  {
+    title: "Quality Disputes",
+    percent: "60%",
+    desc: "Issues with freshness, crop grade, or product condition.",
+  },
+  {
+    title: "Quantity Disputes",
+    percent: "20%",
+    desc: "Delivered quantity differs from agreed amount.",
+  },
+  {
+    title: "Delivery Disputes",
+    percent: "15%",
+    desc: "Late delivery or non-arrival of goods.",
+  },
+  {
+    title: "Payment Disputes",
+    percent: "5%",
+    desc: "Escrow or payment processing issues.",
+  },
+];
+
+const evidenceItems = [
+  "Listing photos",
+  "Delivery photos",
+  "Agent verification report",
+  "Weighing scale photos",
+  "Chat history",
+  "Delivery receipts",
+  "Tracking logs",
+];
 
 function DisputeResolution() {
   return (
-    <div className="page">
-      <header className="header">
-        <div className="logo">
-          <img src="/logo.png" alt="ZimAgritrust Logo" style={{height: '40px', width: 'auto'}} />
+    <div className="min-h-screen bg-gray-50">
+      {/* HEADER */}
+      <header className="fixed top-0 left-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          <Link
+            to="/"
+            className="flex items-center gap-3 text-green-700 font-bold text-xl"
+          >
+            <img
+              src="/logo.png"
+              alt="ZimAgriTrust"
+              className="h-10 w-auto"
+            />
+            <span>ZimAgriTrust</span>
+          </Link>
+
+          <nav className="hidden md:flex items-center gap-8 text-gray-600 font-medium">
+            <Link to="/" className="hover:text-green-700 transition-colors">
+              Home
+            </Link>
+
+            <Link
+              to="/how-it-works"
+              className="hover:text-green-700 transition-colors"
+            >
+              How It Works
+            </Link>
+
+            <Link
+              to="/help"
+              className="hover:text-green-700 transition-colors"
+            >
+              Help
+            </Link>
+          </nav>
         </div>
-        <h1>ZimAgritrust</h1>
-        <nav className="nav-links">
-          <Link to="/">Home</Link>
-          <Link to="/about">About</Link>
-          <Link to="/company-profile">Company</Link>
-          <Link to="/dispute-resolution">Disputes</Link>
-          <Link to="/terms">Terms</Link>
-          <Link to="/privacy">Privacy</Link>
-        </nav>
       </header>
 
-      <main className="page-content">
-        <section className="page-hero">
-          <h1>Dispute Resolution Process</h1>
-          <p>Fair, transparent, and efficient resolution of any conflicts</p>
-        </section>
+      {/* HERO */}
+      <section className="bg-gradient-to-r from-green-700 to-green-900 text-white pt-36 pb-24">
+        <div className="max-w-6xl mx-auto px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-3xl"
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm mb-6">
+              <ShieldAlert className="w-4 h-4" />
+              <span className="text-sm font-medium">
+                Marketplace Protection
+              </span>
+            </div>
 
-        <section className="content-section">
-          <h2>Overview</h2>
-          <p>
-            At ZimAgritrust, we understand that disputes may occasionally arise in the course of business transactions. Our dispute resolution process is designed to be fair, transparent, and efficient, ensuring that all parties are heard and conflicts are resolved promptly.
-          </p>
-          <p>
-            We have established a comprehensive dispute resolution framework that includes multiple stages of escalation, clear timelines, and impartial mediation to ensure satisfactory outcomes for all parties involved.
-          </p>
-        </section>
+            <h1 className="text-5xl md:text-6xl font-bold leading-tight mb-6">
+              Dispute Resolution Process
+            </h1>
 
-        <section className="content-section">
-          <h2>Types of Disputes</h2>
-          <div className="dispute-types">
-            <div className="dispute-type">
-              <h3>Quality Disputes</h3>
-              <p>Disagreements regarding the quality or condition of delivered agricultural products.</p>
-            </div>
-            <div className="dispute-type">
-              <h3>Quantity Disputes</h3>
-              <p>Discrepancies between ordered and delivered quantities of products.</p>
-            </div>
-            <div className="dispute-type">
-              <h3>Payment Disputes</h3>
-              <p>Issues related to payment amounts, timing, or payment failures.</p>
-            </div>
-            <div className="dispute-type">
-              <h3>Delivery Disputes</h3>
-              <p>Problems with delivery timing, location, or transportation issues.</p>
-            </div>
-            <div className="dispute-type">
-              <h3>Contract Disputes</h3>
-              <p>Misunderstandings or disagreements about contract terms and conditions.</p>
-            </div>
-            <div className="dispute-type">
-              <h3>Account Disputes</h3>
-              <p>Issues related to account access, verification, or account status.</p>
-            </div>
-          </div>
-        </section>
-
-        <section className="content-section">
-          <h2>Dispute Resolution Process</h2>
-          <div className="process-steps">
-            <div className="process-step">
-              <div className="step-number">1</div>
-              <div className="step-content">
-                <h3>Direct Communication</h3>
-                <p>First, attempt to resolve the dispute directly with the other party through our in-platform messaging system. Most disputes can be resolved through open communication.</p>
-                <p className="step-timeline">Timeline: Up to 48 hours</p>
-              </div>
-            </div>
-            <div className="process-step">
-              <div className="step-number">2</div>
-              <div className="step-content">
-                <h3>File a Dispute</h3>
-                <p>If direct communication doesn't resolve the issue, file a formal dispute through our platform. Provide detailed information, evidence, and your desired resolution.</p>
-                <p className="step-timeline">Timeline: Immediate filing required</p>
-              </div>
-            </div>
-            <div className="process-step">
-              <div className="step-number">3</div>
-              <div className="step-content">
-                <h3>Platform Mediation</h3>
-                <p>Our dispute resolution team will review the case and mediate between parties. We may request additional information or evidence from both sides.</p>
-                <p className="step-timeline">Timeline: 3-5 business days</p>
-              </div>
-            </div>
-            <div className="process-step">
-              <div className="step-number">4</div>
-              <div className="step-content">
-                <h3>Evidence Review</h3>
-                <p>Both parties submit evidence including photos, documents, delivery receipts, and communication logs. Our team objectively reviews all materials.</p>
-                <p className="step-timeline">Timeline: 2-3 business days</p>
-              </div>
-            </div>
-            <div className="process-step">
-              <div className="step-number">5</div>
-              <div className="step-content">
-                <h3>Decision & Resolution</h3>
-                <p>Based on evidence and platform policies, we issue a binding decision. This may include refunds, partial payments, or other remedies.</p>
-                <p className="step-timeline">Timeline: 1-2 business days</p>
-              </div>
-            </div>
-            <div className="process-step">
-              <div className="step-number">6</div>
-              <div className="step-content">
-                <h3>Appeal Process</h3>
-                <p>If either party disagrees with the decision, they may appeal within 7 days with new evidence. Appeals are reviewed by a senior dispute resolution officer.</p>
-                <p className="step-timeline">Timeline: 5-7 business days</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="content-section">
-          <h2>Filing a Dispute</h2>
-          <div className="filing-guide">
-            <h3>Required Information</h3>
-            <ul className="requirements-list">
-              <li>Transaction ID and date</li>
-              <li>Detailed description of the dispute</li>
-              <li>Evidence (photos, documents, screenshots)</li>
-              <li>Communication history with the other party</li>
-              <li>Desired resolution or outcome</li>
-              <li>Contact information for follow-up</li>
-            </ul>
-
-            <h3>How to File</h3>
-            <ol className="steps-list">
-              <li>Log into your ZimAgritrust account</li>
-              <li>Navigate to the transaction in question</li>
-              <li>Click "Report Issue" or "File Dispute"</li>
-              <li>Complete the dispute form with all required information</li>
-              <li>Upload supporting evidence</li>
-              <li>Submit and await confirmation</li>
-            </ol>
-          </div>
-        </section>
-
-        <section className="content-section">
-          <h2>Escrow Protection</h2>
-          <p>
-            All payments on ZimAgritrust are held in secure escrow until the transaction is successfully completed. This provides protection for both parties:
-          </p>
-          <div className="escrow-info">
-            <div className="escrow-point">
-              <h4>For Buyers</h4>
-              <p>Payment is only released to the farmer after you confirm delivery and quality of products.</p>
-            </div>
-            <div className="escrow-point">
-              <h4>For Farmers</h4>
-              <p>Payment is guaranteed once delivery is confirmed, protecting against non-payment.</p>
-            </div>
-            <div className="escrow-point">
-              <h4>During Disputes</h4>
-              <p>Escrow funds are held until the dispute is resolved, ensuring fair outcomes.</p>
-            </div>
-          </div>
-        </section>
-
-        <section className="content-section">
-          <h2>Resolution Outcomes</h2>
-          <div className="outcomes">
-            <div className="outcome">
-              <h3>Full Refund</h3>
-              <p>Buyer receives full refund if product quality or delivery doesn't meet agreed terms.</p>
-            </div>
-            <div className="outcome">
-              <h3>Partial Refund</h3>
-              <p>Partial refund when there are minor issues but the transaction is mostly satisfactory.</p>
-            </div>
-            <div className="outcome">
-              <h3>Replacement</h3>
-              <p>Farmer may be required to replace the product at their expense.</p>
-            </div>
-            <div className="outcome">
-              <h3>Compensation</h3>
-              <p>Additional compensation may be awarded for damages or inconvenience caused.</p>
-            </div>
-            <div className="outcome">
-              <h3>Account Action</h3>
-              <p>Repeated violations may result in account suspension or termination.</p>
-            </div>
-          </div>
-        </section>
-
-        <section className="content-section">
-          <h2>Timeline Guarantees</h2>
-          <div className="timeline-table">
-            <div className="timeline-row">
-              <span className="timeline-stage">Direct Communication</span>
-              <span className="timeline-time">48 hours</span>
-            </div>
-            <div className="timeline-row">
-              <span className="timeline-stage">Initial Dispute Review</span>
-              <span className="timeline-time">24 hours</span>
-            </div>
-            <div className="timeline-row">
-              <span className="timeline-stage">Mediation Process</span>
-              <span className="timeline-time">3-5 business days</span>
-            </div>
-            <div className="timeline-row">
-              <span className="timeline-stage">Evidence Collection</span>
-              <span className="timeline-time">2-3 business days</span>
-            </div>
-            <div className="timeline-row">
-              <span className="timeline-stage">Final Decision</span>
-              <span className="timeline-time">1-2 business days</span>
-            </div>
-            <div className="timeline-row">
-              <span className="timeline-stage">Appeal Review</span>
-              <span className="timeline-time">5-7 business days</span>
-            </div>
-          </div>
-        </section>
-
-        <section className="content-section">
-          <h2>Fees and Costs</h2>
-          <p>
-            ZimAgritrust does not charge fees for standard dispute resolution. However:
-          </p>
-          <ul className="fees-list">
-            <li>Frivolous or malicious disputes may incur penalties</li>
-            <li>External arbitration (if required) may have associated costs</li>
-            <li>Legal fees are the responsibility of the initiating party unless otherwise determined</li>
-          </ul>
-        </section>
-
-        <section className="content-section">
-          <h2>Contact Dispute Resolution</h2>
-          <div className="contact-info">
-            <p>For urgent disputes or questions about the process:</p>
-            <p>disputes@zagritrust.com</p>
-            <p>+263788272020 (Dispute Hotline)</p>
-            <p>Monday - Friday, 8:00 AM - 5:00 PM</p>
-          </div>
-        </section>
-
-        <section className="content-section cta-section">
-          <h2>Need to File a Dispute?</h2>
-          <p>
-            Log into your account and navigate to your transaction history to begin the dispute resolution process.
-          </p>
-          <Link to="/" className="btn btn-primary btn-lg">Go to Dashboard</Link>
-        </section>
-      </main>
-
-      <footer className="footer">
-        <div className="footer-content">
-          <div className="footer-section">
-            <div className="footer-logo">
-              <div className="logo">
-                <img src="/logo.png" alt="ZimAgritrust Logo" style={{height: '40px', width: 'auto'}} />
-              </div>
-              <h3>ZimAgritrust</h3>
-            </div>
-            <p>Zimbabwe's trusted agricultural marketplace platform.</p>
-          </div>
-          <div className="footer-section">
-            <h4>Quick Links</h4>
-            <Link to="/">Home</Link>
-            <Link to="/about">About Us</Link>
-            <Link to="/company-profile">Company Profile</Link>
-          </div>
-          <div className="footer-section">
-            <h4>Company</h4>
-            <Link to="/company-hierarchy">Organization</Link>
-            <Link to="/dispute-resolution">Dispute Resolution</Link>
-            <Link to="/terms">Terms of Service</Link>
-            <Link to="/privacy">Privacy Policy</Link>
-          </div>
-          <div className="footer-section">
-            <h4>Contact</h4>
-            <p>+263788272020</p>
-            <p>mathew@zagritrust.com</p>
-            <p>Harare, Zimbabwe</p>
-          </div>
+            <p className="text-xl text-green-100 leading-relaxed">
+              Fair, transparent, and structured conflict resolution for farmers,
+              buyers, and logistics partners.
+            </p>
+          </motion.div>
         </div>
-        <div className="footer-bottom">
-          <p>&copy; 2026 ZimAgritrust. All rights reserved.</p>
+      </section>
+
+      {/* MAIN CONTENT */}
+      <section className="py-20">
+        <div className="max-w-6xl mx-auto px-6">
+          {/* INTRO CARD */}
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-10 md:p-14 mb-16">
+            <p className="text-lg text-gray-600 leading-relaxed">
+              ZimAgriTrust provides a structured dispute resolution framework
+              designed to protect both farmers and buyers while maintaining
+              marketplace trust and accountability.
+            </p>
+          </div>
+
+          {/* ESCALATION PATH */}
+          <section className="mb-24">
+            <div className="flex items-center gap-3 mb-10">
+              <Scale className="w-8 h-8 text-green-700" />
+
+              <h2 className="text-4xl font-bold text-gray-900">
+                Escalation Path
+              </h2>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-8">
+              {disputeLevels.map((item, index) => (
+                <motion.div
+                  key={index}
+                  whileHover={{ y: -5 }}
+                  className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8"
+                >
+                  <div className="flex items-center justify-between mb-5">
+                    <span className="text-sm font-semibold bg-green-100 text-green-700 px-3 py-1 rounded-full">
+                      {item.time}
+                    </span>
+
+                    <span className="text-5xl font-bold text-gray-100">
+                      0{index + 1}
+                    </span>
+                  </div>
+
+                  <h3 className="text-2xl font-semibold text-gray-900 mb-4">
+                    {item.title}
+                  </h3>
+
+                  <p className="text-gray-600 leading-relaxed">
+                    {item.description}
+                  </p>
+                </motion.div>
+              ))}
+            </div>
+          </section>
+
+          {/* COMMON DISPUTES */}
+          <section className="mb-24">
+            <div className="flex items-center gap-3 mb-10">
+              <MessageSquare className="w-8 h-8 text-green-700" />
+
+              <h2 className="text-4xl font-bold text-gray-900">
+                Common Dispute Types
+              </h2>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {disputeTypes.map((item, index) => (
+                <div
+                  key={index}
+                  className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8"
+                >
+                  <div className="text-5xl font-bold text-green-700 mb-5">
+                    {item.percent}
+                  </div>
+
+                  <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                    {item.title}
+                  </h3>
+
+                  <p className="text-gray-600 leading-relaxed">
+                    {item.desc}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* EVIDENCE */}
+          <section className="mb-24">
+            <div className="flex items-center gap-3 mb-10">
+              <FileSearch className="w-8 h-8 text-green-700" />
+
+              <h2 className="text-4xl font-bold text-gray-900">
+                Evidence Required
+              </h2>
+            </div>
+
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-10">
+              <div className="grid md:grid-cols-2 gap-6">
+                {evidenceItems.map((item, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-3 text-gray-700"
+                  >
+                    <CheckCircle2 className="w-5 h-5 text-green-700" />
+
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* LEGAL */}
+          <section>
+            <div className="flex items-center gap-3 mb-10">
+              <Gavel className="w-8 h-8 text-green-700" />
+
+              <h2 className="text-4xl font-bold text-gray-900">
+                Legal & Contact
+              </h2>
+            </div>
+
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-10 space-y-5">
+              <p className="text-gray-600 leading-relaxed">
+                Arbitration processes are governed by Zimbabwean law and
+                administered fairly and independently.
+              </p>
+
+              <div>
+                <p className="font-semibold text-gray-900">
+                  Dispute Support Email
+                </p>
+
+                <p className="text-gray-600">
+                  disputes@zimagritrust.com
+                </p>
+              </div>
+
+              <div>
+                <p className="font-semibold text-gray-900">
+                  WhatsApp Support
+                </p>
+
+                <p className="text-gray-600">
+                  +263 71 735 8956
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="border-t border-gray-200 bg-white py-8">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-gray-500 text-sm">
+            © 2026 ZimAgriTrust. All rights reserved.
+          </p>
+
+          <div className="flex items-center gap-6 text-sm text-gray-500">
+            <Link to="/privacy-policy" className="hover:text-green-700">
+              Privacy Policy
+            </Link>
+
+            <Link to="/terms" className="hover:text-green-700">
+              Terms
+            </Link>
+          </div>
         </div>
       </footer>
     </div>

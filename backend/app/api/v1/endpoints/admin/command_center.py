@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 from app.db.session import get_db
 from app.models.user import User, UserRole, UserStatus
-from app.models.listing import Listing
+from app.models.listing import Listing, ListingStatus
 from app.models.transaction import Order, OrderStatus
 from app.models.transaction import Transaction
 from app.models.agent import Agent
@@ -45,7 +45,7 @@ def get_system_health(
     # Listing metrics
     total_listings = db.query(func.count(Listing.id)).scalar() or 0
     active_listings = db.query(func.count(Listing.id)).filter(
-        Listing.status == "APPROVED"
+        Listing.status == ListingStatus.ACTIVE
     ).scalar() or 0
     
     # Order metrics
@@ -310,7 +310,7 @@ def get_realtime_stats(
                 Order.status.in_([OrderStatus.PENDING, OrderStatus.PROCESSING])
             ).scalar() or 0,
             "active_listings": db.query(func.count(Listing.id)).filter(
-                Listing.status == "APPROVED"
+                Listing.status == ListingStatus.ACTIVE
             ).scalar() or 0
         }
     }

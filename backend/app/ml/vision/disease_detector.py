@@ -15,9 +15,15 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-import cv2
 import numpy as np
 from PIL import Image
+
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    cv2 = None
+    CV2_AVAILABLE = False
 
 try:
     from ultralytics import YOLO
@@ -271,10 +277,22 @@ class DiseaseDetector:
 
     def _fallback(self, image: np.ndarray) -> Dict[str, Any]:
         """Colour-histogram heuristic when no model is loaded."""
-        hsv       = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-        hue_mean  = float(np.mean(hsv[:, :, 0]))
-        sat_mean  = float(np.mean(hsv[:, :, 1]))
-        val_mean  = float(np.mean(hsv[:, :, 2]))
+        if CV2_AVAILABLE:
+            hsv      = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+            hue_mean = float(np.mean(hsv[:, :, 0]))
+            sat_mean = float(np.mean(hsv[:, :, 1]))
+            val_mean = float(np.mean(hsv[:, :, 2]))
+        else:
+            r, g, b = image[:, :, 0].astype(float), image[:, :, 1].astype(float), image[:, :, 2].astype(float)
+            max_c = np.maximum(np.maximum(r, g), b)
+            min_c = np.minimum(np.minimum(r, g), b)
+            delta = max_c - min_c + 1e-6
+            hue = np.where(max_c == r, (g - b) / delta % 6,
+                  np.where(max_c == g, (b - r) / delta + 2,
+                                       (r - g) / delta + 4)) * 60 / 2
+            hue_mean = float(np.mean(hue))
+            sat_mean = float(np.mean((max_c - min_c) / (max_c + 1e-6) * 255))
+            val_mean = float(np.mean(max_c))
 
         # Very rough heuristic: brown/yellow tones suggest disease
         disease_detected = (hue_mean < 30 or hue_mean > 150) and sat_mean > 80

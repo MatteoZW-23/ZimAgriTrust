@@ -1,0 +1,118 @@
+{
+  "module_id": 7,
+  "module_title": "Rural Finance & Credit Access",
+  "source_handbook": "handbook_m7.txt",
+  "passing_score": 80.0,
+  "questions": [
+    {
+      "id": "q7_1",
+      "text": "What is 'Inventory-Backed Lending'?",
+      "options": [
+        "Lending based on a farmer's house",
+        "Loans secured by verified crops currently held in escrow/warehouse",
+        "Loans based on future promises",
+        "Giving away money"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q7_2",
+      "text": "What is the Agent's role in a collateralized loan?",
+      "options": [
+        "The Borrower",
+        "The Collateral Officer",
+        "The Bank Manager",
+        "The Insurance Agent"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q7_3",
+      "text": "Which data point is NOT used in ZimAgritrust's Sovereign Credit Scoring?",
+      "options": [
+        "Yield Growth",
+        "Repayment Rate",
+        "Quality Consistency",
+        "Farmer's Political Affiliation"
+      ],
+      "correct_index": 3
+    },
+    {
+      "id": "q7_4",
+      "text": "How are insurance payouts triggered under parametric insurance?",
+      "options": [
+        "By filing a paper claim",
+        "Automatically when satellite data meets predefined conditions",
+        "After a court ruling",
+        "By agent recommendation only"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q7_5",
+      "text": "What happens to the bank's $500 loan when a buyer pays $1000 for the crop?",
+      "options": [
+        "The farmer keeps all $1000",
+        "$500 goes to the bank and $500 to the farmer",
+        "The bank takes $800",
+        "The agent takes a $200 fee"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q7_6",
+      "text": "Why is verifying farm size with satellite imagery important for insurance?",
+      "options": [
+        "To calculate travel distance",
+        "To prevent farmers from claiming more land than they actually farm",
+        "For mapping roads",
+        "To estimate crop prices"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q7_7",
+      "text": "What should an Agent do if asked to verify a total crop loss for an insurance claim?",
+      "options": [
+        "Approve it without visiting",
+        "Visit the field and document conditions accurately",
+        "Ask the farmer for a bribe",
+        "Decline all insurance claims"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q7_8",
+      "text": "How does accurate verification help farmers access credit?",
+      "options": [
+        "It reduces their taxes",
+        "It provides verified data that banks use to issue loans",
+        "It increases crop prices",
+        "It reduces insurance costs"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q7_9",
+      "text": "What type of data does traditional banking use that rural farmers often lack?",
+      "options": [
+        "GPS coordinates",
+        "Pay slips and formal employment records",
+        "Crop photos",
+        "Phone numbers"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q7_10",
+      "text": "What is the passing score for Module 7?",
+      "options": [
+        "70%",
+        "75%",
+        "80%",
+        "85%"
+      ],
+      "correct_index": 2
+    }
+  ]
+}

@@ -1,28 +1,25 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { login, register, getProfile, request, verifyLogin2FA } from "../api";
+import { loginPin, register, getProfile, request } from "../api";
 
 
 export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
   const [tab, setTab] = useState("login");
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [regPhoneNumber, setRegPhoneNumber] = useState("");
-  const [userRole, setUserRole] = useState("farmer");
-  const [regPassword, setRegPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pin, setPin] = useState("");
+  const [regPin, setRegPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
   
   // Forgot Password State
   const [forgotStep, setForgotStep] = useState(1); 
   const [otp, setOtp] = useState("");
-  const [newPassword, setNewPassword] = useState("");
+  const [newPin, setNewPin] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   
-  // Login flow states
-  const [loginStep, setLoginStep] = useState(1); // 1: Credentials, 2: OTP
+  // Login flow states (public users use PIN login, no 2FA)
+  const [loginStep, setLoginStep] = useState(1);
   const [pendingPhone, setPendingPhone] = useState("");
   const [otpValue, setOtpValue] = useState("");
 
@@ -38,20 +35,20 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
   const [userAnswers, setUserAnswers] = useState({});
   const [examResults, setExamResults] = useState(null);
 
-  const [academyPin, setAcademyPin] = useState("");
+  const [academyPassword, setAcademyPassword] = useState("");
   const [academyToken, setAcademyToken] = useState(null);
   const [certificationLevel, setCertificationLevel] = useState("trainee");
 
   // Show/hide PIN toggles
-  const [showPassword, setShowPassword] = useState(false);
-  const [showRegPassword, setShowRegPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPin, setShowPin] = useState(false);
+  const [showRegPin, setShowRegPin] = useState(false);
+  const [showConfirmPin, setShowConfirmPin] = useState(false);
   const [showAcademyPin, setShowAcademyPin] = useState(false);
   const [showNewPin, setShowNewPin] = useState(false);
 
   const enterAcademy = async () => {
-    if (!academyAppId || !academyPin) {
-      setError("PLEASE ENTER BOTH AGENT CODE AND SECURITY PIN.");
+    if (!academyAppId || !academyPassword) {
+      setError("PLEASE ENTER BOTH AGENT CODE AND SECURITY PASSWORD.");
       return;
     }
     try {
@@ -61,7 +58,7 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
       // 1. Secure Authentication Exchange
       const auth = await request(`/academy/login`, {
           method: "POST",
-          body: JSON.stringify({ agent_code: academyAppId, pin: academyPin })
+          body: JSON.stringify({ agent_code: academyAppId, pin: academyPassword })
       });
       
       setAcademyToken(auth.access_token);
@@ -85,7 +82,7 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
       setIsExamStarted(true);
       setAcademyView("curriculum");
     } catch (err) {
-      setError("ACCESS DENIED: " + (err.message || "Invalid Agent Code or PIN."));
+      setError("ACCESS DENIED: " + (err.message || "Invalid Agent Code or Password."));
     } finally {
       setLoading(false);
     }
@@ -268,10 +265,10 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
       if (cleaned.startsWith("0")) cleaned = cleaned.substring(1);
       await request("/auth/reset-password", {
         method: "POST",
-        body: JSON.stringify({ phone_number: "+263" + cleaned, otp, new_password: newPassword })
+        body: JSON.stringify({ phone_number: "+263" + cleaned, otp, new_password: newPin })
       });
       setSuccessMsg("PIN updated! You can now log in with your new PIN.");
-      setTab("login"); setForgotStep(1); setOtp(""); setNewPassword("");
+      setTab("login"); setForgotStep(1); setOtp(""); setNewPin("");
     } catch (err) { setError(err.message || "Reset failed. Check your code."); }
     finally { setLoading(false); }
   }
@@ -288,7 +285,7 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
         method: "POST",
         body: JSON.stringify({ phone_number: "+263" + cleaned })
       });
-      setSuccessMsg("A PIN reset code has been sent to your WhatsApp. Use it to set a new PIN, then log in to the Academy.");
+      setSuccessMsg("A password reset code has been sent to your WhatsApp. Use it to set a new password, then log in to the Academy.");
     } catch (err) { setError(err.message || "Could not send reset code."); }
     finally { setLoading(false); }
   }
@@ -302,36 +299,14 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
       let cleaned = phoneNumber.replace(/\s/g, "");
       if (cleaned.startsWith("0")) cleaned = cleaned.substring(1);
       const fullPhone = "+263" + cleaned;
-      const data = await login(fullPhone, password);
-      
-      if (data.status === "2FA_REQUIRED") {
-        setPendingPhone(fullPhone);
-        setLoginStep(2);
-        setSuccessMsg("Verification code sent via SMS and WhatsApp.");
-      } else {
-        const user = await getProfile(data.access_token);
-        if (user.role?.toUpperCase() === "ADMIN" || user.role?.toUpperCase() === "AGENT") {
-          throw new Error("ACCESS_RESTRICTED: Staff members must use the Secure HQ Portal.");
-        }
-        onLogin({ ...data, user });
-      }
-    } catch (err) {
-      setError(err.message || "Invalid credentials. Please verify your phone number and password.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleVerifyOTP(e) {
-    if (e) e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      const data = await verifyLogin2FA(pendingPhone, otpValue);
+      const data = await loginPin(fullPhone, pin);
       const user = await getProfile(data.access_token);
+      if (user.role?.toUpperCase() === "ADMIN" || user.role?.toUpperCase() === "AGENT") {
+        throw new Error("ACCESS_RESTRICTED: Staff members must use the Secure HQ Portal.");
+      }
       onLogin({ ...data, user });
     } catch (err) {
-      setError(err.message || "Invalid or expired verification code.");
+      setError(err.message || "Invalid credentials. Please verify your phone number and PIN.");
     } finally {
       setLoading(false);
     }
@@ -340,8 +315,8 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
   async function handleRegisterSubmit(e) {
     e.preventDefault();
     setError("");
-    if (regPassword !== confirmPassword) {
-      setError("Passwords do not match");
+    if (regPin !== confirmPin) {
+      setError("PINs do not match");
       return;
     }
     setLoading(true);
@@ -351,9 +326,10 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
       const fullPhone = "+263" + cleaned;
       const roleInDb = userRole.toLowerCase();
       
-      await register(fullName, fullPhone, roleInDb, regPassword);
-      const data = await login(fullPhone, regPassword);
-      onLogin(data);
+      await register(fullName, fullPhone, roleInDb, regPin);
+      const data = await loginPin(fullPhone, regPin);
+      const user = await getProfile(data.access_token);
+      onLogin({ ...data, user });
     } catch (err) {
       setError(err.message || "Registration failed. Please try again later.");
     } finally {
@@ -370,7 +346,7 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
           {!isExamStarted && (
             <div className="v4-login-header">
               <div className="v4-brand">
-                <i className="fas fa-shield-halved" style={{ color: '#000E2B' }}></i>
+                <img src="/logo.png" alt="ZimAgriTrust" style={{ height: '40px', width: 'auto' }} />
                 <span style={{ color: '#000E2B', fontWeight: 1000, letterSpacing: '2px' }}>ZIMAGRITRUST CORE</span>
               </div>
               <h1 className="v4-institutional-title">{tab === 'login' ? 'System Authentication' : 'Account Provisioning'}</h1>
@@ -424,18 +400,18 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                           <span onClick={() => setTab('forgot')} style={{ fontSize: '10px', color: '#000E2B', fontWeight: 800, cursor: 'pointer', opacity: 0.8 }}>Recover PIN?</span>
                       </div>
                       <input 
-                          type={showPassword ? "text" : "password"}
+                          type={showPin ? "text" : "password"}
                           inputMode="numeric"
                           pattern="[0-9]*"
                           placeholder="••••" 
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value.replace(/[^0-9]/g, ''))}
+                          value={pin}
+                          onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, ''))}
                           maxLength={6}
                           style={{ width: '100%', border: 'none', outline: 'none', fontSize: '24px', fontWeight: 950, background: 'transparent', textAlign: 'center', letterSpacing: '0.2em' }}
                           required 
                       />
-                      <button type="button" className="v4-pw-toggle" onClick={() => setShowPassword(v => !v)} tabIndex={-1}>
-                        <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                      <button type="button" className="v4-pw-toggle" onClick={() => setShowPin(v => !v)} tabIndex={-1}>
+                        <i className={`fas ${showPin ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                       </button>
                   </div>
                 </>
@@ -501,17 +477,17 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                 <label>Create Security PIN</label>
                 <div className="v4-input-group">
                    <input 
-                      type={showRegPassword ? "text" : "password"}
+                      type={showRegPin ? "text" : "password"}
                       inputMode="numeric"
                       pattern="[0-9]*"
-                      value={regPassword} 
-                      onChange={(e) => setRegPassword(e.target.value.replace(/[^0-9]/g, ''))} 
+                      value={regPin} 
+                      onChange={(e) => setRegPin(e.target.value.replace(/[^0-9]/g, ''))} 
                       placeholder="••••" 
                       maxLength={6}
                       required 
                    />
-                   <button type="button" className="v4-pw-toggle" onClick={() => setShowRegPassword(v => !v)} tabIndex={-1}>
-                     <i className={`fas ${showRegPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                   <button type="button" className="v4-pw-toggle" onClick={() => setShowRegPin(v => !v)} tabIndex={-1}>
+                     <i className={`fas ${showRegPin ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                    </button>
                 </div>
               </div>
@@ -519,17 +495,17 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                 <label>Repeat Security PIN</label>
                 <div className="v4-input-group">
                    <input 
-                      type={showConfirmPassword ? "text" : "password"}
+                      type={showConfirmPin ? "text" : "password"}
                       inputMode="numeric"
                       pattern="[0-9]*"
-                      value={confirmPassword} 
-                      onChange={(e) => setConfirmPassword(e.target.value.replace(/[^0-9]/g, ''))} 
+                      value={confirmPin} 
+                      onChange={(e) => setConfirmPin(e.target.value.replace(/[^0-9]/g, ''))} 
                       placeholder="••••" 
                       maxLength={6}
                       required 
                    />
-                   <button type="button" className="v4-pw-toggle" onClick={() => setShowConfirmPassword(v => !v)} tabIndex={-1}>
-                     <i className={`fas ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                   <button type="button" className="v4-pw-toggle" onClick={() => setShowConfirmPin(v => !v)} tabIndex={-1}>
+                     <i className={`fas ${showConfirmPin ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                    </button>
                 </div>
               </div>
@@ -644,7 +620,7 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                   <div className="v4-field">
                     <label>New PIN</label>
                     <div className="v4-input-group">
-                      <input type={showNewPin ? "text" : "password"} inputMode="numeric" pattern="[0-9]*" value={newPassword} onChange={e => setNewPassword(e.target.value.replace(/[^0-9]/g, ''))} placeholder="••••" maxLength={6} required style={{ textAlign: 'center', fontSize: '22px', letterSpacing: '0.3em' }} />
+                      <input type={showNewPin ? "text" : "password"} inputMode="numeric" pattern="[0-9]*" value={newPin} onChange={e => setNewPin(e.target.value.replace(/[^0-9]/g, ''))} placeholder="••••" maxLength={6} required style={{ textAlign: 'center', fontSize: '22px', letterSpacing: '0.3em' }} />
                       <button type="button" className="v4-pw-toggle" onClick={() => setShowNewPin(v => !v)} tabIndex={-1}>
                         <i className={`fas ${showNewPin ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                       </button>
@@ -714,14 +690,14 @@ export default function PublicLoginScreen({ onLogin, onBrowseGuest }) {
                       </div>
 
                       <div className="v4-field" style={{ marginBottom: '24px' }}>
-                          <label style={{ fontSize: '10px', fontWeight: 900, color: '#f59e0b', marginBottom: '8px', display: 'block' }}>SECURITY PIN</label>
+                          <label style={{ fontSize: '10px', fontWeight: 900, color: '#f59e0b', marginBottom: '8px', display: 'block' }}>SECURITY PASSWORD</label>
                           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
                             <input 
                                type={showAcademyPin ? "text" : "password"}
                                style={{ flex: 1, border: 'none', outline: 'none', padding: '14px 16px', fontSize: '18px', fontWeight: 800, background: 'transparent', letterSpacing: '0.2em' }}
-                               placeholder="••••••" 
-                               value={academyPin} 
-                               onChange={(e) => setAcademyPin(e.target.value)} 
+                               placeholder="••••••••" 
+                               value={academyPassword} 
+                               onChange={(e) => setAcademyPassword(e.target.value)} 
                             />
                             <button type="button" className="v4-pw-toggle" onClick={() => setShowAcademyPin(v => !v)} tabIndex={-1}>
                               <i className={`fas ${showAcademyPin ? 'fa-eye-slash' : 'fa-eye'}`}></i>

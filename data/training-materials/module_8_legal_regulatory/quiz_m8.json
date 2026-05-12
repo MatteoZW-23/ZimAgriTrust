@@ -1,0 +1,118 @@
+{
+  "module_id": 8,
+  "module_title": "Legal & Regulatory Framework",
+  "source_handbook": "handbook_m8.txt",
+  "passing_score": 80.0,
+  "questions": [
+    {
+      "id": "q8_1",
+      "text": "What is a 'Binding Contract' in ZimAgritrust?",
+      "options": [
+        "A friendly promise",
+        "A legal agreement enforceable by law once signed digitally via the platform",
+        "An email",
+        "A handshake"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q8_2",
+      "text": "What makes an Agent's digital signature on a report legally significant?",
+      "options": [
+        "It is optional",
+        "It makes the Agent a 'Legal Witness' to the quality",
+        "It is only for internal records",
+        "It has no legal value"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q8_3",
+      "text": "Which document proves formal land ownership during verification?",
+      "options": [
+        "A utility bill",
+        "A Title Deed",
+        "A school ID",
+        "A church membership card"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q8_4",
+      "text": "Under RBZ Fintech Sandbox rules, what does AML stand for?",
+      "options": [
+        "Automatic Money Lending",
+        "Anti-Money Laundering",
+        "Approved Merchant List",
+        "Agent Management License"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q8_5",
+      "text": "What is the minimum transaction amount that must be flagged as suspicious under AML rules?",
+      "options": [
+        "$1,000",
+        "$5,000",
+        "$10,000",
+        "$50,000"
+      ],
+      "correct_index": 2
+    },
+    {
+      "id": "q8_6",
+      "text": "Why must corporate money and Escrow money be stored in different bank accounts?",
+      "options": [
+        "To earn more interest",
+        "Zero-Commingling compliance",
+        "To confuse auditors",
+        "Bank preference"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q8_7",
+      "text": "What does KYC require an Agent to verify?",
+      "options": [
+        "The farmer's favorite color",
+        "The farmer's physical National ID",
+        "The farmer's shoe size",
+        "The farmer's social media handle"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q8_8",
+      "text": "How are disputes settled on the platform to ensure speed?",
+      "options": [
+        "Local court trials",
+        "Neutral Auditors appointed by the platform",
+        "Community voting",
+        "Coin flips"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q8_9",
+      "text": "What is 'Leasehold' land tenure?",
+      "options": [
+        "Full ownership forever",
+        "Right to use the land for a specific period",
+        "Government-owned land",
+        "Abandoned land"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q8_10",
+      "text": "What is the passing score for Module 8?",
+      "options": [
+        "70%",
+        "75%",
+        "80%",
+        "85%"
+      ],
+      "correct_index": 2
+    }
+  ]
+}

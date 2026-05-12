@@ -77,7 +77,7 @@ export default function OnboardingScreen({ onComplete }) {
       <View style={styles.container}>
         <View style={styles.languageHeader}>
            <View style={styles.smallLogoContainer}>
-             <Text style={styles.smallLogo}>AGRI</Text>
+             <Image source={require('../../assets/logo.png')} style={{ width: 60, height: 60, resizeMode: 'contain' }} />
            </View>
            <Text style={styles.langTitle}>Select Your Language</Text>
            <Text style={styles.langSub}>/ Khetha Ulimi Lwakho</Text>

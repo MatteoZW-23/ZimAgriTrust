@@ -25,6 +25,8 @@ from app.core.security_middleware import SecurityMiddleware, AuditLoggingMiddlew
 from app.models.session import UserSession  # noqa: F401 — registers session table
 from app.core.health import router as health_router
 from app.core.error_tracking import init_sentry
+from app.core.metrics import router as metrics_router, MetricsMiddleware
+from app.ml.model_loader import model_loader
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -41,9 +43,16 @@ async def lifespan(app: FastAPI):
         apply_schema_patches(engine)
 
         with SessionLocal() as db:
+            print("SYSLOG | Seeding RBAC roles and permissions...")
+            from app.services.rbac_service import RBACService
+            RBACService.create_default_roles(db)
             print("SYSLOG | Finalizing Production Environment...")
             settlement_worker.run_settlement_sweep(db)
             print("SYSLOG | Platform Live and Ready for Market Deployment.")
+
+        # Load ONNX and sklearn inference models (non-fatal if weights missing)
+        model_loader.load_all()
+        print("SYSLOG | ML model loader initialized.")
 
     except Exception as e:
         print(f"BOOT_ERROR | Managed startup failure: {str(e)}")
@@ -81,6 +90,8 @@ app.add_middleware(SecurityMiddleware)
 if settings.ADMIN_AUDIT_LOGGING:
     app.add_middleware(AuditLoggingMiddleware)
 
+app.add_middleware(MetricsMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
@@ -91,8 +102,33 @@ app.add_middleware(
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 app.include_router(health_router, prefix="/health", tags=["health"])
+app.include_router(metrics_router)
 
 # --- INDUSTRIAL STRENGTH MIDDLEWARE ---
+
+@app.middleware("http")
+async def emergency_shutdown_middleware(request: Request, call_next):
+    """
+    When emergency shutdown is engaged, only super-admin endpoints AND read
+    requests are served. All other state-changing requests get 503.
+    """
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        path = request.url.path
+        if path.startswith("/api/v1/super-admin"):
+            return await call_next(request)
+        try:
+            from app.models.system_config import SystemConfig
+            with SessionLocal() as db:
+                cfg = db.query(SystemConfig).filter(SystemConfig.key == "SYSTEM_LOCKDOWN").first()
+                if cfg and str(cfg.value).lower() == "true":
+                    return JSONResponse(
+                        status_code=503,
+                        content={"detail": "PLATFORM_LOCKDOWN: System under emergency read-only lockdown."},
+                    )
+        except Exception:
+            pass
+    return await call_next(request)
+
 
 @app.middleware("http")
 async def audit_and_performance_middleware(request: Request, call_next):

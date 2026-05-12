@@ -193,6 +193,81 @@ class WalletService:
         return user.balance_usd if user else 0.0
 
     @staticmethod
+    def get_balance_detail(db: Session, user_id: uuid.UUID) -> dict:
+        """Returns full wallet balance breakdown as a dict."""
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return {"balance": 0.0, "held_in_escrow": 0.0, "available": 0.0}
+        held = user.pending_usd
+        bal  = user.balance_usd
+        return {
+            "balance":       round(bal + held, 2),
+            "held_in_escrow": round(held, 2),
+            "available":     round(bal, 2),
+        }
+
+    @staticmethod
+    def request_withdrawal(db: Session, user_id: uuid.UUID, amount: float, phone_number: str) -> dict:
+        """Initiates a withdrawal to EcoCash/OneMoney phone number."""
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise ValueError("User not found")
+        if user.balance_usd < amount:
+            raise ValueError(f"Insufficient balance. Available: ${user.balance_usd:.2f}")
+        if amount < 1.0:
+            raise ValueError("Minimum withdrawal is $1.00")
+
+        reference = f"WD-{uuid.uuid4().hex[:10].upper()}"
+        user.balance_usd -= amount
+        txn = Transaction(
+            user_id=user_id,
+            type=TransactionType.WITHDRAWAL,
+            amount=amount,
+            currency="USD",
+            status="pending",
+        )
+        db.add(txn)
+        db.commit()
+        logger.info(f"Withdrawal requested: {amount} USD for user {user_id} → {phone_number}. Ref: {reference}")
+        return {"reference": reference, "amount": amount, "phone_number": phone_number, "status": "pending"}
+
+    @staticmethod
+    def get_summary(db: Session, user_id: uuid.UUID) -> dict:
+        """Returns wallet summary with lifetime earnings, spending, and current balance."""
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return {}
+
+        from sqlalchemy import func as sa_func
+        from app.models.transaction import TransactionType as TT
+
+        def _sum(tx_type: str) -> float:
+            result = (
+                db.query(sa_func.coalesce(sa_func.sum(Transaction.amount), 0.0))
+                .filter(Transaction.user_id == user_id, Transaction.type == tx_type, Transaction.status == "completed")
+                .scalar()
+            )
+            return float(result or 0.0)
+
+        total_deposited  = _sum(TT.DEPOSIT)
+        total_withdrawn  = _sum(TT.WITHDRAWAL)
+        total_received   = _sum(TT.ESCROW_RELEASE)
+        total_spent      = _sum(TT.ESCROW_HOLD)
+
+        return {
+            "balance":            round(user.balance_usd, 2),
+            "held_in_escrow":     round(user.pending_usd, 2),
+            "available":          round(user.balance_usd, 2),
+            "currency":           "USD",
+            "total_deposited":    round(total_deposited, 2),
+            "total_withdrawn":    round(total_withdrawn, 2),
+            "total_received":     round(total_received, 2),
+            "total_spent":        round(total_spent, 2),
+            "trust_score":        user.trust_score,
+            "subscription_tier":  user.subscription_tier.value if user.subscription_tier else "basic",
+        }
+
+    @staticmethod
     def get_transaction_history(db: Session, user_id: uuid.UUID, limit: int = 10) -> list[Transaction]:
         return db.query(Transaction).filter(Transaction.user_id == user_id).order_by(Transaction.created_at.desc()).limit(limit).all()
 

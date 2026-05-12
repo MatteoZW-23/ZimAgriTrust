@@ -1,0 +1,44 @@
+ZimAgritrust Module 8: Legal & Regulatory Framework
+===================================================
+
+Purpose
+-------
+This module explains the legal responsibilities of agents when verifying crops, land, identity, escrow activity and digital signatures.
+
+8.1 Trust Deed and Platform Terms
+---------------------------------
+Every user participates under the platform trust framework. Agent reports form part of the transaction evidence record.
+
+Important principles:
+- Escrow release becomes final after delivery confirmation.
+- Agent digital signature acts as witness evidence.
+- Disputes follow platform arbitration before escalation.
+
+8.2 Land Tenure and Rights
+--------------------------
+Agents may verify that crops are connected to legitimate farming rights.
+
+Common documents:
+- Title deed: formal ownership.
+- Leasehold: right to use land for a defined period.
+- Communal allotment: traditional or local authority confirmation.
+
+Always capture document references only through secure platform workflows.
+
+8.3 RBZ and Financial Compliance
+--------------------------------
+ZimAgritrust operates in a regulated financial environment.
+
+Compliance rules:
+- Escrow and operating funds must not be mixed.
+- KYC is required for traders.
+- Suspicious high-value transactions must be flagged.
+- Audit trails must be preserved.
+
+8.4 Agent Legal Risk
+--------------------
+False reports, bribery, data leaks, or intentional misrepresentation may expose the agent to disciplinary and legal action.
+
+Final Summary
+-------------
+Agents are operational witnesses. Your reports must be truthful, compliant, and supported by evidence.

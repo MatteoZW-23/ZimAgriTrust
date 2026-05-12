@@ -22,6 +22,19 @@ services:
     ports:
       - "6380:6379"
 
+  whatsapp-service:
+    build: ./apps/whatsapp-service
+    ports:
+      - "8001:8000"
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      WHATSAPP_BRIDGE_URL: http://whatsapp-bridge:3006
+      MAIN_BACKEND_URL: http://backend:8000
+      LOG_LEVEL: INFO
+    depends_on:
+      - redis
+    restart: unless-stopped
+
   backend:
     build: ./backend
     ports:
@@ -29,11 +42,13 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/agri_trust
       REDIS_URL: redis://redis:6379/0
+      WHATSAPP_SERVICE_URL: http://whatsapp-service:8000
+      WHATSAPP_USE_REDIS: "false"
       SECRET_KEY: test-key-replace-in-prod
       CORS_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:5000,http://localhost:19006,http://localhost:19000,http://localhost:19002,http://localhost:5173
       ALLOWED_HOSTS: "*"
-      # Limit watchfiles to only the app source — prevents inotify exhaustion
-      WATCHFILES_FORCE_POLLING: "false"
+      # Force polling needed on Windows — inotify events don't cross WSL2/Hyper-V volume boundary
+      WATCHFILES_FORCE_POLLING: "true"
       # Security Configuration
       RATE_LIMIT_ENABLED: "true"
       RATE_LIMIT_REQUESTS: "100"
@@ -52,10 +67,14 @@ services:
       PASSWORD_REQUIRE_LOWERCASE: "true"
       PASSWORD_REQUIRE_DIGIT: "true"
       PASSWORD_REQUIRE_SPECIAL: "true"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+      REFRESH_TOKEN_EXPIRE_MINUTES: "10080"
+      REQUIRE_MFA_ADMIN: "true"
     volumes:
       - ./backend:/app
       - ./data/ml-weights:/app/ml_weights
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
+      - shared_models:/app/models
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,7 +82,9 @@ services:
         condition: service_started
 
   public-website:
-    build: ./apps/public-website
+    build:
+      context: .
+      dockerfile: apps/public-website/Dockerfile
     ports:
       - "3000:3000"
     environment:
@@ -78,7 +99,9 @@ services:
       - backend
 
   admin-dashboard:
-    build: ./apps/admin-dashboard
+    build:
+      context: .
+      dockerfile: apps/admin-dashboard/Dockerfile
     ports:
       - "3001:3001"
     environment:
@@ -90,7 +113,9 @@ services:
       - backend
 
   agent-portal:
-    build: ./apps/agent-portal
+    build:
+      context: .
+      dockerfile: apps/agent-portal/Dockerfile
     ports:
       - "3002:3002"
     environment:
@@ -102,7 +127,9 @@ services:
       - backend
 
   app-portal:
-    build: ./apps/app-portal
+    build:
+      context: .
+      dockerfile: apps/app-portal/Dockerfile
     ports:
       - "3003:3003"
     environment:
@@ -123,6 +150,7 @@ services:
       - "19001:19001"
     environment:
       - EXPO_PUBLIC_API_URL=http://localhost:8080/api/v1
+      - EXPO_PUBLIC_APP_KIND=farmer_buyer
     volumes:
       - ./apps/user-mobile:/app
       - /app/node_modules
@@ -138,6 +166,7 @@ services:
       - "19002:19006"
     environment:
       - EXPO_PUBLIC_API_URL=http://localhost:8080/api/v1
+      - EXPO_PUBLIC_APP_KIND=driver
     volumes:
       - ./apps/driver-mobile:/app
       - /app/node_modules
@@ -179,24 +208,32 @@ services:
       - backend
     restart: always
 
-  notebook-scheduler:
+  # ── Jupyter Research Environment (DEVELOPMENT ONLY — large, ~3-5GB) ────────
+  # Contains PyTorch, YOLOv8, TensorFlow — NEVER used in production
+  # Access: http://localhost:8888  token: zimagritrust
+  jupyter:
     build:
-      context: .
-      dockerfile: config/Dockerfile.scheduler
+      context: ./jupyter
+      dockerfile: Dockerfile
+    ports:
+      - "8888:8888"
     volumes:
-      - ./data/research:/research
-      - ./data/ml-weights:/backend/ml_weights
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ./jupyter/notebooks:/workspace/notebooks
+      - ./jupyter/scripts:/workspace/scripts
+      - ./jupyter/data:/workspace/data
+      - shared_models:/workspace/exports/models
     environment:
-      - BACKEND_API_URL=http://backend:8000/api/v1
-      - REDIS_URL=redis://redis:6379/0
+      - JUPYTER_ENABLE_LAB=yes
     depends_on:
-      - backend
-      - redis
-    restart: always
-    command: python scheduler/auto_scheduler.py --start
+      - postgres
+    profiles:
+      - dev
+    restart: unless-stopped
+
 
 volumes:
   postgres_data:
   wwebjs_auth:
   wwebjs_cache:
+  shared_models:
+    driver: local

@@ -4,6 +4,7 @@ from typing import List, Dict
 from app.api.deps import get_db
 from sqlalchemy.orm import Session
 from app.services.recruitment_service import recruitment_service
+from app.schemas.recruitment import AgentApplicationCreate
 
 router = APIRouter()
 
@@ -13,6 +14,43 @@ async def get_agent_status(user_id: uuid.UUID, db: Session = Depends(get_db)):
     Returns current position in the 10-step recruitment pipeline.
     """
     return recruitment_service.get_application_status(db, user_id)
+
+
+@router.post("/application/resubmit")
+async def resubmit_application(
+    payload: AgentApplicationCreate,
+    db: Session = Depends(get_db),
+):
+    """
+    Resubmit a rejected agent application with updated details.
+    Marks any prior REJECTED record as superseded and creates a fresh APPLIED row.
+    """
+    from app.models.recruitment import AgentApplication, ApplicationStatus
+
+    prior = (
+        db.query(AgentApplication)
+        .filter(AgentApplication.national_id == payload.national_id)
+        .order_by(AgentApplication.created_at.desc())
+        .first()
+        if hasattr(AgentApplication, "created_at")
+        else db.query(AgentApplication)
+        .filter(AgentApplication.national_id == payload.national_id)
+        .first()
+    )
+
+    if prior and prior.status not in {ApplicationStatus.REJECTED}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot resubmit while existing application is in status {prior.status}",
+        )
+
+    # Mark prior rejected record as archived by clearing its national_id so the
+    # uniqueness check in submit_application succeeds.
+    if prior:
+        prior.national_id = f"{prior.national_id}::ARCHIVED::{prior.id}"
+        db.commit()
+
+    return await recruitment_service.submit_application(db, payload)
 
 @router.get("/{agent_code}/verify")
 def verify_agent_public(agent_code: str, db: Session = Depends(get_db)):

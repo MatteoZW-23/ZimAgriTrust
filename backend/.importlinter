@@ -1,0 +1,54 @@
+[importlinter]
+root_packages =
+    app
+include_external_packages = True
+
+# Enforce the dependency rule of clean architecture.
+# Run with:  docker compose exec backend lint-imports
+
+[importlinter:contract:layered-architecture]
+name = Clean architecture layers (domain <- application <- infrastructure/api)
+type = layers
+layers =
+    app.api
+    app.infrastructure
+    app.application
+    app.domain
+ignore_imports =
+    # Composition root is allowed to import adapters (it wires them together).
+    app.api.v1.dependencies -> app.infrastructure.persistence.sqlalchemy
+    app.api.v1.dependencies -> app.infrastructure.notifications
+    app.api.v1.dependencies -> app.infrastructure.escrow
+
+[importlinter:contract:domain-purity]
+name = Domain has no framework or infrastructure dependencies
+type = forbidden
+source_modules =
+    app.domain
+forbidden_modules =
+    sqlalchemy
+    fastapi
+    pydantic
+    redis
+    app.api
+    app.services
+    app.infrastructure
+    app.db
+    app.models
+    app.core
+
+[importlinter:contract:application-purity]
+name = Application layer depends only on domain + its own ports
+type = forbidden
+source_modules =
+    app.application
+forbidden_modules =
+    sqlalchemy
+    fastapi
+    redis
+    app.api
+    app.services
+    app.infrastructure
+    app.db
+    app.models
+    app.core

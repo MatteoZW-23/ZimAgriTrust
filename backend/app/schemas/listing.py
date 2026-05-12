@@ -38,6 +38,83 @@ class CounterOfferRequest(BaseModel):
     counter_price: float = Field(gt=0)
 
 
+# ---------------------------------------------------------------------------
+# Listing extras: edit, photos, boost, stats, save, report  (F#52-58, F#92, F#94)
+# ---------------------------------------------------------------------------
+class ListingUpdate(BaseModel):
+    """Partial update for a listing. F#53."""
+    product_subtype: Optional[str] = Field(default=None, max_length=50)
+    grade: Optional[str] = Field(default=None, max_length=20)
+    quantity: Optional[float] = Field(default=None, gt=0)
+    price_per_unit: Optional[float] = Field(default=None, gt=0)
+    location_province: Optional[str] = Field(default=None, max_length=50)
+    location_district: Optional[str] = Field(default=None, max_length=50)
+    pickup_address: Optional[str] = Field(default=None)
+    is_perishable: Optional[bool] = None
+    expiry_date: Optional[date] = None
+    harvest_date: Optional[date] = None
+    storage_requirements: Optional[str] = Field(default=None, max_length=100)
+    notes: Optional[str] = Field(default=None, max_length=2000)
+
+
+class ListingPhotosUpdate(BaseModel):
+    """Add photo URLs to a listing. F#52."""
+    urls: List[str] = Field(default_factory=list)
+
+
+class ListingPhotosResponse(BaseModel):
+    listing_id: uuid.UUID
+    photo_urls: List[str]
+
+
+class ListingBoostRequest(BaseModel):
+    """F#57. $2 default; admin may configure tiers in future."""
+    duration_days: int = Field(default=7, ge=1, le=30)
+
+
+class ListingBoostResponse(BaseModel):
+    listing_id: uuid.UUID
+    is_boosted: bool
+    boosted_until: Optional[datetime]
+    boost_fee: float
+    wallet_balance: float
+
+
+class ListingStatsResponse(BaseModel):
+    """F#56."""
+    listing_id: uuid.UUID
+    view_count: int
+    offer_count: int
+    accepted_offer_count: int
+    days_active: int
+    is_boosted: bool
+
+
+class SavedListingResponse(BaseModel):
+    id: uuid.UUID
+    listing_id: uuid.UUID
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ListingReportCreate(BaseModel):
+    """F#94."""
+    reason: str = Field(min_length=1, max_length=40)
+    details: Optional[str] = Field(default=None, max_length=2000)
+
+
+class ListingReportResponse(BaseModel):
+    id: uuid.UUID
+    listing_id: uuid.UUID
+    reporter_id: uuid.UUID
+    reason: str
+    status: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class OfferResponse(BaseModel):
     id: uuid.UUID
     listing_id: uuid.UUID
@@ -83,7 +160,14 @@ class ListingResponse(BaseModel):
     expiry_date: Optional[date]
     harvest_date: Optional[date]
     storage_requirements: Optional[str]
-    
+
+    # F#52, F#56, F#57, F#58
+    view_count: int = 0
+    photo_urls: Optional[List[str]] = None
+    is_boosted: bool = False
+    boosted_until: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+
     offers: List[OfferResponse] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)

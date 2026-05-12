@@ -108,3 +108,75 @@ class ExamAttempt(Base):
     answers: Mapped[Optional[Dict]] = mapped_column(JSON)
     passed: Mapped[bool] = mapped_column(Boolean, default=False)
     attempted_at = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ---------------------------------------------------------------------------
+# Practical Assessment — 4 sub-tests after final exam
+# ---------------------------------------------------------------------------
+
+class PracticalTestType(str, enum.Enum):
+    GRADING = "grading"             # 90% — identify grade from 20 crop samples
+    APP_NAVIGATION = "app_nav"      # 100% — navigate the agent app
+    PHOTO_EVIDENCE = "photo"        # 90% — submit acceptable evidence photos
+    DISPUTE_ROLEPLAY = "dispute"    # 80% — handle a simulated dispute
+
+
+class PracticalAssessment(Base):
+    """One row per (agent, test_type) — latest attempt overwrites prior."""
+    __tablename__ = "academy_practical_assessments"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"), nullable=False, index=True)
+    test_type: Mapped[PracticalTestType] = mapped_column(SQLEnum(PracticalTestType), nullable=False)
+    score: Mapped[float] = mapped_column(Float, nullable=False)
+    passing_score: Mapped[float] = mapped_column(Float, nullable=False)
+    passed: Mapped[bool] = mapped_column(Boolean, default=False)
+    answers: Mapped[Optional[Dict]] = mapped_column(JSON)
+    evaluator_notes: Mapped[Optional[str]] = mapped_column(String(2000))
+    attempts: Mapped[int] = mapped_column(Integer, default=1)
+    submitted_at = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ---------------------------------------------------------------------------
+# Shadowing Log — junior agent shadows a senior on real tasks
+# ---------------------------------------------------------------------------
+
+class ShadowingStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    NEEDS_REVISION = "needs_revision"
+
+
+class ShadowingLog(Base):
+    __tablename__ = "agent_shadowing_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"), nullable=False, index=True)
+    senior_agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"), nullable=False, index=True)
+    assignment_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("agent_assignments.id"), nullable=True)
+
+    task_type: Mapped[str] = mapped_column(String(50))  # verification | delivery | dispute
+    observation_notes: Mapped[Optional[str]] = mapped_column(String(2000))
+    agent_actions: Mapped[Optional[str]] = mapped_column(String(2000))
+    senior_feedback: Mapped[Optional[str]] = mapped_column(String(2000))
+
+    status: Mapped[ShadowingStatus] = mapped_column(SQLEnum(ShadowingStatus), default=ShadowingStatus.PENDING)
+    approved_at = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SupervisedTaskReview(Base):
+    """Junior agent does the work; senior reviews. Tracks the 20-task review window."""
+    __tablename__ = "agent_supervised_reviews"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"), nullable=False, index=True)
+    reviewer_agent_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("agents.id"), nullable=True)
+    assignment_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("agent_assignments.id"), nullable=True)
+
+    submission: Mapped[Optional[Dict]] = mapped_column(JSON)  # the agent's report payload
+    review_notes: Mapped[Optional[str]] = mapped_column(String(2000))
+    accuracy_score: Mapped[Optional[float]] = mapped_column(Float)  # 0–100
+    is_approved: Mapped[bool] = mapped_column(Boolean, default=False)
+    reviewed_at = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at = mapped_column(DateTime(timezone=True), server_default=func.now())

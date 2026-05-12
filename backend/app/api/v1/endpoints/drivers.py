@@ -6,17 +6,20 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from jose import JWTError, jwt
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_roles
+from app.core.config import settings
+from app.core.security import get_password_hash
 from app.models.driver import Driver, DriverJob, DriverStatus
 from app.models.listing import LogisticsType
 from app.models.logistics import OrderDelivery, DeliveryStatus
 from app.models.transaction import Order, OrderStatus
-from app.models.user import User, UserRole
+from app.models.user import User, UserRole, UserStatus
 from app.services import transport_service
 
 router = APIRouter()
@@ -66,13 +69,101 @@ class UpdateDeliveryStatusPayload(BaseModel):
 # ── Helper: resolve Driver from current user ────────────────────────────────
 
 def _get_driver(db: Session, user: User) -> Driver:
+    if user.role != UserRole.TRANSPORTER:
+        raise HTTPException(status_code=403, detail="Driver APIs are restricted to driver accounts.")
     driver = db.query(Driver).filter(Driver.user_id == user.id).first()
     if not driver:
         raise HTTPException(status_code=404, detail="Not registered as a driver")
     return driver
 
 
-# ── Driver registration ────────────────────────────────────────────────────────
+# ── Self-registration (new driver, no account yet) ────────────────────────────
+
+@router.post("/self-register", summary="New driver self-registration with document upload")
+async def self_register_driver(
+    authorization: str = Form(..., description="Bearer temp_token from OTP verify"),
+    phone_number: str = Form(...),
+    pin: str = Form(...),
+    first_name: str = Form(...),
+    last_name: str = Form(...),
+    date_of_birth: str = Form(...),
+    address: str = Form(...),
+    vehicle_type: str = Form(...),
+    plate_number: str = Form(...),
+    vehicle_model: Optional[str] = Form(None),
+    vehicle_year: Optional[str] = Form(None),
+    national_id_front: Optional[UploadFile] = File(None),
+    national_id_back: Optional[UploadFile] = File(None),
+    license_front: Optional[UploadFile] = File(None),
+    license_back: Optional[UploadFile] = File(None),
+    vehicle_registration: Optional[UploadFile] = File(None),
+    vehicle_photo: Optional[UploadFile] = File(None),
+    profile_photo: Optional[UploadFile] = File(None),
+    live_selfie: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Complete driver self-registration. Requires a valid temp_token issued by
+    /auth/driver/verify-otp. Creates a PENDING_VERIFICATION User + Driver record.
+    """
+    # ── Validate temp token ─────────────────────────────────────────────────
+    token = authorization.replace("Bearer ", "").strip()
+    try:
+        claims = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if claims.get("scope") != "driver_registration":
+            raise HTTPException(status_code=403, detail="Invalid registration token scope.")
+        token_phone = claims.get("sub", "")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired registration token.")
+
+    if token_phone != phone_number:
+        raise HTTPException(status_code=403, detail="Token phone number does not match submitted phone.")
+
+    # ── Check for duplicate ─────────────────────────────────────────────────
+    existing = db.query(User).filter(User.phone_number == phone_number).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="An account with this phone number already exists.")
+
+    # ── Create User ─────────────────────────────────────────────────────────
+    user = User(
+        phone_number=phone_number,
+        full_name=f"{first_name} {last_name}",
+        password_hash=get_password_hash(pin),
+        ussd_pin_hash=get_password_hash(pin),
+        role=UserRole.TRANSPORTER,
+        status=UserStatus.PENDING_VERIFICATION,
+        is_phone_verified=True,
+    )
+    db.add(user)
+    db.flush()  # get user.id without committing
+
+    # ── Create Driver record ────────────────────────────────────────────────
+    driver = Driver(
+        user_id=user.id,
+        vehicle_reg=plate_number,
+        vehicle_type=vehicle_type,
+        license_number=f"PENDING-{plate_number}",
+        current_district=address,
+        status=DriverStatus.PENDING_REVIEW,
+    )
+    db.add(driver)
+    db.commit()
+    db.refresh(user)
+    db.refresh(driver)
+
+    return {
+        "status": "PENDING_APPROVAL",
+        "user_id": str(user.id),
+        "driver_id": str(driver.id),
+        "message": (
+            "Your application has been submitted. "
+            "An admin will review your documents within 24–48 hours. "
+            "You will be notified via SMS when approved."
+        ),
+    }
+
+
+# ── Driver registration (existing TRANSPORTER user) ───────────────────────────
 
 @router.post("/register")
 def register_driver(
@@ -80,7 +171,9 @@ def register_driver(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Any user can register as a driver. Requires admin approval."""
+    """Driver accounts can submit vehicle details for admin approval."""
+    if current_user.role != UserRole.TRANSPORTER:
+        raise HTTPException(status_code=403, detail="Use the driver mobile app with a driver account.")
     existing = db.query(Driver).filter(Driver.user_id == current_user.id).first()
     if existing:
         raise HTTPException(status_code=400, detail="Already registered as a driver")
@@ -105,9 +198,7 @@ def get_my_driver_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    driver = db.query(Driver).filter(Driver.user_id == current_user.id).first()
-    if not driver:
-        raise HTTPException(status_code=404, detail="Not registered as a driver")
+    driver = _get_driver(db, current_user)
     return {
         "id": str(driver.id),
         "status": driver.status,
@@ -128,9 +219,7 @@ def get_my_jobs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    driver = db.query(Driver).filter(Driver.user_id == current_user.id).first()
-    if not driver:
-        raise HTTPException(status_code=404, detail="Not registered as a driver")
+    driver = _get_driver(db, current_user)
     jobs = db.query(DriverJob).filter(DriverJob.driver_id == driver.id).order_by(DriverJob.created_at.desc()).all()
     return [
         {
@@ -155,6 +244,7 @@ def accept_job(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _get_driver(db, current_user)
     job = transport_service.driver_accept_job(db, job_id, current_user.id)
     return {"status": job.status, "accepted_at": job.accepted_at}
 
@@ -165,6 +255,7 @@ def reject_job(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _get_driver(db, current_user)
     new_job = transport_service.driver_reject_job(db, job_id, current_user.id)
     return {"reassigned": new_job is not None}
 
@@ -456,6 +547,23 @@ def approve_driver(
     driver.background_cleared = True
     driver.registration_fee_paid = True
     db.commit()
+
+    # F#285 — driver approval email (best-effort).
+    try:
+        from app.services.email_service import email_service
+        owner = db.query(User).filter(User.id == driver.user_id).first()
+        if owner and owner.email:
+            email_service.send_template(
+                "email.driver_approval",
+                to=owner.email,
+                context={
+                    "name": owner.full_name,
+                    "tier": getattr(driver, "tier", None) or "New",
+                },
+            )
+    except Exception:  # noqa: BLE001
+        pass
+
     return {"status": driver.status}
 
 

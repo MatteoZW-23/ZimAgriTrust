@@ -1,0 +1,14 @@
+{% extends "_base.html" %}
+{% block title %}You're approved to drive for ZimAgriTrust{% endblock %}
+{% block body %}
+<h2 style="margin-top:0;color:#0f5132;">Welcome to the road, {{ name }}!</h2>
+<p>Your driver application has been approved.</p>
+
+<table role="presentation" width="100%" cellpadding="6" cellspacing="0" style="border-collapse:collapse;margin:16px 0;">
+  <tr><td style="color:#6b7280;">Starting tier</td><td style="text-align:right;font-weight:bold;">{{ tier }}</td></tr>
+</table>
+
+<p>Open the driver app, set yourself online, and start accepting jobs. Your tier improves automatically as you complete deliveries with high ratings and on-time performance.</p>
+
+<p style="font-size:12px;color:#6b7280;">Tip: peak hours (06:00–09:00 and 16:00–19:00) earn +20% bonus.</p>
+{% endblock %}

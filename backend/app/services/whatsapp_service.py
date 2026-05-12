@@ -12,7 +12,11 @@ import httpx
 import uuid
 import asyncio
 from datetime import datetime, timedelta
+import os
 from app.services.cache_service import cache_service
+
+# Feature flag for Redis Streams
+USE_REDIS_STREAMS = os.getenv("WHATSAPP_USE_REDIS", "false").lower() == "true"
 # Redact these for now to avoid circular imports if they occur, 
 # or import them locally in methods if needed.
 # from app.services.marketplace_service import marketplace_core
@@ -35,7 +39,14 @@ from datetime import datetime
 class WhatsAppService:
     @staticmethod
     async def send_whatsapp_message(to_phone: str, message: str):
-        """Sends an outbound message via the Node.js WhatsApp Bridge."""
+        """Sends an outbound message via Redis Streams or direct to WhatsApp Bridge."""
+        if USE_REDIS_STREAMS:
+            from app.infrastructure.messaging import get_whatsapp_producer
+            producer = await get_whatsapp_producer()
+            await producer.send_message(to_phone, message)
+            return
+
+        # Legacy direct bridge communication
         # Sanitize phone number (ensure @c.us suffix)
         if not to_phone.endswith('@c.us'):
             # Convert +263... to 263...
@@ -57,6 +68,20 @@ class WhatsAppService:
     @staticmethod
     async def get_status():
         """Checks if the WhatsApp bridge is responsive."""
+        if USE_REDIS_STREAMS:
+            # In Redis mode, check WhatsApp service health
+            try:
+                import httpx
+                whatsapp_service_url = os.getenv("WHATSAPP_SERVICE_URL", "http://whatsapp-service:8000")
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(f"{whatsapp_service_url}/status", timeout=2)
+                    if resp.status_code == 200:
+                        return resp.json()
+                    return {"status": "DISCONNECTED", "reason": f"HTTP {resp.status_code}"}
+            except Exception as e:
+                return {"status": "OFFLINE", "reason": str(e)}
+
+        # Legacy direct bridge communication
         bridge_url = "http://whatsapp-bridge:3006/status" # Assuming /status exists
         try:
             async with httpx.AsyncClient() as client:

@@ -1,0 +1,17 @@
+{% extends "_base.html" %}
+{% block title %}Your weekly summary{% endblock %}
+{% block body %}
+<h2 style="margin-top:0;color:#0f5132;">Hi {{ name }},</h2>
+<p>Here is your activity for <b>{{ week_start }} – {{ week_end }}</b>:</p>
+
+<table role="presentation" width="100%" cellpadding="6" cellspacing="0" style="border-collapse:collapse;margin:16px 0;">
+  {% for label, value in stats.items() %}
+  <tr>
+    <td style="border-bottom:1px solid #e5e7eb;color:#6b7280;">{{ label }}</td>
+    <td style="border-bottom:1px solid #e5e7eb;text-align:right;font-weight:bold;">{{ value }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<p>The full PDF report is attached.</p>
+{% endblock %}

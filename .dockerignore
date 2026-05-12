@@ -73,6 +73,8 @@ yarn-error.log*
 
 # Build artifacts
 dist/
+!packages/shared/dist/
+!packages/shared/dist/**
 build/
 *.egg-info/
 

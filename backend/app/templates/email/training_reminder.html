@@ -1,0 +1,11 @@
+{% extends "_base.html" %}
+{% block title %}Continue your agent training{% endblock %}
+{% block body %}
+<h2 style="margin-top:0;color:#0f5132;">Hi {{ name }},</h2>
+<p>You're partway through your ZimAgriTrust agent training. Don't lose momentum!</p>
+<p>Next up: <b>{{ next_module }}</b></p>
+
+<p style="margin-top:24px;">
+  <a href="{{ training_link }}" style="background:#0f5132;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px;display:inline-block;">Resume training</a>
+</p>
+{% endblock %}

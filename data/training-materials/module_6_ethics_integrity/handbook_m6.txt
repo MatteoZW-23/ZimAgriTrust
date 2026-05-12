@@ -1,0 +1,45 @@
+ZimAgritrust Module 6: Marketplace Ethics & Integrity
+=====================================================
+
+Purpose
+-------
+This module protects the marketplace from corruption, data misuse, conflict of interest, and off-platform manipulation.
+
+6.1 Professional Ethics
+-----------------------
+ZimAgritrust depends on trusted field truth. Corruption destroys the ledger and harms farmers.
+
+Zero tolerance policies:
+- No bribery: accepting gifts or payments to influence grading leads to dismissal.
+- No collusion: inflating grades or hiding defects is fraud.
+- No poaching: never encourage users to trade off-platform to avoid fees.
+- No false reporting: every report must match physical evidence.
+
+6.2 Data Privacy & Security
+---------------------------
+Agents handle sensitive data including GPS coordinates, national IDs, farm photos, financial information, phone numbers, and earnings records.
+
+Rules:
+- Share data only inside approved platform workflows.
+- Never post farmer or warehouse photos on social media.
+- Keep devices PIN-protected.
+- Do not export or screenshot private user data unless required by workflow.
+- Encrypted chats may only be accessed during approved dispute investigations.
+
+6.3 Conflict of Interest
+------------------------
+Agents must remain neutral.
+
+Examples:
+- Do not verify crops owned by relatives without disclosure.
+- Do not buy crops you previously verified.
+- Disclose employment or commercial ties with other ag-tech firms.
+- Recuse yourself if neutrality could be questioned.
+
+6.4 Enforcement
+---------------
+Serious misconduct may be recorded in the audit ledger, shared with governance teams, trigger suspension, or result in permanent removal.
+
+Final Summary
+-------------
+Integrity is not optional. Agents are trusted because they cannot be bought, pressured, or biased.

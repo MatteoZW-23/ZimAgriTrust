@@ -54,9 +54,9 @@ async function jsonFetch(path, options = {}) {
 }
 
 export async function login(phone, password) {
-  return jsonFetch("/auth/login", {
+  return jsonFetch("/auth/app/login", {
     method: "POST",
-    body: JSON.stringify({ phone_number: phone, password }), // Fixed phone -> phone_number
+    body: JSON.stringify({ phone_number: phone, password }),
   });
 }
 
@@ -81,7 +81,7 @@ export async function getProfile(token) {
 }
 
 export async function getListings() {
-  return jsonFetch("/listings");
+  return jsonFetch("/public/listings");
 }
 
 export async function searchListings(params = {}) {
@@ -91,7 +91,7 @@ export async function searchListings(params = {}) {
     .join("&");
 
   const suffix = query ? `?${query}` : "";
-  return jsonFetch(`/listings/search${suffix}`);
+  return jsonFetch(`/public/listings${suffix}`);
 }
 
 export async function createListing(token, payload) {
@@ -263,6 +263,26 @@ export async function updateProfile(token, payload) {
   });
 }
 
+export async function exportPersonalData(token) {
+  return jsonFetch('/auth/data-export', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function deactivateAccount(token) {
+  return jsonFetch('/auth/deactivate', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function deleteAccount(token) {
+  return jsonFetch('/auth/account', {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export async function getListingOffers(token, listingId) {
   return jsonFetch(`/listings/${listingId}/offers`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -301,6 +321,18 @@ export async function getDisputes(token) {
   return jsonFetch('/disputes', {
     headers: { Authorization: `Bearer ${token}` },
   });
+}
+
+// Agent recruitment ─────────────────────────────────────────────────────────
+export async function submitAgentApplication(payload) {
+  return jsonFetch('/recruitment/apply', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getAgentApplicationStatus(userId) {
+  return jsonFetch(`/agents/my-status/${userId}`);
 }
 
 // Delivery lifecycle
@@ -359,4 +391,130 @@ export async function getVerificationStatus(token) {
   const data = await res.json();
   if (!res.ok) throw new Error(data?.detail || "Failed to fetch status");
   return data;
+}
+
+// Real-time synchronization
+export async function syncData(token, lastSyncTime) {
+  return jsonFetch('/sync/data', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ last_sync_time: lastSyncTime }),
+  });
+}
+
+// Advanced search and filtering
+export async function advancedSearchListings(params = {}) {
+  const query = Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== null && value !== "")
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+    .join("&");
+
+  const suffix = query ? `?${query}` : "";
+  return jsonFetch(`/listings/search${suffix}`);
+}
+
+// Chat and messaging
+export async function getConversations(token) {
+  return jsonFetch('/chat/conversations', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function getMessages(token, conversationId, page = 1) {
+  return jsonFetch(`/chat/conversations/${conversationId}/messages?page=${page}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function sendMessage(token, conversationId, message, attachments = []) {
+  const form = new FormData();
+  form.append('message', message);
+  attachments.forEach((attachment, index) => {
+    form.append(`attachment_${index}`, {
+      uri: attachment.uri,
+      name: attachment.name || `attachment_${index}`,
+      type: attachment.type || 'image/jpeg',
+    });
+  });
+
+  const res = await fetch(`${API_BASE_URL}/chat/conversations/${conversationId}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.detail || 'Failed to send message');
+  return data;
+}
+
+// Notifications
+export async function getNotifications(token, unreadOnly = false) {
+  const suffix = unreadOnly ? '?unreadOnly=true' : '';
+  return jsonFetch(`/notifications${suffix}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function markNotificationRead(token, notificationId) {
+  return jsonFetch(`/notifications/${notificationId}/read`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+// Analytics and insights
+export async function getUserAnalytics(token, period = 'month') {
+  return jsonFetch(`/analytics/user?period=${period}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function getMarketTrends(token) {
+  return jsonFetch('/analytics/market-trends', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+// Document management
+export async function uploadDocument(token, documentType, file, metadata = {}) {
+  const form = new FormData();
+  form.append('document_type', documentType);
+  form.append('file', {
+    uri: file.uri,
+    name: file.name || 'document.jpg',
+    type: file.type || 'image/jpeg',
+  });
+  Object.entries(metadata).forEach(([key, value]) => {
+    form.append(key, String(value));
+  });
+
+  const res = await fetch(`${API_BASE_URL}/documents/upload`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.detail || 'Failed to upload document');
+  return data;
+}
+
+// Location services
+export async function updateLocation(token, latitude, longitude) {
+  return jsonFetch('/user/location', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ 
+      latitude, 
+      longitude, 
+      timestamp: new Date().toISOString(),
+      accuracy: 10 // default accuracy in meters
+    }),
+  });
+}
+
+// Smart recommendations
+export async function getRecommendations(token, type = 'listings') {
+  return jsonFetch(`/recommendations/${type}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 }

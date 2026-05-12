@@ -9,11 +9,13 @@ import {
   fetchDisputes, fetchMarketActivities, updateUserStatus, adjustTrustScore,
   verifyUser, resolveDispute, deleteUser, fetchEscrowStats, fetchAgentStats,
   fetchNationalPulse, fetchMarketNews, proposeAdjustment, fetchUsers, updateProfile,
+  storeSAToken,
 } from './api';
 import './styles.css';
 
 // ── Component Imports ──────────────────────────────────────────────────────────
 import StaffLoginScreen from './components/StaffLoginScreen';
+import HQLoginScreen from './components/HQLoginScreen';
 import { OverviewPanel } from './components/OverviewPanel';
 import UserDirectoryPanel from './components/UserDirectoryPanel';
 import MarketAdvisory from './components/MarketAdvisory';
@@ -28,6 +30,7 @@ import LogisticsCommand from './components/LogisticsCommand';
 import MessagingPanel from './components/MessagingPanel';
 import SupportConcierge from './components/SupportConcierge';
 import AgentRecruitmentPanel from './components/AgentRecruitmentPanel';
+import AgentPostExamReview from './components/AgentPostExamReview';
 import WalletPanel from './components/WalletPanel';
 import { NationalMarketHub } from './components/NationalMarketHub';
 import SystemConfigPanel from './components/SystemConfigPanel';
@@ -37,6 +40,10 @@ import DataPipelinePanel from './components/DataPipelinePanel';
 import { AdminCommandCenter } from './components/AdminCommandCenter';
 import IDVerificationQueuePanel from './components/IDVerificationQueuePanel';
 import BuyerMarketplacePanel from './components/BuyerMarketplacePanel';
+import AdminMFASetup from './components/AdminMFASetup';
+import InvitationAcceptScreen from './components/InvitationAcceptScreen';
+import AdminInvitationsPanel from './components/AdminInvitationsPanel';
+import WhatsAppBotPanel from './components/WhatsAppBotPanel';
 
 // ── Access Denied Screen ───────────────────────────────────────────────────────
 function AccessDenied({ role, onLogout }) {
@@ -85,7 +92,8 @@ function App() {
   };
 
   const [token, setToken] = useState(
-    localStorage.getItem('zimagritrust_admin_auth') === 'true' ? 'active_session' : null
+    localStorage.getItem('zimagritrust_sa_token') ||
+    (localStorage.getItem('zimagritrust_admin_auth') === 'true' ? 'active_session' : null)
   );
   const [profile, setProfile] = useState(safeJSON(localStorage.getItem('zimagritrust_admin_user')));
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(
@@ -93,6 +101,10 @@ function App() {
   );
   const [currentView, setCurrentView] = useState('overview');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('admin_nav_groups') || 'null') || { platform: true, finance: true, agents: true, operations: false, governance: false, personal: false }; }
+    catch { return { platform: true, finance: true, agents: true, operations: false, governance: false, personal: false }; }
+  });
   const [loading, setLoading] = useState(false);
   const [theme, setTheme] = useState(localStorage.getItem('admin_theme') || 'auto');
   const [language, setLanguage] = useState('EN');
@@ -100,6 +112,9 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [showSysInfo, setShowSysInfo] = useState(false);
+  const [portalMode, setPortalMode] = useState(
+    window.location.search.includes('mode=hq') ? 'hq' : 'staff'
+  );
   const [notifications, setNotifications] = useState([]);
 
   // Data state
@@ -173,19 +188,30 @@ function App() {
 
   const handleLogin = (data) => {
     const userData = data?.user || data || {};
-    setToken('active_session');
+    const jwt = data?.access_token || null;
+    const isSuperAdmin = userData?.role === 'SUPER_ADMIN' || data?.super_admin;
+    if (isSuperAdmin && !jwt) {
+      alert('Super-admin login did not return an access token. Please sign in again.');
+      return;
+    }
+    storeSAToken(jwt);
+    setToken(jwt || (isSuperAdmin ? null : 'active_session'));
     setProfile(userData);
     localStorage.setItem('zimagritrust_admin_auth', 'true');
     localStorage.setItem('zimagritrust_admin_user', JSON.stringify(userData));
   };
 
   const handleLogout = () => {
+    storeSAToken(null);
     setToken(null);
     setProfile({});
     localStorage.removeItem('zimagritrust_admin_auth');
     localStorage.removeItem('zimagritrust_admin_user');
     fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'}/auth/logout`, {
-      method: 'POST', credentials: 'include',
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
     }).catch(() => {});
   };
 
@@ -220,44 +246,130 @@ function App() {
     finally { setLoading(false); }
   };
 
+  // ── URL-based pre-auth screens ───────────────────────────────────────────────
+  const urlPath = typeof window !== 'undefined' ? window.location.pathname : '';
+  if (urlPath.startsWith('/accept-invitation')) {
+    return (
+      <InvitationAcceptScreen
+        onComplete={() => { window.location.href = '/'; }}
+      />
+    );
+  }
+  if (urlPath.startsWith('/mfa-setup')) {
+    return (
+      <AdminMFASetup
+        onComplete={() => { window.location.href = '/'; }}
+        onCancel={() => { window.location.href = '/'; }}
+      />
+    );
+  }
+
   // ── Not logged in ────────────────────────────────────────────────────────────
   if (!token) {
-    return <StaffLoginScreen onLogin={handleLogin} />;
+    return (
+      <div style={{ position: 'relative' }}>
+        {portalMode === 'hq' ? (
+          <HQLoginScreen onLogin={handleLogin} />
+        ) : (
+          <StaffLoginScreen onLogin={handleLogin} />
+        )}
+        
+        {/* Discrete Portal Switcher */}
+        <div style={{ 
+          position: 'fixed', bottom: '20px', left: '0', right: '0', 
+          textAlign: 'center', zIndex: 100, fontSize: '11px', color: '#64748b' 
+        }}>
+          {portalMode === 'hq' ? (
+            <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setPortalMode('staff')}>
+              <i className="fas fa-users" style={{ marginRight: '6px' }}></i>
+              Switch to Regional Staff Portal
+            </span>
+          ) : (
+            <span style={{ cursor: 'pointer', opacity: 0.3 }} onClick={() => setPortalMode('hq')}>
+              <i className="fas fa-shield-halved" style={{ marginRight: '6px' }}></i>
+              Access HQ Command Node
+            </span>
+          )}
+        </div>
+      </div>
+    );
   }
 
   const role = profile?.role?.toUpperCase() || 'USER';
 
-  // ── Role guard: admin only ───────────────────────────────────────────────────
-  if (role !== 'ADMIN' && role !== 'STAFF') {
+  // ── Role guard: staff only ───────────────────────────────────────────────────
+  if (role !== 'ADMIN' && role !== 'SUPER_ADMIN' && role !== 'REGIONAL_MANAGER') {
     return <AccessDenied role={role} onLogout={handleLogout} />;
   }
 
-  // ── Admin nav items ──────────────────────────────────────────────────────────
-  const navItems = [
-    { group: 'PLATFORM' },
-    { view: 'overview',          icon: 'fa-home',             label: 'Dashboard' },
-    { view: 'users',             icon: 'fa-users',            label: 'User Management' },
-    { view: 'marketplace',       icon: 'fa-clipboard-check',  label: 'Listing Review' },
-    { view: 'id-verification',   icon: 'fa-id-card',          label: 'ID Verification' },
-    { view: 'market-monitor',    icon: 'fa-tower-observation', label: 'Market Monitor' },
-    { view: 'marketplace-buyer', icon: 'fa-basket-shopping',  label: 'Browse Market' },
-    { view: 'transactions-admin',icon: 'fa-wallet',           label: 'Money & Payments' },
-    { view: 'disputes',          icon: 'fa-gavel',            label: 'Arbitration' },
-    { view: 'network',           icon: 'fa-handshake',        label: 'Agent Network' },
-    { view: 'logistics',         icon: 'fa-truck-fast',       label: 'Logistics & Drivers' },
-    { view: 'reports',           icon: 'fa-chart-pie',        label: 'Market Insights' },
-    { view: 'recruitment',       icon: 'fa-user-tie',         label: 'Agent Recruitment' },
-    { group: 'SYSTEM UTILITIES' },
-    { view: 'ai-models',         icon: 'fa-brain',            label: 'AI Model Training' },
-    { view: 'data-pipeline',     icon: 'fa-spider',           label: 'Data Pipeline' },
-    { view: 'command-center',    icon: 'fa-terminal',         label: 'Command Center' },
-    { view: 'logs',              icon: 'fa-shield-halved',    label: 'Audit Logs' },
-    { view: 'system-config',     icon: 'fa-gears',            label: 'Platform Settings' },
-    { group: 'MY ACCOUNT' },
-    { view: 'ussd',              icon: 'fa-mobile',           label: 'USSD Simulator' },
-    { view: 'wallet',            icon: 'fa-wallet',           label: 'Wallet' },
-    { view: 'settings',          icon: 'fa-user-gear',        label: 'Settings' },
+  // ── Admin nav groups (nested, collapsible) ──────────────────────────────────
+  const toggleGroup = (key) => {
+    setExpandedGroups(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      localStorage.setItem('admin_nav_groups', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const allNavGroups = [
+    // Standalone top-level items (no group)
+    { type: 'item', view: 'overview', icon: 'fa-home', label: 'Dashboard' },
+
+    // PLATFORM group
+    { type: 'group', key: 'platform', icon: 'fa-layer-group', label: 'Platform', children: [
+      { view: 'users',             icon: 'fa-users',             label: 'User Directory' },
+      { view: 'id-verification',   icon: 'fa-id-card',           label: 'ID Verification' },
+      { view: 'marketplace',       icon: 'fa-clipboard-check',   label: 'Listing Review' },
+      { view: 'marketplace-buyer', icon: 'fa-basket-shopping',   label: 'Browse Market' },
+      { view: 'market-monitor',    icon: 'fa-tower-observation', label: 'Market Monitor' },
+    ]},
+
+    // FINANCE group
+    { type: 'group', key: 'finance', icon: 'fa-coins', label: 'Finance', children: [
+      { view: 'transactions-admin', icon: 'fa-wallet',  label: 'Escrow & Revenue' },
+      { view: 'disputes',           icon: 'fa-gavel',  label: 'Arbitration' },
+      { view: 'wallet',             icon: 'fa-credit-card', label: 'My Wallet' },
+    ]},
+
+    // AGENTS group
+    { type: 'group', key: 'agents', icon: 'fa-user-tie', label: 'Agents', children: [
+      { view: 'network',     icon: 'fa-handshake',   label: 'Agent Network' },
+      { view: 'recruitment', icon: 'fa-user-plus',   label: 'Recruitment' },
+      { view: 'post-exam',   icon: 'fa-user-shield', label: 'Post-Exam Review' },
+    ]},
+
+    // OPERATIONS group
+    { type: 'group', key: 'operations', icon: 'fa-tower-broadcast', label: 'Operations', children: [
+      { view: 'logistics',   icon: 'fa-truck-fast',    label: 'Logistics Control' },
+      { view: 'whatsapp-bot',icon: 'fa-comment-dots',  label: 'WhatsApp Bot',  roles: ['ADMIN', 'SUPER_ADMIN', 'REGIONAL_MANAGER'] },
+      { view: 'ussd',        icon: 'fa-mobile',        label: 'USSD Simulator' },
+      { view: 'reports',     icon: 'fa-chart-pie',     label: 'Market Insights' },
+    ]},
+
+    // GOVERNANCE group (ADMIN+ only)
+    { type: 'group', key: 'governance', icon: 'fa-shield-halved', label: 'Governance', roles: ['ADMIN', 'SUPER_ADMIN'], children: [
+      { view: 'ai-models',         icon: 'fa-brain',         label: 'AI Core Control',     roles: ['ADMIN', 'SUPER_ADMIN'] },
+      { view: 'data-pipeline',     icon: 'fa-spider',        label: 'Market Intelligence', roles: ['ADMIN', 'SUPER_ADMIN'] },
+      { view: 'command-center',    icon: 'fa-terminal',      label: 'Central Command',     roles: ['ADMIN', 'SUPER_ADMIN'] },
+      { view: 'admin-invitations', icon: 'fa-user-plus',     label: 'Admin Invitations',   roles: ['SUPER_ADMIN'] },
+      { view: 'logs',              icon: 'fa-shield-halved', label: 'Audit Logs',          roles: ['ADMIN', 'SUPER_ADMIN'] },
+      { view: 'system-config',     icon: 'fa-gears',         label: 'System Config',       roles: ['ADMIN', 'SUPER_ADMIN'] },
+    ]},
+
+    // PERSONAL group
+    { type: 'group', key: 'personal', icon: 'fa-circle-user', label: 'Personal', children: [
+      { view: 'settings', icon: 'fa-user-gear', label: 'Settings' },
+    ]},
   ];
+
+  const navGroups = allNavGroups
+    .filter(g => !g.roles || g.roles.includes(role))
+    .map(g => {
+      if (g.type === 'group') {
+        return { ...g, children: g.children.filter(c => !c.roles || c.roles.includes(role)) };
+      }
+      return g;
+    });
 
   return (
     <main className={`shell-v4 theme-admin ${isSidebarCollapsed ? 'sidebar-hidden' : ''}`}>
@@ -283,23 +395,66 @@ function App() {
         </div>
 
         <nav className="v4-navigation-stack">
-          {navItems.map((item, i) => {
-            if (item.group) {
+          {navGroups.map((item, i) => {
+            if (item.type === 'item') {
               return (
-                <div key={i} className="nav-group-label">
-                  {isSidebarCollapsed ? '—' : item.group}
+                <div
+                  key={item.view}
+                  className={`nav-link-v4 ${currentView === item.view ? 'active' : ''}`}
+                  onClick={() => setCurrentView(item.view)}
+                  title={isSidebarCollapsed ? item.label : ''}
+                >
+                  <i className={`fas ${item.icon}`}></i>
+                  {!isSidebarCollapsed && <span>{item.label}</span>}
                 </div>
               );
             }
+            // Group with sub-items
+            const isOpen = expandedGroups[item.key];
+            const hasActiveChild = item.children.some(c => c.view === currentView);
             return (
-              <div
-                key={item.view}
-                className={`nav-link-v4 ${currentView === item.view ? 'active' : ''}`}
-                onClick={() => setCurrentView(item.view)}
-                title={isSidebarCollapsed ? item.label : ''}
-              >
-                <i className={`fas ${item.icon}`}></i>
-                {!isSidebarCollapsed && <span>{item.label}</span>}
+              <div key={item.key} className="nav-group-v4">
+                <div
+                  className={`nav-group-header ${hasActiveChild ? 'has-active' : ''}`}
+                  onClick={() => isSidebarCollapsed ? null : toggleGroup(item.key)}
+                  title={isSidebarCollapsed ? item.label : ''}
+                >
+                  <i className={`fas ${item.icon}`}></i>
+                  {!isSidebarCollapsed && (
+                    <>
+                      <span className="group-header-label">{item.label}</span>
+                      <i className={`fas fa-chevron-down nav-chevron ${isOpen ? 'open' : ''}`}></i>
+                    </>
+                  )}
+                </div>
+                {!isSidebarCollapsed && isOpen && (
+                  <div className="nav-sub-items">
+                    {item.children.map(child => (
+                      <div
+                        key={child.view}
+                        className={`nav-link-v4 nav-sub-link ${currentView === child.view ? 'active' : ''}`}
+                        onClick={() => setCurrentView(child.view)}
+                      >
+                        <i className={`fas ${child.icon}`}></i>
+                        <span>{child.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {isSidebarCollapsed && (
+                  <div className="nav-sub-items-collapsed">
+                    {item.children.map(child => (
+                      <div
+                        key={child.view}
+                        className={`nav-link-v4 nav-sub-link-icon ${currentView === child.view ? 'active' : ''}`}
+                        onClick={() => setCurrentView(child.view)}
+                        title={child.label}
+                      >
+                        <i className={`fas ${child.icon}`}></i>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -452,6 +607,7 @@ function App() {
             />
           )}
           {currentView === 'market-monitor' && <MarketAdvisory activities={marketActivities} loading={loading} />}
+          {currentView === 'whatsapp-bot' && <WhatsAppBotPanel token={token} />}
           {currentView === 'id-verification' && <IDVerificationQueuePanel token={token} />}
           {currentView === 'transactions-admin' && <EscrowRevenuePanel token={token} onEscrowAction={handleGovernance} />}
           {currentView === 'disputes' && <DisputeResolutionPanel disputes={disputes} onResolve={handleResolveDispute} />}
@@ -459,9 +615,11 @@ function App() {
           {currentView === 'logistics' && <LogisticsCommand token={token} role="ADMIN" transactions={transactions} />}
           {currentView === 'reports' && <NationalMarketHub token={token} />}
           {currentView === 'recruitment' && <AgentRecruitmentPanel token={token} />}
+          {currentView === 'post-exam' && <AgentPostExamReview token={token} />}
           {currentView === 'ai-models' && <AIModelPanel token={token} />}
           {currentView === 'data-pipeline' && <DataPipelinePanel token={token} />}
           {currentView === 'command-center' && <AdminCommandCenter token={token} />}
+          {currentView === 'admin-invitations' && <AdminInvitationsPanel />}
           {currentView === 'logs' && <ActivityHistoryPanel activities={[]} />}
           {currentView === 'system-config' && <SystemConfigPanel token={token} />}
           {currentView === 'ussd' && <USSDSimulator profile={profile} />}

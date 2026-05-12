@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/health")
+@router.get("")
 def health_check():
     """
     Basic health check endpoint
@@ -30,7 +30,7 @@ def health_check():
     }
 
 
-@router.get("/health/ready")
+@router.get("/ready")
 def readiness_check(db: Session = Depends(get_db)):
     """
     Readiness check - verifies the application is ready to handle requests
@@ -52,7 +52,7 @@ def readiness_check(db: Session = Depends(get_db)):
     }, status_code
 
 
-@router.get("/health/live")
+@router.get("/live")
 def liveness_check():
     """
     Liveness check - verifies the application is running
@@ -64,7 +64,7 @@ def liveness_check():
     }
 
 
-@router.get("/health/detailed")
+@router.get("/detailed")
 def detailed_health_check(db: Session = Depends(get_db)):
     """
     Detailed health check with component status

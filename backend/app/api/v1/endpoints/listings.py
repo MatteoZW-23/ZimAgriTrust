@@ -1,23 +1,44 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, Query
+from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles, check_lockdown
-from app.models.listing import Listing, ListingStatus, Offer
+from app.api.deps import get_db, require_roles, check_lockdown, get_current_user
+from app.models.listing import Listing, ListingStatus, Offer, OfferStatus
+from app.models.listing_extras import (
+    ListingReport,
+    ListingReportReason,
+    ListingReportStatus,
+    SavedListing,
+)
 from app.models.user import User, UserRole
 from app.schemas.listing import (
     CounterOfferRequest,
+    ListingBoostRequest,
+    ListingBoostResponse,
     ListingCreate,
+    ListingPhotosResponse,
+    ListingPhotosUpdate,
+    ListingReportCreate,
+    ListingReportResponse,
     ListingResponse,
     ListingSearchResponse,
-    PaginationMeta,
+    ListingStatsResponse,
+    ListingUpdate,
     OfferCreate,
     OfferResponse,
+    PaginationMeta,
+    SavedListingResponse,
 )
 from app.schemas.transaction import OrderResponse
 from app.services.marketplace_service import marketplace_core
 
 router = APIRouter()
+
+# Boost pricing (F#57). $2 per 7-day cycle, prorated by duration.
+BOOST_FEE_PER_DAY_USD = 2.0 / 7.0
 
 
 @router.post("", response_model=ListingResponse)
@@ -168,3 +189,293 @@ def counter_listing_offer(
         raise HTTPException(status_code=403, detail="Forbidden")
 
     return marketplace_core.counter_offer(db, offer, payload.counter_price, current_user)
+
+
+# ===========================================================================
+# Listing CRUD extras (F#52, F#53, F#54, F#56, F#57, F#58, F#89, F#92, F#94)
+# ===========================================================================
+
+def _get_owned_listing(db: Session, listing_id: uuid.UUID, user: User) -> Listing:
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    if listing.seller_id != user.id and user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="You do not own this listing")
+    return listing
+
+
+@router.get("/{listing_id}", response_model=ListingResponse)
+def get_listing_details(
+    listing_id: uuid.UUID,
+    db: Session = Depends(get_db),
+) -> Listing:
+    """F#89 — view listing details. Increments view_count for stats (F#56)."""
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    if listing.status == ListingStatus.DELETED:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    listing.view_count = (listing.view_count or 0) + 1
+    db.commit()
+    db.refresh(listing)
+    return listing
+
+
+@router.put("/{listing_id}", response_model=ListingResponse)
+def update_listing(
+    listing_id: uuid.UUID,
+    payload: ListingUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.FARMER, UserRole.BUYER, UserRole.ADMIN)),
+    lockdown: bool = Depends(check_lockdown),
+) -> Listing:
+    """F#53 — edit listing."""
+    listing = _get_owned_listing(db, listing_id, current_user)
+    if listing.status not in (ListingStatus.ACTIVE, ListingStatus.PENDING):
+        raise HTTPException(status_code=400, detail=f"Cannot edit listing in status {listing.status.value}")
+
+    data = payload.model_dump(exclude_unset=True)
+    for field, value in data.items():
+        setattr(listing, field, value)
+    listing.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(listing)
+    return listing
+
+
+@router.delete("/{listing_id}", response_model=ListingResponse)
+def delete_listing(
+    listing_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.FARMER, UserRole.BUYER, UserRole.ADMIN)),
+    lockdown: bool = Depends(check_lockdown),
+) -> Listing:
+    """F#54 — delete listing (soft delete)."""
+    listing = _get_owned_listing(db, listing_id, current_user)
+    # Disallow delete if there are accepted offers / pending orders
+    has_active_orders = db.query(Offer).filter(
+        Offer.listing_id == listing.id,
+        Offer.status == OfferStatus.ACCEPTED,
+    ).count() > 0
+    if has_active_orders:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete listing with accepted offers; cancel orders first.",
+        )
+    listing.status = ListingStatus.DELETED
+    listing.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(listing)
+    return listing
+
+
+@router.post("/{listing_id}/expire", response_model=ListingResponse)
+def expire_listing(
+    listing_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.FARMER, UserRole.BUYER, UserRole.ADMIN)),
+    lockdown: bool = Depends(check_lockdown),
+) -> Listing:
+    """F#58 — mark listing as expired."""
+    listing = _get_owned_listing(db, listing_id, current_user)
+    listing.status = ListingStatus.EXPIRED
+    listing.expires_at = datetime.utcnow()
+    listing.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(listing)
+    return listing
+
+
+# --- Photos (F#52) ---------------------------------------------------------
+@router.post("/{listing_id}/photos", response_model=ListingPhotosResponse)
+def add_listing_photos(
+    listing_id: uuid.UUID,
+    payload: ListingPhotosUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.FARMER, UserRole.BUYER, UserRole.ADMIN)),
+    lockdown: bool = Depends(check_lockdown),
+) -> ListingPhotosResponse:
+    """F#52 — add photo URLs to a listing. Photo upload itself is handled by media_service."""
+    listing = _get_owned_listing(db, listing_id, current_user)
+    existing = list(listing.photo_urls or [])
+    for url in payload.urls:
+        if url and url not in existing:
+            existing.append(url)
+    listing.photo_urls = existing
+    listing.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(listing)
+    return ListingPhotosResponse(listing_id=listing.id, photo_urls=existing)
+
+
+@router.delete("/{listing_id}/photos", response_model=ListingPhotosResponse)
+def remove_listing_photo(
+    listing_id: uuid.UUID,
+    url: str = Query(..., description="The photo URL to remove"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.FARMER, UserRole.BUYER, UserRole.ADMIN)),
+    lockdown: bool = Depends(check_lockdown),
+) -> ListingPhotosResponse:
+    listing = _get_owned_listing(db, listing_id, current_user)
+    existing = [u for u in (listing.photo_urls or []) if u != url]
+    listing.photo_urls = existing
+    listing.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(listing)
+    return ListingPhotosResponse(listing_id=listing.id, photo_urls=existing)
+
+
+# --- Boost (F#57) ----------------------------------------------------------
+@router.post("/{listing_id}/boost", response_model=ListingBoostResponse)
+def boost_listing(
+    listing_id: uuid.UUID,
+    payload: ListingBoostRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.FARMER, UserRole.BUYER)),
+    lockdown: bool = Depends(check_lockdown),
+) -> ListingBoostResponse:
+    """F#57 — pay $2 (per 7 days) to boost a listing's visibility.
+
+    Fee is deducted from the user's wallet balance. No external payment
+    intent is created in this MVP — buyer must have sufficient wallet funds.
+    """
+    listing = _get_owned_listing(db, listing_id, current_user)
+    if listing.status != ListingStatus.ACTIVE:
+        raise HTTPException(status_code=400, detail="Only active listings can be boosted")
+
+    fee = round(BOOST_FEE_PER_DAY_USD * payload.duration_days, 2)
+    if (current_user.balance_usd or 0) < fee:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Insufficient wallet balance. Boost requires ${fee:.2f}.",
+        )
+
+    current_user.balance_usd = round((current_user.balance_usd or 0) - fee, 2)
+    now = datetime.utcnow()
+    base = listing.boosted_until if (listing.boosted_until and listing.boosted_until > now) else now
+    listing.is_boosted = True
+    listing.boost_fee = (listing.boost_fee or 0) + fee
+    listing.boosted_until = base + timedelta(days=payload.duration_days)
+    listing.updated_at = now
+    db.commit()
+    db.refresh(listing)
+    db.refresh(current_user)
+
+    return ListingBoostResponse(
+        listing_id=listing.id,
+        is_boosted=listing.is_boosted,
+        boosted_until=listing.boosted_until,
+        boost_fee=listing.boost_fee,
+        wallet_balance=current_user.balance_usd or 0.0,
+    )
+
+
+# --- Stats (F#56) ----------------------------------------------------------
+@router.get("/{listing_id}/stats", response_model=ListingStatsResponse)
+def get_listing_stats(
+    listing_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.FARMER, UserRole.BUYER, UserRole.ADMIN)),
+) -> ListingStatsResponse:
+    listing = _get_owned_listing(db, listing_id, current_user)
+    offer_count = db.query(func.count(Offer.id)).filter(Offer.listing_id == listing.id).scalar() or 0
+    accepted_count = (
+        db.query(func.count(Offer.id))
+        .filter(Offer.listing_id == listing.id, Offer.status == OfferStatus.ACCEPTED)
+        .scalar()
+    ) or 0
+    days_active = (datetime.utcnow() - listing.created_at).days
+    return ListingStatsResponse(
+        listing_id=listing.id,
+        view_count=listing.view_count or 0,
+        offer_count=int(offer_count),
+        accepted_offer_count=int(accepted_count),
+        days_active=max(0, days_active),
+        is_boosted=bool(listing.is_boosted),
+    )
+
+
+# --- Save / favorite (F#92) ------------------------------------------------
+@router.post("/{listing_id}/save", response_model=SavedListingResponse, status_code=status.HTTP_201_CREATED)
+def save_listing(
+    listing_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> SavedListing:
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    existing = (
+        db.query(SavedListing)
+        .filter(SavedListing.user_id == current_user.id, SavedListing.listing_id == listing_id)
+        .first()
+    )
+    if existing:
+        return existing
+    saved = SavedListing(user_id=current_user.id, listing_id=listing_id)
+    db.add(saved)
+    db.commit()
+    db.refresh(saved)
+    return saved
+
+
+@router.delete("/{listing_id}/save", status_code=status.HTTP_204_NO_CONTENT)
+def unsave_listing(
+    listing_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    db.query(SavedListing).filter(
+        SavedListing.user_id == current_user.id,
+        SavedListing.listing_id == listing_id,
+    ).delete()
+    db.commit()
+    return None
+
+
+@router.get("/me/saved", response_model=list[SavedListingResponse])
+def list_saved_listings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[SavedListing]:
+    return (
+        db.query(SavedListing)
+        .filter(SavedListing.user_id == current_user.id)
+        .order_by(SavedListing.created_at.desc())
+        .all()
+    )
+
+
+# --- Report listing (F#94) -------------------------------------------------
+@router.post("/{listing_id}/report", response_model=ListingReportResponse, status_code=status.HTTP_201_CREATED)
+def report_listing(
+    listing_id: uuid.UUID,
+    payload: ListingReportCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ListingReport:
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    if listing.seller_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot report your own listing")
+
+    try:
+        reason_enum = ListingReportReason(payload.reason.upper())
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid reason. Allowed: {[r.value for r in ListingReportReason]}",
+        )
+
+    report = ListingReport(
+        listing_id=listing_id,
+        reporter_id=current_user.id,
+        reason=reason_enum,
+        details=payload.details,
+        status=ListingReportStatus.OPEN,
+    )
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+    return report

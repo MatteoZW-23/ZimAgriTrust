@@ -21,6 +21,12 @@ from app.services.cache_service import cache_service
 logger = logging.getLogger(__name__)
 
 
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def compute_device_fingerprint(request_headers: dict, ip: str) -> str:
     """Generate a stable device fingerprint from request headers + IP."""
     components = [
@@ -46,7 +52,7 @@ async def create_session(
 ) -> UserSession:
     """Create a new user session after successful login."""
 
-    fingerprint = compute_device_fingerprint(request_headers, ip_address) if settings.SESSION_FINGERPRINTING else None
+    fingerprint = compute_device_fingerprint(request_headers, ip_address) if settings.SESSION_FINGERPRINTING_ENABLED else None
 
     # Enforce concurrent session limit
     if settings.MAX_CONCURRENT_SESSIONS > 0:
@@ -61,7 +67,7 @@ async def create_session(
             to_revoke = active_sessions[settings.MAX_CONCURRENT_SESSIONS - 1:]
             for old in to_revoke:
                 old.is_active = False
-                old.revoked_at = datetime.utcnow()
+                old.revoked_at = datetime.now(timezone.utc)
                 old.revoke_reason = "concurrent_limit"
                 # Blacklist tokens
                 await cache_service.set(f"blacklist_{old.access_token_jti}", "true", expire=3600)
@@ -77,7 +83,7 @@ async def create_session(
         device_fingerprint=fingerprint,
         user_agent=request_headers.get("user-agent", "")[:500],
         ip_address=ip_address,
-        expires_at=datetime.utcnow() + timedelta(minutes=access_expiry_minutes),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=access_expiry_minutes),
         is_active=True,
     )
     db.add(session)
@@ -125,7 +131,7 @@ async def revoke_session(db: Session, session_id: uuid.UUID, reason: str = "logo
         return False
 
     session.is_active = False
-    session.revoked_at = datetime.utcnow()
+    session.revoked_at = datetime.now(timezone.utc)
     session.revoke_reason = reason
     db.commit()
 
@@ -150,7 +156,7 @@ async def revoke_all_user_sessions(db: Session, user_id: uuid.UUID, except_sessi
     revoked_count = 0
     for session in sessions:
         session.is_active = False
-        session.revoked_at = datetime.utcnow()
+        session.revoked_at = datetime.now(timezone.utc)
         session.revoke_reason = reason
         await cache_service.set(f"blacklist_{session.access_token_jti}", "true", expire=3600)
         if session.refresh_token_jti:
@@ -176,7 +182,7 @@ def update_session_activity(db: Session, session_id: uuid.UUID) -> None:
     """Update last_active timestamp on session."""
     session = db.query(UserSession).filter(UserSession.id == session_id).first()
     if session:
-        session.last_active_at = datetime.utcnow()
+        session.last_active_at = datetime.now(timezone.utc)
         db.commit()
 
 
@@ -193,10 +199,11 @@ def is_session_valid(db: Session, user_id: uuid.UUID, jti: str) -> bool:
     )
     if not session:
         return False
-    if datetime.utcnow() > session.expires_at:
+    now = datetime.now(timezone.utc)
+    if now > _as_utc(session.expires_at):
         # Auto-revoke expired session
         session.is_active = False
-        session.revoked_at = datetime.utcnow()
+        session.revoked_at = now
         session.revoke_reason = "expired"
         db.commit()
         return False

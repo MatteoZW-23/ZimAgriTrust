@@ -32,9 +32,12 @@ const KEYS = {
   ONBOARDED: 'agritrust_onboarded',
 };
 
-export async function saveSession(accessToken, profile, role) {
+export async function saveSession(accessToken, profile, role, refreshToken = null) {
   const store = await getStore();
   await store.setItemAsync(KEYS.ACCESS_TOKEN, accessToken);
+  if (refreshToken) {
+    await store.setItemAsync(KEYS.REFRESH_TOKEN, refreshToken);
+  }
   if (profile) {
     await store.setItemAsync(KEYS.USER_PROFILE, JSON.stringify(profile));
   }
@@ -46,6 +49,7 @@ export async function saveSession(accessToken, profile, role) {
 export async function getSession() {
   const store = await getStore();
   const token = await store.getItemAsync(KEYS.ACCESS_TOKEN);
+  const refreshToken = await store.getItemAsync(KEYS.REFRESH_TOKEN);
   if (!token) return null;
 
   let profile = null;
@@ -58,7 +62,7 @@ export async function getSession() {
     role = await store.getItemAsync(KEYS.USER_ROLE);
   } catch {}
 
-  return { access_token: token, profile, role };
+  return { access_token: token, refresh_token: refreshToken, profile, role };
 }
 
 export async function clearSession() {

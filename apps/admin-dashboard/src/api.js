@@ -1,12 +1,31 @@
 const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 
+const SA_TOKEN_KEY = "zimagritrust_sa_token";
+
+export function storeSAToken(token) {
+  if (token) localStorage.setItem(SA_TOKEN_KEY, token);
+  else localStorage.removeItem(SA_TOKEN_KEY);
+}
+
+export function getSAToken() {
+  return localStorage.getItem(SA_TOKEN_KEY) || null;
+}
+
 export async function request(path, options = {}) {
+  const saToken = getSAToken();
+  const optionHeaders = options.headers || {};
+  const explicitAuth = optionHeaders["Authorization"];
+  const invalidAuth = !explicitAuth ||
+    explicitAuth === "Bearer null" ||
+    explicitAuth === "Bearer undefined" ||
+    explicitAuth === "Bearer active_session";
   const headers = {
     ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-    ...(options.headers || {}),
+    ...(optionHeaders || {}),
+    ...(saToken && invalidAuth ? { "Authorization": `Bearer ${saToken}` } : {}),
   };
 
-  // Strip Authorization if the token is null/undefined/fake to rely on HttpOnly cookie
+  // Strip Authorization if the token is still null/undefined/placeholder
   if (
     headers["Authorization"] === "Bearer null" ||
     headers["Authorization"] === "Bearer undefined" ||
@@ -51,16 +70,80 @@ export function register(full_name, phone_number, role, password, admin_secret =
 
 
 export function login(phone_number, password) {
-  return request("/auth/login", {
+  return request("/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ phone_number, password }),
+  });
+}
+
+// ── ADMIN INVITATIONS (Super Admin only) ────────────────────────────────────
+export function createAdminInvitation({ email, role_name, phone, region, branch_id, expires_hours = 72 }) {
+  return request("/admin/invitations", {
+    method: "POST",
+    body: JSON.stringify({ email, role_name, phone, region, branch_id, expires_hours }),
+  });
+}
+
+export function listAdminInvitations({ status, role_name, limit = 100 } = {}) {
+  const qs = new URLSearchParams();
+  if (status) qs.set("status", status);
+  if (role_name) qs.set("role_name", role_name);
+  qs.set("limit", String(limit));
+  return request(`/admin/invitations?${qs.toString()}`);
+}
+
+export function getAdminInvitation(id) {
+  return request(`/admin/invitations/${id}`);
+}
+
+export function revokeAdminInvitation(id) {
+  return request(`/admin/invitations/${id}/revoke`, { method: "DELETE" });
+}
+
+export function acceptInvitation({ email, token, password, full_name, phone_number }) {
+  return request("/auth/invitation/accept", {
+    method: "POST",
+    body: JSON.stringify({ email, token, password, full_name, phone_number }),
+  });
+}
+
+// ── MFA (TOTP) ──────────────────────────────────────────────────────────────
+export function setupMFA() {
+  return request("/auth/mfa/setup", { method: "POST", body: JSON.stringify({}) });
+}
+
+export function verifyMFA(code) {
+  return request("/auth/mfa/verify", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+}
+
+export function loginPin(phone_number, password) {
+  return request("/auth/login-pin", {
     method: "POST",
     body: JSON.stringify({ phone_number, password }),
   });
 }
 
 export function verifyLogin2FA(phone_number, otp) {
-  return request("/auth/verify-login-2fa", {
+  return request("/admin/verify-mfa", {
     method: "POST",
     body: JSON.stringify({ phone_number, otp }),
+  });
+}
+
+export function superAdminLogin(username, password) {
+  return request("/super-admin/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
+}
+
+export function verifySuperAdminMFA(pre_mfa_token, mfa_code) {
+  return request("/super-admin/verify-mfa", {
+    method: "POST",
+    body: JSON.stringify({ pre_mfa_token, mfa_code, method: "totp" }),
   });
 }
 
@@ -71,10 +154,10 @@ export function forgotPassword(phone_number) {
   });
 }
 
-export function resetPassword(phone_number, token, new_password) {
+export function resetPassword(phone_number, otp, new_password) {
   return request("/auth/reset-password", {
     method: "POST",
-    body: JSON.stringify({ phone_number, token, new_password }),
+    body: JSON.stringify({ phone_number, otp, new_password }),
   });
 }
 
@@ -445,6 +528,38 @@ export function fetchMarketNews(token) {
 export function fetchWhatsAppStatus(token) {
   return request("/whatsapp/status", {
     headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function sendWhatsAppBroadcast(token, payload) {
+  return request("/whatsapp/broadcast", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function sendWhatsAppPriceAlert(token, payload) {
+  return request("/whatsapp/alerts/price", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function sendWhatsAppWeatherAlert(token, payload) {
+  return request("/whatsapp/alerts/weather", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function sendWhatsAppHarvestReminder(token, payload) {
+  return request("/whatsapp/alerts/harvest", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
   });
 }
 
@@ -855,6 +970,50 @@ export function completeTrainingModule(token, appId, moduleId) {
   });
 }
 
+// AGENT POST-EXAM REVIEW (admin) ──────────────────────────────────────────────
+export function listAgents(token, filters = {}) {
+  const qs = new URLSearchParams(
+    Object.entries(filters).filter(([, v]) => v !== undefined && v !== null && v !== '')
+  ).toString();
+  return request(`/admin/agents${qs ? `?${qs}` : ''}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function getAgentDetail(token, agentId) {
+  return request(`/admin/agents/${agentId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function evaluateAgentPromotion(token, agentId) {
+  return request(`/admin/agents/${agentId}/evaluate-promotion`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+// Note: practical/shadowing/supervised endpoints are agent-scoped and require
+// the agent's own JWT. Admin can view summaries via the agent detail endpoint
+// or pass an explicit `agent_id` query string here once the backend exposes it.
+export function getAgentPracticalResultsAsAdmin(token, agentId) {
+  return request(`/admin/agents/${agentId}/practical-results`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }).catch(() => ({ tests: {}, all_passed: false })); // graceful fallback
+}
+
+export function getAgentShadowingAsAdmin(token, agentId) {
+  return request(`/admin/agents/${agentId}/shadowing`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }).catch(() => ({ logs: [], approved_count: 0, required: 10 }));
+}
+
+export function getAgentSupervisedAsAdmin(token, agentId) {
+  return request(`/admin/agents/${agentId}/supervised`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }).catch(() => ({ reviews: [], approved_count: 0, required: 20 }));
+}
+
 // DISEASE DETECTION
 export function detectDisease(token, file) {
   const formData = new FormData();
@@ -1003,5 +1162,4 @@ export function rejectVerification(token, requestId, note) {
     body: form,
   });
 }
-
 

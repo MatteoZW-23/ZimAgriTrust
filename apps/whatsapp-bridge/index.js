@@ -128,6 +128,13 @@ client.on('message', async (msg) => {
     console.log(`RECEIVED MESSAGE from ${msg.from}: ${msg.body}`);
 
     try {
+        let contact = null;
+        try {
+            contact = await msg.getContact();
+        } catch (contactError) {
+            console.warn('Could not resolve WhatsApp contact:', contactError.message);
+        }
+
         let mediaData = null;
         if (msg.hasMedia) {
             const media = await msg.downloadMedia();
@@ -140,11 +147,15 @@ client.on('message', async (msg) => {
 
         const response = await axios.post(BACKEND_URL, {
             from: msg.from,
+            senderId: msg.id?._serialized,
+            contactId: contact?.id?._serialized,
+            contactNumber: contact?.number,
+            phone: contact?.number,
             body: msg.body,
             hasMedia: msg.hasMedia,
             media: mediaData,
             timestamp: msg.timestamp,
-            pushname: msg._data.notifyName
+            pushname: contact?.pushname || contact?.name || msg._data.notifyName
         });
 
         if (response.data && response.data.reply) {

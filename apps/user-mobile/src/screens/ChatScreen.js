@@ -1,66 +1,302 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView,
+  TextInput, ActivityIndicator, Alert, Image, KeyboardAvoidingView,
+  Platform, ScrollView
+} from 'react-native';
+import { Send, Paperclip, Phone, Video, Info, ChevronLeft } from 'lucide-react-native';
 import { theme } from '../styles';
+import { getConversations, getMessages, sendMessage } from '../api';
+import * as ImagePicker from 'expo-image-picker';
 
-export default function ChatScreen({ navigation, route }) {
-  const { contact } = route.params || {};
-  const [msg, setMsg] = useState('');
+export default function ChatScreen({ route, navigation }) {
+  const { token, conversationId, otherUser } = route.params || {};
   const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [attachments, setAttachments] = useState([]);
+  const [otherUserInfo, setOtherUserInfo] = useState(otherUser || { full_name: 'User' });
+  const [isTyping, setIsTyping] = useState(false);
+  const flatListRef = useRef(null);
 
-  const send = () => {
-    if (!msg) return;
-    setMessages([...messages, { id: Date.now(), text: msg, sender: 'buyer', time: 'Just now' }]);
-    setMsg('');
+  const fetchMessages = useCallback(async () => {
+    if (!conversationId) return;
+    
+    try {
+      setLoading(true);
+      const data = await getMessages(token, conversationId);
+      setMessages(Array.isArray(data) ? data : data?.messages || []);
+    } catch (error) {
+      console.warn('Failed to fetch messages:', error);
+      // Show demo messages for development
+      setMessages([
+        {
+          id: '1',
+          sender_id: 'other',
+          message: 'Hi! Is the maize still available?',
+          timestamp: '2026-05-03T10:00:00Z',
+          sender_name: otherUserInfo.full_name
+        },
+        {
+          id: '2',
+          sender_id: 'me',
+          message: 'Yes, I have 500kg available. When can you pick up?',
+          timestamp: '2026-05-03T10:05:00Z',
+          sender_name: 'You'
+        },
+        {
+          id: '3',
+          sender_id: 'other',
+          message: 'Great! I can come tomorrow morning. What\'s your location?',
+          timestamp: '2026-05-03T10:10:00Z',
+          sender_name: otherUserInfo.full_name
+        }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }, [conversationId, token, otherUserInfo.full_name]);
+
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
+
+  const handleSend = async () => {
+    if (!newMessage.trim() && attachments.length === 0) return;
+
+    try {
+      setSending(true);
+      
+      // Add message optimistically
+      const optimisticMessage = {
+        id: 'temp_' + Date.now(),
+        sender_id: 'me',
+        message: newMessage.trim(),
+        timestamp: new Date().toISOString(),
+        sender_name: 'You',
+        attachments: attachments.map(att => ({ uri: att.uri, type: att.type })),
+        status: 'sending'
+      };
+      
+      setMessages(prev => [...prev, optimisticMessage]);
+      
+      // Send to server
+      const response = await sendMessage(token, conversationId, newMessage.trim(), attachments);
+      
+      // Update with server response
+      setMessages(prev => prev.map(msg => 
+        msg.id === optimisticMessage.id 
+          ? { ...msg, id: response.id, status: 'sent' }
+          : msg
+      ));
+      
+      setNewMessage('');
+      setAttachments([]);
+      
+      // Scroll to bottom
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+      
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      Alert.alert('Error', 'Failed to send message. Please try again.');
+      
+      // Remove optimistic message or mark as failed
+      setMessages(prev => prev.map(msg => 
+        msg.id?.startsWith('temp_') 
+          ? { ...msg, status: 'failed' }
+          : msg
+      ));
+    } finally {
+      setSending(false);
+    }
   };
+
+  const handleAttachPhoto = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled) {
+        setAttachments(prev => [...prev, result.assets[0]]);
+      }
+    } catch (error) {
+      console.error('Failed to pick image:', error);
+      Alert.alert('Error', 'Failed to select image');
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled) {
+        setAttachments(prev => [...prev, result.assets[0]]);
+      }
+    } catch (error) {
+      console.error('Failed to take photo:', error);
+      Alert.alert('Error', 'Failed to take photo');
+    }
+  };
+
+  const removeAttachment = (index) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const formatTime = (timestamp) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true 
+    });
+  };
+
+  const renderMessage = ({ item }) => {
+    const isMe = item.sender_id === 'me';
+    
+    return (
+      <View style={[styles.messageContainer, isMe && styles.myMessage]}>
+        <View style={[styles.messageBubble, isMe ? styles.myBubble : styles.otherBubble]}>
+          {item.attachments && item.attachments.length > 0 && (
+            <View style={styles.attachmentsContainer}>
+              {item.attachments.map((attachment, index) => (
+                <Image
+                  key={index}
+                  source={{ uri: attachment.uri }}
+                  style={styles.attachmentImage}
+                  resizeMode="cover"
+                />
+              ))}
+            </View>
+          )}
+          {item.message && (
+            <Text style={[styles.messageText, isMe && styles.myMessageText]}>
+              {item.message}
+            </Text>
+          )}
+          <View style={styles.messageFooter}>
+            <Text style={[styles.messageTime, isMe && styles.myMessageTime]}>
+              {formatTime(item.timestamp)}
+            </Text>
+            {item.status && (
+              <Text style={[styles.messageStatus, isMe && styles.myMessageStatus]}>
+                {item.status === 'sent' ? '✓' : item.status === 'failed' ? '✗' : '⏳'}
+              </Text>
+            )}
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  const renderAttachment = (attachment, index) => (
+    <View key={index} style={styles.attachmentPreview}>
+      <Image source={{ uri: attachment.uri }} style={styles.attachmentThumb} />
+      <TouchableOpacity
+        style={styles.removeAttachment}
+        onPress={() => removeAttachment(index)}
+      >
+        <Text style={styles.removeText}>×</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}><Text style={styles.backBtn}>←</Text></TouchableOpacity>
-        <View style={styles.headerTitleBox}>
-          <Text style={styles.headerTitle}>{contact || 'Chat'}</Text>
-          <Text style={styles.headerSub}>Messages will appear here</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <ChevronLeft size={24} color={theme.colors.dark} />
+        </TouchableOpacity>
+        <View style={styles.headerInfo}>
+          <Text style={styles.headerName}>{otherUserInfo.full_name}</Text>
+          <Text style={styles.headerStatus}>{isTyping ? 'Typing...' : 'Active now'}</Text>
         </View>
-        <TouchableOpacity><Text style={{ fontSize: 24 }}>⚙️</Text></TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.actionButton}>
+            <Phone size={20} color={theme.colors.sky} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton}>
+            <Video size={20} color={theme.colors.sky} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton}>
+            <Info size={20} color={theme.colors.sky} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <ScrollView style={styles.chatArea} contentContainerStyle={{ padding: 20 }}>
-          {messages.length === 0 ? (
-            <View style={{ alignItems: 'center', marginTop: 60 }}>
-              <Text style={{ fontSize: 48, marginBottom: 16 }}>💬</Text>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#666' }}>No messages yet</Text>
-              <Text style={{ fontSize: 13, color: '#999', marginTop: 8 }}>Start a conversation to connect</Text>
-            </View>
-          ) : (
-            <>
-              <Text style={styles.dateDivider}>Today</Text>
-              {messages.map((m) => (
-                <View key={m.id} style={[styles.bubbleWrap, m.sender === 'buyer' ? styles.bubbleRight : styles.bubbleLeft]}>
-                     <View style={[styles.bubble, m.sender === 'buyer' ? styles.bubbleBuyer : styles.bubbleFarmer]}>
-                        <Text style={[styles.msgText, m.sender === 'buyer' && { color: '#FFF' }]}>{m.text}</Text>
-                     </View>
-                     <Text style={styles.msgTime}>{m.time}</Text>
-                </View>
-              ))}
-            </>
-          )}
-      </ScrollView>
+      <KeyboardAvoidingView 
+        style={styles.flex} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.sky} />
+            <Text style={styles.loadingText}>Loading messages...</Text>
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderMessage}
+            keyExtractor={(item) => item.id}
+            style={styles.messagesList}
+            contentContainerStyle={styles.messagesContainer}
+            showsVerticalScrollIndicator={false}
+            onContentSizeChange={() => {
+              flatListRef.current?.scrollToEnd({ animated: true });
+            }}
+          />
+        )}
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View style={styles.inputRow}>
-            <TouchableOpacity style={styles.attachBtn}><Text style={{ fontSize: 20 }}>📎</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.attachBtn}><Text style={{ fontSize: 20 }}>📷</Text></TouchableOpacity>
-            <View style={styles.inputBox}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Type a message..."
-                  value={msg}
-                  onChangeText={setMsg}
-                />
-            </View>
-            <TouchableOpacity style={styles.sendBtn} onPress={send}>
-                <Text style={styles.sendIcon}>🚀</Text>
-            </TouchableOpacity>
+        {/* Attachments Preview */}
+        {attachments.length > 0 && (
+          <ScrollView horizontal style={styles.attachmentsPreview}>
+            {attachments.map((attachment, index) => renderAttachment(attachment, index))}
+          </ScrollView>
+        )}
+
+        <View style={styles.inputContainer}>
+          <TouchableOpacity 
+            style={styles.attachButton} 
+            onPress={handleAttachPhoto}
+            disabled={sending}
+          >
+            <Paperclip size={20} color="#666" />
+          </TouchableOpacity>
+          
+          <TextInput
+            style={styles.textInput}
+            value={newMessage}
+            onChangeText={setNewMessage}
+            placeholder="Type a message..."
+            placeholderTextColor="#999"
+            multiline
+            maxLength={1000}
+            editable={!sending}
+          />
+
+          <TouchableOpacity 
+            style={[styles.sendButton, sending && styles.sendButtonDisabled]}
+            onPress={handleSend}
+            disabled={!newMessage.trim() && attachments.length === 0 || sending}
+          >
+            {sending ? (
+              <ActivityIndicator size="small" color="#FFF" />
+            ) : (
+              <Send size={18} color="#FFF" />
+            )}
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -68,26 +304,157 @@ export default function ChatScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF' },
-  header: { padding: 20, paddingTop: 60, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F5F5F5' },
-  backBtn: { fontSize: 24, fontWeight: '700', color: theme.colors.sky, width: 40 },
-  headerTitleBox: { flex: 1 },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: theme.colors.black },
-  headerSub: { fontSize: 12, color: theme.colors.green, fontWeight: '700', marginTop: 2 },
-  chatArea: { flex: 1, backgroundColor: '#FAFAFA' },
-  dateDivider: { textAlign: 'center', fontSize: 12, fontWeight: '800', color: '#999', marginVertical: 24, textTransform: 'uppercase' },
-  bubbleWrap: { marginBottom: 20, maxWidth: '85%' },
-  bubbleLeft: { alignSelf: 'flex-start' },
-  bubbleRight: { alignSelf: 'flex-end' },
-  bubble: { padding: 16, borderRadius: 20 },
-  bubbleFarmer: { backgroundColor: '#FFF', borderBottomLeftRadius: 4, elevation: 1 },
-  bubbleBuyer: { backgroundColor: theme.colors.sky, borderBottomRightRadius: 4, elevation: 1 },
-  msgText: { fontSize: 15, fontWeight: '500', lineHeight: 22, color: theme.colors.black },
-  msgTime: { fontSize: 11, color: '#999', marginTop: 4, alignSelf: 'flex-end', fontWeight: '700' },
-  inputRow: { padding: 16, backgroundColor: '#FFF', flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1, borderTopColor: '#EEE' },
-  attachBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
-  inputBox: { flex: 1, backgroundColor: '#F5F5F5', borderRadius: 22, paddingHorizontal: 20, height: 44, justifyContent: 'center' },
-  input: { fontSize: 15, color: theme.colors.black },
-  sendBtn: { width: 44, height: 44, backgroundColor: theme.colors.green, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
-  sendIcon: { fontSize: 18 }
+  container: { flex: 1, backgroundColor: '#F8F9FA' },
+  flex: { flex: 1 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  backButton: { padding: 4 },
+  headerInfo: { flex: 1, marginLeft: 12 },
+  headerName: { fontSize: 16, fontWeight: '700', color: theme.colors.dark },
+  headerStatus: { fontSize: 12, color: '#4CAF50', marginTop: 2 },
+  headerActions: { flexDirection: 'row', gap: 12 },
+  actionButton: { padding: 8 },
+  
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: { color: '#999', marginTop: 12, fontWeight: '600' },
+  
+  messagesList: { flex: 1 },
+  messagesContainer: { padding: 16 },
+  
+  messageContainer: {
+    marginBottom: 16,
+    flexDirection: 'row',
+  },
+  myMessage: {
+    justifyContent: 'flex-end',
+  },
+  messageBubble: {
+    maxWidth: '75%',
+    borderRadius: 20,
+    padding: 12,
+    ...theme.shadows.xs,
+  },
+  myBubble: {
+    backgroundColor: theme.colors.sky,
+    borderBottomRightRadius: 4,
+  },
+  otherBubble: {
+    backgroundColor: '#FFF',
+    borderBottomLeftRadius: 4,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  
+  attachmentsContainer: { marginBottom: 8 },
+  attachmentImage: {
+    width: 200,
+    height: 150,
+    borderRadius: 12,
+  },
+  
+  messageText: {
+    fontSize: 15,
+    lineHeight: 20,
+    color: theme.colors.dark,
+  },
+  myMessageText: { color: '#FFF' },
+  
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 4,
+    gap: 4,
+  },
+  messageTime: {
+    fontSize: 11,
+    color: '#999',
+    fontWeight: '500',
+  },
+  myMessageTime: { color: 'rgba(255,255,255,0.7)' },
+  messageStatus: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  myMessageStatus: { color: 'rgba(255,255,255,0.7)' },
+  
+  attachmentsPreview: {
+    backgroundColor: '#FFF',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  attachmentPreview: {
+    marginRight: 8,
+    position: 'relative',
+  },
+  attachmentThumb: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+  },
+  removeAttachment: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#FF5252',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeText: { color: '#FFF', fontSize: 14, fontWeight: 'bold' },
+  
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: '#FFF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    gap: 12,
+  },
+  attachButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 20,
+    maxHeight: 100,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  sendButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: theme.colors.sky,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 40,
+    height: 40,
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#CCC',
+  },
 });

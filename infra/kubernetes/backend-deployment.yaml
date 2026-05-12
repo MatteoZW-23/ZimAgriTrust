@@ -1,0 +1,271 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agritrust
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agritrust-config
+  namespace: agritrust
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  DATABASE_POOL_SIZE: "20"
+  DATABASE_MAX_OVERFLOW: "40"
+  JWT_ALGORITHM: "HS256"
+  JWT_ACCESS_TOKEN_EXPIRE_MINUTES: "15"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: agritrust-secrets
+  namespace: agritrust
+type: Opaque
+stringData:
+  DATABASE_URL: "postgresql://user:password@postgres.agritrust.svc.cluster.local:5432/agritrust"
+  REDIS_URL: "redis://redis.agritrust.svc.cluster.local:6379/0"
+  JWT_SECRET: "your-secret-key-change-this-in-production"
+  SENTRY_DSN: ""
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agritrust-backend
+  namespace: agritrust
+spec:
+  replicas: 3  # Production minimum: 3 replicas for HA
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # Add 1 new pod during rollout
+      maxUnavailable: 0  # Zero downtime deployments
+  selector:
+    matchLabels:
+      app: agritrust-backend
+  template:
+    metadata:
+      labels:
+        app: agritrust-backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Pod anti-affinity: spread across nodes for resilience
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - agritrust-backend
+              topologyKey: kubernetes.io/hostname
+      
+      # Service account for RBAC
+      serviceAccountName: agritrust-backend
+      
+      containers:
+      - name: backend
+        image: agritrust/backend:latest
+        imagePullPolicy: Always
+        
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        
+        # Environment variables
+        envFrom:
+        - configMapRef:
+            name: agritrust-config
+        - secretRef:
+            name: agritrust-secrets
+        
+        # Resource limits (critical for autoscaling)
+        resources:
+          requests:
+            cpu: "500m"        # Request: 0.5 CPU
+            memory: "512Mi"    # Request: 512MB
+          limits:
+            cpu: "2000m"       # Limit: 2 CPU
+            memory: "2Gi"      # Limit: 2GB
+        
+        # Liveness probe (restart if unhealthy)
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        # Readiness probe (remove from LB if not ready)
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        
+        # Security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+        
+        # Volume mounts
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      
+      # Volumes
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      
+      # Security context for pod
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agritrust-backend
+  namespace: agritrust
+  labels:
+    app: agritrust-backend
+spec:
+  type: ClusterIP
+  selector:
+    app: agritrust-backend
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+---
+apiVersion: autoscaling.k8s.io/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: agritrust-backend-hpa
+  namespace: agritrust
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: agritrust-backend
+  minReplicas: 3
+  maxReplicas: 20  # Scale to 20 pods under heavy load
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70  # Target 70% CPU utilization
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80  # Target 80% memory utilization
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100              # Double pods if needed
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50               # Halve pods gradually
+        periodSeconds: 60
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: agritrust-backend-pdb
+  namespace: agritrust
+spec:
+  minAvailable: 2  # Always keep at least 2 pods running
+  selector:
+    matchLabels:
+      app: agritrust-backend
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agritrust-backend
+  namespace: agritrust
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: agritrust-backend
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: agritrust-backend
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: agritrust-backend
+subjects:
+- kind: ServiceAccount
+  name: agritrust-backend
+  namespace: agritrust
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agritrust-backend
+  namespace: agritrust
+spec:
+  podSelector:
+    matchLabels:
+      app: agritrust-backend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8000
+  egress:
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 5432    # PostgreSQL
+    - protocol: TCP
+      port: 6379    # Redis
+    - protocol: TCP
+      port: 443     # HTTPS (external APIs)

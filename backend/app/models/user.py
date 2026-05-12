@@ -13,8 +13,10 @@ class UserRole(str, enum.Enum):
     FARMER = "farmer"
     BUYER = "buyer"
     AGENT = "agent"
-    ADMIN = "admin"
+    ADMIN = "admin" # Acts as Super Admin / HQ
+    REGIONAL_MANAGER = "regional_manager"
     TRANSPORTER = "transporter"
+    SUPER_ADMIN = "super_admin"
 
 
 class UserStatus(str, enum.Enum):
@@ -35,13 +37,17 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    phone_number: Mapped[str] = mapped_column(String(15), unique=True, index=True, nullable=False)
+    phone_number: Mapped[str] = mapped_column(String(32), unique=True, index=True, nullable=False)
     
     # Core Identity (KYC Foundation)
     full_name: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False)
+    
+    # New Dynamic RBAC (replaces Enum over time)
+    role_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("roles.id"), nullable=True)
+    organization_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
     
     created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), server_default=func.now())
     
@@ -55,6 +61,10 @@ class User(Base):
     # Phone Verification
     is_phone_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     phone_verified_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Multi-Factor Auth (Hardware or TOTP)
+    mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    mfa_secret: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Email Verification
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -133,6 +143,8 @@ class User(Base):
     offers_received = relationship("Offer", back_populates="seller", foreign_keys="Offer.seller_id")
     orders_as_buyer = relationship("Order", back_populates="buyer", foreign_keys="Order.buyer_id")
     orders_as_seller = relationship("Order", back_populates="seller", foreign_keys="Order.seller_id")
+
+    dynamic_role = relationship("Role", back_populates="users")
 
     @property
     def masked_phone(self) -> str:

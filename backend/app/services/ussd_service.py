@@ -252,7 +252,7 @@ class USSDService:
                 return USSDResponse(message="END User not found.", end_session=True)
             from app.core.security import get_password_hash
             hashed = get_password_hash(latest)
-            user.password_hash = hashed
+            # Only update ussd_pin_hash for USSD PIN changes
             user.ussd_pin_hash = hashed
             db.commit()
             await delete_key(session_key)

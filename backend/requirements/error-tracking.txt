@@ -1,2 +1,0 @@
-# Error Tracking Dependencies
-sentry-sdk[fastapi]>=1.40.0

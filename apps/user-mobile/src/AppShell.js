@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -24,6 +24,8 @@ import RateUserScreen from './screens/RateUserScreen';
 import WithdrawScreen from './screens/WithdrawScreen';
 import PaymentScreen from './screens/PaymentScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import AgentApplicationScreen from './screens/AgentApplicationScreen';
+import EditProfileScreen from './screens/EditProfileScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -173,7 +175,11 @@ export default function AppShell() {
   const handleAuth = useCallback(async (authData) => {
     setSession(authData);
     setAuthenticated(true);
-    await saveSession(authData.access_token, authData.profile, role);
+    const serverRole = authData.profile?.role?.toLowerCase() || authData.user?.role?.toLowerCase() || role;
+    setRole(serverRole);
+    setOnboardedState(true);
+    await saveSession(authData.access_token, authData.profile || authData.user, serverRole, authData.refresh_token);
+    await setOnboarded(true);
     registerForPushNotifications().catch(() => {});
   }, [role]);
 
@@ -185,11 +191,17 @@ export default function AppShell() {
     setOnboardedState(false);
   }, []);
 
+  const handleGuest = useCallback(() => {
+    setRole('buyer');
+    setSession({ guest: true, profile: { role: 'buyer', full_name: 'Guest' } });
+    setAuthenticated(true);
+  }, []);
+
   if (isLoading || isSplashing) {
     return (
       <View style={styles.splash}>
         <View style={styles.splashLogoContainer}>
-          <Text style={styles.splashLogo}>🌾</Text>
+          <Image source={require('../assets/logo.png')} style={{ width: 100, height: 100, resizeMode: 'contain' }} />
         </View>
         <Text style={styles.splashBrand}>ZIMAGRITRUST</Text>
         <Text style={styles.splashMarket}>AGRICULTURAL MARKETPLACE</Text>
@@ -201,12 +213,12 @@ export default function AppShell() {
     );
   }
 
-  if (!onboardedState) {
-    return <OnboardingScreen onComplete={handleOnboardingComplete} />;
+  if (!authenticated) {
+    return <LoginScreen role={role || 'buyer'} onAuthenticated={handleAuth} onGuest={handleGuest} />;
   }
 
-  if (!authenticated) {
-    return <LoginScreen role={role} onAuthenticated={handleAuth} />;
+  if (!onboardedState && !session?.guest) {
+    return <OnboardingScreen onComplete={handleOnboardingComplete} />;
   }
 
   return (
@@ -232,6 +244,8 @@ export default function AppShell() {
         <Stack.Screen name="Withdraw" component={WithdrawScreen} />
         <Stack.Screen name="CreateListing" component={CreateListingScreen} />
         <Stack.Screen name="Payment" component={PaymentScreen} />
+        <Stack.Screen name="AgentApplication" component={AgentApplicationScreen} />
+        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

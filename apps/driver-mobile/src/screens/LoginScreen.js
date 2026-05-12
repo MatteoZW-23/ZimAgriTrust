@@ -7,7 +7,7 @@ import { Eye, EyeOff, Phone, Lock, Shield, Truck, ArrowRight } from 'lucide-reac
 import { theme } from "../styles";
 import { driverLogin, getProfile } from "../api";
 
-export default function LoginScreen({ onAuthenticated }) {
+export default function LoginScreen({ onAuthenticated, onRegister }) {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -103,12 +103,10 @@ export default function LoginScreen({ onAuthenticated }) {
             <TextInput
               ref={pinRef}
               style={[styles.input, { flex: 1 }]}
-              placeholder="Enter 4-6 digit PIN"
+              placeholder="Enter Password"
               value={password}
               onChangeText={(t) => { setPassword(t); setError(''); }}
               secureTextEntry={!showPassword}
-              keyboardType="number-pad"
-              maxLength={6}
               placeholderTextColor="#CCC"
               onFocus={() => setPinFocused(true)}
               onBlur={() => setPinFocused(false)}
@@ -121,7 +119,7 @@ export default function LoginScreen({ onAuthenticated }) {
 
           {/* Forgot */}
           <TouchableOpacity style={styles.forgotRow}>
-            <Text style={styles.forgotText}>Forgot PIN?</Text>
+            <Text style={styles.forgotText}>Forgot Password?</Text>
           </TouchableOpacity>
 
           {/* Sign In Button */}
@@ -144,7 +142,7 @@ export default function LoginScreen({ onAuthenticated }) {
           {/* Register */}
           <View style={styles.registerRow}>
             <Text style={styles.registerText}>New driver? </Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={onRegister}>
               <Text style={styles.registerLink}>Register your vehicle</Text>
             </TouchableOpacity>
           </View>

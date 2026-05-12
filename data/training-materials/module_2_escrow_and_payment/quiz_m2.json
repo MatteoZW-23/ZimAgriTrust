@@ -1,0 +1,118 @@
+{
+  "module_id": 2,
+  "module_title": "Escrow & Payment System",
+  "source_handbook": "handbook_m2.txt",
+  "passing_score": 80.0,
+  "questions": [
+    {
+      "id": "q2_1",
+      "text": "What is the 'Sovereign Escrow Pool'?",
+      "options": [
+        "A private bank account",
+        "A decentralized pool holding funds until contract terms are met",
+        "A government tax fund",
+        "An insurance policy"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q2_2",
+      "text": "Who is the 'Escrow Custodian' in the ZimAgritrust system?",
+      "options": [
+        "The Bank Manager",
+        "The Smart Contract Logic",
+        "The Field Agent",
+        "The Farmer"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q2_3",
+      "text": "What does a Buyer do to initiate an order?",
+      "options": [
+        "Sends cash to the agent",
+        "Deposits full amount into Escrow",
+        "Promises to pay later",
+        "Sends a check to the farmer"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q2_4",
+      "text": "When is the Escrow released to the Farmer?",
+      "options": [
+        "Upon delivery confirmation",
+        "When the order is placed",
+        "After 30 days regardless of quality",
+        "When the Agent starts traveling"
+      ],
+      "correct_index": 0
+    },
+    {
+      "id": "q2_5",
+      "text": "What happens if a Buyer cancels an order after verification but before delivery?",
+      "options": [
+        "Full refund automatically",
+        "Cancellation fee is deducted from the deposit",
+        "Buyer loses 100% of the funds",
+        "No refund possible"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q2_6",
+      "text": "What is the standard ZimAgritrust platform fee percentage?",
+      "options": [
+        "1%",
+        "2.5%",
+        "5%",
+        "10%"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q2_7",
+      "text": "What happens in a 'Payment Dispute'?",
+      "options": [
+        "Funds stay in Escrow until resolved",
+        "Funds are split 50/50 immediately",
+        "Funds return to Buyer immediately",
+        "Funds go to the Agent"
+      ],
+      "correct_index": 0
+    },
+    {
+      "id": "q2_8",
+      "text": "How long does a Farmer have to wait for funds after Agent 'Seals' the deal?",
+      "options": [
+        "Instantly (via Mobile Money)",
+        "2-5 Days",
+        "14 Days",
+        "Upon buyer's secondary approval"
+      ],
+      "correct_index": 0
+    },
+    {
+      "id": "q2_9",
+      "text": "Fraudulent payment attempts result in...",
+      "options": [
+        "Warning",
+        "System ban and report to local authorities",
+        "Loss of 10 points",
+        "A retry"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q2_10",
+      "text": "What is the passing score for Module 2?",
+      "options": [
+        "70%",
+        "80%",
+        "90%",
+        "100%"
+      ],
+      "correct_index": 1
+    }
+  ]
+}

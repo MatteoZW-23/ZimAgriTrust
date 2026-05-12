@@ -218,7 +218,7 @@ def clean_price_data(_: User = Depends(require_roles(UserRole.ADMIN))):
             "clean_count":     len(cleaned),
             "outliers_removed": removed,
             "items":           cleaned,
-            "exported_to":     "data/research/data/processed/",
+            "exported_to":     "data/processed/snapshots/",
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -271,7 +271,7 @@ def clean_listing_data(
             "clean_count":     len(df_feat),
             "removed":         len(records) - len(df_feat),
             "features_added":  [c for c in df_feat.columns if c not in df.columns],
-            "exported_to":     "data/research/data/processed/",
+            "exported_to":     "data/processed/snapshots/",
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -329,7 +329,7 @@ def clean_transaction_data(
             "raw_count":   len(records),
             "clean_count": len(df_feat),
             "removed":     len(records) - len(df_feat),
-            "exported_to": "data/research/data/processed/",
+            "exported_to": "data/processed/snapshots/",
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -379,7 +379,7 @@ def clear_all_caches(_: User = Depends(require_roles(UserRole.ADMIN))):
 def list_snapshots(_: User = Depends(require_roles(UserRole.ADMIN))):
     """List all exported CSV snapshots in the processed data directory."""
     import os
-    processed_dir = "data/research/data/processed"
+    processed_dir = "data/processed/snapshots"
     if not os.path.exists(processed_dir):
         return {"snapshots": []}
 

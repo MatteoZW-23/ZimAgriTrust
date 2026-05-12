@@ -17,12 +17,15 @@ ZimAgritrust is a sovereign-grade digital infrastructure designed to modernize Z
 The ZimAgritrust ecosystem is built as a series of integrated micro-services:
 
 *   **`backend/`**: High-concurrency FastAPI core managing the ledger, authentication, and service orchestration.
-*   **`apps/admin-dashboard/`**: A premium React 18 interface for HQ staff and Field Agents.
+*   **`apps/admin-dashboard/`**: A premium React 18 interface for Admin, Super Admin, and Regional Manager staff only.
+*   **`apps/agent-portal/`**: Web-only training, task, verification, and dispute portal for certified Field Agents.
+*   **`apps/app-portal/`**: Responsive web app for Farmers and Buyers after secure login.
+*   **`apps/user-mobile/`**: Unified Expo mobile app for Farmers and Buyers on Android and iOS.
+*   **`apps/driver-mobile/`**: Separate Expo mobile app for Drivers on Android and iOS.
 *   **`apps/whatsapp-bridge/`**: A Node.js gateway that maintains secure persistent sessions with the WhatsApp network.
 *   **`apps/ussd-simulator/`**: A developer environment to test GSM-based USSD menus and session flows.
 *   **`apps/iot-gateway/`**: Integration points for regional soil sensors and storage humidity monitors.
-*   **`apps/agent-portal/`**: Training and academy portal for field agents.
-*   **`apps/farmer-app/`**: Interface focused on farmer trade and listings.
+*   **`apps/mobile/` and `apps/web/`**: Legacy/reference folders. Active apps are listed above.
 
 ## 📊 System Visualizations
 
@@ -130,10 +133,44 @@ To initialize the entire national agricultural trade stack:
 docker-compose up -d --build
 ```
 
+Run database migrations after the backend is healthy:
+
+```powershell
+docker compose exec backend alembic upgrade head
+```
+
+### Current Application Split
+| App | URL | Intended users |
+| :--- | :--- | :--- |
+| Public website | [http://localhost:3000](http://localhost:3000) | Guests, public browsing, signup/login entry |
+| Farmer/Buyer web app | [http://localhost:3003](http://localhost:3003) | Farmers and Buyers only |
+| Admin portal | [http://localhost:3001](http://localhost:3001) | Admin, Super Admin, Regional Manager only |
+| Agent portal | [http://localhost:3002](http://localhost:3002) | Agents only |
+| User mobile app | Docker service `user-mobile` | Farmers and Buyers on Android/iOS |
+| Driver mobile app | Docker service `driver-mobile` | Drivers only |
+| Backend API | [http://localhost:8080](http://localhost:8080) | FastAPI services and Swagger docs |
+| USSD simulator | [http://localhost:5000](http://localhost:5000) | Developer USSD testing |
+
+Mobile apps use project-local commands, so you do not need global `expo` or `eas` installs:
+
+```powershell
+cd apps\user-mobile
+npm run start
+npm run build:android
+npm run build:ios
+
+cd ..\driver-mobile
+npm run start
+npm run build:android
+npm run build:ios
+```
+
 ### 🛰️ Access Nodes
 | Node | URL | Purpose |
 | :--- | :--- | :--- |
-| **Command Center** | [http://localhost:3001](http://localhost:3001) | Main Admin/Agent Portal. |
+| **Command Center** | [http://localhost:3001](http://localhost:3001) | Admin portal only. |
+| **Agent Portal** | [http://localhost:3002](http://localhost:3002) | Agent academy, tasks, and verification. |
+| **Farmer/Buyer Web App** | [http://localhost:3003](http://localhost:3003) | Public-user dashboards and marketplace actions. |
 | **National API** | [http://localhost:8080](http://localhost:8080) | Core Service & Swagger Docs. |
 | **USSD Terminal** | [http://localhost:5000](http://localhost:5000) | Farmer Simulation Tool. |
 | **WhatsApp Sync** | [http://localhost:3006/qr](http://localhost:3006/qr) | Mobile Bridge Linking. |

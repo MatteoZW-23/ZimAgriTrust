@@ -34,6 +34,33 @@ def list_requests(db: Session = Depends(get_db)) -> list[BuyerRequest]:
     return db.query(BuyerRequest).filter(BuyerRequest.status == "open").all()
 
 
+@router.get("/me", response_model=list[BuyerRequestResponse])
+def list_my_requests(
+    db: Session = Depends(get_db),
+    buyer: User = Depends(require_roles(UserRole.BUYER, UserRole.ADMIN)),
+) -> list[BuyerRequest]:
+    query = db.query(BuyerRequest)
+    if buyer.role != UserRole.ADMIN:
+        query = query.filter(BuyerRequest.buyer_id == buyer.id)
+    return query.order_by(BuyerRequest.created_at.desc()).all()
+
+
+@router.delete("/{request_id}")
+def delete_request(
+    request_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    buyer: User = Depends(require_roles(UserRole.BUYER, UserRole.ADMIN)),
+):
+    request = db.query(BuyerRequest).filter(BuyerRequest.id == request_id).first()
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+    if request.buyer_id != buyer.id and buyer.role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this request")
+    request.status = "cancelled"
+    db.commit()
+    return {"success": True}
+
+
 @router.post("/{request_id}/respond", response_model=FarmerResponseResponse)
 def respond_to_request(
     request_id: uuid.UUID,

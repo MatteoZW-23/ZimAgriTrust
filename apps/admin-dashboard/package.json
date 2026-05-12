@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "vite --port 3001",
-    "build": "vite build"
+    "dev": "npx vite --port 3001",
+    "build": "npx vite build"
   },
   "dependencies": {
     "@agritrust/shared": "file:../../packages/shared",

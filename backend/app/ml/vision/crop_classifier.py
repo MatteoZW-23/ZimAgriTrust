@@ -15,9 +15,15 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-import cv2
 import numpy as np
 from PIL import Image
+
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    cv2 = None
+    CV2_AVAILABLE = False
 
 try:
     from ultralytics import YOLO
@@ -214,21 +220,23 @@ class CropClassifier:
     
     def _fallback_classify(self, image: np.ndarray) -> Dict[str, Any]:
         """
-        Fallback classification using OpenCV color histograms
-        This is a simplified version - for production, train a proper model
+        Fallback classification using colour heuristics (PIL/numpy, no cv2 required)
         """
-        # Convert to HSV for better color analysis
-        hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-        
-        # Calculate color histogram
-        hist_hue = cv2.calcHist([hsv], [0], None, [180], [0, 180])
-        
-        # Simple color-based heuristic
-        # Greenish hues (35-85) indicate leafy crops
-        # Yellowish hues (20-35) indicate maize/grains
-        # Reddish hues (0-10, 170-180) indicate tomatoes/fruits
-        
-        hue_mean = np.mean(hsv[:, :, 0])
+        if CV2_AVAILABLE:
+            hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+            hue_mean = np.mean(hsv[:, :, 0])
+        else:
+            # Approximate HSV hue via numpy: use R-G-B ratios
+            r, g, b = image[:, :, 0].astype(float), image[:, :, 1].astype(float), image[:, :, 2].astype(float)
+            max_c = np.maximum(np.maximum(r, g), b)
+            min_c = np.minimum(np.minimum(r, g), b)
+            delta = max_c - min_c + 1e-6
+            hue = np.where(max_c == r, (g - b) / delta % 6,
+                  np.where(max_c == g, (b - r) / delta + 2,
+                                       (r - g) / delta + 4)) * 60
+            hue_mean = float(np.mean(hue))
+            # Remap 0-360 to 0-180 to match OpenCV convention
+            hue_mean = hue_mean / 2
         
         # Determine crop type by dominant color
         if 35 <= hue_mean <= 85:
@@ -376,19 +384,24 @@ class GradeEstimator:
     
     def _calculate_sharpness(self, image: np.ndarray) -> float:
         """Calculate image sharpness using Laplacian variance"""
-        gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-        laplacian = cv2.Laplacian(gray, cv2.CV_64F)
-        variance = laplacian.var()
-        
-        # Normalize to 0-1 range (typical sharp images have variance > 100)
+        if CV2_AVAILABLE:
+            gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+            laplacian = cv2.Laplacian(gray, cv2.CV_64F)
+            variance = laplacian.var()
+        else:
+            # Approximate via numpy gradient
+            gray = np.mean(image, axis=2)
+            gy, gx = np.gradient(gray)
+            variance = float(np.var(gx) + np.var(gy))
         return min(variance / 500, 1.0)
     
     def _calculate_color_uniformity(self, image: np.ndarray) -> float:
         """Calculate color uniformity (lower std dev = more uniform)"""
-        hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-        hue_std = np.std(hsv[:, :, 0])
-        
-        # Normalize (lower std is better)
+        if CV2_AVAILABLE:
+            hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+            hue_std = np.std(hsv[:, :, 0])
+        else:
+            hue_std = float(np.std(image[:, :, 0].astype(float)))
         return max(0, 1 - (hue_std / 90))
 
 

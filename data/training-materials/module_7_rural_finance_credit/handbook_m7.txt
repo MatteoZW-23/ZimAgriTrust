@@ -1,0 +1,54 @@
+ZimAgritrust Module 7: Rural Finance & Credit Access
+===================================================
+
+Purpose
+-------
+This module teaches agents how verified agricultural data helps smallholder farmers access credit, insurance, and financial services.
+
+7.1 Inventory-Backed Lending
+----------------------------
+Farmers often have crops but no cash. Verified inventory can become collateral.
+
+Example flow:
+1. Agent verifies 10 tonnes of maize.
+2. Crop is sealed, tagged and logged.
+3. Bank issues a crop-backed loan.
+4. When buyer pays, loan is settled first.
+5. Remaining funds go to the farmer.
+
+Agent responsibility:
+- Report quantity and quality accurately.
+- Never exaggerate collateral value.
+- Capture clear photos and GPS evidence.
+- Understand that false reporting can cause financial loss.
+
+7.2 Credit Scoring for Smallholders
+-----------------------------------
+Traditional banks rely on payslips and formal employment records. ZimAgritrust uses verified agricultural performance.
+
+Data points:
+- Yield growth over seasons.
+- Repayment and delivery reliability.
+- Quality consistency.
+- Dispute history.
+- Timely listing and fulfilment.
+
+7.3 Insurance & Risk
+--------------------
+Insurance protects farmers from drought, pests and crop failure.
+
+Parametric insurance may trigger payouts automatically when satellite or weather data meets set conditions. Agents may be sent to verify field conditions for claims.
+
+7.4 Agent Conduct in Finance Tasks
+----------------------------------
+Loan and insurance verification must be extra careful because money is released based on your evidence.
+
+Rules:
+- Visit the farm physically.
+- Capture GPS and photos.
+- Do not approve claims without evidence.
+- Escalate suspicious claims.
+
+Final Summary
+-------------
+Accurate verification gives farmers access to finance while protecting banks, insurers and the platform from fraud.

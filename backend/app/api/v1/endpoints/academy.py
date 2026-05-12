@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
@@ -14,6 +14,7 @@ from app.models.academy import AgentTraining, AcademyModule, ExamAttempt, Module
 from app.schemas.academy import (
     ModuleProgressUpdate, ExamSubmission, CertificationRequest, TraineeLogin, TraineeToken
 )
+from app.services.portal_auth_service import issue_session_token
 
 
 
@@ -22,7 +23,12 @@ router = APIRouter(tags=["academy"])
 
 
 @router.post("/login", response_model=TraineeToken)
-def academy_login(payload: TraineeLogin, db: Session = Depends(get_db)):
+async def academy_login(
+    payload: TraineeLogin,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
     """Authenticate a Trainee or Agent using their official Code and PIN"""
     agent = db.query(Agent).filter(Agent.agent_code == payload.agent_code).first()
     if not agent or not agent.user:
@@ -44,10 +50,14 @@ def academy_login(payload: TraineeLogin, db: Session = Depends(get_db)):
             detail="INVALID_PIN: The security PIN provided does not match our records."
         )
     
-    # Generate JWT using project-specific signature (subject, role)
-    access_token = create_access_token(subject=str(agent.user.id), role="agent")
+    session_token = await issue_session_token(
+        db=db,
+        user=agent.user,
+        request=request,
+        response=response,
+    )
     return {
-        "access_token": access_token,
+        "access_token": session_token.access_token,
         "token_type": "bearer",
         "agent_code": agent.agent_code
     }
@@ -458,7 +468,25 @@ def submit_final_exam(
         agent = db.query(Agent).filter(Agent.id == current_agent.id).first()
         agent.status = AgentStatus.ACTIVE
         db.commit()
-        
+
+        # F#283 — agent certification email (best-effort).
+        try:
+            from app.services.email_service import email_service
+            from app.models.user import User as _User
+            owner = db.query(_User).filter(_User.id == agent.user_id).first()
+            if owner and owner.email:
+                email_service.send_template(
+                    "email.agent_certification",
+                    to=owner.email,
+                    context={
+                        "name": owner.full_name,
+                        "agent_code": agent.agent_code,
+                        "certified_at": training.certified_at.strftime("%Y-%m-%d"),
+                    },
+                )
+        except Exception:  # noqa: BLE001
+            pass
+
         return {"passed": True, "score": score, "message": "🎉 CONGRATULATIONS! You are now a Certified ZimAgritrust Field Agent."}
     else:
         # If this was the last attempt, permanently fail the trainee

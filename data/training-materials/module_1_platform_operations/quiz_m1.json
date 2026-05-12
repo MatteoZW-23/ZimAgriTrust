@@ -1,31 +1,118 @@
 {
   "module_id": 1,
   "module_title": "Platform Operations (Core)",
+  "source_handbook": "handbook_m1.txt",
+  "passing_score": 80.0,
   "questions": [
-    {"id": "q1_1", "text": "What is the primary mission of ZimAgritrust?", "options": ["Profit Maximization", "Connecting farmers directly to buyers with secure escrow", "Data Harvesting", "Government Surveillance"], "correct_index": 1},
-    {"id": "q1_2", "text": "Which interface is the primary tool for Farmers?", "options": ["USSD / WhatsApp", "React Native Pro", "Python Scripting", "Desktop Dashboard"], "correct_index": 0},
-    {"id": "q1_3", "text": "Who is considered the 'Point of Truth' in the field?", "options": ["The Farmer", "The Buyer", "The Field Agent", "The Warehouse Manager"], "correct_index": 2},
-    {"id": "q1_4", "text": "At what stage are funds released to the Farmer?", "options": ["Before planting", "When the buyer orders", "After Agent verification and delivery", "6 months after sale"], "correct_index": 2},
-    {"id": "q1_5", "text": "What happens if an Agent accepts a bribe to inflate a crop grade?", "options": ["A small fine", "A warning email", "Immediate and permanent ban", "Nothing"], "correct_index": 2},
-    {"id": "q1_6", "text": "Which technology ensures that the ledger cannot be tampered with?", "options": ["Excel Spreadsheets", "Blockchain-inspired Immutable Ledger", "Centralized SQL Trigger", "Manual Paper Records"], "correct_index": 1},
-    {"id": "q1_7", "text": "What is the maximum time allowed for a Verification request to be actioned?", "options": ["12 Hours", "24 Hours", "48 Hours", "1 Week"], "correct_index": 1},
-    {"id": "q1_8", "text": "Which hardware device tracks moisture in real-time in warehouses?", "options": ["Smartphone Camera", "IoT Sensor Gateway", "Analog Thermometer", "Laser Pointer"], "correct_index": 1},
-    {"id": "q1_9", "text": "What does 'Sovereign Identity' mean for a farmer?", "options": ["They are controlled by the state", "They own and control their own digital data/credentials", "They have a physical passport", "They are a king"], "correct_index": 1},
-    {"id": "q1_10", "text": "Who triggers the release of funds from Escrow?", "options": ["The Buyer manually", "The Agent via verification app", "The Farmer via WhatsApp", "The Bank Manager"], "correct_index": 1},
-    {"id": "q1_11", "text": "Which backend framework powers the ZimAgritrust API?", "options": ["Django", "Express.js", "FastAPI", "Ruby on Rails"], "correct_index": 2},
-    {"id": "q1_12", "text": "In a Low-Connectivity zone, how does the Agent app behave?", "options": ["It crashes", "It works in Offline Mode and syncs later", "It requires a Satellite connection", "It disables all features"], "correct_index": 1},
-    {"id": "q1_13", "text": "What is the primary crop listed in the example lifecycle?", "options": ["Maize", "Coffee", "Cocoa", "Wheat"], "correct_index": 0},
-    {"id": "q1_14", "text": "How much of the order value must the buyer deposit into Escrow initially?", "options": ["10%", "50%", "100%", "0%"], "correct_index": 2},
-    {"id": "q1_15", "text": "What is the role of 'ML Intelligence' in the platform?", "options": ["Automated Chatbot", "Crop Disease Detection via Photos", "Financial Auditing", "GPS Tracking"], "correct_index": 1},
-    {"id": "q1_16", "text": "Which document is mandatory for all Field Agents?", "options": ["ZimAgritrust Operations Handbook", "Generic Driver's License", "Social Media Guidelines", "None"], "correct_index": 0},
-    {"id": "q1_17", "text": "What is the 'Trust Deficit' in agricultural markets?", "options": ["Banks not having enough money", "Lack of verified data between producers and buyers", "Farmers not trusting their neighbors", "High taxes"], "correct_index": 1},
-    {"id": "q1_18", "text": "Which role manages global disputes and certifications?", "options": ["Field Agent", "Administrator", "Customer", "Farmer"], "correct_index": 1},
-    {"id": "q1_19", "text": "What is a 'Digital Twin' in the context of ZimAgritrust?", "options": ["A second farmer", "A digital representation of a physical asset/identity", "A duplicate database", "A smartphone"], "correct_index": 1},
-    {"id": "q1_20", "text": "What happens if a photo is not GPS-tagged during verification?", "options": ["It is accepted", "It is flagged for review/rejection", "It is automatically blurred", "It is deleted"], "correct_index": 1},
-    {"id": "q1_21", "text": "Which protocol governs the ethical behavior of Agents?", "options": ["Sovereign Protocol", "Nairobi Protocol", "Standard Operating Procedure", "Agent Manual"], "correct_index": 0},
-    {"id": "q1_22", "text": "What is the first step of a ZimAgritrust trade?", "options": ["Payment", "Listing", "Verification", "Grading"], "correct_index": 1},
-    {"id": "q1_23", "text": "Why do farmers use WhatsApp instead of the mobile app?", "options": ["Apps are too expensive", "Data usage is lower and it works on basic smartphones", "WhatsApp is more secure", "There is no app"], "correct_index": 1},
-    {"id": "q1_24", "text": "The Agent commission is released...", "options": ["Monthly at fixed rate", "Along with the Farmer's settlement", "Before the work starts", "In cash in the field"], "correct_index": 1},
-    {"id": "q1_25", "text": "What is the passing score for Module 1?", "options": ["50%", "75%", "80%", "100%"], "correct_index": 2}
+    {
+      "id": "q1_1",
+      "text": "What is the primary mission of ZimAgritrust?",
+      "options": [
+        "Profit Maximization",
+        "Sovereign Trust in Trade",
+        "Data Harvesting",
+        "Government Surveillance"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q1_2",
+      "text": "Which interface is the primary tool for Farmers?",
+      "options": [
+        "USSD / WhatsApp",
+        "React Native Pro",
+        "Python Scripting",
+        "Desktop Dashboard"
+      ],
+      "correct_index": 0
+    },
+    {
+      "id": "q1_3",
+      "text": "Who is considered the 'Point of Truth' in the field?",
+      "options": [
+        "The Farmer",
+        "The Buyer",
+        "The Field Agent",
+        "The Warehouse Manager"
+      ],
+      "correct_index": 2
+    },
+    {
+      "id": "q1_4",
+      "text": "At what stage are funds released to the Farmer?",
+      "options": [
+        "Before planting",
+        "When the buyer orders",
+        "After Agent verification and delivery",
+        "6 months after sale"
+      ],
+      "correct_index": 2
+    },
+    {
+      "id": "q1_5",
+      "text": "What happens if an Agent accepts a bribe to inflate a crop grade?",
+      "options": [
+        "A small fine",
+        "A warning email",
+        "Immediate and permanent ban",
+        "Nothing"
+      ],
+      "correct_index": 2
+    },
+    {
+      "id": "q1_6",
+      "text": "Which technology ensures that the ledger cannot be tampered with?",
+      "options": [
+        "Excel Spreadsheets",
+        "Blockchain-inspired Immutable Ledger",
+        "Centralized SQL Trigger",
+        "Manual Paper Records"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q1_7",
+      "text": "What is the maximum time allowed for a Verification request to be actioned?",
+      "options": [
+        "12 Hours",
+        "24 Hours",
+        "48 Hours",
+        "1 Week"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q1_8",
+      "text": "What is the first step of an ZimAgritrust trade?",
+      "options": [
+        "Payment",
+        "Listing",
+        "Verification",
+        "Grading"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q1_9",
+      "text": "Why do farmers primarily use WhatsApp instead of a dedicated mobile app?",
+      "options": [
+        "Apps are too expensive",
+        "Data usage is lower and it works on basic smartphones",
+        "WhatsApp is more secure",
+        "There is no app"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q1_10",
+      "text": "What is the passing score for Module 1?",
+      "options": [
+        "50%",
+        "75%",
+        "80%",
+        "100%"
+      ],
+      "correct_index": 2
+    }
   ]
 }

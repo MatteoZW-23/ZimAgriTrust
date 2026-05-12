@@ -10,7 +10,7 @@ class SystemAudit(Base):
     __tablename__ = "system_audits"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    admin_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    admin_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     
     admin = relationship("User", foreign_keys=[admin_id])
     

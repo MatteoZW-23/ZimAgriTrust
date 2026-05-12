@@ -13,6 +13,7 @@ function GovernanceModal({ user, token, onClose, onDone }) {
   const [error, setError] = useState('');
 
   const ACTIONS = [
+    { key: 'APPROVE',   label: '✅ Activate/Approve', color: '#10b981', desc: 'Activate a pending account and grant platform access.' },
     { key: 'SUSPEND',   label: '🚫 Suspend',        color: '#f59e0b', desc: 'Freeze account access. User notified via WhatsApp & SMS.' },
     { key: 'REINSTATE', label: '✅ Reinstate',       color: '#22c55e', desc: 'Restore full access. User notified via WhatsApp & SMS.' },
     { key: 'FLAG',      label: '⚠️ Flag',            color: '#f97316', desc: 'Mark for review. Restricts some features.' },
@@ -31,8 +32,9 @@ function GovernanceModal({ user, token, onClose, onDone }) {
     try {
       const id = user.raw_id || user.id;
       const headers = { Authorization: `Bearer ${token}` };
+      if (action === 'APPROVE')   await request(`/admin/users/${id}/status?target_status=ACTIVE&reason=${encodeURIComponent(reason)}`, { method: 'POST', headers });
       if (action === 'SUSPEND')   await request(`/admin/users/${id}/status?target_status=SUSPENDED&reason=${encodeURIComponent(reason)}`, { method: 'POST', headers });
-      if (action === 'REINSTATE') await request(`/admin/users/${id}/reinstate?reason=${encodeURIComponent(reason)}`, { method: 'POST', headers });
+      if (action === 'REINSTATE') await request(`/admin/users/${id}/status?target_status=ACTIVE&reason=${encodeURIComponent(reason)}`, { method: 'POST', headers });
       if (action === 'FLAG')      await request(`/admin/users/${id}/status?target_status=FLAGGED&reason=${encodeURIComponent(reason)}`, { method: 'POST', headers });
       if (action === 'VERIFY')    await request(`/admin/users/${id}/verify?reason=${encodeURIComponent(reason)}`, { method: 'POST', headers });
       if (action === 'UNVERIFY')  await request(`/admin/users/${id}/verify-reject?reason=${encodeURIComponent(reason)}`, { method: 'POST', headers });
@@ -122,7 +124,7 @@ export default function UserDirectoryPanel({ users = [], token, onGovernance, pr
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [governanceTarget, setGovernanceTarget] = useState(null); // user for GovernanceModal
   const [toast, setToast] = useState('');
-  const isAdmin = profile?.role === 'ADMIN';
+  const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPER_ADMIN';
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 5000); };
 
@@ -186,9 +188,10 @@ export default function UserDirectoryPanel({ users = [], token, onGovernance, pr
 
   const handleEnroll = async () => {
       try {
-          const { enrollUser } = await import('../api');
-          await enrollUser(enrollData.name, enrollData.phone, enrollData.role, "ZimAgritrust2026!", token); 
-          alert(`SUCCESS: ${enrollData.name} has been enrolled as a verified ${enrollData.role} in ${enrollData.region}. Credentials issued.`);
+          // Generate a random 8-digit bootstrap secret
+          const bootstrapSecret = Math.floor(10000000 + Math.random() * 90000000).toString();
+          await enrollUser(enrollData.name, enrollData.phone, enrollData.role, bootstrapSecret, token); 
+          alert(`SUCCESS: ${enrollData.name} has been enrolled. A secure bootstrap secret has been dispatched to ${enrollData.phone}.`);
           setShowEnrollModal(false);
           setEnrollData({ name: '', phone: '', region: 'Harare Hub', role: 'AGENT' });
           if (onGovernance) onGovernance(null, 'REFRESH', null, 'New Enrollment');
@@ -460,7 +463,7 @@ export default function UserDirectoryPanel({ users = [], token, onGovernance, pr
 }
 
 function UserDetailView({ user, onBack, onGovernance, onManage, profile }) {
-    const isAdmin = profile?.role === 'ADMIN';
+    const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPER_ADMIN';
     return (
         <div className="v4-dashboard-container animate-fade-in compact-mode">
             <div className="v4-navigation-strip">

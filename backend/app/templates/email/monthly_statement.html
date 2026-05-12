@@ -1,0 +1,17 @@
+{% extends "_base.html" %}
+{% block title %}Monthly statement{% endblock %}
+{% block body %}
+<h2 style="margin-top:0;color:#0f5132;">Statement — {{ month }}</h2>
+<p>Hi {{ name }}, your full statement for <b>{{ month }}</b> is attached as PDF.</p>
+
+<table role="presentation" width="100%" cellpadding="6" cellspacing="0" style="border-collapse:collapse;margin:16px 0;">
+  {% for label, value in summary.items() %}
+  <tr>
+    <td style="border-bottom:1px solid #e5e7eb;color:#6b7280;">{{ label }}</td>
+    <td style="border-bottom:1px solid #e5e7eb;text-align:right;font-weight:bold;">{{ value }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<p style="font-size:12px;color:#6b7280;">Statements are kept for 7 years per Zimbabwe records-retention requirements.</p>
+{% endblock %}

@@ -1,0 +1,118 @@
+{
+  "module_id": 9,
+  "module_title": "Advanced Ag-Tech & IoT",
+  "source_handbook": "handbook_m9.txt",
+  "passing_score": 85.0,
+  "questions": [
+    {
+      "id": "q9_1",
+      "text": "What is an 'IoT Sensor'?",
+      "options": [
+        "A smartphone",
+        "An interconnected device that collects and transmits data in real-time",
+        "A satellite",
+        "A laptop"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q9_2",
+      "text": "What does NDVI stand for and what does it measure?",
+      "options": [
+        "National Data Verification Index - measures bank balances",
+        "Normalized Difference Vegetation Index - measures plant health",
+        "New Device Verification Interface - measures battery life",
+        "Network Distribution Volume Indicator - measures internet speed"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q9_3",
+      "text": "What should an Agent do if a sensor loses calibration during verification?",
+      "options": [
+        "Continue with the faulty reading",
+        "Use a secondary tool immediately and flag the report",
+        "Estimate the value",
+        "Ignore the sensor"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q9_4",
+      "text": "Why does ZimAgritrust use a Distributed Ledger instead of a central database?",
+      "options": [
+        "It is cheaper",
+        "It ensures immutability and prevents tampering with transaction records",
+        "It is faster",
+        "It uses less storage"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q9_5",
+      "text": "What happens to a signed report on the Sovereign Ledger if an error is discovered?",
+      "options": [
+        "It is deleted immediately",
+        "It can never be deleted or altered, but a correction can be appended",
+        "An admin can edit it",
+        "The agent can request deletion"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q9_6",
+      "text": "What do soil sensors primarily analyze to predict future yield?",
+      "options": [
+        "GPS coordinates",
+        "Nitrogen and phosphorous levels",
+        "Farmer's age",
+        "Market prices"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q9_7",
+      "text": "How do Smart Scales prevent manual entry errors?",
+      "options": [
+        "By using voice commands",
+        "The weight display is captured via the agent's camera",
+        "They automatically type numbers",
+        "They don't connect to the app"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q9_8",
+      "text": "What type of satellite imagery does ZimAgritrust use to verify farm size?",
+      "options": [
+        "Google Street View",
+        "Sentinel-2 Satellite Imagery",
+        "NASA Apollo photos",
+        "Weather radar"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q9_9",
+      "text": "Why is immutability important for international buyer confidence?",
+      "options": [
+        "It makes data look fancy",
+        "It proves the data is mathematically impossible to forge",
+        "It reduces server costs",
+        "It is required by the government"
+      ],
+      "correct_index": 1
+    },
+    {
+      "id": "q9_10",
+      "text": "What is the passing score for Module 9?",
+      "options": [
+        "70%",
+        "75%",
+        "80%",
+        "85%"
+      ],
+      "correct_index": 3
+    }
+  ]
+}
