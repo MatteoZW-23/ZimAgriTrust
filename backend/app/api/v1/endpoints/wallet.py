@@ -54,6 +54,14 @@ def get_wallet_balance(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@router.get("", response_model=WalletBalanceOut, summary="Get wallet balance")
+def get_wallet(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return get_wallet_balance(db=db, current_user=current_user)
+
+
 @router.post("/withdraw", summary="Request wallet withdrawal to EcoCash/OneMoney")
 def withdraw(
     payload: WithdrawRequest,
@@ -72,6 +80,15 @@ def withdraw(
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/deposit", summary="Initiate wallet deposit via EcoCash/OneMoney")
+def deposit(
+    payload: TopUpRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return top_up(payload=payload, db=db, current_user=current_user)
 
 
 @router.post("/top-up", summary="Initiate wallet top-up via EcoCash/OneMoney")
@@ -99,6 +116,15 @@ def top_up(
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/transactions", summary="Get wallet transaction history")
+def wallet_transactions(
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return wallet_history(limit=limit, db=db, current_user=current_user)
 
 
 @router.get("/history", summary="Get wallet transaction history")

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { ActivityIndicator, Alert, TextInput, View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { 
   ArrowLeft as IconArrowLeft, 
   Plus as IconPlus, 
@@ -10,21 +10,43 @@ import {
   CreditCard as IconCreditCard
 } from 'lucide-react-native';
 import { theme } from '../styles';
+import { depositFunds, getEarnings, getTransactions, getWalletBalance } from '../api';
 
 export default function WalletScreen({ navigation, route }) {
   const { token } = route.params || {};
   const [transactions, setTransactions] = React.useState([]);
   const [balance, setBalance] = React.useState(null);
   const [earnings, setEarnings] = React.useState(null);
+  const [showDeposit, setShowDeposit] = React.useState(false);
+  const [depositAmount, setDepositAmount] = React.useState('');
+  const [depositing, setDepositing] = React.useState(false);
 
   React.useEffect(() => {
     if (!token) return;
-    import('../api').then(({ getWalletBalance, getTransactions, getEarnings }) => {
-      getWalletBalance(token).then(data => setBalance(data)).catch(() => {});
-      getTransactions(token).then(data => setTransactions(Array.isArray(data) ? data : data?.data || [])).catch(() => {});
-      getEarnings(token).then(data => setEarnings(data)).catch(() => {});
-    });
+    getWalletBalance(token).then(data => setBalance(data)).catch(() => {});
+    getTransactions(token).then(data => setTransactions(Array.isArray(data) ? data : data?.data || [])).catch(() => {});
+    getEarnings(token).then(data => setEarnings(data)).catch(() => {});
   }, [token]);
+
+  const handleDeposit = async () => {
+    const amount = Number(depositAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      Alert.alert('Invalid amount', 'Enter a valid deposit amount.');
+      return;
+    }
+    try {
+      setDepositing(true);
+      await depositFunds(token, { amount, payment_method: 'ecocash' });
+      setShowDeposit(false);
+      setDepositAmount('');
+      setBalance(await getWalletBalance(token));
+      Alert.alert('Deposit started', 'Follow the EcoCash/OneMoney prompt to complete payment.');
+    } catch (err) {
+      Alert.alert('Deposit failed', err.message || 'Could not start deposit.');
+    } finally {
+      setDepositing(false);
+    }
+  };
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -45,7 +67,7 @@ export default function WalletScreen({ navigation, route }) {
            <Text style={styles.balanceTag}>ZIG: {balance?.balance_zig != null ? balance.balance_zig.toFixed(2) : '--'} · Pending: ${balance?.pending_usd != null ? balance.pending_usd.toFixed(2) : '--'}</Text>
 
            <View style={styles.actionRow}>
-                <TouchableOpacity style={styles.actionBtn}>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => setShowDeposit((v) => !v)}>
                   <IconPlus size={16} color="#FFF" style={{ marginBottom: 4 }} />
                   <Text style={styles.actionBtnText}>Add Funds</Text>
                 </TouchableOpacity>
@@ -53,12 +75,28 @@ export default function WalletScreen({ navigation, route }) {
                   <IconDownload size={16} color="#FFF" style={{ marginBottom: 4 }} />
                   <Text style={styles.actionBtnText}>Withdraw</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn}>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => {}}>
                   <IconHistory size={16} color="#FFF" style={{ marginBottom: 4 }} />
                   <Text style={styles.actionBtnText}>History</Text>
                 </TouchableOpacity>
            </View>
         </View>
+        {showDeposit && (
+          <View style={styles.depositCard}>
+            <Text style={styles.inputLabel}>Deposit amount (USD)</Text>
+            <TextInput
+              style={styles.depositInput}
+              value={depositAmount}
+              onChangeText={setDepositAmount}
+              keyboardType="decimal-pad"
+              placeholder="10.00"
+              placeholderTextColor="#94a3b8"
+            />
+            <TouchableOpacity style={styles.depositBtn} onPress={handleDeposit} disabled={depositing}>
+              {depositing ? <ActivityIndicator color="#fff" /> : <Text style={styles.depositBtnText}>Start Mobile Money Deposit</Text>}
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* Earnings Summary */}
@@ -160,6 +198,11 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: 12, marginTop: 32 },
   actionBtn: { flex: 1, paddingVertical: 12, paddingHorizontal: 8, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 12, alignItems: 'center' },
   actionBtnText: { color: '#FFF', fontSize: 11, fontWeight: '700' },
+  depositCard: { marginTop: 14, backgroundColor: '#FFF', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#EEE' },
+  inputLabel: { color: '#64748b', fontSize: 12, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 },
+  depositInput: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 14, padding: 14, fontSize: 17, fontWeight: '900' },
+  depositBtn: { backgroundColor: theme.colors.green, borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
+  depositBtnText: { color: '#FFF', fontWeight: '900' },
   listCard: { backgroundColor: '#F9F9F9', borderRadius: 20, overflow: 'hidden' },
   txItem: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, borderTopWidth: 1, borderTopColor: '#EEE' },
   txLeft: { flex: 1, paddingRight: 12 },

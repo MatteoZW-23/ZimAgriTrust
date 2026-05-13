@@ -155,7 +155,7 @@ def counter_offer(db: Session, offer: Offer, counter_price: float, actor: User) 
 
     # Update logic: Flip the initiator
     offer.status = OfferStatus.COUNTERED
-    offer.price_per_unit = counter_price
+    offer.offered_price = counter_price
     
     # In a real system, we might track 'last_actor_id' to know who needs to respond next.
     db.commit()

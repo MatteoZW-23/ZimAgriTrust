@@ -75,13 +75,19 @@ export async function register(payload) {
 }
 
 export async function getProfile(token) {
-  return jsonFetch("/auth/me", {
+  return jsonFetch("/users/me", {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
 
 export async function getListings() {
   return jsonFetch("/public/listings");
+}
+
+export async function getListingDetails(token, listingId) {
+  return jsonFetch(`/listings/${listingId}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
 }
 
 export async function searchListings(params = {}) {
@@ -111,6 +117,40 @@ export async function getMyListings(token) {
 export async function getTransactions(token) {
   return jsonFetch("/transactions", {
     headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function getOffersReceived(token) {
+  return jsonFetch('/offers/received', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function getOffersMade(token) {
+  return jsonFetch('/offers/made', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function acceptOfferById(token, offerId) {
+  return jsonFetch(`/offers/${offerId}/accept`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function rejectOfferById(token, offerId) {
+  return jsonFetch(`/offers/${offerId}/reject`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function counterOfferById(token, offerId, counterPrice) {
+  return jsonFetch(`/offers/${offerId}/counter`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ counter_price: Number(counterPrice) }),
   });
 }
 
@@ -189,9 +229,15 @@ export async function counterOffer(token, listingId, offerId, payload) {
 }
 
 export async function getWalletBalance(token) {
-  return jsonFetch('/payments/balance', {
+  const data = await jsonFetch('/wallet', {
     headers: { Authorization: `Bearer ${token}` },
   });
+  return {
+    ...data,
+    balance_usd: data.balance_usd ?? data.balance ?? 0,
+    pending_usd: data.pending_usd ?? data.held_in_escrow ?? 0,
+    available_usd: data.available_usd ?? data.available ?? 0,
+  };
 }
 
 export async function getEarnings(token) {
@@ -201,7 +247,7 @@ export async function getEarnings(token) {
 }
 
 export async function withdrawFunds(token, payload) {
-  return jsonFetch('/payments/withdraw', {
+  return jsonFetch('/wallet/withdraw', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
@@ -209,8 +255,16 @@ export async function withdrawFunds(token, payload) {
 }
 
 export async function getWalletTransactions(token) {
-  return jsonFetch('/payments/wallet/transactions', {
+  return jsonFetch('/wallet/transactions', {
     headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function depositFunds(token, payload) {
+  return jsonFetch('/wallet/deposit', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
   });
 }
 
@@ -256,8 +310,8 @@ export async function resetPassword(phone, otp, new_password) {
 }
 
 export async function updateProfile(token, payload) {
-  return jsonFetch('/auth/profile', {
-    method: 'PATCH',
+  return jsonFetch('/users/me', {
+    method: 'PUT',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
   });
@@ -277,9 +331,37 @@ export async function deactivateAccount(token) {
 }
 
 export async function deleteAccount(token) {
-  return jsonFetch('/auth/account', {
+  return jsonFetch('/users/data', {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function changePin(token, currentPin, newPin) {
+  return jsonFetch('/auth/pin/change', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ current_pin: currentPin, new_pin: newPin }),
+  });
+}
+
+export async function getTrustScore(token) {
+  return jsonFetch('/users/trust-score', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function getUserSettings(token) {
+  return jsonFetch('/users/settings', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function updateUserSettings(token, payload) {
+  return jsonFetch('/users/settings', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
   });
 }
 
@@ -320,6 +402,66 @@ export async function createDispute(token, orderId, type, description) {
 export async function getDisputes(token) {
   return jsonFetch('/disputes', {
     headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function raiseOrderDispute(token, orderId, payload) {
+  return jsonFetch(`/transactions/${orderId}/dispute`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function uploadDisputeEvidence(token, disputeId, files = []) {
+  const form = new FormData();
+  files.forEach((file, index) => {
+    form.append('files', {
+      uri: file.uri,
+      name: file.name || `evidence-${index + 1}.jpg`,
+      type: file.type || 'image/jpeg',
+    });
+  });
+
+  const res = await fetch(`${API_BASE_URL}/disputes/${disputeId}/evidence`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.detail || 'Failed to upload dispute evidence');
+  return data;
+}
+
+export async function getSavedListings(token) {
+  const saved = await jsonFetch('/listings/me/saved', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const savedRows = Array.isArray(saved) ? saved : saved?.data || [];
+  return Promise.all(
+    savedRows.map(async (row) => {
+      try {
+        const listing = await getListingDetails(token, row.listing_id);
+        return { ...listing, saved_id: row.id, saved_at: row.created_at };
+      } catch {
+        return row;
+      }
+    }),
+  );
+}
+
+export async function saveListing(token, listingId) {
+  return jsonFetch(`/listings/${listingId}/save`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function reportListing(token, listingId, reason) {
+  return jsonFetch(`/listings/${listingId}/report`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ reason }),
   });
 }
 

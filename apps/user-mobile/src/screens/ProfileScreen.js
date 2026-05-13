@@ -194,9 +194,11 @@ export default function ProfileScreen({ route, navigation }) {
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>Account</Text>
           <MenuItem icon={<IconSettings size={20} color={accent} />} label="Account Settings" onPress={handleEditProfile} />
-          <MenuItem icon={<IconBell size={20} color={accent} />} label="Notifications" />
-          <MenuItem icon={<IconShield size={20} color={accent} />} label="Verification" />
+          <MenuItem icon={<IconShield size={20} color={accent} />} label="Change PIN" onPress={() => navigation.navigate('ChangePin', { token })} />
+          <MenuItem icon={<IconBell size={20} color={accent} />} label="Notifications & Language" onPress={() => navigation.navigate('Settings', { token })} />
+          <MenuItem icon={<IconShield size={20} color={accent} />} label="Verification" onPress={() => navigation.navigate('Verification', { token })} />
           <MenuItem icon={<IconDownload size={20} color={accent} />} label="Export My Data" onPress={handleExportData} />
+          <MenuItem icon={<IconFileText size={20} color={accent} />} label="My Disputes" onPress={() => navigation.navigate('Disputes', { token })} />
           {role !== 'agent' && (
             <MenuItem
               icon={<IconBriefcase size={20} color={accent} />}
@@ -208,8 +210,8 @@ export default function ProfileScreen({ route, navigation }) {
 
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>Support</Text>
-          <MenuItem icon={<IconHelpCircle size={20} color={accent} />} label="Help Center" />
-          <MenuItem icon={<IconFileText size={20} color={accent} />} label="Terms & Privacy" />
+          <MenuItem icon={<IconHelpCircle size={20} color={accent} />} label="Help Center" onPress={() => navigation.navigate('Support')} />
+          <MenuItem icon={<IconFileText size={20} color={accent} />} label="Terms & Privacy" onPress={() => navigation.navigate('Privacy', { token, onLogout })} />
         </View>
 
         <View style={styles.menuSection}>

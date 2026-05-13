@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   RefreshControl, SafeAreaView, ActivityIndicator, Alert,
 } from 'react-native';
+import MapView, { Marker } from '../components/MapViewComponent';
 import {
   MapPin as IconMapPin, Navigation as IconNavigation, 
   Package as IconPackage, Clock as IconClock, Zap as IconZap, 
@@ -35,18 +36,17 @@ export default function JobsScreen({ route, navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [online, setOnline] = useState(true);
   const [accepting, setAccepting] = useState(null);
+  const [error, setError] = useState('');
+  const [viewMode, setViewMode] = useState('list');
 
   const fetchJobs = useCallback(async () => {
     try {
+      setError('');
       const data = await getAvailableJobs(token);
       setJobs(Array.isArray(data) ? data : data?.jobs || []);
-    } catch {
-      setJobs([
-        { id: '1', pickup_location: 'Harare - Mbare Musika', delivery_location: 'Bulawayo - Renkini', distance_km: 440, weight_kg: 2000, crop_type: 'Maize', payment_amount: 150, currency: 'USD' },
-        { id: '2', pickup_location: 'Mutare - Sakubva Market', delivery_location: 'Harare - Mbare Musika', distance_km: 260, weight_kg: 1500, crop_type: 'Tobacco', payment_amount: 90, currency: 'USD' },
-        { id: '3', pickup_location: 'Gweru - Kudzanayi', delivery_location: 'Masvingo - Mucheke', distance_km: 180, weight_kg: 800, crop_type: 'Groundnuts', payment_amount: 65, currency: 'USD' },
-        { id: '4', pickup_location: 'Chinhoyi - Gadzema', delivery_location: 'Kariba Town', distance_km: 210, weight_kg: 600, crop_type: 'Soya Beans', payment_amount: 75, currency: 'USD' },
-      ]);
+    } catch (err) {
+      setJobs([]);
+      setError(err.message || 'Could not load available jobs from the server.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -83,6 +83,13 @@ export default function JobsScreen({ route, navigation }) {
 
   const firstName = (profile.full_name || 'Driver').split(' ')[0];
   const totalEarnable = jobs.reduce((s, j) => s + (j.payment_amount || 0), 0);
+  const jobCoordinates = jobs
+    .map((job) => ({
+      job,
+      latitude: Number(job.pickup_latitude ?? job.pickup_lat ?? job.pickup_location_lat),
+      longitude: Number(job.pickup_longitude ?? job.pickup_lng ?? job.pickup_location_lng),
+    }))
+    .filter((item) => Number.isFinite(item.latitude) && Number.isFinite(item.longitude));
 
   const renderJob = ({ item }) => {
     const isUrgent = item.payment_amount >= 100;
@@ -218,6 +225,17 @@ export default function JobsScreen({ route, navigation }) {
             </View>
           </View>
         )}
+
+        {online && jobs.length > 0 && (
+          <View style={styles.viewToggle}>
+            <TouchableOpacity style={[styles.viewToggleBtn, viewMode === 'list' && styles.viewToggleActive]} onPress={() => setViewMode('list')}>
+              <Text style={[styles.viewToggleText, viewMode === 'list' && styles.viewToggleTextActive]}>List</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.viewToggleBtn, viewMode === 'map' && styles.viewToggleActive]} onPress={() => setViewMode('map')}>
+              <Text style={[styles.viewToggleText, viewMode === 'map' && styles.viewToggleTextActive]}>Map</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* Offline state */}
@@ -242,6 +260,46 @@ export default function JobsScreen({ route, navigation }) {
           <ActivityIndicator size="large" color={theme.colors.sky} />
           <Text style={styles.loadingText}>Finding jobs near you...</Text>
         </View>
+      ) : viewMode === 'map' ? (
+        <View style={styles.mapMode}>
+          <MapView
+            style={styles.map}
+            initialRegion={{
+              latitude: jobCoordinates[0]?.latitude || -17.8292,
+              longitude: jobCoordinates[0]?.longitude || 31.0522,
+              latitudeDelta: 4,
+              longitudeDelta: 4,
+            }}
+          >
+            {jobCoordinates.map(({ job, latitude, longitude }) => (
+              <Marker
+                key={job.id}
+                coordinate={{ latitude, longitude }}
+                title={job.crop_type || 'Delivery job'}
+                description={`${job.pickup_location || 'Pickup'} - $${job.payment_amount || 0}`}
+                onCalloutPress={() => navigation.navigate('JobDetails', { job, token })}
+              />
+            ))}
+          </MapView>
+          {jobCoordinates.length === 0 && (
+            <View style={styles.mapNotice}>
+              <Text style={styles.mapNoticeText}>No GPS coordinates are attached to these jobs yet. Showing Zimbabwe map center.</Text>
+            </View>
+          )}
+          <FlatList
+            horizontal
+            data={jobs}
+            keyExtractor={item => String(item.id)}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={styles.mapJobCard} onPress={() => navigation.navigate('JobDetails', { job: item, token })}>
+                <Text style={styles.mapJobTitle}>{item.crop_type || 'Delivery job'}</Text>
+                <Text style={styles.mapJobMeta}>{item.distance_km || 0} km - ${item.payment_amount || 0}</Text>
+              </TouchableOpacity>
+            )}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.mapJobList}
+          />
+        </View>
       ) : (
         <FlatList
           data={jobs}
@@ -257,8 +315,8 @@ export default function JobsScreen({ route, navigation }) {
               <View style={styles.emptyIcon}>
                 <IconMapPin size={40} color="#CCC" />
               </View>
-              <Text style={styles.emptyTitle}>No Jobs Available</Text>
-              <Text style={styles.emptyText}>New jobs are posted frequently.{'\n'}Pull down to refresh.</Text>
+              <Text style={styles.emptyTitle}>{error ? 'Jobs Could Not Load' : 'No Jobs Available'}</Text>
+              <Text style={styles.emptyText}>{error || `New jobs are posted frequently.\nPull down to refresh.`}</Text>
               <TouchableOpacity style={styles.refreshBtn} onPress={onRefresh}>
                 <Text style={styles.refreshBtnText}>Refresh</Text>
               </TouchableOpacity>
@@ -295,8 +353,21 @@ const styles = StyleSheet.create({
   summaryNum: { fontSize: 18, fontWeight: '900', color: theme.colors.dark },
   summaryLabel: { fontSize: 10, color: '#999', fontWeight: '600' },
   summaryDivider: { width: 1, backgroundColor: '#F0F0F0' },
+  viewToggle: { flexDirection: 'row', backgroundColor: '#FFF', borderRadius: 16, padding: 4, marginTop: 12, borderWidth: 1, borderColor: '#F0F0F0' },
+  viewToggleBtn: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 12 },
+  viewToggleActive: { backgroundColor: theme.colors.sky },
+  viewToggleText: { color: '#64748b', fontWeight: '900' },
+  viewToggleTextActive: { color: '#FFF' },
 
   listContent: { paddingBottom: 120, paddingHorizontal: 20, paddingTop: 4 },
+  mapMode: { flex: 1 },
+  map: { flex: 1, marginHorizontal: 20, borderRadius: 24, overflow: 'hidden' },
+  mapNotice: { position: 'absolute', left: 32, right: 32, top: 16, backgroundColor: '#FFF', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#E0E0E0' },
+  mapNoticeText: { color: '#64748b', fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  mapJobList: { paddingHorizontal: 20, paddingVertical: 14, gap: 12 },
+  mapJobCard: { width: 220, backgroundColor: '#FFF', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#F0F0F0', ...theme.shadows.xs },
+  mapJobTitle: { color: theme.colors.dark, fontSize: 16, fontWeight: '900' },
+  mapJobMeta: { color: theme.colors.sky, fontSize: 13, fontWeight: '800', marginTop: 6 },
 
   jobCard: {
     backgroundColor: '#FFF', borderRadius: 20, padding: 18, marginBottom: 14,

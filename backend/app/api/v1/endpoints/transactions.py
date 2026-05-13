@@ -9,7 +9,9 @@ from app.models.transaction import Order, OrderStatus, Transaction
 from app.models.user import User, UserRole
 from app.models.review import TradeReview
 from app.schemas.review import TradeReviewCreate, TradeReviewResponse
+from app.schemas.dispute import DisputeCreate, DisputeResponse
 from app.schemas.transaction import DeliveryConfirmRequest, OrderResponse, TransactionResponse
+from app.services.dispute_service import create_dispute
 
 # --- Clean architecture (v2) wiring ----------------------------------------
 from app.api.v1.dependencies import get_confirm_delivery, get_get_order
@@ -32,6 +34,12 @@ from app.domain.orders.exceptions import (
 # ---------------------------------------------------------------------------
 
 router = APIRouter()
+
+
+class OrderDisputeRequest(BaseModel):
+    reason: str = "quality"
+    type: Optional[str] = None
+    description: Optional[str] = None
 
 
 # --- Domain-error -> HTTP translator (single place) -------------------------
@@ -98,6 +106,19 @@ def confirm_order_delivery(
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Settlement Failure: {str(e)}")
+
+
+@router.post("/{order_id}/dispute", response_model=DisputeResponse)
+def raise_order_dispute(
+    order_id: uuid.UUID,
+    payload: OrderDisputeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    description = payload.description or payload.reason
+    dispute_type = payload.type or payload.reason
+    command = DisputeCreate(order_id=order_id, type=dispute_type[:30], description=description)
+    return create_dispute(db, command, current_user)
 
 
 @router.get("/{order_id}/transactions", response_model=List[TransactionResponse])

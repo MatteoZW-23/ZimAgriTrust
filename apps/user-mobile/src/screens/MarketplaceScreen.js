@@ -50,7 +50,8 @@ function StatCard({ label, value }) {
   );
 }
 
-export default function MarketplaceScreen({ navigation }) {
+export default function MarketplaceScreen({ navigation, route }) {
+  const { role = 'buyer', token, profile } = route.params || {};
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [listings, setListings] = useState([]);
   const [pagination, setPagination] = useState(null);
@@ -265,7 +266,7 @@ export default function MarketplaceScreen({ navigation }) {
               key={listing.id}
               style={styles.listingCard}
               activeOpacity={0.9}
-              onPress={() => navigation.navigate('MakeOffer', { product: toOfferPayload(listing) })}
+              onPress={() => navigation.navigate('ListingDetail', { listing, role, token, profile })}
             >
               <View style={styles.cardTop}>
                 <View style={{ flex: 1, paddingRight: 12 }}>

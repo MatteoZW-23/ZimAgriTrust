@@ -29,30 +29,7 @@ export default function ChatScreen({ route, navigation }) {
       setMessages(Array.isArray(data) ? data : data?.messages || []);
     } catch (error) {
       console.warn('Failed to fetch messages:', error);
-      // Show demo messages for development
-      setMessages([
-        {
-          id: '1',
-          sender_id: 'other',
-          message: 'Hi! Is the maize still available?',
-          timestamp: '2026-05-03T10:00:00Z',
-          sender_name: otherUserInfo.full_name
-        },
-        {
-          id: '2',
-          sender_id: 'me',
-          message: 'Yes, I have 500kg available. When can you pick up?',
-          timestamp: '2026-05-03T10:05:00Z',
-          sender_name: 'You'
-        },
-        {
-          id: '3',
-          sender_id: 'other',
-          message: 'Great! I can come tomorrow morning. What\'s your location?',
-          timestamp: '2026-05-03T10:10:00Z',
-          sender_name: otherUserInfo.full_name
-        }
-      ]);
+      setMessages([]);
     } finally {
       setLoading(false);
     }

@@ -2,7 +2,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView,
   Alert, Image, Modal, TextInput, ActivityIndicator, Share, Platform,
+  Linking, PanResponder,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import {
   ArrowLeft as IconArrowLeft, MapPin as IconMapPin, 
   CheckCircle as IconCheckCircle, Truck as IconTruck, 
@@ -32,10 +34,13 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
   const [photos, setPhotos] = useState([]);
   const [notes, setNotes] = useState('');
   const [signature, setSignature] = useState(null);
+  const [signaturePaths, setSignaturePaths] = useState([]);
+  const [currentSignaturePath, setCurrentSignaturePath] = useState('');
   const [issueType, setIssueType] = useState('');
   const [issueDescription, setIssueDescription] = useState('');
   const [locationStatus, setLocationStatus] = useState({});
   const mapRef = useRef(null);
+  const currentPathRef = useRef('');
 
   const currentIdx = STEPS.findIndex(s => s.key === status);
 
@@ -106,8 +111,42 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
   };
 
   const handleCaptureSignature = async () => {
-    // In a real app, this would open a signature pad
-    Alert.alert('Signature', 'Signature capture feature would open here');
+    if (signaturePaths.length === 0) {
+      Alert.alert('Signature required', 'Please sign inside the signature box first.');
+      return;
+    }
+    setSignature({ uri: 'signature-pad', paths: signaturePaths });
+    Alert.alert('Signature captured', 'The buyer signature has been attached to this delivery proof.');
+  };
+
+  const signatureResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: (event) => {
+      const { locationX, locationY } = event.nativeEvent;
+      currentPathRef.current = `M ${Math.round(locationX)} ${Math.round(locationY)}`;
+      setCurrentSignaturePath(currentPathRef.current);
+      setSignature(null);
+    },
+    onPanResponderMove: (event) => {
+      const { locationX, locationY } = event.nativeEvent;
+      currentPathRef.current = `${currentPathRef.current} L ${Math.round(locationX)} ${Math.round(locationY)}`;
+      setCurrentSignaturePath(currentPathRef.current);
+    },
+    onPanResponderRelease: () => {
+      if (currentPathRef.current) {
+        setSignaturePaths((paths) => [...paths, currentPathRef.current]);
+      }
+      currentPathRef.current = '';
+      setCurrentSignaturePath('');
+    },
+  })).current;
+
+  const clearSignature = () => {
+    setSignature(null);
+    setSignaturePaths([]);
+    setCurrentSignaturePath('');
+    currentPathRef.current = '';
   };
 
   const handleSubmitProof = async () => {
@@ -115,13 +154,18 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
       Alert.alert('Error', 'Please take at least one photo');
       return;
     }
+    const isPickupProof = status === 'picked_up' || status === 'pending';
+    if (!isPickupProof && signaturePaths.length === 0) {
+      Alert.alert('Signature required', 'Please capture the receiver signature before submitting delivery proof.');
+      return;
+    }
 
     try {
       setUpdating(true);
       const photoBase64 = photos[0].uri; // In real app, convert to base64
-      const signatureBase64 = signature ? signature.uri : null;
+      const signatureBase64 = signaturePaths.length > 0 ? JSON.stringify(signaturePaths) : null;
 
-      if (status === 'picked_up' || status === 'pending') {
+      if (isPickupProof) {
         await confirmPickup(token, delivery.id, photoBase64);
         setStatus('picked_up');
       } else {
@@ -133,6 +177,8 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
       setPhotos([]);
       setNotes('');
       setSignature(null);
+      setSignaturePaths([]);
+      setCurrentSignaturePath('');
       
       Alert.alert('Success', 'Delivery proof submitted successfully');
     } catch (error) {
@@ -183,17 +229,21 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
   };
 
   const handleCallCustomer = () => {
-    // In a real app, this would make a phone call
-    Alert.alert('Call Customer', `Would call ${delivery.customer_phone || 'customer'}`);
+    const phone = delivery.customer_phone || delivery.buyer_phone || delivery.farmer_phone;
+    if (!phone) {
+      Alert.alert('No phone number', 'This delivery does not include a callable phone number.');
+      return;
+    }
+    Linking.openURL(`tel:${phone}`).catch(() => Alert.alert('Call failed', 'Could not open the phone dialer.'));
   };
 
   const handleNavigate = () => {
-    // In a real app, this would open navigation app
     const currentLocation = LocationTracker.getLastLocation();
-    if (currentLocation && delivery.delivery_location_coords) {
-      const url = `https://maps.google.com/maps/dir/${currentLocation.latitude},${currentLocation.longitude}/${delivery.delivery_location_coords.latitude},${delivery.delivery_location_coords.longitude}`;
-      console.log('Navigate to:', url);
-    }
+    const destination = delivery.delivery_location_coords || delivery.dropoff_coords || delivery.pickup_location_coords;
+    const url = currentLocation && destination
+      ? `https://maps.google.com/maps/dir/${currentLocation.latitude},${currentLocation.longitude}/${destination.latitude},${destination.longitude}`
+      : `https://maps.google.com/?q=${encodeURIComponent(delivery.delivery_location || delivery.pickup_location || '')}`;
+    Linking.openURL(url).catch(() => Alert.alert('Navigation failed', 'Could not open maps.'));
   };
 
   const nextStep = STEPS[currentIdx + 1];
@@ -385,11 +435,28 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
               numberOfLines={4}
             />
             
-            <TouchableOpacity style={styles.signatureButton} onPress={handleCaptureSignature}>
-              <Text style={styles.signatureButtonText}>
-                {signature ? 'Signature Captured' : 'Capture Signature'}
-              </Text>
-            </TouchableOpacity>
+            <Text style={styles.modalSectionTitle}>Receiver Signature</Text>
+            <View style={styles.signaturePad} {...signatureResponder.panHandlers}>
+              <Svg width="100%" height="100%">
+                {signaturePaths.map((path, index) => (
+                  <Path key={index} d={path} stroke="#111827" strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                ))}
+                {currentSignaturePath ? (
+                  <Path d={currentSignaturePath} stroke="#111827" strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                ) : null}
+              </Svg>
+              {signaturePaths.length === 0 && !currentSignaturePath ? <Text style={styles.signatureHint}>Sign here</Text> : null}
+            </View>
+            <View style={styles.signatureActions}>
+              <TouchableOpacity style={styles.signatureButton} onPress={handleCaptureSignature}>
+                <Text style={styles.signatureButtonText}>
+                  {signature ? 'Signature Attached' : 'Use Signature'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.signatureButton, styles.clearSignatureButton]} onPress={clearSignature}>
+                <Text style={[styles.signatureButtonText, { color: '#ef4444' }]}>Clear</Text>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
           
           <View style={styles.modalFooter}>
@@ -748,6 +815,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   signatureButton: {
+    flex: 1,
     backgroundColor: '#F5F5F5',
     borderRadius: 12,
     padding: 16,
@@ -756,10 +824,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
+  clearSignatureButton: {
+    backgroundColor: '#fff5f5',
+    borderColor: '#fecaca',
+  },
   signatureButtonText: {
     fontSize: 15,
     fontWeight: '600',
     color: theme.colors.sky,
+  },
+  signaturePad: {
+    height: 180,
+    backgroundColor: '#FFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  signatureHint: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 74,
+    textAlign: 'center',
+    color: '#CBD5E1',
+    fontWeight: '800',
+  },
+  signatureActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 24,
   },
 
   issueTypes: {

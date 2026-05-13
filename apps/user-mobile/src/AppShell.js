@@ -5,7 +5,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { 
   Home as IconHome, ShoppingBag as IconShoppingBag, Package as IconPackage, 
-  Wallet as IconWallet, User as IconUser, PlusCircle as IconPlusCircle 
+  Wallet as IconWallet, User as IconUser, ClipboardList as IconClipboardList,
+  HandCoins as IconHandCoins
 } from 'lucide-react-native';
 import { theme } from './styles';
 import { saveSession, getSession, clearSession, setOnboarded, hasOnboarded } from './utils/auth';
@@ -15,20 +16,37 @@ import { setupNotificationHandler, registerForPushNotifications } from './utils/
 import OnboardingScreen from './screens/OnboardingScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import HomeScreen from './screens/HomeScreen';
+import FarmerDashboardScreen from './screens/FarmerDashboardScreen';
+import BuyerDashboardScreen from './screens/BuyerDashboardScreen';
 import MarketplaceScreen from './screens/MarketplaceScreen';
+import ListingDetailScreen from './screens/ListingDetailScreen';
 import CreateListingScreen from './screens/CreateListingScreen';
 import OrderDetailsScreen from './screens/OrderDetailsScreen';
 import MakeOfferScreen from './screens/MakeOfferScreen';
 import ConfirmationScreen from './screens/ConfirmationScreen';
 import WalletScreen from './screens/WalletScreen';
+import FarmerWalletScreen from './screens/FarmerWalletScreen';
+import BuyerWalletScreen from './screens/BuyerWalletScreen';
 import MyListingsScreen from './screens/MyListingsScreen';
 import MyOrdersScreen from './screens/MyOrdersScreen';
+import FarmerOrdersScreen from './screens/FarmerOrdersScreen';
+import BuyerOrdersScreen from './screens/BuyerOrdersScreen';
+import OffersReceivedScreen from './screens/OffersReceivedScreen';
+import MyOffersScreen from './screens/MyOffersScreen';
+import SavedListingsScreen from './screens/SavedListingsScreen';
 import RateUserScreen from './screens/RateUserScreen';
 import WithdrawScreen from './screens/WithdrawScreen';
 import PaymentScreen from './screens/PaymentScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import AgentApplicationScreen from './screens/AgentApplicationScreen';
 import EditProfileScreen from './screens/EditProfileScreen';
+import ChangePinScreen from './screens/ChangePinScreen';
+import SettingsScreen from './screens/SettingsScreen';
+import PrivacyScreen from './screens/PrivacyScreen';
+import SupportScreen from './screens/SupportScreen';
+import DisputesScreen from './screens/DisputesScreen';
+import RaiseDisputeScreen from './screens/RaiseDisputeScreen';
+import VerificationScreen from './screens/VerificationScreen';
 
 let Stack = null;
 if (Platform.OS !== 'web') {
@@ -40,23 +58,37 @@ const Tab = createBottomTabNavigator();
 // Web-only simple tab bar fallback
 function WebTabBar({ activeTab, onChangeTab, role, token, profile, onLogout }) {
   const accent = role === 'farmer' ? theme.colors.green : theme.colors.sky;
+  const webNavigation = {
+    navigate: (screen) => onChangeTab(['Dashboard', 'Market', 'Listings', 'Offers', 'Orders', 'Profile'].includes(screen) ? screen : 'Profile'),
+    goBack: () => onChangeTab('Dashboard'),
+  };
   
   const tabs = [
     ...(role === 'farmer' 
-      ? [{ key: 'Home', icon: IconHome, label: 'Home' }] 
-      : [{ key: 'Market', icon: IconShoppingBag, label: 'Market' }]
+      ? [
+          { key: 'Dashboard', icon: IconHome, label: 'Dashboard' },
+          { key: 'Market', icon: IconShoppingBag, label: 'Market' },
+          { key: 'Listings', icon: IconClipboardList, label: 'Listings' },
+        ] 
+      : [
+          { key: 'Dashboard', icon: IconHome, label: 'Dashboard' },
+          { key: 'Market', icon: IconShoppingBag, label: 'Market' },
+          { key: 'Offers', icon: IconHandCoins, label: 'Offers' },
+        ]
     ),
     { key: 'Orders', icon: IconPackage, label: 'Orders' },
-    { key: 'Wallet', icon: IconWallet, label: 'Wallet' },
     { key: 'Profile', icon: IconUser, label: 'Profile' },
   ];
 
   const screens = {
-    Home: <HomeScreen route={{ params: { role, token, profile } }} />,
-    Market: <MarketplaceScreen route={{ params: { token } }} />,
-    Orders: <MyOrdersScreen route={{ params: { role, token } }} />,
-    Wallet: <WalletScreen route={{ params: { token } }} />,
-    Profile: <ProfileScreen route={{ params: { role, token, profile, onLogout } }} />,
+    Dashboard: role === 'farmer'
+      ? <FarmerDashboardScreen route={{ params: { role, token, profile } }} navigation={webNavigation} />
+      : <BuyerDashboardScreen route={{ params: { role, token, profile } }} navigation={webNavigation} />,
+    Market: <MarketplaceScreen route={{ params: { role, token, profile } }} navigation={webNavigation} />,
+    Listings: <MyListingsScreen route={{ params: { token } }} navigation={webNavigation} />,
+    Offers: <MyOffersScreen route={{ params: { token } }} navigation={webNavigation} />,
+    Orders: <MyOrdersScreen route={{ params: { role, token } }} navigation={webNavigation} />,
+    Profile: <ProfileScreen route={{ params: { role, token, profile, onLogout } }} navigation={webNavigation} />,
   };
 
   return (
@@ -109,59 +141,55 @@ function MainTabs({ route }) {
     >
       {role === 'farmer' ? (
         <Tab.Screen
-          name="FarmerDash"
-          component={HomeScreen}
+          name="FarmerDashboard"
+          component={FarmerDashboardScreen}
           initialParams={{ role, token, profile }}
           options={{
-            tabBarLabel: 'Home',
+            tabBarLabel: 'Dashboard',
             tabBarIcon: ({ color, size }) => <IconHome size={size || 22} color={color} />,
           }}
         />
       ) : (
         <Tab.Screen
-          name="Marketplace"
-          component={MarketplaceScreen}
-          initialParams={{ token }}
+          name="BuyerDashboard"
+          component={BuyerDashboardScreen}
+          initialParams={{ role, token, profile }}
           options={{
-            tabBarLabel: 'Market',
-            tabBarIcon: ({ color, size }) => <IconShoppingBag size={size || 22} color={color} />,
+            tabBarLabel: 'Dashboard',
+            tabBarIcon: ({ color, size }) => <IconHome size={size || 22} color={color} />,
           }}
         />
       )}
 
       <Tab.Screen
-        name="MyOrders"
-        component={MyOrdersScreen}
+        name="Marketplace"
+        component={MarketplaceScreen}
+        initialParams={{ role, token, profile }}
+        options={{
+          tabBarLabel: 'Market',
+          tabBarIcon: ({ color, size }) => <IconShoppingBag size={size || 22} color={color} />,
+        }}
+      />
+
+      <Tab.Screen
+        name={role === 'farmer' ? 'FarmerListings' : 'BuyerOffers'}
+        component={role === 'farmer' ? MyListingsScreen : MyOffersScreen}
+        initialParams={{ token }}
+        options={{
+          tabBarLabel: role === 'farmer' ? 'Listings' : 'Offers',
+          tabBarIcon: ({ color, size }) => role === 'farmer'
+            ? <IconClipboardList size={size || 22} color={color} />
+            : <IconHandCoins size={size || 22} color={color} />,
+        }}
+      />
+
+      <Tab.Screen
+        name={role === 'farmer' ? 'FarmerOrders' : 'BuyerOrders'}
+        component={role === 'farmer' ? FarmerOrdersScreen : BuyerOrdersScreen}
         initialParams={{ role, token }}
         options={{
           tabBarLabel: 'Orders',
           tabBarIcon: ({ color, size }) => <IconPackage size={size || 22} color={color} />,
-        }}
-      />
-
-      {role === 'farmer' && (
-        <Tab.Screen
-          name="AddListing"
-          component={CreateListingScreen}
-          initialParams={{ token }}
-          options={{
-            tabBarLabel: 'Sell',
-            tabBarIcon: () => (
-              <View style={[styles.addBtn, { backgroundColor: accent }]}>
-                <IconPlusCircle size={28} color="#FFF" />
-              </View>
-            ),
-          }}
-        />
-      )}
-
-      <Tab.Screen
-        name="WalletTab"
-        component={WalletScreen}
-        initialParams={{ token }}
-        options={{
-          tabBarLabel: 'Wallet',
-          tabBarIcon: ({ color, size }) => <IconWallet size={size || 22} color={color} />,
         }}
       />
 
@@ -189,8 +217,7 @@ export default function AppShell() {
 
   // Sync webTab if role changes
   useEffect(() => {
-    if (role === 'farmer') setWebTab('Home');
-    else setWebTab('Market');
+    setWebTab('Dashboard');
   }, [role]);
 
   // Restore session on mount
@@ -302,18 +329,33 @@ export default function AppShell() {
             onLogout: handleLogout,
           }}
         />
+        <Stack.Screen name="ListingDetail" component={ListingDetailScreen} />
         <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} />
         <Stack.Screen name="MakeOffer" component={MakeOfferScreen} />
         <Stack.Screen name="ConfirmDelivery" component={ConfirmationScreen} />
         <Stack.Screen name="Wallet" component={WalletScreen} />
+        <Stack.Screen name="FarmerWallet" component={FarmerWalletScreen} />
+        <Stack.Screen name="BuyerWallet" component={BuyerWalletScreen} />
         <Stack.Screen name="MyListings" component={MyListingsScreen} />
+        <Stack.Screen name="OffersReceived" component={OffersReceivedScreen} />
+        <Stack.Screen name="MyOffers" component={MyOffersScreen} />
+        <Stack.Screen name="SavedListings" component={SavedListingsScreen} />
         <Stack.Screen name="MyOrders" component={MyOrdersScreen} />
+        <Stack.Screen name="FarmerOrders" component={FarmerOrdersScreen} />
+        <Stack.Screen name="BuyerOrders" component={BuyerOrdersScreen} />
         <Stack.Screen name="RateUser" component={RateUserScreen} />
         <Stack.Screen name="Withdraw" component={WithdrawScreen} />
         <Stack.Screen name="CreateListing" component={CreateListingScreen} />
         <Stack.Screen name="Payment" component={PaymentScreen} />
         <Stack.Screen name="AgentApplication" component={AgentApplicationScreen} />
         <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+        <Stack.Screen name="ChangePin" component={ChangePinScreen} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="Privacy" component={PrivacyScreen} />
+        <Stack.Screen name="Support" component={SupportScreen} />
+        <Stack.Screen name="Disputes" component={DisputesScreen} />
+        <Stack.Screen name="RaiseDispute" component={RaiseDisputeScreen} />
+        <Stack.Screen name="Verification" component={VerificationScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

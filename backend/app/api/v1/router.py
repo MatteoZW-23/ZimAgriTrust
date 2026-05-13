@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import admin, audit, auth, disputes, listings, market, payments, transactions, ussd, agents, logistics, ai, whatsapp, trades, recruitment, onboarding, requests, academy, vision, public, drivers, verification, loans, portal_auth, agent_portal, super_admin, admin_approvals, deposits, inputs, browse, wallet, agent_practical, agent_shadowing, ml
+from app.api.v1.endpoints import admin, audit, auth, disputes, listings, market, payments, transactions, ussd, agents, logistics, ai, whatsapp, trades, recruitment, onboarding, requests, academy, vision, public, drivers, verification, loans, portal_auth, agent_portal, super_admin, admin_approvals, deposits, inputs, browse, wallet, agent_practical, agent_shadowing, ml, sepsisai, users, offers
 from app.api.v1.endpoints.webhooks import vision_webhook
 
 api_router = APIRouter()
@@ -13,6 +13,8 @@ api_router.include_router(agent_portal.router, prefix="/agent", tags=["agent-por
 api_router.include_router(whatsapp.router, prefix="/whatsapp", tags=["whatsapp"])
 api_router.include_router(market.router, prefix="/market", tags=["market"])
 api_router.include_router(listings.router, prefix="/listings", tags=["listings"])
+api_router.include_router(offers.router, prefix="/offers", tags=["offers"])
+api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(requests.router, prefix="/procurement", tags=["procurement"])
 api_router.include_router(trades.router, prefix="/trades", tags=["trades"])
 api_router.include_router(transactions.router, prefix="/transactions", tags=["transactions"])
@@ -39,6 +41,7 @@ api_router.include_router(admin_approvals.router, prefix="/admin/approvals", tag
 api_router.include_router(super_admin.router, prefix="/super-admin", tags=["super-admin"])
 api_router.include_router(deposits.router, prefix="/deposits", tags=["deposits"])
 api_router.include_router(inputs.router, prefix="/inputs", tags=["inputs"])
+api_router.include_router(sepsisai.router, prefix="/sepsisai", tags=["sepsisai"])
 api_router.include_router(browse.router, prefix="/browse", tags=["browse"])
 api_router.include_router(wallet.router, prefix="/wallet", tags=["wallet"])
 api_router.include_router(ml.router)

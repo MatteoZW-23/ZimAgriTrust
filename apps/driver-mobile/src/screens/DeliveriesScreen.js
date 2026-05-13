@@ -42,18 +42,16 @@ export default function DeliveriesScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [error, setError] = useState('');
 
   const fetchDeliveries = useCallback(async () => {
     try {
+      setError('');
       const data = await getMyDeliveries(token);
       setDeliveries(Array.isArray(data) ? data : data?.deliveries || []);
-    } catch {
-      setDeliveries([
-        { id: '1', pickup_location: 'Harare - Mbare', delivery_location: 'Chitungwiza', status: 'in_transit', crop_type: 'Maize', weight_kg: 1200, payment_amount: 45, distance_km: 30 },
-        { id: '2', pickup_location: 'Bulawayo - Central', delivery_location: 'Victoria Falls', status: 'delivered', crop_type: 'Tobacco', weight_kg: 800, payment_amount: 120, distance_km: 440 },
-        { id: '3', pickup_location: 'Gweru - Market', delivery_location: 'Kwekwe', status: 'pending', crop_type: 'Groundnuts', weight_kg: 500, payment_amount: 30, distance_km: 60 },
-        { id: '4', pickup_location: 'Chinhoyi - Depot', delivery_location: 'Kariba Town', status: 'picked_up', crop_type: 'Soya Beans', weight_kg: 900, payment_amount: 75, distance_km: 210 },
-      ]);
+    } catch (err) {
+      setDeliveries([]);
+      setError(err.message || 'Could not load deliveries from the server.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -204,11 +202,11 @@ export default function DeliveriesScreen({ route, navigation }) {
               <View style={styles.emptyIcon}>
                 <IconInbox size={40} color="#CCC" />
               </View>
-              <Text style={styles.emptyTitle}>No Deliveries</Text>
+              <Text style={styles.emptyTitle}>{error ? 'Deliveries Could Not Load' : 'No Deliveries'}</Text>
               <Text style={styles.emptyText}>
-                {filter === 'all'
+                {error || (filter === 'all'
                   ? 'Accept jobs from the Jobs tab to start delivering'
-                  : `No ${filter} deliveries found`}
+                  : `No ${filter} deliveries found`)}
               </Text>
             </View>
           }

@@ -8,7 +8,7 @@ import shutil
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
@@ -17,13 +17,15 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_roles
 from app.core.config import settings
-from app.core.security import get_password_hash
+from app.core.security import get_password_hash, verify_password
 from app.models.driver import Driver, DriverJob, DriverStatus
 from app.models.listing import LogisticsType
 from app.models.logistics import OrderDelivery, DeliveryStatus
 from app.models.transaction import Order, OrderStatus
 from app.models.user import User, UserRole, UserStatus
+from app.schemas.auth import Token, UserLogin
 from app.services import transport_service
+from app.services.portal_auth_service import DRIVER_ROLES, login_with_pin
 
 # ── Document storage ──────────────────────────────────────────────────────────
 DRIVER_UPLOAD_DIR = "uploads/driver_documents"
@@ -62,6 +64,24 @@ def _save_driver_file(file: UploadFile, driver_id: str, slot: str) -> Optional[s
     return dest
 
 router = APIRouter()
+
+
+@router.post("/login", response_model=Token)
+async def login_driver_alias(
+    payload: UserLogin,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> Token:
+    return await login_with_pin(
+        db=db,
+        request=request,
+        response=response,
+        phone_number=payload.phone_number,
+        pin=payload.password,
+        allowed_roles=DRIVER_ROLES,
+        portal_name="driver",
+    )
 
 
 # Global OPTIONS handler for all routes in this router
@@ -408,28 +428,29 @@ def register_driver(
 
 
 @router.get("/me")
-def get_my_driver_profile(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+@router.get("/profile")
+def get_my_driver_profile(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     driver = _get_driver(db, current_user)
+    # Use User model for name and phone fields
+    full_name = getattr(current_user, "full_name", getattr(driver, "user", None).full_name if getattr(driver, "user", None) else None)
+    phone_number = getattr(current_user, "phone_number", getattr(driver, "user", None).phone_number if getattr(driver, "user", None) else None)
     return {
         "id": str(driver.id),
-        "full_name": driver.name,
-        "phone_number": driver.phone,
-        "status": driver.status,
-        "vehicle_reg": driver.vehicle_reg,
-        "vehicle_type": driver.vehicle_type,
-        "vehicle_capacity_kg": driver.vehicle_capacity_kg,
-        "avg_rating": driver.avg_rating,
-        "total_deliveries": driver.total_deliveries,
-        "warning_count": driver.warning_count,
-        "license_verified": driver.license_verified,
-        "insurance_verified": driver.insurance_verified,
-        "background_cleared": driver.background_cleared,
-        "address": driver.address,
-        "email": getattr(current_user, "email", ""),
-    }
+            "full_name": full_name,
+            "phone_number": phone_number,
+            "status": driver.status,
+            "vehicle_reg": driver.vehicle_reg,
+            "vehicle_type": driver.vehicle_type,
+            "vehicle_capacity_kg": driver.vehicle_capacity_kg,
+            "avg_rating": driver.avg_rating,
+            "total_deliveries": driver.total_deliveries,
+            "warning_count": driver.warning_count,
+            "license_verified": driver.license_verified,
+            "insurance_verified": driver.insurance_verified,
+            "background_cleared": driver.background_cleared,
+            "address": driver.address,
+            "email": getattr(current_user, "email", ""),
+        }
 
 
 @router.put("/me")
@@ -452,6 +473,15 @@ def update_profile(
         
     db.commit()
     return {"success": True, "message": "Profile updated successfully"}
+
+
+@router.put("/profile")
+def update_driver_profile_alias(
+    payload: ProfileUpdatePayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return update_profile(payload=payload, db=db, current_user=current_user)
 
 
 @router.put("/me/vehicle")
@@ -480,13 +510,24 @@ def change_pin(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Verify current PIN
-    if not verify_password(payload.current_pin, current_user.hashed_password):
+    current_hash = current_user.ussd_pin_hash or current_user.password_hash
+    if not current_hash or not verify_password(payload.current_pin, current_hash):
         raise HTTPException(status_code=400, detail="Invalid current PIN")
     
-    current_user.hashed_password = get_password_hash(payload.new_pin)
+    hashed = get_password_hash(payload.new_pin)
+    current_user.ussd_pin_hash = hashed
+    current_user.password_hash = hashed
     db.commit()
     return {"success": True, "message": "PIN changed successfully"}
+
+
+@router.post("/change-pin")
+def change_pin_alias(
+    payload: ChangePinPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return change_pin(payload=payload, db=db, current_user=current_user)
 
 
 @router.get("/me/settings")
@@ -508,6 +549,14 @@ def get_settings(
     }
 
 
+@router.get("/settings")
+def get_settings_alias(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return get_settings(db=db, current_user=current_user)
+
+
 @router.put("/me/settings")
 def update_settings(
     payload: SettingsUpdatePayload,
@@ -516,6 +565,15 @@ def update_settings(
 ):
     # Mock update
     return {"success": True, "message": "Settings updated"}
+
+
+@router.put("/settings")
+def update_settings_alias(
+    payload: SettingsUpdatePayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return update_settings(payload=payload, db=db, current_user=current_user)
 
 
 @router.post("/me/settings/privacy")
@@ -538,6 +596,14 @@ def delete_driver_data(
     driver.status = DriverStatus.TERMINATED
     db.commit()
     return {"success": True, "message": "Data deletion request submitted"}
+
+
+@router.delete("/data")
+def delete_driver_data_alias(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return delete_driver_data(db=db, current_user=current_user)
 
 
 @router.get("/me/jobs")
@@ -1151,7 +1217,7 @@ class AvailabilityPayload(BaseModel):
 
 class WithdrawPayload(BaseModel):
     amount: float = Field(..., gt=0)
-    method: str = Field(..., regex="^(ecocash|onemoney|bank)$")
+    method: str = Field(..., pattern="^(ecocash|onemoney|bank)$")
 
 
 class NegotiatePayload(BaseModel):

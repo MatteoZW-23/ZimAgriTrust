@@ -659,6 +659,16 @@ async def change_pin(
     return current_user
 
 
+@router.post("/pin/change", response_model=UserResponse)
+async def change_pin_mobile_alias(
+    payload: ChangePinRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> User:
+    return await change_pin(payload=payload, request=request, db=db, current_user=current_user)
+
+
 @router.patch("/profile", response_model=UserResponse)
 def update_profile(
     payload: ProfileUpdate,
