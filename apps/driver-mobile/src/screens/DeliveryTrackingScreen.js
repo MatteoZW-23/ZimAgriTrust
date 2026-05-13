@@ -365,7 +365,7 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
                     style={styles.removePhoto}
                     onPress={() => setPhotos(prev => prev.filter((_, i) => i !== index))}
                   >
-                    <Text style={styles.removePhotoText}>×</Text>
+                    <IconX size={16} color="#FFF" />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -462,7 +462,7 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
                     style={styles.removePhoto}
                     onPress={() => setPhotos(prev => prev.filter((_, i) => i !== index))}
                   >
-                    <Text style={styles.removePhotoText}>×</Text>
+                    <IconX size={16} color="#FFF" />
                   </TouchableOpacity>
                 </View>
               ))}
