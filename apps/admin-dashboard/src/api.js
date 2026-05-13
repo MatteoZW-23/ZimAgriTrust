@@ -910,6 +910,16 @@ export function approveDriver(token, driverId) {
   });
 }
 
+export function rejectDriver(token, driverId, note) {
+  const form = new FormData();
+  form.append('note', note);
+  return request(`/drivers/admin/${driverId}/reject`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+}
+
 export function suspendDriver(token, driverId) {
   return request(`/drivers/admin/${driverId}/suspend`, {
     method: 'POST',

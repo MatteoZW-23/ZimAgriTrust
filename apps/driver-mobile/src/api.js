@@ -24,9 +24,9 @@ async function jsonFetch(path, options = {}) {
   try {
     const response = await fetch(url, {
       headers: {
+        ...(options.headers || {}),
         "Content-Type": "application/json",
         "Accept": "application/json",
-        ...(options.headers || {}),
       },
       ...options,
     });
@@ -66,8 +66,7 @@ export async function driverVerifyOtp(phone_number, otp) {
   });
 }
 
-export async function driverRegister(formData, tempToken) {
-  formData.append("authorization", `Bearer ${tempToken}`);
+export async function driverRegister(formData) {
   const res = await fetch(`${API_BASE_URL}/drivers/self-register`, {
     method: "POST",
     body: formData,
@@ -75,6 +74,23 @@ export async function driverRegister(formData, tempToken) {
   const data = await res.json();
   if (!res.ok) throw new Error(data?.detail || "Registration failed");
   return data;
+}
+
+// Step-by-step Registration (Part 2 requirement)
+export async function registerStepOtp(phone) {
+  return jsonFetch("/drivers/register/otp", { method: "POST", body: JSON.stringify({ phone }) });
+}
+export async function registerStepVerify(phone, otp) {
+  return jsonFetch("/drivers/register/verify", { method: "POST", body: JSON.stringify({ phone, otp }) });
+}
+export async function registerStepPin(pin) {
+  return jsonFetch("/drivers/register/pin", { method: "POST", body: JSON.stringify({ pin }) });
+}
+export async function registerStepPersonal(data) {
+  return jsonFetch("/drivers/register/personal", { method: "POST", body: JSON.stringify(data) });
+}
+export async function registerStepVehicle(data) {
+  return jsonFetch("/drivers/register/vehicle", { method: "POST", body: JSON.stringify(data) });
 }
 
 export async function getProfile(token) {
@@ -110,23 +126,108 @@ export async function updateDeliveryStatus(token, deliveryId, status) {
   });
 }
 
+export async function confirmPickup(token, jobId, photoBase64) {
+  return jsonFetch(`/drivers/jobs/${jobId}/pickup`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ photo_base64: photoBase64 }),
+  });
+}
+
+export async function confirmDelivery(token, jobId, photoBase64, signatureBase64) {
+  return jsonFetch(`/drivers/jobs/${jobId}/deliver`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ photo_base64: photoBase64, signature_base64: signatureBase64 }),
+  });
+}
+
 export async function getEarnings(token) {
   return jsonFetch("/drivers/earnings", {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
 
-export async function getDriverProfile(token) {
-  return jsonFetch("/drivers/profile", {
+export function getDriverProfile(token) {
+  return jsonFetch('/drivers/me', {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
 
-export async function updateDriverLocation(token, latitude, longitude) {
+export function updateDriverProfile(token, payload) {
+  return jsonFetch('/drivers/me', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateVehicleInfo(token, payload) {
+  return jsonFetch('/drivers/me/vehicle', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function changeDriverPin(token, currentPin, newPin) {
+  return jsonFetch('/drivers/me/change-pin', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ current_pin: currentPin, new_pin: newPin }),
+  });
+}
+
+export function getDriverSettings(token) {
+  return jsonFetch('/drivers/me/settings', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function updateDriverSettings(token, payload) {
+  return jsonFetch('/drivers/me/settings', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updatePrivacySettings(token, payload) {
+  return jsonFetch('/drivers/me/settings/privacy', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteDriverData(token) {
+  return jsonFetch('/drivers/me/data', {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function updateDriverLocation(token, latitude, longitude, jobId = null) {
   return jsonFetch("/drivers/location", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ latitude, longitude, timestamp: new Date().toISOString() }),
+    body: JSON.stringify({ latitude, longitude, job_id: jobId }),
+  });
+}
+
+export async function updateAvailability(token, isAvailable) {
+  return jsonFetch("/drivers/availability", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ is_available: isAvailable }),
+  });
+}
+
+export async function withdrawEarnings(token, amount, method, phone) {
+  return jsonFetch("/drivers/earnings/withdraw", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ amount, method, phone }),
   });
 }
 
@@ -189,14 +290,6 @@ export async function reportIssue(token, deliveryId, issueType, description, pho
 export async function getDriverAnalytics(token, period = 'week') {
   return jsonFetch(`/drivers/analytics?period=${period}`, {
     headers: { Authorization: `Bearer ${token}` },
-  });
-}
-
-export async function updateDriverProfile(token, profileData) {
-  return jsonFetch("/drivers/profile", {
-    method: "PATCH",
-    headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify(profileData),
   });
 }
 

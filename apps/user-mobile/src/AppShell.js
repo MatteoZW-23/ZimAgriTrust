@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Home, ShoppingBag, Package, Wallet, User, PlusCircle } from 'lucide-react-native';
+import { 
+  Home as IconHome, ShoppingBag as IconShoppingBag, Package as IconPackage, 
+  Wallet as IconWallet, User as IconUser, PlusCircle as IconPlusCircle 
+} from 'lucide-react-native';
 import { theme } from './styles';
 import { saveSession, getSession, clearSession, setOnboarded, hasOnboarded } from './utils/auth';
 import { setupNotificationHandler, registerForPushNotifications } from './utils/notifications';
@@ -27,8 +30,53 @@ import ProfileScreen from './screens/ProfileScreen';
 import AgentApplicationScreen from './screens/AgentApplicationScreen';
 import EditProfileScreen from './screens/EditProfileScreen';
 
-const Stack = createStackNavigator();
+let Stack = null;
+if (Platform.OS !== 'web') {
+  const { createStackNavigator } = require('@react-navigation/stack');
+  Stack = createStackNavigator();
+}
 const Tab = createBottomTabNavigator();
+
+// Web-only simple tab bar fallback
+function WebTabBar({ activeTab, onChangeTab, role, token, profile, onLogout }) {
+  const accent = role === 'farmer' ? theme.colors.green : theme.colors.sky;
+  
+  const tabs = [
+    ...(role === 'farmer' 
+      ? [{ key: 'Home', icon: IconHome, label: 'Home' }] 
+      : [{ key: 'Market', icon: IconShoppingBag, label: 'Market' }]
+    ),
+    { key: 'Orders', icon: IconPackage, label: 'Orders' },
+    { key: 'Wallet', icon: IconWallet, label: 'Wallet' },
+    { key: 'Profile', icon: IconUser, label: 'Profile' },
+  ];
+
+  const screens = {
+    Home: <HomeScreen route={{ params: { role, token, profile } }} />,
+    Market: <MarketplaceScreen route={{ params: { token } }} />,
+    Orders: <MyOrdersScreen route={{ params: { role, token } }} />,
+    Wallet: <WalletScreen route={{ params: { token } }} />,
+    Profile: <ProfileScreen route={{ params: { role, token, profile, onLogout } }} />,
+  };
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>{screens[activeTab]}</View>
+      <View style={styles.webTabBar}>
+        {tabs.map(t => {
+          const IconComp = t.icon;
+          const active = activeTab === t.key;
+          return (
+            <TouchableOpacity key={t.key} style={styles.webTab} onPress={() => onChangeTab(t.key)}>
+              <IconComp size={22} color={active ? accent : '#999'} />
+              <Text style={[styles.webTabLabel, active && { color: accent }]}>{t.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
 
 function MainTabs({ route }) {
   const { role = 'buyer', token, profile = {}, onLogout } = route.params || {};
@@ -66,7 +114,7 @@ function MainTabs({ route }) {
           initialParams={{ role, token, profile }}
           options={{
             tabBarLabel: 'Home',
-            tabBarIcon: ({ color, size }) => <Home size={size || 22} color={color} />,
+            tabBarIcon: ({ color, size }) => <IconHome size={size || 22} color={color} />,
           }}
         />
       ) : (
@@ -76,7 +124,7 @@ function MainTabs({ route }) {
           initialParams={{ token }}
           options={{
             tabBarLabel: 'Market',
-            tabBarIcon: ({ color, size }) => <ShoppingBag size={size || 22} color={color} />,
+            tabBarIcon: ({ color, size }) => <IconShoppingBag size={size || 22} color={color} />,
           }}
         />
       )}
@@ -87,7 +135,7 @@ function MainTabs({ route }) {
         initialParams={{ role, token }}
         options={{
           tabBarLabel: 'Orders',
-          tabBarIcon: ({ color, size }) => <Package size={size || 22} color={color} />,
+          tabBarIcon: ({ color, size }) => <IconPackage size={size || 22} color={color} />,
         }}
       />
 
@@ -100,7 +148,7 @@ function MainTabs({ route }) {
             tabBarLabel: 'Sell',
             tabBarIcon: () => (
               <View style={[styles.addBtn, { backgroundColor: accent }]}>
-                <PlusCircle size={28} color="#FFF" />
+                <IconPlusCircle size={28} color="#FFF" />
               </View>
             ),
           }}
@@ -113,7 +161,7 @@ function MainTabs({ route }) {
         initialParams={{ token }}
         options={{
           tabBarLabel: 'Wallet',
-          tabBarIcon: ({ color, size }) => <Wallet size={size || 22} color={color} />,
+          tabBarIcon: ({ color, size }) => <IconWallet size={size || 22} color={color} />,
         }}
       />
 
@@ -123,7 +171,7 @@ function MainTabs({ route }) {
         initialParams={{ role, token, profile, onLogout }}
         options={{
           tabBarLabel: 'Profile',
-          tabBarIcon: ({ color, size }) => <User size={size || 22} color={color} />,
+          tabBarIcon: ({ color, size }) => <IconUser size={size || 22} color={color} />,
         }}
       />
     </Tab.Navigator>
@@ -137,6 +185,13 @@ export default function AppShell() {
   const [role, setRole] = useState(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [session, setSession] = useState(null);
+  const [webTab, setWebTab] = useState('Home');
+
+  // Sync webTab if role changes
+  useEffect(() => {
+    if (role === 'farmer') setWebTab('Home');
+    else setWebTab('Market');
+  }, [role]);
 
   // Restore session on mount
   useEffect(() => {
@@ -221,6 +276,19 @@ export default function AppShell() {
     return <OnboardingScreen onComplete={handleOnboardingComplete} />;
   }
 
+  if (Platform.OS === 'web') {
+    return (
+      <WebTabBar
+        activeTab={webTab}
+        onChangeTab={setWebTab}
+        role={role}
+        token={session?.access_token}
+        profile={session?.profile}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -290,4 +358,7 @@ const styles = StyleSheet.create({
   splashMarket: { fontSize: 16, fontWeight: '600', color: theme.colors.gold, letterSpacing: 2, textTransform: 'uppercase', marginTop: 8 },
   onboardBox: { position: 'absolute', bottom: 100, paddingHorizontal: 40, alignItems: 'center' },
   onboardText: { color: '#FFF', fontSize: 16, textAlign: 'center', marginBottom: 40, lineHeight: 24, fontWeight: '500', letterSpacing: 0.5 },
+  webTabBar: { flexDirection: 'row', backgroundColor: '#FFF', borderTopWidth: 1, borderTopColor: '#EEE', paddingVertical: 10, paddingBottom: 20 },
+  webTab: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  webTabLabel: { fontSize: 11, fontWeight: '700', color: '#999' },
 });

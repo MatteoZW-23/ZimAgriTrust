@@ -4,7 +4,7 @@ import {
   TextInput, ActivityIndicator, Alert, Image, KeyboardAvoidingView,
   Platform, ScrollView
 } from 'react-native';
-import { Send, Paperclip, Phone, Video, Info, ChevronLeft } from 'lucide-react-native';
+import { Send as IconSend, Paperclip as IconPaperclip, Phone as IconPhone, Video as IconVideo, Info as IconInfo, ChevronLeft as IconChevronLeft } from 'lucide-react-native';
 import { theme } from '../styles';
 import { getConversations, getMessages, sendMessage } from '../api';
 import * as ImagePicker from 'expo-image-picker';
@@ -216,7 +216,7 @@ export default function ChatScreen({ route, navigation }) {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <ChevronLeft size={24} color={theme.colors.dark} />
+          <IconChevronLeft size={24} color={theme.colors.dark} />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
           <Text style={styles.headerName}>{otherUserInfo.full_name}</Text>
@@ -224,13 +224,13 @@ export default function ChatScreen({ route, navigation }) {
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.actionButton}>
-            <Phone size={20} color={theme.colors.sky} />
+            <IconPhone size={20} color={theme.colors.sky} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton}>
-            <Video size={20} color={theme.colors.sky} />
+            <IconVideo size={20} color={theme.colors.sky} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton}>
-            <Info size={20} color={theme.colors.sky} />
+            <IconInfo size={20} color={theme.colors.sky} />
           </TouchableOpacity>
         </View>
       </View>
@@ -272,7 +272,7 @@ export default function ChatScreen({ route, navigation }) {
             onPress={handleAttachPhoto}
             disabled={sending}
           >
-            <Paperclip size={20} color="#666" />
+            <IconPaperclip size={20} color="#666" />
           </TouchableOpacity>
           
           <TextInput
@@ -294,7 +294,7 @@ export default function ChatScreen({ route, navigation }) {
             {sending ? (
               <ActivityIndicator size="small" color="#FFF" />
             ) : (
-              <Send size={18} color="#FFF" />
+              <IconSend size={18} color="#FFF" />
             )}
           </TouchableOpacity>
         </View>

@@ -1332,10 +1332,16 @@ class WhatsAppService:
         """
         AI Vision Advisory: Handles Pest/Disease detection and Grading via chat.
         """
-        from app.ml.vision.vision_service import vision_core
+        try:
+            from app.ml.vision.vision_service import vision_service
+        except ImportError as e:
+            # Vision service not available in production-slim environment
+            return (f"⚠️ *Vision Service Unavailable*\n\n"
+                    f"The AI vision analysis feature is currently unavailable in this environment.\n\n"
+                    f"Please contact support or use the web portal for crop analysis.")
         
         # In production, we'd download the media from WhatsApp's API here.
-        # For now, we simulate the analysis result using the production vision_core engine.
+        # For now, we simulate the analysis result using the production vision_service engine.
         import base64
         import tempfile
         import os
@@ -1345,25 +1351,43 @@ class WhatsAppService:
             tmp.write(base64.b64decode(media['data']))
             image_path = tmp.name
         
-        analysis = vision_core.analyze_produce(image_path)
-        
-        # Cleanup
-        try: os.remove(image_path)
-        except: pass
-        
-        if not analysis.get("is_agricultural", True):
-            return (f"⚠️ *Visual Validation Failed*\n\n"
-                    f"The image provided does not appear to be a recognized agricultural commodity.\n\n"
-                    f"Please ensure the photo is clear, well-lit, and focused on the crop or leaf you wish to analyze.")
+        try:
+            with open(image_path, 'rb') as f:
+                image_data = f.read()
+            
+            # Use the actual vision_service API
+            analysis = await vision_service.full_analysis(image_data)
+            
+            # Cleanup
+            try: os.remove(image_path)
+            except: pass
+            
+            if not analysis.get("success", True):
+                return (f"⚠️ *Visual Validation Failed*\n\n"
+                        f"The image provided does not appear to be a recognized agricultural commodity.\n\n"
+                        f"Please ensure the photo is clear, well-lit, and focused on the crop or leaf you wish to analyze.")
 
-        return (f"🔬 *Sovereign AI Vision Analysis*\n\n"
-                f"Crop Detected: *{analysis['crop_type']}*\n"
-                f"Health Status: *{analysis['health']['status']}*\n"
-                f"Quality Grade: *{analysis['grading']['grade']}*\n"
-                f"Confidence: {analysis['classification']['confidence'] * 100:.1f}%\n\n"
-                f"🌿 *Recommended Action:* \n"
-                f"{analysis['health'].get('remedy', 'Maintain current moisture levels.')}\n\n"
-                f"Type 'sell' if you want to list this crop.")
+            crop_info = analysis.get("crop", {})
+            health_info = analysis.get("health", {})
+            grade_info = analysis.get("grade", {})
+            disease_info = analysis.get("disease", {})
+
+            return (f"🔬 *Sovereign AI Vision Analysis*\n\n"
+                    f"Crop Detected: *{crop_info.get('name', 'Unknown')}*\n"
+                    f"Health Status: *{health_info.get('status', 'Unknown')}*\n"
+                    f"Quality Grade: *{grade_info.get('grade', 'Standard')}*\n"
+                    f"Confidence: {crop_info.get('confidence', 0) * 100:.1f}%\n\n"
+                    f"🌿 *Recommended Action:* \n"
+                    f"{health_info.get('issues', ['No issues detected'])[0] if health_info.get('issues') else 'Maintain current moisture levels.'}\n\n"
+                    f"Type 'sell' if you want to list this crop.")
+        except Exception as e:
+            # Cleanup on error
+            try: os.remove(image_path)
+            except: pass
+            
+            return (f"⚠️ *Analysis Error*\n\n"
+                    f"Unable to analyze the image: {str(e)}\n\n"
+                    f"Please try again with a clearer photo.")
 
     @staticmethod
     async def _handle_loan_application_flow(db, user, body, state):

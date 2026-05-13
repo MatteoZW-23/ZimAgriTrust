@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Dimensions, Image } from 'react-native';
 import { theme } from '../styles';
+import { 
+  Sprout as IconSprout, 
+  Lock as IconLock, 
+  Star as IconStar, 
+  ShoppingCart as IconShopping, 
+  Briefcase as IconBriefcase, 
+  Truck as IconTruck,
+  ChevronRight as IconChevronRight
+} from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -18,21 +27,21 @@ export default function OnboardingScreen({ onComplete }) {
       {
         title: "Maximize Your Agricultural Yield",
         desc: "Direct market access for farmers across Zimbabwe",
-        icon: "FARM",
+        icon: IconSprout,
         btn: "Get Started",
         skip: true
       },
       {
         title: "Secure Transaction Platform",
         desc: "Protected payments with escrow verification",
-        icon: "LOCK",
+        icon: IconLock,
         btn: "Next",
         skip: true
       },
       {
         title: "Trusted Agricultural Network",
         desc: "Verified participants across the entire value chain",
-        icon: "STAR",
+        icon: IconStar,
         btn: "Start Selling",
         skip: false
       }
@@ -44,7 +53,7 @@ export default function OnboardingScreen({ onComplete }) {
       <SafeAreaView style={styles.container}>
         <View style={styles.illustrationBox}>
            <View style={styles.illusIconContainer}>
-             <Text style={styles.illusIcon}>{current.icon}</Text>
+             <current.icon size={80} color={theme.colors.green} />
            </View>
         </View>
         <View style={styles.onboardContent}>
@@ -109,39 +118,47 @@ export default function OnboardingScreen({ onComplete }) {
         </View>
         <ScrollView style={styles.roleContainer} showsVerticalScrollIndicator={false}>
             <TouchableOpacity style={styles.roleCard} onPress={() => handleFinish('farmer')}>
-                <View style={[styles.roleIcon, { backgroundColor: '#E8F5E9' }]}><Text style={{ fontSize: 16, fontWeight: '700' }}>FARM</Text></View>
+                <View style={[styles.roleIcon, { backgroundColor: '#E8F5E9' }]}>
+                  <IconSprout size={28} color="#2E7D32" />
+                </View>
                 <View style={{ flex: 1 }}>
                     <Text style={styles.roleTitle}>Farmer</Text>
                     <Text style={styles.roleDesc}>Sell your produce</Text>
                 </View>
-                <Text style={styles.roleArrow}>→</Text>
+                <IconChevronRight size={24} color={theme.colors.green} />
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.roleCard} onPress={() => handleFinish('buyer')}>
-                <View style={[styles.roleIcon, { backgroundColor: '#E1F5FE' }]}><Text style={{ fontSize: 16, fontWeight: '700' }}>SHOP</Text></View>
+                <View style={[styles.roleIcon, { backgroundColor: '#E1F5FE' }]}>
+                  <IconShopping size={28} color="#0288D1" />
+                </View>
                 <View style={{ flex: 1 }}>
                     <Text style={styles.roleTitle}>Buyer</Text>
                     <Text style={styles.roleDesc}>Buy produce</Text>
                 </View>
-                <Text style={styles.roleArrow}>→</Text>
+                <IconChevronRight size={24} color={theme.colors.green} />
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.roleCard} onPress={() => handleFinish('agent')}>
-                <View style={[styles.roleIcon, { backgroundColor: '#FFF3E0' }]}><Text style={{ fontSize: 16, fontWeight: '700' }}>AGNT</Text></View>
+                <View style={[styles.roleIcon, { backgroundColor: '#FFF3E0' }]}>
+                  <IconBriefcase size={28} color="#EF6C00" />
+                </View>
                 <View style={{ flex: 1 }}>
                     <Text style={styles.roleTitle}>Agent</Text>
                     <Text style={styles.roleDesc}>Check deals</Text>
                 </View>
-                <Text style={styles.roleArrow}>→</Text>
+                <IconChevronRight size={24} color={theme.colors.green} />
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.roleCard} onPress={() => handleFinish('driver')}>
-                <View style={[styles.roleIcon, { backgroundColor: '#EDE7F6' }]}><Text style={{ fontSize: 16, fontWeight: '700' }}>TRUCK</Text></View>
+                <View style={[styles.roleIcon, { backgroundColor: '#EDE7F6' }]}>
+                  <IconTruck size={28} color="#5E35B1" />
+                </View>
                 <View style={{ flex: 1 }}>
                     <Text style={styles.roleTitle}>Driver</Text>
                     <Text style={styles.roleDesc}>Deliver goods & earn</Text>
                 </View>
-                <Text style={styles.roleArrow}>→</Text>
+                <IconChevronRight size={24} color={theme.colors.green} />
             </TouchableOpacity>
         </ScrollView>
     </View>

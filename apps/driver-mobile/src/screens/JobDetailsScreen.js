@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Alert } from 'react-native';
-import { ArrowLeft, MapPin, Navigation, Package, Truck, DollarSign, Clock } from 'lucide-react-native';
+import {
+  View, Text, StyleSheet, TouchableOpacity, ScrollView,
+  SafeAreaView, Alert, ActivityIndicator,
+} from 'react-native';
+import {
+  ArrowLeft as IconArrowLeft, MapPin as IconMapPin, 
+  Navigation as IconNavigation, Package as IconPackage, 
+  Truck as IconTruck, Clock as IconClock, 
+  DollarSign as IconDollarSign, Wheat as IconWheat, 
+  CheckCircle as IconCheckCircle,
+} from 'lucide-react-native';
 import { theme } from '../styles';
 import { acceptJob } from '../api';
 
@@ -12,36 +21,51 @@ export default function JobDetailsScreen({ route, navigation }) {
     setAccepting(true);
     try {
       await acceptJob(token, job.id);
-      Alert.alert('Job Accepted!', 'Check your Deliveries tab to start this delivery.', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
+      Alert.alert(
+        'Job Accepted',
+        'Head to the Deliveries tab to start this delivery.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }],
+      );
     } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to accept job');
+      Alert.alert('Failed to Accept', err.message || 'Please try again.');
     } finally {
       setAccepting(false);
     }
   };
 
+  const perKm = job.distance_km
+    ? (job.payment_amount / job.distance_km).toFixed(2)
+    : null;
+
   return (
     <SafeAreaView style={styles.container}>
+      {/* Top bar */}
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <ArrowLeft size={22} color={theme.colors.dark} />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <IconArrowLeft size={22} color={theme.colors.dark} />
         </TouchableOpacity>
         <Text style={styles.topTitle}>Job Details</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-        {/* Payment Hero */}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+
+        {/* Payment hero */}
         <View style={styles.paymentCard}>
+          <IconDollarSign size={20} color="rgba(255,255,255,0.7)" />
           <Text style={styles.paymentLabel}>Delivery Payment</Text>
-          <Text style={styles.paymentAmount}>${job.payment_amount || job.price || 0}</Text>
+          <Text style={styles.paymentAmount}>${job.payment_amount || 0}</Text>
           <Text style={styles.paymentCurrency}>{job.currency || 'USD'}</Text>
+          {perKm && (
+            <View style={styles.rateChip}>
+              <Text style={styles.rateText}>${perKm} per km</Text>
+            </View>
+          )}
         </View>
 
-        {/* Route */}
+        {/* Route card */}
         <View style={styles.routeCard}>
+          <Text style={styles.cardLabel}>Route</Text>
           <View style={styles.routeRow}>
             <View style={styles.routeIcons}>
               <View style={[styles.routeDot, { backgroundColor: theme.colors.sky }]} />
@@ -50,103 +74,194 @@ export default function JobDetailsScreen({ route, navigation }) {
             </View>
             <View style={styles.routeDetails}>
               <View style={styles.routeStop}>
-                <Text style={styles.routeLabel}>PICKUP</Text>
-                <Text style={styles.routeLocation}>{job.pickup_location || job.pickup || 'TBD'}</Text>
+                <Text style={styles.routeStopLabel}>PICKUP</Text>
+                <Text style={styles.routeLocation}>{job.pickup_location || 'TBD'}</Text>
               </View>
-              <View style={[styles.routeStop, { marginTop: 20 }]}>
-                <Text style={styles.routeLabel}>DELIVERY</Text>
-                <Text style={styles.routeLocation}>{job.delivery_location || job.destination || 'TBD'}</Text>
+              <View style={[styles.routeStop, { marginTop: 18 }]}>
+                <Text style={styles.routeStopLabel}>DROP-OFF</Text>
+                <Text style={styles.routeLocation}>{job.delivery_location || 'TBD'}</Text>
               </View>
             </View>
           </View>
         </View>
 
-        {/* Details Grid */}
+        {/* Details grid */}
         <View style={styles.detailsGrid}>
-          <DetailCard icon={<Navigation size={18} color={theme.colors.sky} />} label="Distance" value={`${job.distance_km || job.distance || '—'} km`} />
-          <DetailCard icon={<Package size={18} color="#FF9800" />} label="Weight" value={`${job.weight_kg || '—'} kg`} />
-          <DetailCard icon={<Truck size={18} color="#4CAF50" />} label="Cargo" value={job.crop_type || 'General'} />
-          <DetailCard icon={<Clock size={18} color="#9C27B0" />} label="Status" value={(job.status || 'available').replace('_', ' ')} />
+          <DetailCard
+            icon={<IconNavigation size={18} color={theme.colors.sky} />}
+            bg="#E1F5FE"
+            label="Distance"
+            value={job.distance_km ? `${job.distance_km} km` : '—'}
+          />
+          <DetailCard
+            icon={<IconPackage size={18} color="#F59E0B" />}
+            bg="#FFFBEB"
+            label="Weight"
+            value={job.weight_kg ? `${job.weight_kg} kg` : '—'}
+          />
+          <DetailCard
+            icon={<IconWheat size={18} color="#16a34a" />}
+            bg="#F0FDF4"
+            label="Cargo"
+            value={job.crop_type || 'General'}
+          />
+          <DetailCard
+            icon={<IconClock size={18} color="#9C27B0" />}
+            bg="#F5F3FF"
+            label="Est. Time"
+            value={job.distance_km ? estimateTime(job.distance_km) : '—'}
+          />
         </View>
 
-        {/* Accept Button */}
-        <TouchableOpacity
-          style={[styles.acceptBtn, accepting && { opacity: 0.7 }]}
-          onPress={handleAccept}
-          disabled={accepting}
-        >
-          <Text style={styles.acceptText}>{accepting ? 'Accepting...' : 'Accept This Job'}</Text>
+        {/* Info note */}
+        <View style={styles.infoBox}>
+          <IconCheckCircle size={16} color={theme.colors.sky} />
+          <Text style={styles.infoText}>
+            Payment is released after successful delivery confirmation.
+          </Text>
+        </View>
+
+        {/* Action Buttons */}
+        <View style={{ marginHorizontal: 20, marginTop: 24, gap: 12 }}>
+          <TouchableOpacity
+            style={[styles.acceptBtn, accepting && styles.acceptBtnLoading]}
+            onPress={handleAccept}
+            disabled={accepting}
+            activeOpacity={0.85}
+          >
+            {accepting ? (
+              <ActivityIndicator color="#FFF" size="small" />
+            ) : (
+              <>
+                <IconCheckCircle size={20} color="#FFF" />
+                <Text style={styles.acceptText}>Accept This Job</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity 
+              style={[styles.actionBtn, styles.declineBtn]}
+              onPress={() => Alert.alert('Job Declined', 'The job has been removed from your list.')}
+            >
+              <Text style={styles.declineText}>Decline</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.actionBtn, styles.negotiateBtn]}
+              onPress={() => Alert.alert('Negotiation', 'Send a counter-offer for this job?', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Send +10%', onPress: () => Alert.alert('Sent', 'Counter-offer sent to customer.') }
+              ])}
+            >
+              <Text style={styles.negotiateText}>Negotiate</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.backLink} onPress={() => navigation.goBack()}>
+          <IconArrowLeft size={14} color="#999" />
+          <Text style={styles.backLinkText}>Back to Jobs</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function DetailCard({ icon, label, value }) {
+function DetailCard({ icon, bg, label, value }) {
   return (
     <View style={styles.detailCard}>
-      {icon}
+      <View style={[styles.detailIconWrap, { backgroundColor: bg }]}>{icon}</View>
       <Text style={styles.detailLabel}>{label}</Text>
       <Text style={styles.detailValue}>{value}</Text>
     </View>
   );
 }
 
+function estimateTime(km) {
+  const hrs = km / 60;
+  if (hrs < 1) return `${Math.round(hrs * 60)} min`;
+  const h = Math.floor(hrs);
+  const m = Math.round((hrs - h) * 60);
+  return m > 0 ? `~${h}h ${m}m` : `~${h}h`;
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
-  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F0F0F0', justifyContent: 'center', alignItems: 'center' },
+  container: { flex: 1, backgroundColor: '#F8F9FA' },
+  topBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingVertical: 14,
+  },
+  backBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: '#F0F0F0', justifyContent: 'center', alignItems: 'center',
+  },
   topTitle: { fontSize: 18, fontWeight: '800', color: theme.colors.dark },
+  scrollContent: { paddingBottom: 40 },
+
   paymentCard: {
-    marginHorizontal: 20,
-    backgroundColor: theme.colors.sky,
-    borderRadius: 24,
-    padding: 28,
-    alignItems: 'center',
-    ...theme.shadows.lg,
+    marginHorizontal: 20, backgroundColor: theme.colors.sky,
+    borderRadius: 24, padding: 28, alignItems: 'center', ...theme.shadows.lg,
   },
-  paymentLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
-  paymentAmount: { color: '#FFF', fontSize: 48, fontWeight: '900', marginTop: 4 },
-  paymentCurrency: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '600', marginTop: 4 },
+  paymentLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600', marginTop: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  paymentAmount: { color: '#FFF', fontSize: 52, fontWeight: '900', marginTop: 4, letterSpacing: -1 },
+  paymentCurrency: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: '600', marginTop: 2 },
+  rateChip: {
+    marginTop: 12, backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20,
+  },
+  rateText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
+
   routeCard: {
-    marginHorizontal: 20,
-    marginTop: 20,
-    backgroundColor: '#FFF',
-    borderRadius: 20,
-    padding: 24,
-    ...theme.shadows.xs,
-    borderWidth: 1,
-    borderColor: '#F0F0F0',
+    marginHorizontal: 20, marginTop: 20, backgroundColor: '#FFF',
+    borderRadius: 20, padding: 20, ...theme.shadows.xs, borderWidth: 1, borderColor: '#F0F0F0',
   },
+  cardLabel: { fontSize: 11, fontWeight: '800', color: '#BBB', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 },
   routeRow: { flexDirection: 'row' },
   routeIcons: { alignItems: 'center', marginRight: 16, paddingTop: 4 },
   routeDot: { width: 12, height: 12, borderRadius: 6 },
-  routeLine: { width: 2, height: 30, backgroundColor: '#E0E0E0', marginVertical: 4 },
+  routeLine: { width: 2, height: 28, backgroundColor: '#E0E0E0', marginVertical: 4 },
   routeDetails: { flex: 1 },
   routeStop: {},
-  routeLabel: { fontSize: 11, fontWeight: '700', color: '#999', letterSpacing: 1 },
-  routeLocation: { fontSize: 16, fontWeight: '700', color: theme.colors.dark, marginTop: 4 },
-  detailsGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: 16, marginTop: 16, gap: 8 },
+  routeStopLabel: { fontSize: 10, fontWeight: '700', color: '#BBB', letterSpacing: 1 },
+  routeLocation: { fontSize: 16, fontWeight: '700', color: theme.colors.dark, marginTop: 3 },
+
+  detailsGrid: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    marginHorizontal: 16, marginTop: 16, gap: 10,
+  },
   detailCard: {
-    width: '48%',
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
-    ...theme.shadows.xs,
-    borderWidth: 1,
-    borderColor: '#F0F0F0',
-    flexGrow: 1,
+    width: '47%', backgroundColor: '#FFF', borderRadius: 16, padding: 16,
+    ...theme.shadows.xs, borderWidth: 1, borderColor: '#F0F0F0', flexGrow: 1,
   },
-  detailLabel: { fontSize: 11, color: '#999', fontWeight: '600', marginTop: 8 },
-  detailValue: { fontSize: 16, fontWeight: '800', color: theme.colors.dark, marginTop: 2, textTransform: 'capitalize' },
+  detailIconWrap: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+  detailLabel: { fontSize: 11, color: '#999', fontWeight: '600' },
+  detailValue: { fontSize: 16, fontWeight: '800', color: theme.colors.dark, marginTop: 3 },
+
+  infoBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginHorizontal: 20, marginTop: 16, backgroundColor: '#E1F5FE',
+    borderRadius: 14, padding: 14,
+  },
+  infoText: { flex: 1, fontSize: 13, color: '#0369a1', fontWeight: '600', lineHeight: 18 },
+
   acceptBtn: {
-    marginHorizontal: 20,
-    marginTop: 28,
-    backgroundColor: theme.colors.sky,
-    paddingVertical: 18,
-    borderRadius: 16,
-    alignItems: 'center',
-    ...theme.shadows.md,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    marginHorizontal: 20, marginTop: 24, backgroundColor: theme.colors.sky,
+    paddingVertical: 18, borderRadius: 16, ...theme.shadows.md,
   },
-  acceptText: { color: '#FFF', fontSize: 17, fontWeight: '700', letterSpacing: 0.5 },
+  acceptBtnLoading: { opacity: 0.7 },
+  acceptText: { color: '#FFF', fontSize: 17, fontWeight: '800', letterSpacing: 0.3 },
+
+  actionBtn: { flex: 1, height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5 },
+  declineBtn: { borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' },
+  negotiateBtn: { borderColor: theme.colors.sky, backgroundColor: '#FFF' },
+  declineText: { fontSize: 14, fontWeight: '700', color: '#6B7280' },
+  negotiateText: { fontSize: 14, fontWeight: '700', color: theme.colors.sky },
+
+  backLink: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, marginTop: 16, paddingVertical: 12,
+  },
+  backLinkText: { fontSize: 13, fontWeight: '600', color: '#999' },
 });

@@ -3,20 +3,33 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   SafeAreaView, RefreshControl, ActivityIndicator
 } from 'react-native';
+import { 
+  CheckCircle2 as IconCheckCircle, 
+  PackageCheck as IconPackageCheck, 
+  ShieldCheck as IconShieldCheck, 
+  AlertCircle as IconAlertCircle, 
+  Clock as IconClock, 
+  XCircle as IconXCircle, 
+  Circle as IconCircle,
+  Package as IconPackage,
+  Check as IconCheck,
+  Star as IconStar,
+  AlertTriangle as IconAlertTriangle
+} from 'lucide-react-native';
 import { getTransactions } from '../api';
 import { theme } from '../styles';
 
 const STATUS_CONFIG = {
-  COMPLETED:  { color: '#22c55e', bg: '#f0fdf4', icon: '🟢', label: 'COMPLETED' },
-  DELIVERED:  { color: '#3b82f6', bg: '#eff6ff', icon: '🟡', label: 'DELIVERED' },
-  IN_ESCROW:  { color: '#f59e0b', bg: '#fffbeb', icon: '🟡', label: 'IN ESCROW' },
-  DISPUTED:   { color: '#ef4444', bg: '#fef2f2', icon: '🔴', label: 'DISPUTED' },
-  PENDING:    { color: '#f59e0b', bg: '#fffbeb', icon: '⏳', label: 'PENDING' },
-  CANCELLED:  { color: '#94a3b8', bg: '#f8fafc', icon: '⚫', label: 'CANCELLED' },
+  COMPLETED:  { color: '#22c55e', bg: '#f0fdf4', icon: IconCheckCircle, label: 'COMPLETED' },
+  DELIVERED:  { color: '#3b82f6', bg: '#eff6ff', icon: IconPackageCheck, label: 'DELIVERED' },
+  IN_ESCROW:  { color: '#f59e0b', bg: '#fffbeb', icon: IconShieldCheck, label: 'IN ESCROW' },
+  DISPUTED:   { color: '#ef4444', bg: '#fef2f2', icon: IconAlertCircle, label: 'DISPUTED' },
+  PENDING:    { color: '#f59e0b', bg: '#fffbeb', icon: IconClock, label: 'PENDING' },
+  CANCELLED:  { color: '#94a3b8', bg: '#f8fafc', icon: IconXCircle, label: 'CANCELLED' },
 };
 
 function getStatusConfig(status = '') {
-  return STATUS_CONFIG[status.toUpperCase()] || { color: '#64748b', bg: '#f8fafc', icon: '⚪', label: status };
+  return STATUS_CONFIG[status.toUpperCase()] || { color: '#64748b', bg: '#f8fafc', icon: IconCircle, label: status };
 }
 
 export default function MyOrdersScreen({ navigation, route }) {
@@ -102,7 +115,7 @@ export default function MyOrdersScreen({ navigation, route }) {
         >
           {filtered.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>📦</Text>
+              <IconPackage size={64} color="#CBD5E1" style={{ marginBottom: 16 }} />
               <Text style={styles.emptyTitle}>No orders here</Text>
               <Text style={styles.emptyText}>Your orders will appear once you start trading.</Text>
             </View>
@@ -140,7 +153,8 @@ function OrderCard({ order, role, onPress, onConfirm, onRate, onDispute }) {
     <TouchableOpacity style={[styles.card, { borderLeftColor: cfg.color, borderLeftWidth: 4 }]} onPress={onPress} activeOpacity={0.85}>
       <View style={styles.cardTop}>
         <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
-          <Text style={[styles.statusText, { color: cfg.color }]}>{cfg.icon} {cfg.label}</Text>
+          <cfg.icon size={12} color={cfg.color} style={{ marginRight: 4 }} />
+          <Text style={[styles.statusText, { color: cfg.color }]}>{cfg.label}</Text>
         </View>
         <Text style={styles.orderId}>{shortId}</Text>
       </View>
@@ -151,23 +165,31 @@ function OrderCard({ order, role, onPress, onConfirm, onRate, onDispute }) {
 
       <View style={styles.amountRow}>
         <Text style={styles.amount}>{amount}</Text>
-        {order.escrow_held && <Text style={styles.escrowTag}>🛡️ In Escrow</Text>}
+        {order.escrow_held && (
+          <View style={styles.escrowTagContainer}>
+            <IconShieldCheck size={14} color="#f59e0b" />
+            <Text style={styles.escrowTag}>In Escrow</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.actions}>
         {status.toUpperCase() === 'DELIVERED' && (
           <TouchableOpacity style={styles.primaryAction} onPress={onConfirm}>
-            <Text style={styles.primaryActionText}>✅ Confirm Delivery</Text>
+            <IconCheck size={14} color="#fff" style={{ marginRight: 4 }} />
+            <Text style={styles.primaryActionText}>Confirm Delivery</Text>
           </TouchableOpacity>
         )}
         {status.toUpperCase() === 'COMPLETED' && !isReviewed && (
           <TouchableOpacity style={[styles.primaryAction, { backgroundColor: '#f59e0b' }]} onPress={onRate}>
-            <Text style={styles.primaryActionText}>⭐ Rate {role === 'farmer' ? 'Buyer' : 'Farmer'}</Text>
+            <IconStar size={14} color="#fff" style={{ marginRight: 4 }} />
+            <Text style={styles.primaryActionText}>Rate {role === 'farmer' ? 'Buyer' : 'Farmer'}</Text>
           </TouchableOpacity>
         )}
         {['PENDING', 'IN_ESCROW', 'DELIVERED'].includes(status.toUpperCase()) && (
           <TouchableOpacity style={styles.secondaryAction} onPress={onDispute}>
-            <Text style={styles.secondaryActionText}>⚠️ Dispute</Text>
+            <IconAlertTriangle size={14} color="#ef4444" style={{ marginRight: 4 }} />
+            <Text style={styles.secondaryActionText}>Dispute</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity style={styles.detailAction} onPress={onPress}>
@@ -200,7 +222,7 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 14, color: '#64748b', textAlign: 'center', lineHeight: 22 },
   card: { marginHorizontal: 20, marginBottom: 14, backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: '#e5e7eb', padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 3 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, flexDirection: 'row', alignItems: 'center' },
   statusText: { fontSize: 11, fontWeight: '900' },
   orderId: { fontSize: 11, fontWeight: '800', color: '#94a3b8' },
   cropName: { fontSize: 17, fontWeight: '900', color: theme.colors.black, marginBottom: 4 },
@@ -208,11 +230,12 @@ const styles = StyleSheet.create({
   date: { fontSize: 12, color: '#94a3b8', fontWeight: '600', marginBottom: 8 },
   amountRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
   amount: { fontSize: 20, fontWeight: '900', color: theme.colors.black },
+  escrowTagContainer: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   escrowTag: { fontSize: 12, color: '#f59e0b', fontWeight: '800' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  primaryAction: { backgroundColor: theme.colors.green, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
+  primaryAction: { backgroundColor: theme.colors.green, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center' },
   primaryActionText: { color: '#fff', fontWeight: '900', fontSize: 12 },
-  secondaryAction: { backgroundColor: '#fef2f2', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#fecaca' },
+  secondaryAction: { backgroundColor: '#fef2f2', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#fecaca', flexDirection: 'row', alignItems: 'center' },
   secondaryActionText: { color: '#ef4444', fontWeight: '900', fontSize: 12 },
   detailAction: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' },
   detailActionText: { color: '#475569', fontWeight: '800', fontSize: 12 },

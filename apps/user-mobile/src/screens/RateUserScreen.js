@@ -3,6 +3,11 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   SafeAreaView, TextInput, Alert, ActivityIndicator
 } from 'react-native';
+import { 
+  ArrowLeft as IconArrowLeft, 
+  Star as IconStar, 
+  Check as IconCheck 
+} from 'lucide-react-native';
 import { submitReview } from '../api';
 import { theme } from '../styles';
 
@@ -52,15 +57,17 @@ export default function RateUserScreen({ navigation, route }) {
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.back}>← Back</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtnBox}>
+            <IconArrowLeft size={22} color={theme.colors.black} />
           </TouchableOpacity>
           <Text style={styles.title}>Rate {targetLabel}</Text>
-          <View style={{ width: 60 }} />
+          <View style={{ width: 44 }} />
         </View>
 
         <View style={styles.heroCard}>
-          <Text style={styles.heroIcon}>⭐</Text>
+          <View style={styles.heroIconBox}>
+            <IconStar size={40} color="#f59e0b" fill="#f59e0b" />
+          </View>
           <Text style={styles.heroTitle}>How was your experience?</Text>
           <Text style={styles.heroSub}>Your honest feedback helps build trust in the ZimAgritrust community.</Text>
         </View>
@@ -77,7 +84,11 @@ export default function RateUserScreen({ navigation, route }) {
                 onPressOut={() => setHovered(0)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.star, star <= displayRating && styles.starActive]}>★</Text>
+                <IconStar 
+                  size={48} 
+                  color={star <= displayRating ? '#f59e0b' : '#e2e8f0'} 
+                  fill={star <= displayRating ? '#f59e0b' : 'transparent'} 
+                />
               </TouchableOpacity>
             ))}
           </View>
@@ -99,9 +110,12 @@ export default function RateUserScreen({ navigation, route }) {
                   style={[styles.tag, selectedTags.includes(tag) && styles.tagActive]}
                   onPress={() => toggleTag(tag)}
                 >
-                  <Text style={[styles.tagText, selectedTags.includes(tag) && styles.tagTextActive]}>
-                    {selectedTags.includes(tag) ? '✓ ' : ''}{tag}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {selectedTags.includes(tag) && <IconCheck size={14} color="#FFF" />}
+                    <Text style={[styles.tagText, selectedTags.includes(tag) && styles.tagTextActive]}>
+                      {tag}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
@@ -149,17 +163,15 @@ export default function RateUserScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 24, paddingTop: 60 },
-  back: { fontSize: 16, fontWeight: '700', color: theme.colors.sky },
+  backBtnBox: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F9FAFB', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#EEE' },
   title: { fontSize: 18, fontWeight: '900', color: theme.colors.black },
   heroCard: { marginHorizontal: 20, marginBottom: 8, backgroundColor: '#f0fdf4', borderRadius: 24, padding: 28, alignItems: 'center', borderWidth: 1, borderColor: '#bbf7d0' },
-  heroIcon: { fontSize: 56, marginBottom: 12 },
+  heroIconBox: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', marginBottom: 12, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
   heroTitle: { fontSize: 22, fontWeight: '900', color: theme.colors.black, textAlign: 'center', marginBottom: 8 },
   heroSub: { fontSize: 14, color: '#475569', textAlign: 'center', lineHeight: 22 },
   section: { marginHorizontal: 20, marginTop: 24 },
   sectionLabel: { fontSize: 11, fontWeight: '900', color: '#94a3b8', letterSpacing: 1.2, marginBottom: 14, textTransform: 'uppercase' },
   starsRow: { flexDirection: 'row', gap: 8, justifyContent: 'center', marginBottom: 8 },
-  star: { fontSize: 48, color: '#e2e8f0' },
-  starActive: { color: '#f59e0b' },
   ratingLabel: { textAlign: 'center', fontSize: 16, fontWeight: '800', color: '#f59e0b', marginTop: 4 },
   tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   tag: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0' },

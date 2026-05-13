@@ -1,4 +1,4 @@
-﻿node_modules
+node_modules
 .env
 dist
 build
@@ -41,6 +41,7 @@ outputs/
 .ipynb_checkpoints/
 .kiro/
 fastapi-import-fixer.agent.md
+data/
 data/research/
 
 # Training datasets (never push raw data/images)

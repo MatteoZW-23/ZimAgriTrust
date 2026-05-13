@@ -2,7 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Platform, TouchableOpacity, Image } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { MapPin, Truck, DollarSign, User } from 'lucide-react-native';
+import { 
+  MapPin as IconMapPin, Truck as IconTruck, DollarSign as IconDollarSign, 
+  User as IconUser, Clock as IconClock 
+} from 'lucide-react-native';
 import { theme } from './styles';
 import { saveSession, getSession, clearSession } from './utils/auth';
 import { setupNotificationHandler, registerForPushNotifications } from './utils/notifications';
@@ -16,6 +19,11 @@ import EarningsScreen from './screens/EarningsScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import JobDetailsScreen from './screens/JobDetailsScreen';
 import DeliveryTrackingScreen from './screens/DeliveryTrackingScreen';
+import EditProfileScreen from './screens/EditProfileScreen';
+import SettingsScreen from './screens/SettingsScreen';
+import ChangePinScreen from './screens/ChangePinScreen';
+import PrivacyScreen from './screens/PrivacyScreen';
+import SupportScreen from './screens/SupportScreen';
 
 let Stack = null;
 if (Platform.OS !== 'web') {
@@ -27,10 +35,10 @@ const Tab = createBottomTabNavigator();
 // Simple web-only tab bar for fallback
 function WebTabBar({ activeTab, onChangeTab, token, profile, onLogout }) {
   const tabs = [
-    { key: 'Jobs', icon: MapPin, label: 'Jobs' },
-    { key: 'Deliveries', icon: Truck, label: 'Deliveries' },
-    { key: 'Earnings', icon: DollarSign, label: 'Earnings' },
-    { key: 'Profile', icon: User, label: 'Profile' },
+    { key: 'Jobs', icon: IconMapPin, label: 'Jobs' },
+    { key: 'Deliveries', icon: IconTruck, label: 'Deliveries' },
+    { key: 'Earnings', icon: IconDollarSign, label: 'Earnings' },
+    { key: 'Profile', icon: IconUser, label: 'Profile' },
   ];
 
   const screens = {
@@ -78,7 +86,7 @@ function DriverTabs({ route }) {
         initialParams={{ token, profile }}
         options={{
           tabBarLabel: 'Jobs',
-          tabBarIcon: ({ color, size }) => <MapPin size={size || 22} color={color} />,
+          tabBarIcon: ({ color, size }) => <IconMapPin size={size || 22} color={color} />,
         }}
       />
       <Tab.Screen
@@ -87,7 +95,7 @@ function DriverTabs({ route }) {
         initialParams={{ token }}
         options={{
           tabBarLabel: 'Deliveries',
-          tabBarIcon: ({ color, size }) => <Truck size={size || 22} color={color} />,
+          tabBarIcon: ({ color, size }) => <IconTruck size={size || 22} color={color} />,
         }}
       />
       <Tab.Screen
@@ -96,7 +104,7 @@ function DriverTabs({ route }) {
         initialParams={{ token }}
         options={{
           tabBarLabel: 'Earnings',
-          tabBarIcon: ({ color, size }) => <DollarSign size={size || 22} color={color} />,
+          tabBarIcon: ({ color, size }) => <IconDollarSign size={size || 22} color={color} />,
         }}
       />
       <Tab.Screen
@@ -105,7 +113,7 @@ function DriverTabs({ route }) {
         initialParams={{ token, profile, onLogout }}
         options={{
           tabBarLabel: 'Profile',
-          tabBarIcon: ({ color, size }) => <User size={size || 22} color={color} />,
+          tabBarIcon: ({ color, size }) => <IconUser size={size || 22} color={color} />,
         }}
       />
     </Tab.Navigator>
@@ -178,7 +186,9 @@ export default function AppShell() {
     if (pendingApproval) {
       return (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, backgroundColor: '#f8f9fa' }}>
-          <Text style={{ fontSize: 48, marginBottom: 16 }}>⏳</Text>
+          <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#FFF8E1', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+            <IconClock size={40} color="#F59E0B" />
+          </View>
           <Text style={{ fontSize: 20, fontWeight: '700', color: '#1a1a1a', marginBottom: 8, textAlign: 'center' }}>Application Submitted</Text>
           <Text style={{ fontSize: 14, color: '#666', textAlign: 'center', lineHeight: 22 }}>
             Your driver application is under review. An admin will verify your documents within 24–48 hours.{`\n\n`}You will be notified via SMS and WhatsApp once approved.
@@ -239,6 +249,11 @@ export default function AppShell() {
         />
         <Stack.Screen name="JobDetails" component={JobDetailsScreen} />
         <Stack.Screen name="DeliveryTracking" component={DeliveryTrackingScreen} />
+        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="ChangePin" component={ChangePinScreen} />
+        <Stack.Screen name="Privacy" component={PrivacyScreen} />
+        <Stack.Screen name="Support" component={SupportScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

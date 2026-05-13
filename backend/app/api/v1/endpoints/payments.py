@@ -317,7 +317,7 @@ def get_seller_earnings(
 
     # Boost fees paid by this user (as listing owner)
     from app.models.listing import Listing
-    listings = db.query(Listing).filter(Listing.farmer_id == current_user.id, Listing.is_boosted == True).all()
+    listings = db.query(Listing).filter(Listing.seller_id == current_user.id, Listing.is_boosted == True).all()
     boost_fees_paid = sum(l.boost_fee or 0.0 for l in listings)
 
     # Wallet transactions summary

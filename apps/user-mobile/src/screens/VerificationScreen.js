@@ -3,6 +3,16 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   TextInput, ActivityIndicator, Alert, Platform
 } from 'react-native';
+import { 
+  ArrowLeft as IconArrowLeft, 
+  ClipboardList as IconClipboard, 
+  Clock as IconClock, 
+  CheckCircle2 as IconCheckCircle, 
+  XCircle as IconXCircle,
+  Camera as IconCamera,
+  Image as IconImage,
+  Check as IconCheck
+} from 'lucide-react-native';
 import { theme } from '../styles';
 import { submitIdDocuments, getVerificationStatus } from '../api';
 
@@ -18,10 +28,10 @@ try {
 }
 
 const STATUS_CONFIG = {
-  not_submitted: { color: '#94a3b8', icon: '📋', label: 'Not Submitted' },
-  pending:       { color: '#f59e0b', icon: '⏳', label: 'Under Review' },
-  approved:      { color: '#22c55e', icon: '✅', label: 'Verified' },
-  rejected:      { color: '#ef4444', icon: '❌', label: 'Rejected — Resubmit' },
+  not_submitted: { color: '#94a3b8', icon: IconClipboard, label: 'Not Submitted' },
+  pending:       { color: '#f59e0b', icon: IconClock, label: 'Under Review' },
+  approved:      { color: '#22c55e', icon: IconCheckCircle, label: 'Verified' },
+  rejected:      { color: '#ef4444', icon: IconXCircle, label: 'Rejected — Resubmit' },
 };
 
 export default function VerificationScreen({ navigation, route }) {
@@ -64,7 +74,7 @@ export default function VerificationScreen({ navigation, route }) {
       'How would you like to add this photo?',
       [
         {
-          text: '📷 Camera',
+          text: 'Camera',
           onPress: async () => {
             const result = await launchCameraAsync({ mediaTypes: MediaTypeOptions.Images, quality: 0.8, allowsEditing: true });
             if (!result.canceled && result.assets?.[0]) {
@@ -77,7 +87,7 @@ export default function VerificationScreen({ navigation, route }) {
           }
         },
         {
-          text: '🖼️ Gallery',
+          text: 'Gallery',
           onPress: async () => {
             const result = await launchImageLibraryAsync({ mediaTypes: MediaTypeOptions.Images, quality: 0.8, allowsEditing: true });
             if (!result.canceled && result.assets?.[0]) {
@@ -121,18 +131,18 @@ export default function VerificationScreen({ navigation, route }) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtn}>← Back</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtnBox}>
+          <IconArrowLeft size={22} color={theme.colors.black} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>ID Verification</Text>
-        <View style={{ width: 60 }} />
+        <View style={{ width: 44 }} />
       </View>
 
       {/* Status Banner */}
       <View style={[styles.statusBanner, { borderColor: cfg.color, backgroundColor: cfg.color + '15' }]}>
-        <Text style={styles.statusIcon}>{cfg.icon}</Text>
+        <cfg.icon size={32} color={cfg.color} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.statusLabel, { color: cfg.color }]}>{cfg.label}</Text>
           {status?.reviewer_note && (
@@ -146,7 +156,10 @@ export default function VerificationScreen({ navigation, route }) {
 
       {/* Info */}
       <View style={styles.infoBox}>
-        <Text style={styles.infoTitle}>📋 Why verify?</Text>
+        <View style={styles.rowAlignCenter}>
+          <IconClipboard size={18} color={theme.colors.black} style={{ marginRight: 8 }} />
+          <Text style={styles.infoTitle}>Why verify?</Text>
+        </View>
         <Text style={styles.infoText}>
           Verified users unlock higher transaction limits, appear as trusted sellers, and get priority in the marketplace.
           Your documents are reviewed by a certified ZimAgritrust agent within 24 hours.
@@ -231,14 +244,16 @@ function UploadSlot({ label, hint, file, onPick, onClear }) {
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
       {file ? (
         <View style={styles.uploadedRow}>
-          <Text style={styles.uploadedName} numberOfLines={1}>✅ {file.name}</Text>
+          <IconCheck size={18} color="#166534" style={{ marginRight: 8 }} />
+          <Text style={styles.uploadedName} numberOfLines={1}>{file.name}</Text>
           <TouchableOpacity onPress={onClear} style={styles.clearBtn}>
             <Text style={styles.clearBtnText}>Remove</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <TouchableOpacity style={styles.uploadBtn} onPress={onPick}>
-          <Text style={styles.uploadBtnText}>📷 Take Photo / Choose File</Text>
+          <IconCamera size={20} color="#64748b" style={{ marginRight: 10 }} />
+          <Text style={styles.uploadBtnText}>Take Photo / Choose File</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -248,16 +263,16 @@ function UploadSlot({ label, hint, file, onPick, onClear }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFF' },
   header: { padding: 24, paddingTop: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  backBtn: { fontSize: 16, fontWeight: '700', color: theme.colors.sky },
+  backBtnBox: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F9FAFB', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#EEE' },
   headerTitle: { fontSize: 18, fontWeight: '800', color: theme.colors.black },
 
   statusBanner: { marginHorizontal: 24, marginBottom: 8, padding: 20, borderRadius: 16, borderWidth: 1.5, flexDirection: 'row', alignItems: 'center', gap: 16 },
-  statusIcon: { fontSize: 28 },
   statusLabel: { fontSize: 16, fontWeight: '900' },
   statusNote: { fontSize: 13, color: '#475569', fontWeight: '600', marginTop: 4 },
 
   infoBox: { marginHorizontal: 24, marginVertical: 16, padding: 20, backgroundColor: '#f8fafc', borderRadius: 16 },
-  infoTitle: { fontSize: 14, fontWeight: '800', color: theme.colors.black, marginBottom: 8 },
+  rowAlignCenter: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  infoTitle: { fontSize: 14, fontWeight: '800', color: theme.colors.black },
   infoText: { fontSize: 13, color: '#64748b', lineHeight: 20 },
 
   section: { paddingHorizontal: 24, marginTop: 8 },
@@ -268,7 +283,7 @@ const styles = StyleSheet.create({
   uploadCard: { marginBottom: 20 },
   uploadLabel: { fontSize: 14, fontWeight: '800', color: theme.colors.black, marginBottom: 4 },
   hint: { fontSize: 12, color: '#94a3b8', fontWeight: '600', marginBottom: 10 },
-  uploadBtn: { height: 64, borderRadius: 14, borderStyle: 'dashed', borderWidth: 2, borderColor: '#cbd5e1', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' },
+  uploadBtn: { height: 64, borderRadius: 14, borderStyle: 'dashed', borderWidth: 2, borderColor: '#cbd5e1', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc', flexDirection: 'row' },
   uploadBtnText: { fontSize: 14, fontWeight: '700', color: '#64748b' },
   uploadedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, backgroundColor: '#f0fdf4', borderRadius: 12, borderWidth: 1.5, borderColor: '#86efac' },
   uploadedName: { flex: 1, fontSize: 13, fontWeight: '700', color: '#166534' },

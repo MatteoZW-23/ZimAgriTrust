@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Alert, Platform, Share } from 'react-native';
-import { User, MapPin, Phone, Shield, Star, LogOut, ChevronRight, Bell, HelpCircle, FileText, Settings, Briefcase, Download, Trash2, PowerOff } from 'lucide-react-native';
+import { 
+  User as IconUser, MapPin as IconMapPin, Phone as IconPhone, 
+  Shield as IconShield, Star as IconStar, LogOut as IconLogOut, 
+  ChevronRight as IconChevronRight, Bell as IconBell, 
+  HelpCircle as IconHelpCircle, FileText as IconFileText, 
+  Settings as IconSettings, Briefcase as IconBriefcase, 
+  Download as IconDownload, Trash2 as IconTrash2, 
+  PowerOff as IconPowerOff, ShoppingCart as IconShopping,
+  Sprout as IconSprout
+} from 'lucide-react-native';
 import { theme } from '../styles';
 import { deactivateAccount, deleteAccount, exportPersonalData, getProfile } from '../api';
 import { clearSession } from '../utils/auth';
@@ -109,7 +118,7 @@ export default function ProfileScreen({ route, navigation }) {
   const trustScore = profile.trust_score || 50;
   const trustColor = trustScore >= 80 ? '#4CAF50' : trustScore >= 50 ? '#FFC107' : '#D32F2F';
   const trustLabel = trustScore >= 80 ? 'Excellent' : trustScore >= 50 ? 'Good' : 'Needs Improvement';
-  const roleEmoji = role === 'farmer' ? '👨‍🌾' : role === 'buyer' ? '🛒' : role === 'agent' ? '👨‍💼' : '👤';
+  const RoleIcon = role === 'farmer' ? IconSprout : role === 'buyer' ? IconShopping : role === 'agent' ? IconBriefcase : IconUser;
   const accent = role === 'farmer' ? theme.colors.green : theme.colors.sky;
 
   return (
@@ -123,25 +132,25 @@ export default function ProfileScreen({ route, navigation }) {
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <View style={[styles.avatar, { backgroundColor: `${accent}15`, borderColor: `${accent}30` }]}>
-            <Text style={{ fontSize: 40 }}>{roleEmoji}</Text>
+            <RoleIcon size={40} color={accent} />
           </View>
           <Text style={styles.name}>{profile.full_name || profile.name || 'User'}</Text>
           <Text style={styles.roleLabel}>{(role || 'user').charAt(0).toUpperCase() + (role || 'user').slice(1)}</Text>
 
           <View style={styles.infoRow}>
-            <Phone size={14} color="#999" />
+            <IconPhone size={14} color="#999" />
             <Text style={styles.infoText}>{profile.phone_number || '+263...'}</Text>
           </View>
           {profile.location && (
             <View style={styles.infoRow}>
-              <MapPin size={14} color="#999" />
+              <IconMapPin size={14} color="#999" />
               <Text style={styles.infoText}>{profile.location}</Text>
             </View>
           )}
 
           {/* Verification Badge */}
           <View style={[styles.badge, { backgroundColor: profile.verified ? '#E8F5E9' : '#FFF3E0' }]}>
-            <Shield size={14} color={profile.verified ? '#4CAF50' : '#FF9800'} />
+            <IconShield size={14} color={profile.verified ? '#4CAF50' : '#FF9800'} />
             <Text style={[styles.badgeText, { color: profile.verified ? '#4CAF50' : '#FF9800' }]}>
               {profile.verified ? 'Verified' : 'Not Verified'}
             </Text>
@@ -156,7 +165,7 @@ export default function ProfileScreen({ route, navigation }) {
               <Text style={[styles.trustValue, { color: trustColor }]}>{trustScore}/100</Text>
             </View>
             <View style={[styles.trustBadge, { backgroundColor: `${trustColor}15` }]}>
-              <Star size={18} color={trustColor} />
+              <IconStar size={18} color={trustColor} />
               <Text style={[styles.trustBadgeText, { color: trustColor }]}>{trustLabel}</Text>
             </View>
           </View>
@@ -184,13 +193,13 @@ export default function ProfileScreen({ route, navigation }) {
         {/* Menu Items */}
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>Account</Text>
-          <MenuItem icon={<Settings size={20} color={accent} />} label="Account Settings" onPress={handleEditProfile} />
-          <MenuItem icon={<Bell size={20} color={accent} />} label="Notifications" />
-          <MenuItem icon={<Shield size={20} color={accent} />} label="Verification" />
-          <MenuItem icon={<Download size={20} color={accent} />} label="Export My Data" onPress={handleExportData} />
+          <MenuItem icon={<IconSettings size={20} color={accent} />} label="Account Settings" onPress={handleEditProfile} />
+          <MenuItem icon={<IconBell size={20} color={accent} />} label="Notifications" />
+          <MenuItem icon={<IconShield size={20} color={accent} />} label="Verification" />
+          <MenuItem icon={<IconDownload size={20} color={accent} />} label="Export My Data" onPress={handleExportData} />
           {role !== 'agent' && (
             <MenuItem
-              icon={<Briefcase size={20} color={accent} />}
+              icon={<IconBriefcase size={20} color={accent} />}
               label="Become an Agent"
               onPress={() => navigation.navigate('AgentApplication', { profile })}
             />
@@ -199,19 +208,19 @@ export default function ProfileScreen({ route, navigation }) {
 
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>Support</Text>
-          <MenuItem icon={<HelpCircle size={20} color={accent} />} label="Help Center" />
-          <MenuItem icon={<FileText size={20} color={accent} />} label="Terms & Privacy" />
+          <MenuItem icon={<IconHelpCircle size={20} color={accent} />} label="Help Center" />
+          <MenuItem icon={<IconFileText size={20} color={accent} />} label="Terms & Privacy" />
         </View>
 
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>Data & Account Control</Text>
-          <MenuItem icon={<PowerOff size={20} color="#D97706" />} label="Deactivate Account" onPress={handleDeactivateAccount} />
-          <MenuItem icon={<Trash2 size={20} color="#D32F2F" />} label="Delete My Account" onPress={handleDeleteAccount} />
+          <MenuItem icon={<IconPowerOff size={20} color="#D97706" />} label="Deactivate Account" onPress={handleDeactivateAccount} />
+          <MenuItem icon={<IconTrash2 size={20} color="#D32F2F" />} label="Delete My Account" onPress={handleDeleteAccount} />
         </View>
 
         {/* Logout */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <LogOut size={20} color="#D32F2F" />
+          <IconLogOut size={20} color="#D32F2F" />
           <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
 
@@ -228,7 +237,7 @@ function MenuItem({ icon, label, onPress }) {
         {icon}
         <Text style={styles.menuItemLabel}>{label}</Text>
       </View>
-      <ChevronRight size={18} color="#CCC" />
+      <IconChevronRight size={18} color="#CCC" />
     </TouchableOpacity>
   );
 }

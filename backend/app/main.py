@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 import time
 import logging
 import traceback
@@ -26,6 +27,7 @@ from app.models.session import UserSession  # noqa: F401 — registers session t
 from app.core.health import router as health_router
 from app.core.error_tracking import init_sentry
 from app.core.metrics import router as metrics_router, MetricsMiddleware
+from app.models.system_config import SystemConfig
 from app.ml.model_loader import model_loader
 
 @asynccontextmanager
@@ -74,31 +76,47 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.APP_NAME, version="1.0.0", lifespan=lifespan)
 
-# Only apply TrustedHostMiddleware when a specific host list is configured.
-# When ALLOWED_HOSTS="*" (default in Docker), skip it — the middleware does NOT
-# treat "*" as allow-all; it would redirect every request with a real hostname.
+# 1. CORS Middleware (Must be at the very top to handle preflights before security)
+# Allow credentials with specific origins for admin dashboard, wildcard for mobile apps
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+        "http://localhost:3003",
+        "http://localhost:5173",  # Admin dashboard Vite dev server
+        "http://localhost:19000",
+        "http://localhost:19001",
+        "http://localhost:19002",
+        "http://localhost:19006",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:19000",
+        "http://127.0.0.1:19002",
+        "*",  # Fallback for mobile apps with dynamic IPs
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
+# 2. Trusted Host Middleware (Skip if wildcard is used)
 if settings.ALLOWED_HOSTS.strip() != "*":
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts_list)
 
 if settings.FORCE_HTTPS:
     app.add_middleware(HTTPSRedirectMiddleware)
 
-# Add security middleware
+# 3. Security & Business Middlewares
 app.add_middleware(SecurityMiddleware)
 
-# Add audit logging for admin routes
 if settings.ADMIN_AUDIT_LOGGING:
     app.add_middleware(AuditLoggingMiddleware)
 
 app.add_middleware(MetricsMiddleware)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 app.include_router(health_router, prefix="/health", tags=["health"])
@@ -106,58 +124,56 @@ app.include_router(metrics_router)
 
 # --- INDUSTRIAL STRENGTH MIDDLEWARE ---
 
-@app.middleware("http")
-async def emergency_shutdown_middleware(request: Request, call_next):
-    """
-    When emergency shutdown is engaged, only super-admin endpoints AND read
-    requests are served. All other state-changing requests get 503.
-    """
-    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
-        path = request.url.path
-        if path.startswith("/api/v1/super-admin"):
+class EmergencyShutdownMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Skip preflight requests
+        if request.method == "OPTIONS":
             return await call_next(request)
+
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            path = request.url.path
+            if path.startswith("/api/v1/super-admin"):
+                return await call_next(request)
+            try:
+                with SessionLocal() as db:
+                    cfg = db.query(SystemConfig).filter(SystemConfig.key == "SYSTEM_LOCKDOWN").first()
+                    if cfg and str(cfg.value).lower() == "true":
+                        return JSONResponse(
+                            status_code=503,
+                            content={"detail": "PLATFORM_LOCKDOWN: System under emergency read-only lockdown."},
+                        )
+            except Exception:
+                pass
+        return await call_next(request)
+
+
+class AuditPerformanceMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
+        start_time = time.time()
+        request_id = request.headers.get("X-Request-ID", str(int(time.time() * 1000)))
+
         try:
-            from app.models.system_config import SystemConfig
-            with SessionLocal() as db:
-                cfg = db.query(SystemConfig).filter(SystemConfig.key == "SYSTEM_LOCKDOWN").first()
-                if cfg and str(cfg.value).lower() == "true":
-                    return JSONResponse(
-                        status_code=503,
-                        content={"detail": "PLATFORM_LOCKDOWN: System under emergency read-only lockdown."},
-                    )
-        except Exception:
-            pass
-    return await call_next(request)
+            response = await call_next(request)
+            process_time = time.time() - start_time
+            logging.info(
+                f"AUDIT | {request.method} {request.url.path} | "
+                f"STATUS: {response.status_code} | TIME: {process_time:.4f}s | ID: {request_id}"
+            )
+            response.headers["X-Process-Time"] = str(process_time)
+            return response
+        except Exception as e:
+            logging.error(f"SYSTEM FAILURE | ID: {request_id} | ERROR: {str(e)}")
+            logging.error(traceback.format_exc())
+            raise e
 
 
-@app.middleware("http")
-async def audit_and_performance_middleware(request: Request, call_next):
-    """
-    Middleware for structured logging and performance auditing.
-    """
-    start_time = time.time()
-    
-    # Generate request session ID for tracing
-    request_id = request.headers.get("X-Request-ID", str(int(time.time() * 1000)))
-    
-    try:
-        response = await call_next(request)
-        process_time = time.time() - start_time
-        
-        # Log successful request
-        logging.info(
-            f"AUDIT | {request.method} {request.url.path} | "
-            f"STATUS: {response.status_code} | TIME: {process_time:.4f}s | ID: {request_id}"
-        )
-        
-        response.headers["X-Process-Time"] = str(process_time)
-        return response
-        
-    except Exception as e:
-        # Capture and log critical system failures, then re-raise so CORSMiddleware catches it
-        logging.error(f"SYSTEM FAILURE | ID: {request_id} | ERROR: {str(e)}")
-        logging.error(traceback.format_exc())
-        raise e
+# Register the custom middlewares after they are defined
+app.add_middleware(EmergencyShutdownMiddleware)
+app.add_middleware(AuditPerformanceMiddleware)
+
 
 # --- GLOBAL EXCEPTION HANDLING ---
 

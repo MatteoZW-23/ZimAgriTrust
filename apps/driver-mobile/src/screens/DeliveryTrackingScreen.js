@@ -1,22 +1,26 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView,
-  Alert, Image, Modal, TextInput, ActivityIndicator, Share
+  Alert, Image, Modal, TextInput, ActivityIndicator, Share, Platform,
 } from 'react-native';
 import {
-  ArrowLeft, MapPin, CheckCircle, Truck, Package, Camera, Phone,
-  Navigation, Upload, MessageSquare, AlertCircle, User, Clock
+  ArrowLeft as IconArrowLeft, MapPin as IconMapPin, 
+  CheckCircle as IconCheckCircle, Truck as IconTruck, 
+  Package as IconPackage, Camera as IconCamera, Phone as IconPhone,
+  Navigation as IconNavigation, Upload as IconUpload, 
+  MessageSquare as IconMessageSquare, AlertTriangle as IconAlertTriangle, 
+  User as IconUser, Clock as IconClock,
+  X as IconX, Wheat as IconWheat, DollarSign as IconDollarSign,
 } from 'lucide-react-native';
 import { theme } from '../styles';
-import { updateDeliveryStatus, submitDeliveryProof, reportIssue } from '../api';
+import { updateDeliveryStatus, submitDeliveryProof, reportIssue, confirmPickup, confirmDelivery } from '../api';
 import LocationTracker from '../utils/locationTracker';
-import * as ImagePicker from 'expo-image-picker';
 
 const STEPS = [
-  { key: 'pending', label: 'Job Accepted', icon: CheckCircle },
-  { key: 'picked_up', label: 'Cargo Picked Up', icon: Package },
-  { key: 'in_transit', label: 'In Transit', icon: Truck },
-  { key: 'delivered', label: 'Delivered', icon: MapPin },
+  { key: 'pending', label: 'Job Accepted', icon: IconCheckCircle },
+  { key: 'picked_up', label: 'Cargo Picked Up', icon: IconPackage },
+  { key: 'in_transit', label: 'In Transit', icon: IconTruck },
+  { key: 'delivered', label: 'Delivered', icon: IconMapPin },
 ];
 
 export default function DeliveryTrackingScreen({ route, navigation }) {
@@ -50,16 +54,20 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
   const handleUpdateStatus = async (newStatus) => {
     setUpdating(true);
     try {
-      await updateDeliveryStatus(token, delivery.id, newStatus);
-      setStatus(newStatus);
-      
-      // Start location tracking when in transit
-      if (newStatus === 'in_transit') {
+      if (newStatus === 'picked_up') {
+        // If it's pickup, we ideally want a photo, but we can also just update status
+        await updateDeliveryStatus(token, delivery.id, 'PICKUP_DONE');
+      } else if (newStatus === 'in_transit') {
+        await updateDeliveryStatus(token, delivery.id, 'IN_TRANSIT');
         LocationTracker.startTracking(token);
+      } else {
+        await updateDeliveryStatus(token, delivery.id, newStatus.toUpperCase());
       }
       
+      setStatus(newStatus);
+      
       if (newStatus === 'delivered') {
-        Alert.alert('Delivery Complete!', 'Great job! Payment will be processed shortly.');
+        setShowProofModal(true); // Open proof modal automatically
       }
     } catch (err) {
       Alert.alert('Error', err.message || 'Failed to update status');
@@ -69,19 +77,31 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
   };
 
   const handleTakePhoto = async () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          setPhotos(prev => [...prev, { uri: URL.createObjectURL(file), name: file.name, type: file.type }]);
+        }
+      };
+      input.click();
+      return;
+    }
     try {
+      const ImagePicker = require('expo-image-picker');
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
       });
-
       if (!result.canceled) {
         setPhotos(prev => [...prev, result.assets[0]]);
       }
     } catch (error) {
-      console.error('Failed to take photo:', error);
-      Alert.alert('Error', 'Failed to take photo');
+      Alert.alert('Camera Error', 'Could not open camera. Please try again.');
     }
   };
 
@@ -98,9 +118,17 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
 
     try {
       setUpdating(true);
-      await submitDeliveryProof(token, delivery.id, photos, notes, signature);
+      const photoBase64 = photos[0].uri; // In real app, convert to base64
+      const signatureBase64 = signature ? signature.uri : null;
+
+      if (status === 'picked_up' || status === 'pending') {
+        await confirmPickup(token, delivery.id, photoBase64);
+        setStatus('picked_up');
+      } else {
+        await confirmDelivery(token, delivery.id, photoBase64, signatureBase64);
+        setStatus('completed');
+      }
       
-      setStatus('completed');
       setShowProofModal(false);
       setPhotos([]);
       setNotes('');
@@ -174,7 +202,7 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <ArrowLeft size={22} color={theme.colors.dark} />
+          <IconArrowLeft size={22} color={theme.colors.dark} />
         </TouchableOpacity>
         <Text style={styles.topTitle}>Delivery Tracking</Text>
         <View style={{ width: 40 }} />
@@ -193,9 +221,18 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
             <Text style={styles.routeText} numberOfLines={1}>{delivery.delivery_location || 'Destination'}</Text>
           </View>
           <View style={styles.routeMeta}>
-            <Text style={styles.metaText}>🌾 {delivery.crop_type || 'Cargo'}</Text>
-            <Text style={styles.metaText}>📦 {delivery.weight_kg || '—'} kg</Text>
-            <Text style={[styles.metaText, { fontWeight: '800', color: theme.colors.sky }]}>${delivery.payment_amount || 0}</Text>
+            <View style={styles.metaChip}>
+              <IconWheat size={12} color="#16a34a" />
+              <Text style={styles.metaText}>{delivery.crop_type || 'Cargo'}</Text>
+            </View>
+            <View style={styles.metaChip}>
+              <IconPackage size={12} color="#666" />
+              <Text style={styles.metaText}>{delivery.weight_kg || '—'} kg</Text>
+            </View>
+            <View style={[styles.metaChip, { backgroundColor: '#E1F5FE' }]}>
+              <IconDollarSign size={12} color={theme.colors.sky} />
+              <Text style={[styles.metaText, { color: theme.colors.sky, fontWeight: '800' }]}>{delivery.payment_amount || 0}</Text>
+            </View>
           </View>
         </View>
 
@@ -242,7 +279,7 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
 
         {status === 'delivered' && (
           <View style={styles.completeCard}>
-            <CheckCircle size={32} color="#4CAF50" />
+            <IconCheckCircle size={32} color="#4CAF50" />
             <Text style={styles.completeTitle}>Delivery Complete</Text>
             <Text style={styles.completeText}>Payment is being processed</Text>
           </View>
@@ -252,7 +289,7 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
         {locationStatus.isTracking && (
           <View style={styles.trackingCard}>
             <View style={styles.trackingHeader}>
-              <Navigation size={20} color={theme.colors.sky} />
+              <IconNavigation size={20} color={theme.colors.sky} />
               <Text style={styles.trackingTitle}>Live Tracking Active</Text>
             </View>
             <View style={styles.trackingStats}>
@@ -272,11 +309,11 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
         {/* Customer Information */}
         <View style={styles.customerCard}>
           <View style={styles.customerHeader}>
-            <User size={20} color={theme.colors.sky} />
+            <IconUser size={20} color={theme.colors.sky} />
             <Text style={styles.customerName}>{delivery.customer_name || 'Customer'}</Text>
           </View>
           <TouchableOpacity style={styles.contactButton} onPress={handleCallCustomer}>
-            <Phone size={18} color="#FFF" />
+            <IconPhone size={18} color="#FFF" />
             <Text style={styles.contactButtonText}>Call Customer</Text>
           </TouchableOpacity>
         </View>
@@ -284,26 +321,26 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
         {/* Enhanced Quick Actions */}
         <View style={styles.quickActions}>
           <TouchableOpacity style={styles.quickBtn} onPress={() => setShowProofModal(true)}>
-            <Camera size={20} color={theme.colors.sky} />
+            <IconCamera size={20} color={theme.colors.sky} />
             <Text style={styles.quickLabel}>Photo Proof</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.quickBtn} onPress={handleCallCustomer}>
-            <Phone size={20} color={theme.colors.sky} />
+            <IconPhone size={20} color={theme.colors.sky} />
             <Text style={styles.quickLabel}>Call Customer</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.quickBtn} onPress={handleNavigate}>
-            <Navigation size={20} color={theme.colors.sky} />
+            <IconNavigation size={20} color={theme.colors.sky} />
             <Text style={styles.quickLabel}>Navigate</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.quickBtn} onPress={handleShareLocation}>
-            <MapPin size={20} color={theme.colors.sky} />
+            <IconMapPin size={20} color={theme.colors.sky} />
             <Text style={styles.quickLabel}>Share Location</Text>
           </TouchableOpacity>
         </View>
 
         {/* Report Issue Button */}
         <TouchableOpacity style={styles.issueReportBtn} onPress={() => setShowIssueModal(true)}>
-          <AlertCircle size={20} color="#FF5722" />
+          <IconAlertTriangle size={20} color="#FF5722" />
           <Text style={styles.issueReportText}>Report Issue</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -313,8 +350,8 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Proof of Delivery</Text>
-            <TouchableOpacity onPress={() => setShowProofModal(false)}>
-              <Text style={styles.modalClose}>Cancel</Text>
+            <TouchableOpacity onPress={() => setShowProofModal(false)} style={styles.modalCloseBtn}>
+              <IconX size={20} color="#666" />
             </TouchableOpacity>
           </View>
           
@@ -333,7 +370,7 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
                 </View>
               ))}
               <TouchableOpacity style={styles.addPhoto} onPress={handleTakePhoto}>
-                <Camera size={24} color="#999" />
+                <IconCamera size={24} color="#999" />
                 <Text style={styles.addPhotoText}>Add Photo</Text>
               </TouchableOpacity>
             </View>
@@ -365,7 +402,7 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
                 <ActivityIndicator size="small" color="#FFF" />
               ) : (
                 <>
-                  <Upload size={18} color="#FFF" />
+                  <IconUpload size={18} color="#FFF" />
                   <Text style={styles.submitButtonText}>Submit Proof</Text>
                 </>
               )}
@@ -379,8 +416,8 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Report Issue</Text>
-            <TouchableOpacity onPress={() => setShowIssueModal(false)}>
-              <Text style={styles.modalClose}>Cancel</Text>
+            <TouchableOpacity onPress={() => setShowIssueModal(false)} style={styles.modalCloseBtn}>
+              <IconX size={20} color="#666" />
             </TouchableOpacity>
           </View>
           
@@ -430,7 +467,7 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
                 </View>
               ))}
               <TouchableOpacity style={styles.addPhoto} onPress={handleTakePhoto}>
-                <Camera size={24} color="#999" />
+                <IconCamera size={24} color="#999" />
                 <Text style={styles.addPhotoText}>Add Photo</Text>
               </TouchableOpacity>
             </View>
@@ -446,7 +483,7 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
                 <ActivityIndicator size="small" color="#FFF" />
               ) : (
                 <>
-                  <MessageSquare size={18} color="#FFF" />
+                  <IconMessageSquare size={18} color="#FFF" />
                   <Text style={styles.submitButtonText}>Report Issue</Text>
                 </>
               )}
@@ -476,8 +513,9 @@ const styles = StyleSheet.create({
   dot: { width: 10, height: 10, borderRadius: 5 },
   routeText: { fontSize: 15, fontWeight: '600', color: theme.colors.dark, flex: 1 },
   routeDivider: { width: 2, height: 16, backgroundColor: '#E0E0E0', marginLeft: 4, marginVertical: 4 },
-  routeMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#F5F5F5' },
-  metaText: { fontSize: 13, fontWeight: '600', color: '#666' },
+  routeMeta: { flexDirection: 'row', gap: 8, marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#F5F5F5' },
+  metaChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F5F5F5', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8 },
+  metaText: { fontSize: 12, fontWeight: '600', color: '#666' },
   timelineCard: {
     marginHorizontal: 20,
     marginTop: 20,
@@ -639,10 +677,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: theme.colors.dark,
   },
-  modalClose: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.colors.sky,
+  modalCloseBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: '#F5F5F5', justifyContent: 'center', alignItems: 'center',
   },
   modalContent: { flex: 1, padding: 20 },
   modalSectionTitle: {

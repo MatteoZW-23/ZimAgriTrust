@@ -3,13 +3,19 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   SafeAreaView, TextInput, Alert, ActivityIndicator
 } from 'react-native';
+import { 
+  ArrowLeft as IconArrowLeft, 
+  Smartphone as IconSmartphone, 
+  CreditCard as IconCreditCard, 
+  Landmark as IconLandmark 
+} from 'lucide-react-native';
 import { theme } from '../styles';
 import { getWalletBalance, withdrawFunds } from '../api';
 
 const METHODS = [
-  { id: 'ecocash', label: 'EcoCash', icon: '📱', desc: 'Instant transfer to EcoCash wallet' },
-  { id: 'onemoney', label: 'OneMoney', icon: '💳', desc: 'Transfer to OneMoney account' },
-  { id: 'bank', label: 'Bank Transfer', icon: '🏦', desc: 'Transfer to your bank account (1-2 days)' },
+  { id: 'ecocash', label: 'EcoCash', icon: IconSmartphone, desc: 'Instant transfer to EcoCash wallet' },
+  { id: 'onemoney', label: 'OneMoney', icon: IconCreditCard, desc: 'Transfer to OneMoney account' },
+  { id: 'bank', label: 'Bank Transfer', icon: IconLandmark, desc: 'Transfer to your bank account (1-2 days)' },
 ];
 
 export default function WithdrawScreen({ navigation, route }) {
@@ -68,11 +74,11 @@ export default function WithdrawScreen({ navigation, route }) {
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.back}>← Back</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <IconArrowLeft size={22} color={theme.colors.black} />
           </TouchableOpacity>
           <Text style={styles.title}>Withdraw Funds</Text>
-          <View style={{ width: 60 }} />
+          <View style={{ width: 44 }} />
         </View>
 
         {/* Balance Card */}
@@ -131,7 +137,9 @@ export default function WithdrawScreen({ navigation, route }) {
               style={[styles.methodCard, method === m.id && styles.methodCardActive]}
               onPress={() => setMethod(m.id)}
             >
-              <Text style={styles.methodIcon}>{m.icon}</Text>
+              <View style={styles.methodIconBox}>
+                <m.icon size={24} color={method === m.id ? theme.colors.green : '#94a3b8'} />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.methodLabel, method === m.id && styles.methodLabelActive]}>{m.label}</Text>
                 <Text style={styles.methodDesc}>{m.desc}</Text>
@@ -199,9 +207,9 @@ export default function WithdrawScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 24, paddingTop: 60 },
-  back: { fontSize: 16, fontWeight: '700', color: theme.colors.sky },
-  title: { fontSize: 18, fontWeight: '900', color: theme.colors.black },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 60, paddingBottom: 20 },
+  backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
+  title: { fontSize: 20, fontWeight: '900', color: theme.colors.black },
   balanceCard: { marginHorizontal: 20, marginBottom: 8, backgroundColor: theme.colors.black, borderRadius: 24, padding: 28, alignItems: 'center' },
   balanceLabel: { fontSize: 11, fontWeight: '900', color: '#64748b', letterSpacing: 1.2, marginBottom: 8 },
   balanceAmount: { fontSize: 40, fontWeight: '900', color: '#fff', marginBottom: 8 },
@@ -219,7 +227,7 @@ const styles = StyleSheet.create({
   errorText: { color: '#ef4444', fontWeight: '700', fontSize: 13, marginTop: 8 },
   methodCard: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 16, borderWidth: 1.5, borderColor: '#e2e8f0', marginBottom: 10, backgroundColor: '#f8fafc' },
   methodCardActive: { borderColor: theme.colors.green, backgroundColor: '#f0fdf4' },
-  methodIcon: { fontSize: 28 },
+  methodIconBox: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
   methodLabel: { fontSize: 15, fontWeight: '800', color: theme.colors.black },
   methodLabelActive: { color: theme.colors.green },
   methodDesc: { fontSize: 12, color: '#64748b', marginTop: 2 },

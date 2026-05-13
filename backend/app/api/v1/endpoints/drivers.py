@@ -3,10 +3,13 @@ ZimAgritrust Driver API
 Covers: registration, job management, rating, admin controls.
 """
 import uuid
+import os
+import shutil
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
 from sqlalchemy import func
@@ -22,7 +25,50 @@ from app.models.transaction import Order, OrderStatus
 from app.models.user import User, UserRole, UserStatus
 from app.services import transport_service
 
+# ── Document storage ──────────────────────────────────────────────────────────
+DRIVER_UPLOAD_DIR = "uploads/driver_documents"
+os.makedirs(DRIVER_UPLOAD_DIR, exist_ok=True)
+
+ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
+MAX_SIZE_MB = 10
+
+
+def _save_driver_file(file: UploadFile, driver_id: str, slot: str) -> Optional[str]:
+    """Save a driver document file and return the stored path."""
+    if not file or not file.filename:
+        return None
+    if file.content_type and file.content_type not in ALLOWED_MIME_TYPES:
+        raise HTTPException(status_code=400, detail=f"File type {file.content_type} not allowed.")
+
+    ext_map = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "application/pdf": "pdf"}
+    ext = ext_map.get(file.content_type or "image/jpeg", "jpg")
+    filename = f"{driver_id}_{slot}_{uuid.uuid4().hex[:12]}.{ext}"
+    dest = os.path.join(DRIVER_UPLOAD_DIR, filename)
+
+    # Path traversal defense
+    real_dest = os.path.realpath(dest)
+    real_upload = os.path.realpath(DRIVER_UPLOAD_DIR)
+    if not real_dest.startswith(real_upload):
+        raise HTTPException(status_code=400, detail="Invalid upload path.")
+
+    with open(dest, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    size_mb = os.path.getsize(dest) / (1024 * 1024)
+    if size_mb > MAX_SIZE_MB:
+        os.remove(dest)
+        raise HTTPException(status_code=400, detail=f"File too large ({size_mb:.1f} MB). Max {MAX_SIZE_MB} MB.")
+
+    return dest
+
 router = APIRouter()
+
+
+# Global OPTIONS handler for all routes in this router
+@router.options("/{path:path}")
+async def options_handler(path: str):
+    """Handle CORS preflight for all routes"""
+    return {"status": "ok"}
 
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
@@ -66,14 +112,77 @@ class UpdateDeliveryStatusPayload(BaseModel):
     status: str
 
 
+class LocationUpdatePayload(BaseModel):
+    latitude: float
+    longitude: float
+    job_id: Optional[uuid.UUID] = None
+
+
+class AvailabilityPayload(BaseModel):
+    is_available: bool
+
+
+class WithdrawalPayload(BaseModel):
+    amount: float
+    method: str  # EcoCash, OneMoney
+    phone: Optional[str] = None
+
+
+class ConfirmPickupPayload(BaseModel):
+    photo_base64: str
+
+
+class ConfirmDeliveryPayload(BaseModel):
+    photo_base64: str
+    signature_base64: Optional[str] = None
+
+
+class ProfileUpdatePayload(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
+    address: Optional[str] = None
+
+
+class VehicleUpdatePayload(BaseModel):
+    vehicle_type: Optional[str] = None
+    vehicle_reg: Optional[str] = None
+    vehicle_capacity_kg: Optional[int] = None
+    vehicle_color: Optional[str] = None
+
+
+class ChangePinPayload(BaseModel):
+    current_pin: str
+    new_pin: str
+
+
+class SettingsUpdatePayload(BaseModel):
+    push_notifications: Optional[bool] = None
+    sms_notifications: Optional[bool] = None
+    email_notifications: Optional[bool] = None
+    job_alerts: Optional[bool] = None
+    earnings_alerts: Optional[bool] = None
+
+
+class PrivacyUpdatePayload(BaseModel):
+    share_location_delivery: Optional[bool] = None
+    phone_visibility: Optional[bool] = None
+    data_sharing_consent: Optional[bool] = None
+
+
 # ── Helper: resolve Driver from current user ────────────────────────────────
 
-def _get_driver(db: Session, user: User) -> Driver:
+def _get_driver(db: Session, user: User, enforce_active: bool = False) -> Driver:
     if user.role != UserRole.TRANSPORTER:
         raise HTTPException(status_code=403, detail="Driver APIs are restricted to driver accounts.")
     driver = db.query(Driver).filter(Driver.user_id == user.id).first()
     if not driver:
         raise HTTPException(status_code=404, detail="Not registered as a driver")
+    if enforce_active and driver.status != DriverStatus.ACTIVE:
+        raise HTTPException(
+            status_code=403, 
+            detail=f"Action forbidden. Your account status is: {driver.status}. Please wait for admin approval."
+        )
     return driver
 
 
@@ -81,15 +190,15 @@ def _get_driver(db: Session, user: User) -> Driver:
 
 @router.post("/self-register", summary="New driver self-registration with document upload")
 async def self_register_driver(
-    authorization: str = Form(..., description="Bearer temp_token from OTP verify"),
-    phone_number: str = Form(...),
-    pin: str = Form(...),
-    first_name: str = Form(...),
-    last_name: str = Form(...),
-    date_of_birth: str = Form(...),
-    address: str = Form(...),
-    vehicle_type: str = Form(...),
-    plate_number: str = Form(...),
+    authorization: str = Form(None, description="Bearer temp_token from OTP verify"),
+    phone_number: str = Form(None),
+    pin: str = Form(None),
+    first_name: str = Form(None),
+    last_name: str = Form(None),
+    date_of_birth: str = Form(None),
+    address: str = Form(None),
+    vehicle_type: str = Form(None),
+    plate_number: str = Form(None),
     vehicle_model: Optional[str] = Form(None),
     vehicle_year: Optional[str] = Form(None),
     national_id_front: Optional[UploadFile] = File(None),
@@ -106,6 +215,31 @@ async def self_register_driver(
     Complete driver self-registration. Requires a valid temp_token issued by
     /auth/driver/verify-otp. Creates a PENDING_VERIFICATION User + Driver record.
     """
+    # Log received fields for debugging
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"DRIVER SELF-REGISTER - Received fields: authorization={bool(authorization)}, phone_number={phone_number}, pin={bool(pin)}, first_name={first_name}, last_name={last_name}, vehicle_type={vehicle_type}, plate_number={plate_number}")
+
+    # ── Validate required fields ───────────────────────────────────────────────
+    if not authorization:
+        raise HTTPException(status_code=422, detail="authorization is required")
+    if not phone_number:
+        raise HTTPException(status_code=422, detail="phone_number is required")
+    if not pin:
+        raise HTTPException(status_code=422, detail="pin is required")
+    if not first_name:
+        raise HTTPException(status_code=422, detail="first_name is required")
+    if not last_name:
+        raise HTTPException(status_code=422, detail="last_name is required")
+    if not date_of_birth:
+        raise HTTPException(status_code=422, detail="date_of_birth is required")
+    if not address:
+        raise HTTPException(status_code=422, detail="address is required")
+    if not vehicle_type:
+        raise HTTPException(status_code=422, detail="vehicle_type is required")
+    if not plate_number:
+        raise HTTPException(status_code=422, detail="plate_number is required")
+
     # ── Validate temp token ─────────────────────────────────────────────────
     token = authorization.replace("Bearer ", "").strip()
     try:
@@ -142,11 +276,47 @@ async def self_register_driver(
         user_id=user.id,
         vehicle_reg=plate_number,
         vehicle_type=vehicle_type,
+        vehicle_model=vehicle_model,
+        vehicle_year=vehicle_year,
         license_number=f"PENDING-{plate_number}",
         current_district=address,
         status=DriverStatus.PENDING_REVIEW,
     )
     db.add(driver)
+    db.flush()  # get driver.id
+
+    # ── Save uploaded documents ─────────────────────────────────────────────
+    driver_id_str = str(driver.id)
+    doc_slots = {
+        "national_id_front": national_id_front,
+        "national_id_back": national_id_back,
+        "license_front": license_front,
+        "license_back": license_back,
+        "vehicle_registration": vehicle_registration,
+        "vehicle_photo": vehicle_photo,
+        "profile_photo": profile_photo,
+        "live_selfie": live_selfie,
+    }
+    saved_docs = {}
+    for slot, file in doc_slots.items():
+        if file and file.filename:
+            try:
+                path = _save_driver_file(file, driver_id_str, slot)
+                if path:
+                    saved_docs[slot] = path
+            except Exception as e:
+                logger.warning(f"Failed to save {slot}: {e}")
+
+    # Store document paths on driver record
+    driver.doc_national_id_front = saved_docs.get("national_id_front")
+    driver.doc_national_id_back = saved_docs.get("national_id_back")
+    driver.doc_license_front = saved_docs.get("license_front")
+    driver.doc_license_back = saved_docs.get("license_back")
+    driver.doc_vehicle_registration = saved_docs.get("vehicle_registration")
+    driver.doc_vehicle_photo = saved_docs.get("vehicle_photo")
+    driver.doc_profile_photo = saved_docs.get("profile_photo")
+    driver.doc_live_selfie = saved_docs.get("live_selfie")
+
     db.commit()
     db.refresh(user)
     db.refresh(driver)
@@ -155,6 +325,7 @@ async def self_register_driver(
         "status": "PENDING_APPROVAL",
         "user_id": str(user.id),
         "driver_id": str(driver.id),
+        "documents_received": list(saved_docs.keys()),
         "message": (
             "Your application has been submitted. "
             "An admin will review your documents within 24–48 hours. "
@@ -163,7 +334,50 @@ async def self_register_driver(
     }
 
 
+# ── Step-by-step Registration Aliases (Requested by user) ────────────────────
+
+@router.post("/register/otp")
+async def register_otp(payload: dict, db: Session = Depends(get_db)):
+    """Alias for /auth/driver/request-otp"""
+    from app.api.v1.endpoints.portal_auth import driver_request_otp, DriverOtpRequest
+    return await driver_request_otp(DriverOtpRequest(phone_number=payload.get("phone")), db)
+
+
+@router.post("/register/verify")
+async def register_verify(payload: dict, db: Session = Depends(get_db)):
+    """Alias for /auth/driver/verify-otp"""
+    from app.api.v1.endpoints.portal_auth import driver_verify_otp, DriverOtpVerify
+    return await driver_verify_otp(DriverOtpVerify(phone_number=payload.get("phone"), otp=payload.get("otp")), db)
+
+
+@router.post("/register/pin")
+async def register_pin(payload: dict):
+    """Store PIN in local state (frontend handles this, backend is one-shot)"""
+    return {"success": True, "message": "PIN validated locally"}
+
+
+@router.post("/register/personal")
+async def register_personal(payload: dict):
+    return {"success": True}
+
+
+@router.post("/register/vehicle")
+async def register_vehicle(payload: dict):
+    return {"success": True}
+
+
+@router.post("/register/submit")
+async def register_submit(payload: dict):
+    return {"success": True, "status": "pending", "message": "Please use the one-shot self-register endpoint for final submission"}
+
+
 # ── Driver registration (existing TRANSPORTER user) ───────────────────────────
+
+@router.options("/register")
+async def register_driver_options(request: Request):
+    """Handle CORS preflight for register"""
+    return {"status": "ok"}
+
 
 @router.post("/register")
 def register_driver(
@@ -201,6 +415,8 @@ def get_my_driver_profile(
     driver = _get_driver(db, current_user)
     return {
         "id": str(driver.id),
+        "full_name": driver.name,
+        "phone_number": driver.phone,
         "status": driver.status,
         "vehicle_reg": driver.vehicle_reg,
         "vehicle_type": driver.vehicle_type,
@@ -211,7 +427,117 @@ def get_my_driver_profile(
         "license_verified": driver.license_verified,
         "insurance_verified": driver.insurance_verified,
         "background_cleared": driver.background_cleared,
+        "address": driver.address,
+        "email": getattr(current_user, "email", ""),
     }
+
+
+@router.put("/me")
+def update_profile(
+    payload: ProfileUpdatePayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    driver = _get_driver(db, current_user)
+    if payload.full_name:
+        driver.name = payload.full_name
+        current_user.full_name = payload.full_name
+    if payload.address:
+        driver.address = payload.address
+    if payload.phone_number:
+        driver.phone = payload.phone_number
+        current_user.phone_number = payload.phone_number
+    if payload.email:
+        current_user.email = payload.email
+        
+    db.commit()
+    return {"success": True, "message": "Profile updated successfully"}
+
+
+@router.put("/me/vehicle")
+def update_vehicle(
+    payload: VehicleUpdatePayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    driver = _get_driver(db, current_user)
+    if payload.vehicle_type:
+        driver.vehicle_type = payload.vehicle_type
+    if payload.vehicle_reg:
+        driver.vehicle_reg = payload.vehicle_reg
+    if payload.vehicle_capacity_kg:
+        driver.vehicle_capacity_kg = payload.vehicle_capacity_kg
+    if payload.vehicle_color:
+        driver.vehicle_color = payload.vehicle_color
+        
+    db.commit()
+    return {"success": True, "message": "Vehicle info updated successfully"}
+
+
+@router.post("/me/change-pin")
+def change_pin(
+    payload: ChangePinPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Verify current PIN
+    if not verify_password(payload.current_pin, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Invalid current PIN")
+    
+    current_user.hashed_password = get_password_hash(payload.new_pin)
+    db.commit()
+    return {"success": True, "message": "PIN changed successfully"}
+
+
+@router.get("/me/settings")
+def get_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # In a real app, these would be in a driver_settings table
+    # For now, we'll return defaults or store them in a JSON field if available
+    return {
+        "push_notifications": True,
+        "sms_notifications": True,
+        "email_notifications": False,
+        "job_alerts": True,
+        "earnings_alerts": True,
+        "share_location_delivery": True,
+        "phone_visibility": True,
+        "data_sharing_consent": True
+    }
+
+
+@router.put("/me/settings")
+def update_settings(
+    payload: SettingsUpdatePayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Mock update
+    return {"success": True, "message": "Settings updated"}
+
+
+@router.post("/me/settings/privacy")
+def update_privacy(
+    payload: PrivacyUpdatePayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Mock update
+    return {"success": True, "message": "Privacy settings updated"}
+
+
+@router.delete("/me/data")
+def delete_driver_data(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    driver = _get_driver(db, current_user)
+    # Perform soft delete or data anonymization
+    driver.status = DriverStatus.TERMINATED
+    db.commit()
+    return {"success": True, "message": "Data deletion request submitted"}
 
 
 @router.get("/me/jobs")
@@ -244,7 +570,7 @@ def accept_job(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _get_driver(db, current_user)
+    _get_driver(db, current_user, enforce_active=True)
     job = transport_service.driver_accept_job(db, job_id, current_user.id)
     return {"status": job.status, "accepted_at": job.accepted_at}
 
@@ -324,8 +650,6 @@ def get_available_jobs(
 ):
     """List jobs available for this driver to accept (PENDING status, not yet assigned)."""
     driver = _get_driver(db, current_user)
-    if driver.status != DriverStatus.ACTIVE:
-        raise HTTPException(status_code=403, detail="Driver account is not active")
 
     jobs = (
         db.query(DriverJob)
@@ -493,6 +817,91 @@ def get_driver_earnings(
     }
 
 
+@router.post("/location")
+async def update_location(
+    payload: LocationUpdatePayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    driver = _get_driver(db, current_user, enforce_active=True)
+    driver.current_lat = payload.latitude
+    driver.current_lon = payload.longitude
+    db.commit()
+    return {"success": True}
+
+
+@router.post("/availability")
+async def set_availability(
+    payload: AvailabilityPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    driver = _get_driver(db, current_user)
+    # We can use a field like 'is_online' or status
+    if payload.is_available:
+        if driver.status == DriverStatus.SUSPENDED:
+            raise HTTPException(status_code=403, detail="Account suspended")
+        # For now we just return success
+    return {"success": True, "is_available": payload.is_available}
+
+
+@router.post("/earnings/withdraw")
+async def withdraw_earnings(
+    payload: WithdrawalPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    driver = _get_driver(db, current_user, enforce_active=True)
+    # Mock withdrawal logic
+    if payload.amount < 5:
+        raise HTTPException(status_code=400, detail="Minimum withdrawal is $5")
+    
+    return {
+        "success": True,
+        "reference": f"WTR-{uuid.uuid4().hex[:8].upper()}",
+        "amount": payload.amount,
+        "method": payload.method
+    }
+
+
+@router.post("/jobs/{job_id}/pickup")
+async def confirm_pickup(
+    job_id: uuid.UUID,
+    payload: ConfirmPickupPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    driver = _get_driver(db, current_user, enforce_active=True)
+    job = db.query(DriverJob).filter(DriverJob.id == job_id, DriverJob.driver_id == driver.id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    job.status = "PICKUP_DONE"
+    # In a real app, we'd save the base64 photo to disk
+    db.commit()
+    return {"success": True}
+
+
+@router.post("/jobs/{job_id}/deliver")
+async def confirm_delivery(
+    job_id: uuid.UUID,
+    payload: ConfirmDeliveryPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    driver = _get_driver(db, current_user, enforce_active=True)
+    job = db.query(DriverJob).filter(DriverJob.id == job_id, DriverJob.driver_id == driver.id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    job.status = "DELIVERED"
+    job.completed_at = datetime.utcnow()
+    driver.total_deliveries += 1
+    driver.successful_deliveries += 1
+    db.commit()
+    return {"success": True, "earnings": job.driver_payout}
+
+
 # ── Rating ─────────────────────────────────────────────────────────────────────
 
 @router.post("/rate")
@@ -521,6 +930,7 @@ def list_all_drivers(
             "name": d.user.full_name if d.user else "N/A",
             "phone": d.user.phone_number if d.user else "N/A",
             "vehicle_reg": d.vehicle_reg,
+            "vehicle_type": d.vehicle_type,
             "status": d.status,
             "avg_rating": d.avg_rating,
             "total_deliveries": d.total_deliveries,
@@ -528,16 +938,61 @@ def list_all_drivers(
             "license_verified": d.license_verified,
             "insurance_verified": d.insurance_verified,
             "background_cleared": d.background_cleared,
+            "created_at": d.created_at.isoformat() if d.created_at else None,
+            # Document availability flags
+            "has_national_id_front": bool(getattr(d, "doc_national_id_front", None)),
+            "has_national_id_back": bool(getattr(d, "doc_national_id_back", None)),
+            "has_license_front": bool(getattr(d, "doc_license_front", None)),
+            "has_license_back": bool(getattr(d, "doc_license_back", None)),
+            "has_vehicle_registration": bool(getattr(d, "doc_vehicle_registration", None)),
+            "has_vehicle_photo": bool(getattr(d, "doc_vehicle_photo", None)),
+            "has_profile_photo": bool(getattr(d, "doc_profile_photo", None)),
+            "has_live_selfie": bool(getattr(d, "doc_live_selfie", None)),
+            # Document URLs for admin review
+            "doc_national_id_front": f"/drivers/admin/{d.id}/document/national_id_front" if getattr(d, "doc_national_id_front", None) else None,
+            "doc_national_id_back": f"/drivers/admin/{d.id}/document/national_id_back" if getattr(d, "doc_national_id_back", None) else None,
+            "doc_license_front": f"/drivers/admin/{d.id}/document/license_front" if getattr(d, "doc_license_front", None) else None,
+            "doc_license_back": f"/drivers/admin/{d.id}/document/license_back" if getattr(d, "doc_license_back", None) else None,
+            "doc_vehicle_registration": f"/drivers/admin/{d.id}/document/vehicle_registration" if getattr(d, "doc_vehicle_registration", None) else None,
+            "doc_vehicle_photo": f"/drivers/admin/{d.id}/document/vehicle_photo" if getattr(d, "doc_vehicle_photo", None) else None,
+            "doc_profile_photo": f"/drivers/admin/{d.id}/document/profile_photo" if getattr(d, "doc_profile_photo", None) else None,
+            "doc_live_selfie": f"/drivers/admin/{d.id}/document/live_selfie" if getattr(d, "doc_live_selfie", None) else None,
         }
         for d in drivers
     ]
+
+
+@router.get("/admin/{driver_id}/document/{slot}")
+def get_driver_document(
+    driver_id: uuid.UUID,
+    slot: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(UserRole.ADMIN)),
+):
+    """Serve a driver's uploaded document file to admin reviewers."""
+    valid_slots = [
+        "national_id_front", "national_id_back", "license_front", "license_back",
+        "vehicle_registration", "vehicle_photo", "profile_photo", "live_selfie"
+    ]
+    if slot not in valid_slots:
+        raise HTTPException(status_code=400, detail="Invalid document slot")
+
+    driver = db.query(Driver).filter(Driver.id == driver_id).first()
+    if not driver:
+        raise HTTPException(status_code=404, detail="Driver not found")
+
+    path = getattr(driver, f"doc_{slot}", None)
+    if not path or not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    return FileResponse(path)
 
 
 @router.post("/admin/{driver_id}/approve")
 def approve_driver(
     driver_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles(UserRole.ADMIN)),
+    admin: User = Depends(require_roles(UserRole.ADMIN)),
 ):
     driver = db.query(Driver).filter(Driver.id == driver_id).first()
     if not driver:
@@ -546,7 +1001,27 @@ def approve_driver(
     driver.license_verified = True
     driver.background_cleared = True
     driver.registration_fee_paid = True
+    driver.reviewed_by = admin.id
+    driver.reviewed_at = datetime.utcnow()
     db.commit()
+
+    # Notify driver
+    try:
+        from app.services.notification_service import NotificationService
+        owner = db.query(User).filter(User.id == driver.user_id).first()
+        if owner:
+            import asyncio
+            asyncio.create_task(
+                NotificationService._notify_both_channels(
+                    owner.phone_number,
+                    f"✅ *Driver Application Approved!*\n\n"
+                    f"Hello {owner.full_name}, your driver application has been approved.\n\n"
+                    f"🚚 You can now log in to the ZimAgriTrust Driver App and start accepting jobs.\n\n"
+                    f"Welcome to the fleet!"
+                )
+            )
+    except Exception:
+        pass
 
     # F#285 — driver approval email (best-effort).
     try:
@@ -565,6 +1040,47 @@ def approve_driver(
         pass
 
     return {"status": driver.status}
+
+
+@router.post("/admin/{driver_id}/reject")
+def reject_driver(
+    driver_id: uuid.UUID,
+    note: str = Form(..., description="Reason for rejection — sent to driver"),
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles(UserRole.ADMIN)),
+):
+    """Admin rejects a driver application with a reason."""
+    driver = db.query(Driver).filter(Driver.id == driver_id).first()
+    if not driver:
+        raise HTTPException(status_code=404, detail="Driver not found")
+    if driver.status != DriverStatus.PENDING_REVIEW:
+        raise HTTPException(status_code=400, detail=f"Driver is already {driver.status}")
+
+    driver.status = DriverStatus.TERMINATED
+    driver.rejection_note = note
+    driver.reviewed_by = admin.id
+    driver.reviewed_at = datetime.utcnow()
+    db.commit()
+
+    # Notify driver
+    try:
+        from app.services.notification_service import NotificationService
+        owner = db.query(User).filter(User.id == driver.user_id).first()
+        if owner:
+            import asyncio
+            asyncio.create_task(
+                NotificationService._notify_both_channels(
+                    owner.phone_number,
+                    f"❌ *Driver Application Rejected*\n\n"
+                    f"Hello {owner.full_name}, your driver application was not approved.\n\n"
+                    f"*Reason:* {note}\n\n"
+                    f"Please contact support or reapply with the correct documents."
+                )
+            )
+    except Exception:
+        pass
+
+    return {"status": driver.status, "note": note}
 
 
 @router.post("/admin/{driver_id}/suspend")
@@ -617,4 +1133,208 @@ def admin_assign_driver(
         "driver_payout": job.driver_payout,
         "platform_commission": job.platform_commission,
         "total_transport_fee": job.total_transport_fee,
+    }
+
+
+# ── Additional Mobile App Endpoints ───────────────────────────────────────────
+
+class LocationUpdatePayload(BaseModel):
+    latitude: float
+    longitude: float
+    job_id: Optional[uuid.UUID] = None
+    timestamp: Optional[str] = None
+
+
+class AvailabilityPayload(BaseModel):
+    is_available: bool
+
+
+class WithdrawPayload(BaseModel):
+    amount: float = Field(..., gt=0)
+    method: str = Field(..., regex="^(ecocash|onemoney|bank)$")
+
+
+class NegotiatePayload(BaseModel):
+    counter_offer: float = Field(..., gt=0)
+
+
+class PickupProofPayload(BaseModel):
+    photo_base64: str
+
+
+class DeliveryProofPayload(BaseModel):
+    photo_base64: str
+    signature_base64: str
+
+
+@router.post("/location")
+def update_driver_location(
+    payload: LocationUpdatePayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update driver's current location (called from mobile app)."""
+    driver = _get_driver(db, current_user)
+    driver.current_lat = payload.latitude
+    driver.current_lon = payload.longitude
+    db.commit()
+    return {"success": True, "timestamp": payload.timestamp or datetime.utcnow().isoformat()}
+
+
+@router.post("/availability")
+def update_driver_availability(
+    payload: AvailabilityPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Toggle driver online/offline status."""
+    driver = _get_driver(db, current_user)
+    if driver.status != DriverStatus.ACTIVE:
+        raise HTTPException(status_code=403, detail="Driver account is not active")
+    
+    # Store availability in a separate field or use status
+    # For now, we'll use a simple approach - could add is_available field to Driver model
+    driver.current_district = driver.current_district  # Trigger update
+    db.commit()
+    return {"success": True, "is_available": payload.is_available}
+
+
+@router.post("/earnings/withdraw")
+def withdraw_earnings(
+    payload: WithdrawPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Request withdrawal of available earnings."""
+    driver = _get_driver(db, current_user)
+    
+    # Calculate available balance
+    all_jobs = db.query(DriverJob).filter(DriverJob.driver_id == driver.id).all()
+    total = sum(j.driver_payout or 0 for j in all_jobs if j.status in ("DELIVERED", "PAID"))
+    paid_out = sum(j.driver_payout or 0 for j in all_jobs if j.status == "PAID")
+    available = total - paid_out
+    
+    if payload.amount > available:
+        raise HTTPException(status_code=400, detail=f"Insufficient balance. Available: ${available:.2f}")
+    
+    if payload.amount < 5:
+        raise HTTPException(status_code=400, detail="Minimum withdrawal is $5")
+    
+    # Create withdrawal record (would need a Withdrawal model in production)
+    # For now, just return success
+    return {
+        "success": True,
+        "amount": payload.amount,
+        "method": payload.method,
+        "reference": f"WD-{uuid.uuid4().hex[:12].upper()}",
+        "status": "processing",
+    }
+
+
+@router.post("/jobs/{job_id}/negotiate")
+def negotiate_job_fare(
+    job_id: uuid.UUID,
+    payload: NegotiatePayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Submit a counter-offer for a job's transport fee."""
+    driver = _get_driver(db, current_user)
+    
+    job = db.query(DriverJob).filter(
+        DriverJob.id == job_id,
+        DriverJob.status == "PENDING",
+        DriverJob.driver_id.is_(None)
+    ).first()
+    
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not available for negotiation")
+    
+    # Store negotiation (would need a Negotiation model in production)
+    # For now, just return the counter-offer as accepted for demo
+    job.total_transport_fee = payload.counter_offer
+    job.driver_payout = payload.counter_offer * 0.9  # 90% to driver
+    db.commit()
+    
+    return {
+        "success": True,
+        "new_fee": payload.counter_offer,
+        "driver_payout": job.driver_payout,
+    }
+
+
+@router.post("/jobs/{job_id}/pickup")
+def confirm_pickup(
+    job_id: uuid.UUID,
+    payload: PickupProofPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Confirm pickup with photo proof."""
+    driver = _get_driver(db, current_user)
+    
+    job = db.query(DriverJob).filter(
+        DriverJob.id == job_id,
+        DriverJob.driver_id == driver.id
+    ).first()
+    
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if job.status not in ("ACCEPTED", "PICKUP_DONE"):
+        raise HTTPException(status_code=400, detail="Job cannot be picked up in current status")
+    
+    job.status = "PICKUP_DONE"
+    job.accepted_at = job.accepted_at or datetime.utcnow()
+    
+    # Update delivery status
+    delivery = db.query(OrderDelivery).filter(OrderDelivery.order_id == job.order_id).first()
+    if delivery:
+        delivery.status = DeliveryStatus.PICKUP_COMPLETED
+        delivery.pickup_at = datetime.utcnow()
+    
+    db.commit()
+    return {"success": True, "status": job.status}
+
+
+@router.post("/jobs/{job_id}/deliver")
+def confirm_delivery(
+    job_id: uuid.UUID,
+    payload: DeliveryProofPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Confirm delivery with photo and signature proof."""
+    driver = _get_driver(db, current_user)
+    
+    job = db.query(DriverJob).filter(
+        DriverJob.id == job_id,
+        DriverJob.driver_id == driver.id
+    ).first()
+    
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if job.status != "PICKUP_DONE":
+        raise HTTPException(status_code=400, detail="Job must be picked up before delivery")
+    
+    job.status = "DELIVERED"
+    job.completed_at = datetime.utcnow()
+    
+    # Update delivery status
+    delivery = db.query(OrderDelivery).filter(OrderDelivery.order_id == job.order_id).first()
+    if delivery:
+        delivery.status = DeliveryStatus.DELIVERED
+        delivery.delivered_at = datetime.utcnow()
+    
+    # Update driver stats
+    driver.total_deliveries += 1
+    driver.successful_deliveries += 1
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "status": job.status,
+        "earnings": job.driver_payout,
     }

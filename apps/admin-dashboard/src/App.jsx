@@ -39,6 +39,7 @@ import AIModelPanel from './components/AIModelPanel';
 import DataPipelinePanel from './components/DataPipelinePanel';
 import { AdminCommandCenter } from './components/AdminCommandCenter';
 import IDVerificationQueuePanel from './components/IDVerificationQueuePanel';
+import DriverVerificationPanel from './components/DriverVerificationPanel';
 import BuyerMarketplacePanel from './components/BuyerMarketplacePanel';
 import AdminMFASetup from './components/AdminMFASetup';
 import InvitationAcceptScreen from './components/InvitationAcceptScreen';
@@ -317,11 +318,12 @@ function App() {
 
     // PLATFORM group
     { type: 'group', key: 'platform', icon: 'fa-layer-group', label: 'Platform', children: [
-      { view: 'users',             icon: 'fa-users',             label: 'User Directory' },
-      { view: 'id-verification',   icon: 'fa-id-card',           label: 'ID Verification' },
-      { view: 'marketplace',       icon: 'fa-clipboard-check',   label: 'Listing Review' },
-      { view: 'marketplace-buyer', icon: 'fa-basket-shopping',   label: 'Browse Market' },
-      { view: 'market-monitor',    icon: 'fa-tower-observation', label: 'Market Monitor' },
+      { view: 'users',               icon: 'fa-users',             label: 'User Directory' },
+      { view: 'id-verification',     icon: 'fa-id-card',           label: 'ID Verification' },
+      { view: 'driver-verification', icon: 'fa-truck',             label: 'Driver Verification' },
+      { view: 'marketplace',         icon: 'fa-clipboard-check',   label: 'Listing Review' },
+      { view: 'marketplace-buyer',   icon: 'fa-basket-shopping',   label: 'Browse Market' },
+      { view: 'market-monitor',      icon: 'fa-tower-observation', label: 'Market Monitor' },
     ]},
 
     // FINANCE group
@@ -609,6 +611,7 @@ function App() {
           {currentView === 'market-monitor' && <MarketAdvisory activities={marketActivities} loading={loading} />}
           {currentView === 'whatsapp-bot' && <WhatsAppBotPanel token={token} />}
           {currentView === 'id-verification' && <IDVerificationQueuePanel token={token} />}
+          {currentView === 'driver-verification' && <DriverVerificationPanel token={token} />}
           {currentView === 'transactions-admin' && <EscrowRevenuePanel token={token} onEscrowAction={handleGovernance} />}
           {currentView === 'disputes' && <DisputeResolutionPanel disputes={disputes} onResolve={handleResolveDispute} />}
           {currentView === 'network' && <AgentPerformancePanel agents={agents} onRefresh={loadAllData} profile={profile} />}

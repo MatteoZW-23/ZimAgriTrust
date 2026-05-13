@@ -3,18 +3,18 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   SafeAreaView, RefreshControl, Alert, ActivityIndicator
 } from 'react-native';
+import { 
+  Sprout as IconSprout, 
+  MapPin as IconMapPin, 
+  Edit3 as IconEdit, 
+  ClipboardList as IconOffers, 
+  Trash2 as IconDelete, 
+  Plus as IconPlus,
+  Leaf as IconLeaf,
+  AlertCircle as IconAlert
+} from 'lucide-react-native';
 import { getMyListings } from '../api';
 import { theme } from '../styles';
-
-const CROP_EMOJI = {
-  maize: '🌽', corn: '🌽', wheat: '🌾', beans: '🫘', soybeans: '🫘',
-  tobacco: '🍃', cotton: '🌿', groundnuts: '🥜', sorghum: '🌾',
-  sunflower: '🌻', default: '🌱',
-};
-
-function cropEmoji(name = '') {
-  return CROP_EMOJI[name.toLowerCase()] || CROP_EMOJI.default;
-}
 
 function statusColor(status = '') {
   const s = status.toUpperCase();
@@ -69,7 +69,8 @@ export default function MyListingsScreen({ navigation, route }) {
           style={styles.addBtn}
           onPress={() => navigation.navigate('CreateListing', { token })}
         >
-          <Text style={styles.addBtnText}>+ NEW</Text>
+          <IconPlus size={14} color="#fff" style={{ marginRight: 4 }} />
+          <Text style={styles.addBtnText}>NEW</Text>
         </TouchableOpacity>
       </View>
 
@@ -93,7 +94,7 @@ export default function MyListingsScreen({ navigation, route }) {
         >
           {listings.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>🌱</Text>
+              <IconLeaf size={64} color="#CBD5E1" style={{ marginBottom: 16 }} />
               <Text style={styles.emptyTitle}>No listings yet</Text>
               <Text style={styles.emptyText}>Create your first listing to start selling.</Text>
               <TouchableOpacity
@@ -134,11 +135,16 @@ function ListingCard({ listing, onDelete, onEdit, onViewOffers }) {
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Text style={styles.cardEmoji}>{cropEmoji(crop)}</Text>
+        <View style={styles.cardIconBox}>
+          <IconSprout size={32} color={theme.colors.green} />
+        </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.cardCrop}>{crop.toUpperCase()} — {listing.grade || 'Ungraded'}</Text>
           <Text style={styles.cardMeta}>{qty} | {price} | {total} total</Text>
-          <Text style={styles.cardLocation}>📍 {location}</Text>
+          <View style={styles.cardLocationRow}>
+            <IconMapPin size={12} color="#94a3b8" />
+            <Text style={styles.cardLocation}>{location}</Text>
+          </View>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: statusColor(status) + '20' }]}>
           <Text style={[styles.statusText, { color: statusColor(status) }]}>{status}</Text>
@@ -147,19 +153,23 @@ function ListingCard({ listing, onDelete, onEdit, onViewOffers }) {
 
       {offerCount > 0 && (
         <TouchableOpacity style={styles.offerBanner} onPress={onViewOffers}>
-          <Text style={styles.offerBannerText}>🔴 {offerCount} new offer{offerCount > 1 ? 's' : ''}! Tap to review</Text>
+          <IconAlert size={16} color="#dc2626" style={{ marginRight: 8 }} />
+          <Text style={styles.offerBannerText}>{offerCount} new offer{offerCount > 1 ? 's' : ''}! Tap to review</Text>
         </TouchableOpacity>
       )}
 
       <View style={styles.cardActions}>
         <TouchableOpacity style={styles.actionBtn} onPress={onEdit}>
-          <Text style={styles.actionBtnText}>✏️ EDIT</Text>
+          <IconEdit size={14} color={theme.colors.green} style={{ marginRight: 4 }} />
+          <Text style={styles.actionBtnText}>EDIT</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.actionBtn, { borderColor: '#f59e0b' }]} onPress={onViewOffers}>
-          <Text style={[styles.actionBtnText, { color: '#f59e0b' }]}>📋 OFFERS</Text>
+          <IconOffers size={14} color="#f59e0b" style={{ marginRight: 4 }} />
+          <Text style={[styles.actionBtnText, { color: '#f59e0b' }]}>OFFERS</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.actionBtn, { borderColor: '#ef4444' }]} onPress={onDelete}>
-          <Text style={[styles.actionBtnText, { color: '#ef4444' }]}>🗑️ DELETE</Text>
+          <IconDelete size={14} color="#ef4444" style={{ marginRight: 4 }} />
+          <Text style={[styles.actionBtnText, { color: '#ef4444' }]}>DELETE</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -171,7 +181,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 24, paddingTop: 60 },
   back: { fontSize: 16, fontWeight: '700', color: theme.colors.sky },
   title: { fontSize: 18, fontWeight: '900', color: theme.colors.black },
-  addBtn: { backgroundColor: theme.colors.green, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
+  addBtn: { backgroundColor: theme.colors.green, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center' },
   addBtnText: { color: '#fff', fontWeight: '900', fontSize: 12 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   loadingText: { marginTop: 12, color: '#64748b', fontWeight: '600' },
@@ -179,22 +189,22 @@ const styles = StyleSheet.create({
   retryBtn: { backgroundColor: theme.colors.green, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
   retryText: { color: '#fff', fontWeight: '800' },
   empty: { alignItems: 'center', paddingTop: 80, paddingHorizontal: 40 },
-  emptyIcon: { fontSize: 64, marginBottom: 16 },
   emptyTitle: { fontSize: 22, fontWeight: '900', color: theme.colors.black, marginBottom: 8 },
   emptyText: { fontSize: 14, color: '#64748b', textAlign: 'center', lineHeight: 22, marginBottom: 32 },
   createBtn: { backgroundColor: theme.colors.green, paddingHorizontal: 32, paddingVertical: 16, borderRadius: 16 },
   createBtnText: { color: '#fff', fontWeight: '900', fontSize: 16 },
   card: { marginHorizontal: 20, marginBottom: 16, backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: '#e5e7eb', padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 3 },
   cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
-  cardEmoji: { fontSize: 32 },
+  cardIconBox: { width: 50, height: 50, borderRadius: 12, backgroundColor: '#F0FDF4', justifyContent: 'center', alignItems: 'center' },
   cardCrop: { fontSize: 15, fontWeight: '900', color: theme.colors.black },
   cardMeta: { fontSize: 13, color: '#475569', marginTop: 2, fontWeight: '600' },
-  cardLocation: { fontSize: 12, color: '#94a3b8', marginTop: 4, fontWeight: '600' },
+  cardLocationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  cardLocation: { fontSize: 12, color: '#94a3b8', fontWeight: '600' },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   statusText: { fontSize: 11, fontWeight: '900' },
-  offerBanner: { backgroundColor: '#fef2f2', borderRadius: 12, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#fecaca' },
-  offerBannerText: { color: '#dc2626', fontWeight: '800', fontSize: 13, textAlign: 'center' },
+  offerBanner: { backgroundColor: '#fef2f2', borderRadius: 12, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#fecaca', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  offerBannerText: { color: '#dc2626', fontWeight: '800', fontSize: 13 },
   cardActions: { flexDirection: 'row', gap: 8 },
-  actionBtn: { flex: 1, paddingVertical: 10, borderRadius: 12, borderWidth: 1.5, borderColor: theme.colors.green, alignItems: 'center' },
+  actionBtn: { flex: 1, paddingVertical: 10, borderRadius: 12, borderWidth: 1.5, borderColor: theme.colors.green, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   actionBtnText: { fontSize: 11, fontWeight: '900', color: theme.colors.green },
 });

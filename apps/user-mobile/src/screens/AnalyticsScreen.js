@@ -5,8 +5,11 @@ import {
 } from 'react-native';
 import { LineChart, BarChart, PieChart } from 'react-native-chart-kit';
 import { 
-  TrendingUp, TrendingDown, DollarSign, Package, Users, 
-  Calendar, Filter, Download, RefreshCw, Eye
+  TrendingUp as IconTrendingUp, TrendingDown as IconTrendingDown, 
+  DollarSign as IconDollarSign, Package as IconPackage, 
+  Users as IconUsers, Calendar as IconCalendar, 
+  Filter as IconFilter, Download as IconDownload, 
+  RefreshCw as IconRefreshCw, Eye as IconEye 
 } from 'lucide-react-native';
 import { theme } from '../styles';
 import { getUserAnalytics, getMarketTrends } from '../api';
@@ -108,9 +111,9 @@ export default function AnalyticsScreen({ route, navigation }) {
           </View>
           <View style={styles.metricTrend}>
             {isPositive ? (
-              <TrendingUp size={16} color="#4CAF50" />
+              <IconTrendingUp size={16} color="#4CAF50" />
             ) : (
-              <TrendingDown size={16} color="#F44336" />
+              <IconTrendingDown size={16} color="#F44336" />
             )}
             <Text style={[styles.trendText, isPositive ? styles.positiveTrend : styles.negativeTrend]}>
               {Math.abs(growth)}%
@@ -156,10 +159,10 @@ export default function AnalyticsScreen({ route, navigation }) {
         <Text style={styles.title}>Analytics</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.actionButton} onPress={handleRefresh}>
-            <RefreshCw size={20} color={theme.colors.sky} />
+            <IconRefreshCw size={20} color={theme.colors.sky} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={handleExport}>
-            <Download size={20} color={theme.colors.sky} />
+            <IconDownload size={20} color={theme.colors.sky} />
           </TouchableOpacity>
         </View>
       </View>
@@ -189,7 +192,7 @@ export default function AnalyticsScreen({ route, navigation }) {
               value={`$${data.revenue?.current.toLocaleString()}`}
               previous={`$${data.revenue?.previous.toLocaleString()}`}
               growth={data.revenue?.growth}
-              icon={DollarSign}
+              icon={IconDollarSign}
               color="#4CAF50"
             />
             <MetricCard
@@ -197,7 +200,7 @@ export default function AnalyticsScreen({ route, navigation }) {
               value={data.orders?.current}
               previous={data.orders?.previous}
               growth={data.orders?.growth}
-              icon={Package}
+              icon={IconPackage}
               color="#FF9800"
             />
             <MetricCard
@@ -205,7 +208,7 @@ export default function AnalyticsScreen({ route, navigation }) {
               value={data.listings?.current}
               previous={data.listings?.previous}
               growth={data.listings?.growth}
-              icon={Eye}
+              icon={IconEye}
               color="#2196F3"
             />
             <MetricCard
@@ -213,7 +216,7 @@ export default function AnalyticsScreen({ route, navigation }) {
               value={data.customers?.current}
               previous={data.customers?.previous}
               growth={data.customers?.growth}
-              icon={Users}
+              icon={IconUsers}
               color="#9C27B0"
             />
           </View>
@@ -278,25 +281,25 @@ export default function AnalyticsScreen({ route, navigation }) {
               label="Avg Order Value"
               value={data.performance?.avg_order_value}
               unit="USD"
-              icon={DollarSign}
+              icon={IconDollarSign}
             />
             <PerformanceIndicator
               label="Conversion Rate"
               value={data.performance?.conversion_rate}
               unit="%"
-              icon={TrendingUp}
+              icon={IconTrendingUp}
             />
             <PerformanceIndicator
               label="Fulfillment Rate"
               value={data.performance?.fulfillment_rate}
               unit="%"
-              icon={Package}
+              icon={IconPackage}
             />
             <PerformanceIndicator
               label="Customer Satisfaction"
               value={data.performance?.customer_satisfaction}
               unit="/5"
-              icon={Users}
+              icon={IconUsers}
             />
           </View>
         </View>

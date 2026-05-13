@@ -1,4 +1,4 @@
-import React from "react";
+import React from "react"; // Metro rebuild trigger
 import { Platform, SafeAreaView, StatusBar, Text, View } from "react-native";
 import AppShell from "./src/AppShell";
 

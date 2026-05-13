@@ -43,6 +43,8 @@ class Driver(Base):
     # Vehicle
     vehicle_reg: Mapped[str] = mapped_column(String(20), nullable=False)
     vehicle_type: Mapped[Optional[str]] = mapped_column(String(50))   # e.g. "3-Ton Truck", "Pickup"
+    vehicle_model: Mapped[Optional[str]] = mapped_column(String(100))
+    vehicle_year: Mapped[Optional[str]] = mapped_column(String(10))
     vehicle_capacity_kg: Mapped[float] = mapped_column(Float, default=1000.0)
     is_platform_fleet: Mapped[bool] = mapped_column(Boolean, default=False)
 
@@ -52,6 +54,21 @@ class Driver(Base):
     insurance_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     background_cleared: Mapped[bool] = mapped_column(Boolean, default=False)
     registration_fee_paid: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Uploaded documents (file paths on disk)
+    doc_national_id_front: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    doc_national_id_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    doc_license_front: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    doc_license_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    doc_vehicle_registration: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    doc_vehicle_photo: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    doc_profile_photo: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    doc_live_selfie: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
+    # Admin review
+    rejection_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    reviewed_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Performance
     status: Mapped[DriverStatus] = mapped_column(Enum(DriverStatus), default=DriverStatus.PENDING_REVIEW)

@@ -77,8 +77,7 @@ export default function LoginScreen({ onAuthenticated, onRegister }) {
               <Phone size={18} color={phoneFocused ? theme.colors.sky : '#999'} />
             </View>
             <View style={styles.countryCode}>
-              <Text style={styles.codeFlag}>🇿🇼</Text>
-              <Text style={styles.codeText}>+263</Text>
+              <Text style={styles.codeText}>ZW +263</Text>
             </View>
             <View style={styles.inputDivider} />
             <TextInput
@@ -198,8 +197,7 @@ const styles = StyleSheet.create({
   inputGroup: { flexDirection: 'row', alignItems: 'center', height: 56, borderRadius: 16, backgroundColor: '#F8F9FA', marginBottom: 14, paddingHorizontal: 4, borderWidth: 2, borderColor: 'transparent' },
   inputGroupFocused: { borderColor: theme.colors.sky, backgroundColor: '#FFF' },
   inputIcon: { width: 40, alignItems: 'center' },
-  countryCode: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  codeFlag: { fontSize: 16 },
+  countryCode: { flexDirection: 'row', alignItems: 'center' },
   codeText: { fontWeight: '700', color: theme.colors.dark, fontSize: 14 },
   inputDivider: { width: 1, height: 24, backgroundColor: '#E0E0E0', marginHorizontal: 10 },
   input: { flex: 1, fontSize: 16, fontWeight: '600', color: theme.colors.dark, paddingVertical: 0 },

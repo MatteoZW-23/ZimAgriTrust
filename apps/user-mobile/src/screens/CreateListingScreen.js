@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Text, TextInput, TouchableOpacity, View, ScrollView } from "react-native";
-
+import { Text, TextInput, TouchableOpacity, View, ScrollView, StyleSheet } from "react-native";
+import { theme } from "../styles";
 import { createListing } from "../api";
 import { appStyles } from "../styles";
 

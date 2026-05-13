@@ -1,8 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { Text, TextInput, TouchableOpacity, View } from "react-native";
+import { 
+  Lock as IconLock, 
+  CheckCircle2 as IconCheckCircle, 
+  ChevronUp as IconChevronUp, 
+  ChevronDown as IconChevronDown,
+  DollarSign as IconDollar
+} from 'lucide-react-native';
 
 import { confirmDelivery, getTransactions, submitReview, getOrderReviews } from "../api";
-import { appStyles } from "../styles";
+import { appStyles, theme } from "../styles";
 
 export function TransactionsScreen({ token, profile }) {
   const [transactions, setTransactions] = useState([]);
@@ -99,12 +106,24 @@ export function TransactionsScreen({ token, profile }) {
             <View style={appStyles.row}>
               <Text style={appStyles.cardTitle}>{isFarmer ? "Outgoing Supply" : "Order"} #{transaction.listing_id}</Text>
               <View style={appStyles.row}>
-                <Text style={[appStyles.badge, { backgroundColor: statusColor }]}>
-                  {transaction.escrow_state === "ESCROW" ? "🔒 Escrow" : 
-                   transaction.escrow_state === "COMPLETED" ? "✅ Payout Released" :
-                   transaction.escrow_state}
-                </Text>
-                <Text style={{ marginLeft: 8, fontSize: 16, opacity: 0.5 }}>{isExpanded ? "▲" : "▼"}</Text>
+                <View style={[appStyles.badge, { backgroundColor: statusColor, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                  {transaction.escrow_state === "ESCROW" ? (
+                    <>
+                      <IconLock size={12} color="#FFF" />
+                      <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Escrow</Text>
+                    </>
+                  ) : transaction.escrow_state === "COMPLETED" ? (
+                    <>
+                      <IconCheckCircle size={12} color="#FFF" />
+                      <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Payout Released</Text>
+                    </>
+                  ) : (
+                    <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>{transaction.escrow_state}</Text>
+                  )}
+                </View>
+                <View style={{ marginLeft: 8, opacity: 0.5 }}>
+                  {isExpanded ? <IconChevronUp size={18} color="#000" /> : <IconChevronDown size={18} color="#000" />}
+                </View>
               </View>
             </View>
 
@@ -146,8 +165,9 @@ export function TransactionsScreen({ token, profile }) {
                 </View>
 
                 {isFarmer && transaction.escrow_state === "ESCROW" && (
-                  <View style={[appStyles.emptyState, { marginTop: 12, padding: 12, backgroundColor: "rgba(47,111,66,0.1)" }]}>
-                    <Text style={{ fontSize: 13, color: "#214027", lineHeight: 18 }}>💰 Your payment is currently held by ZimAgritrust. Once the buyer confirms delivery, funds will reflect in your balance.</Text>
+                  <View style={[appStyles.emptyState, { marginTop: 12, padding: 12, backgroundColor: "rgba(47,111,66,0.1)", flexDirection: 'row', alignItems: 'flex-start', gap: 10 }]}>
+                    <IconDollar size={20} color="#214027" />
+                    <Text style={{ flex: 1, fontSize: 13, color: "#214027", lineHeight: 18 }}>Your payment is currently held by ZimAgritrust. Once the buyer confirms delivery, funds will reflect in your balance.</Text>
                   </View>
                 )}
 

@@ -53,6 +53,12 @@ router = APIRouter()
 # Auth
 # ---------------------------------------------------------------------------
 
+@router.options("/login")
+async def super_admin_login_options(request: Request):
+    """Handle CORS preflight for login"""
+    return {"status": "ok"}
+
+
 @router.post("/login", response_model=SuperAdminPreMfaResponse)
 def super_admin_login(
     body: SuperAdminLoginRequest,

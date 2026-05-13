@@ -36,7 +36,9 @@ services:
     restart: unless-stopped
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      target: production-slim
     ports:
       - "8080:8000"
     environment:
@@ -45,7 +47,7 @@ services:
       WHATSAPP_SERVICE_URL: http://whatsapp-service:8000
       WHATSAPP_USE_REDIS: "false"
       SECRET_KEY: test-key-replace-in-prod
-      CORS_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:5000,http://localhost:19006,http://localhost:19000,http://localhost:19002,http://localhost:5173
+      CORS_ORIGINS: "*"
       ALLOWED_HOSTS: "*"
       # Force polling needed on Windows — inotify events don't cross WSL2/Hyper-V volume boundary
       WATCHFILES_FORCE_POLLING: "true"

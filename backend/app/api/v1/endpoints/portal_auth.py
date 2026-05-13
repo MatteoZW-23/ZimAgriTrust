@@ -39,6 +39,13 @@ admin_auth_router = APIRouter()
 agent_auth_router = APIRouter()
 
 
+# Global OPTIONS handler for driver auth router
+@driver_auth_router.options("/{path:path}")
+async def driver_auth_options(path: str):
+    """Handle CORS preflight for all driver auth routes"""
+    return {"status": "ok"}
+
+
 @app_auth_router.post("/login", response_model=Token)
 async def login_app_user(
     payload: UserLogin,
@@ -58,6 +65,12 @@ async def login_app_user(
     )
 
 
+@driver_auth_router.options("/request-otp")
+async def driver_request_otp_options(request: Request):
+    """Handle CORS preflight for request-otp"""
+    return {"status": "ok"}
+
+
 @driver_auth_router.post("/request-otp", summary="Request OTP for driver self-registration")
 async def driver_request_otp(
     payload: DriverOtpRequest,
@@ -69,11 +82,22 @@ async def driver_request_otp(
         "otp": otp,
         "expires_at": datetime.now(timezone.utc) + timedelta(minutes=10),
     }
+
+    # Send via WhatsApp
+    from app.services.whatsapp_service import WhatsAppService
+    message = f"🚚 *ZimAgriTrust Driver Verification*\n\nYour OTP code is: {otp}\n\nValid for 10 minutes. Do not share this code with anyone."
+    try:
+        await WhatsAppService.send_whatsapp_message(payload.phone_number, message)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to send WhatsApp OTP: {e}")
+
     # TODO: dispatch via Africa's Talking SMS in production
     # sms_service.send(payload.phone_number, f"Your ZimAgriTrust driver OTP: {otp}")
     import logging
     logging.getLogger(__name__).info("DRIVER OTP for %s: %s", payload.phone_number, otp)
-    return {"status": "sent", "message": "OTP sent to your phone number"}
+    # Return OTP in response for development (remove in production)
+    return {"status": "sent", "message": "OTP sent to your phone number", "otp": otp, "dev_note": "OTP returned for development only - remove in production"}
 
 
 @driver_auth_router.post("/verify-otp", summary="Verify OTP and get temp registration token")

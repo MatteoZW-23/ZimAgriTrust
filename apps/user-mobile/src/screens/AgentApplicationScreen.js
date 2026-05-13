@@ -14,12 +14,12 @@ import {
   Platform,
 } from 'react-native';
 import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  CheckCircle2,
-  ChevronDown,
-  UserCheck,
+  ArrowLeft as IconArrowLeft,
+  ArrowRight as IconArrowRight,
+  Check as IconCheck,
+  CheckCircle2 as IconCheckCircle2,
+  ChevronDown as IconChevronDown,
+  UserCheck as IconUserCheck,
 } from 'lucide-react-native';
 import { theme } from '../styles';
 import { submitAgentApplication } from '../api';
@@ -136,7 +136,7 @@ export default function AgentApplicationScreen({ navigation, route }) {
       <SafeAreaView style={styles.container}>
         <View style={styles.successWrap}>
           <View style={styles.successIconCircle}>
-            <CheckCircle2 size={56} color={theme.colors.green} />
+            <IconCheckCircle2 size={56} color={theme.colors.green} />
           </View>
           <Text style={styles.successTitle}>Application Submitted</Text>
           <Text style={styles.successText}>
@@ -183,7 +183,7 @@ export default function AgentApplicationScreen({ navigation, route }) {
             onPress={() => (step > 1 ? setStep(step - 1) : navigation.goBack())}
             style={styles.backBtn}
           >
-            <ArrowLeft size={20} color="#333" />
+            <IconArrowLeft size={20} color="#333" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Become an Agent</Text>
           <Text style={styles.headerStep}>Step {step}/3</Text>
@@ -252,7 +252,7 @@ export default function AgentApplicationScreen({ navigation, route }) {
                 <Text style={[styles.dropdownText, !province && { color: '#999' }]}>
                   {province || 'Select Province'}
                 </Text>
-                <ChevronDown size={18} color="#666" />
+                <IconChevronDown size={18} color="#666" />
               </TouchableOpacity>
               {showProvinces && (
                 <View style={styles.dropdownList}>
@@ -266,7 +266,7 @@ export default function AgentApplicationScreen({ navigation, route }) {
                       }}
                     >
                       <Text style={{ fontSize: 14 }}>{p}</Text>
-                      {province === p && <Check size={16} color={theme.colors.green} />}
+                      {province === p && <IconCheck size={16} color={theme.colors.green} />}
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -335,7 +335,7 @@ export default function AgentApplicationScreen({ navigation, route }) {
                     onPress={() => toggleSpec(s.value)}
                   >
                     <View style={[styles.specCheck, selected && styles.specCheckActive]}>
-                      {selected && <Check size={14} color="#fff" />}
+                      {selected && <IconCheck size={14} color="#fff" />}
                     </View>
                     <Text style={styles.specLabel}>{s.label}</Text>
                   </TouchableOpacity>
@@ -364,7 +364,7 @@ export default function AgentApplicationScreen({ navigation, route }) {
           {step < 3 ? (
             <TouchableOpacity style={styles.cta} onPress={next}>
               <Text style={styles.ctaText}>Continue</Text>
-              <ArrowRight size={18} color="#fff" />
+              <IconArrowRight size={18} color="#fff" />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -376,7 +376,7 @@ export default function AgentApplicationScreen({ navigation, route }) {
                 <ActivityIndicator color="#fff" />
               ) : (
                 <>
-                  <UserCheck size={18} color="#fff" />
+                  <IconUserCheck size={18} color="#fff" />
                   <Text style={styles.ctaText}>Submit Application</Text>
                 </>
               )}

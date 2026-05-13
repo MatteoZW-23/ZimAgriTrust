@@ -28,6 +28,10 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         client_ip = self._get_client_ip(request)
         request_id = request.headers.get("X-Request-ID", str(int(time.time() * 1000000)))
 
+        # 0. Skip security for preflight (OPTIONS) requests
+        if method == "OPTIONS":
+            return await call_next(request)
+
         # Skip security for public endpoints
         if self._should_skip(request):
             response = await call_next(request)
@@ -79,7 +83,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         if method in ("POST", "PUT", "PATCH", "DELETE") and path.startswith("/api/"):
             ct = request.headers.get("Content-Type", "").lower()
             if not ct.startswith("multipart/"):
-                allowed = {"application/json", "application/x-www-form-urlencoded"}
+                allowed = {"application/json", "application/x-www-form-urlencoded", "text/plain"}
                 if not any(a in ct for a in allowed):
                     logger.warning(f"SECURITY | Invalid Content-Type | ct={ct} | ip={client_ip} | path={path}")
                     return JSONResponse(
@@ -169,7 +173,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
         response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
-        response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+        response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
         return response
 
     async def _check_anomaly(self, request: Request, client_ip: str, path: str) -> None:

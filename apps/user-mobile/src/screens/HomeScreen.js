@@ -1,5 +1,15 @@
 import React from "react";
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView } from "react-native";
+import { 
+  Bell as IconBell, 
+  Trophy as IconTrophy, 
+  Sprout as IconSprout, 
+  DollarSign as IconDollar, 
+  Package as IconPackage, 
+  Star as IconStar, 
+  Plus as IconPlus, 
+  BarChart3 as IconAnalytics 
+} from 'lucide-react-native';
 import { theme } from "../styles";
 
 export default function HomeScreen({ route }) {
@@ -20,7 +30,7 @@ export default function HomeScreen({ route }) {
             </View>
             <View style={styles.headerIcons}>
                 <TouchableOpacity style={styles.iconBtn}>
-                    <Text style={{ fontSize: 20 }}>🔔</Text>
+                    <IconBell size={24} color={theme.colors.black} />
                 </TouchableOpacity>
                 <View style={styles.walletBox}>
                     <Text style={styles.walletText}>${balance.toLocaleString()} | ZiG {zigBalance.toLocaleString()}</Text>
@@ -38,7 +48,7 @@ export default function HomeScreen({ route }) {
                         <Text style={styles.trustStatus}>{trustScore > 80 ? 'Elite Tier' : 'Standard'}</Text>
                     </View>
                 </View>
-                <Text style={{ fontSize: 40 }}>🏆</Text>
+                <IconTrophy size={48} color="#FFD700" />
             </View>
             <View style={styles.progressBar}>
                 <View style={[styles.progressFill, { width: `${trustScore}%` }]} />
@@ -48,12 +58,12 @@ export default function HomeScreen({ route }) {
         {/* Metric Grid */}
         <View style={styles.grid}>
             <View style={styles.gridRow}>
-                <MetricCard icon="🌾" label="My Listings" value={profile.listing_count || "0"} />
-                <MetricCard icon="💰" label="Total Sales" value={`$${profile.total_sales || "0"}`} />
+                <MetricCard icon={<IconSprout size={28} color={theme.colors.green} />} label="My Listings" value={profile.listing_count || "0"} />
+                <MetricCard icon={<IconDollar size={28} color={theme.colors.green} />} label="Total Sales" value={`$${profile.total_sales || "0"}`} />
             </View>
             <View style={styles.gridRow}>
-                <MetricCard icon="📦" label="Pending Handover" value={profile.pending_orders || "0"} />
-                <MetricCard icon="⭐" label="Reliability" value={profile.rating || "---"} />
+                <MetricCard icon={<IconPackage size={28} color={theme.colors.green} />} label="Pending Handover" value={profile.pending_orders || "0"} />
+                <MetricCard icon={<IconStar size={28} color={theme.colors.green} />} label="Reliability" value={profile.rating || "---"} />
             </View>
         </View>
 
@@ -61,10 +71,12 @@ export default function HomeScreen({ route }) {
         <Text style={styles.sectionTitle}>Operational Hub</Text>
         <View style={styles.row}>
             <TouchableOpacity style={styles.actionBtn}>
-                <Text style={styles.actionText}>➕ New Listing</Text>
+                <IconPlus size={18} color={theme.colors.green} style={{ marginRight: 8 }} />
+                <Text style={styles.actionText}>New Listing</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#F0F0F0' }]}>
-                <Text style={[styles.actionText, { color: '#333' }]}>📊 Analytics</Text>
+                <IconAnalytics size={18} color="#333" style={{ marginRight: 8 }} />
+                <Text style={[styles.actionText, { color: '#333' }]}>Analytics</Text>
             </TouchableOpacity>
         </View>
 
@@ -83,7 +95,7 @@ export default function HomeScreen({ route }) {
 function MetricCard({ icon, label, value }) {
     return (
         <View style={styles.metricCard}>
-            <Text style={{ fontSize: 24, marginBottom: 8 }}>{icon}</Text>
+            <View style={{ marginBottom: 8 }}>{icon}</View>
             <Text style={styles.metricValue}>{value}</Text>
             <Text style={styles.metricLabel}>{label}</Text>
         </View>

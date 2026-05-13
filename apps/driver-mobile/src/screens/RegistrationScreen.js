@@ -4,19 +4,21 @@ import {
   StyleSheet, ActivityIndicator, Alert, Platform, Image,
 } from "react-native";
 import {
-  Phone, Lock, User, Truck, FileText, Camera,
-  CheckCircle, ArrowRight, ArrowLeft, Upload,
+  Phone as IconPhone, Lock as IconLock, User as IconUser, 
+  Truck as IconTruck, FileText as IconFileText, Camera as IconCamera,
+  CheckCircle as IconCheckCircle, ArrowRight as IconArrowRight, 
+  ArrowLeft as IconArrowLeft, Upload as IconUpload,
 } from "lucide-react-native";
 import { theme } from "../styles";
-import { API_BASE_URL } from "../api";
+import * as api from "../api";
 
 const STEPS = [
-  { id: 1, title: "Phone Verification", icon: Phone },
-  { id: 2, title: "Create PIN",         icon: Lock },
-  { id: 3, title: "Personal Info",      icon: User },
-  { id: 4, title: "Vehicle Info",       icon: Truck },
-  { id: 5, title: "Documents",          icon: FileText },
-  { id: 6, title: "Live Selfie",        icon: Camera },
+  { id: 1, title: "Phone Verification", icon: IconPhone },
+  { id: 2, title: "Create PIN",         icon: IconLock },
+  { id: 3, title: "Personal Info",      icon: IconUser },
+  { id: 4, title: "Vehicle Info",       icon: IconTruck },
+  { id: 5, title: "Documents",          icon: IconFileText },
+  { id: 6, title: "Live Selfie",        icon: IconCamera },
 ];
 
 const DOCUMENT_SLOTS = [
@@ -29,11 +31,12 @@ const DOCUMENT_SLOTS = [
   { key: "profile_photo",          label: "Profile Photo" },
 ];
 
-async function post(path, body, token = null) {
-  const headers = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    method: "POST", headers, body: JSON.stringify(body),
+// Helper for JSON posts (used for early steps)
+async function post(path, body) {
+  const res = await fetch(`${api.API_BASE_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.detail || "Request failed");
@@ -71,7 +74,7 @@ export default function RegistrationScreen({ onRegistered, onBack }) {
     if (phone.length < 9) return setError("Enter a valid phone number");
     setLoading(true); setError("");
     try {
-      await post("/auth/driver/request-otp", { phone_number: fullPhone });
+      await api.registerStepOtp(fullPhone);
       setOtpSent(true);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
@@ -81,9 +84,7 @@ export default function RegistrationScreen({ onRegistered, onBack }) {
     if (otp.length < 4) return setError("Enter the OTP code");
     setLoading(true); setError("");
     try {
-      const data = await post("/auth/driver/verify-otp", {
-        phone_number: fullPhone, otp,
-      });
+      const data = await api.registerStepVerify(fullPhone, otp);
       setTempToken(data.temp_token);
       setOtpVerified(true);
       setStep(2);
@@ -147,13 +148,9 @@ export default function RegistrationScreen({ onRegistered, onBack }) {
         else form.append("live_selfie", { uri: selfie.uri, name: "selfie.jpg", type: "image/jpeg" });
       }
 
-      const res = await fetch(`${API_BASE_URL}/drivers/register`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${tempToken}` },
-        body: form,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.detail || "Registration failed");
+      form.append("authorization", `Bearer ${tempToken}`);
+      
+      const data = await api.driverRegister(form);
       onRegistered(data);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
@@ -166,12 +163,15 @@ export default function RegistrationScreen({ onRegistered, onBack }) {
     if (step === 2) {
       const err = validatePin();
       if (err) return setError(err);
+      api.registerStepPin(pin).catch(() => {}); // Fire and forget
     }
     if (step === 3) {
       if (!firstName || !lastName || !dob) return setError("Fill in all personal details");
+      api.registerStepPersonal({ firstName, lastName, dob, address }).catch(() => {});
     }
     if (step === 4) {
       if (!vehicleType || !plateNumber) return setError("Fill in vehicle details");
+      api.registerStepVehicle({ vehicleType, plateNumber, vehicleModel, vehicleYear }).catch(() => {});
     }
     if (step === 5) {
       const missing = DOCUMENT_SLOTS.filter((s) => !documents[s.key]);
@@ -209,7 +209,12 @@ export default function RegistrationScreen({ onRegistered, onBack }) {
               <TouchableOpacity style={s.btn} onPress={verifyOtp} disabled={loading}>
                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>Verify OTP</Text>}
               </TouchableOpacity>
-              {otpVerified && <Text style={s.success}>✓ Phone verified</Text>}
+              {otpVerified && (
+                <View style={s.successRow}>
+                  <IconCheckCircle size={14} color="#38a169" />
+                  <Text style={s.success}>Phone verified</Text>
+                </View>
+              )}
             </>
           )}
         </View>
@@ -272,15 +277,24 @@ export default function RegistrationScreen({ onRegistered, onBack }) {
       case 5: return (
         <View>
           <Text style={s.hint}>Upload all 7 documents. Clear photos required for approval.</Text>
-          {DOCUMENT_SLOTS.map(({ key, label }) => (
-            <TouchableOpacity key={key} style={[s.docSlot, documents[key] && s.docSlotDone]}
-              onPress={() => pickDocument(key)}>
-              <Upload size={18} color={documents[key] ? theme.colors.sky : "#999"} />
-              <Text style={[s.docLabel, documents[key] && { color: theme.colors.sky }]}>
-                {documents[key] ? `✓ ${label}` : label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {DOCUMENT_SLOTS.map(({ key, label }) => {
+            const isDone = Boolean(documents[key]);
+            return (
+              <TouchableOpacity
+                key={key}
+                style={[s.docSlot, isDone && s.docSlotDone]}
+                onPress={() => pickDocument(key)}
+              >
+                {isDone
+                  ? <IconCheckCircle size={18} color={theme.colors.sky} />
+                  : <IconUpload size={18} color="#999" />
+                }
+                <Text style={[s.docLabel, isDone && { color: theme.colors.sky }]}>
+                  {isDone ? `${label} — uploaded` : label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       );
 
@@ -294,7 +308,10 @@ export default function RegistrationScreen({ onRegistered, onBack }) {
               {Platform.OS === "web" && selfie.uri && (
                 <Image source={{ uri: selfie.uri }} style={s.selfiePreview} />
               )}
-              <Text style={[s.success, { marginTop: 8 }]}>✓ Selfie uploaded</Text>
+              <View style={s.successRow}>
+                <IconCheckCircle size={16} color="#38a169" />
+                <Text style={s.success}>Selfie uploaded</Text>
+              </View>
             </View>
           ) : null}
           <TouchableOpacity style={[s.btn, { marginTop: 16 }]}
@@ -311,7 +328,7 @@ export default function RegistrationScreen({ onRegistered, onBack }) {
                 Alert.alert("Camera", "Use expo-camera in native build");
               }
             }}>
-            <Camera size={18} color="#fff" />
+            <IconCamera size={18} color="#fff" />
             <Text style={s.btnText}> {selfie ? "Retake Selfie" : "Take Selfie"}</Text>
           </TouchableOpacity>
         </View>
@@ -352,7 +369,7 @@ export default function RegistrationScreen({ onRegistered, onBack }) {
       <View style={s.navRow}>
         <TouchableOpacity style={s.backBtn}
           onPress={step === 1 ? onBack : () => { setError(""); setStep((s) => s - 1); }}>
-          <ArrowLeft size={16} color={theme.colors.sky} />
+          <IconArrowLeft size={16} color={theme.colors.sky} />
           <Text style={s.backBtnText}>{step === 1 ? "Login" : "Back"}</Text>
         </TouchableOpacity>
 
@@ -364,7 +381,7 @@ export default function RegistrationScreen({ onRegistered, onBack }) {
             ? <ActivityIndicator color="#fff" />
             : <>
                 <Text style={s.btnText}>{step === 6 ? "Submit" : "Next"}</Text>
-                <ArrowRight size={16} color="#fff" />
+                <IconArrowRight size={16} color="#fff" />
               </>}
         </TouchableOpacity>
       </View>
@@ -424,6 +441,7 @@ const s = StyleSheet.create({
   },
   errorText:    { color: "#c53030", fontSize: 13 },
   success:      { color: "#38a169", fontWeight: "600", fontSize: 14, textAlign: "center" },
+  successRow:   { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8, justifyContent: "center" },
   hint:         {
     fontSize: 13, color: "#666", backgroundColor: "#f0f7ff",
     borderRadius: 8, padding: 10, marginBottom: 12, lineHeight: 18,

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
-import { Save, X } from 'lucide-react-native';
+import { Save as IconSave, X as IconX } from 'lucide-react-native';
 import { updateProfile } from '../api';
 import { theme } from '../styles';
 
@@ -44,7 +44,7 @@ export default function EditProfileScreen({ route, navigation }) {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
-            <X size={22} color={theme.colors.black} />
+            <IconX size={22} color={theme.colors.black} />
           </TouchableOpacity>
           <Text style={styles.title}>Account Settings</Text>
           <View style={styles.iconBtn} />
@@ -59,7 +59,7 @@ export default function EditProfileScreen({ route, navigation }) {
         </View>
 
         <TouchableOpacity style={[styles.saveBtn, saving && styles.disabledBtn]} onPress={handleSave} disabled={saving}>
-          <Save size={20} color="#FFF" />
+          <IconSave size={20} color="#FFF" />
           <Text style={styles.saveText}>{saving ? 'Saving...' : 'Save Changes'}</Text>
         </TouchableOpacity>
       </ScrollView>

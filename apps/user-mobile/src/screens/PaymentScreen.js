@@ -3,6 +3,21 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   SafeAreaView, ActivityIndicator, Alert, Animated
 } from 'react-native';
+import { 
+  Smartphone as IconSmartphone, 
+  CreditCard as IconCreditCard, 
+  Landmark as IconLandmark, 
+  Handshake as IconHandshake,
+  ClipboardList as IconOrder,
+  ShieldCheck as IconShield,
+  DollarSign as IconDollar,
+  Clock as IconClock,
+  AlertTriangle as IconAlert,
+  CheckCircle2 as IconCheckCircle,
+  ArrowRight as IconArrowRight,
+  ArrowLeft as IconArrowLeft,
+  PartyPopper as IconParty
+} from 'lucide-react-native';
 import { getFeePreview, initiatePayment, getPaymentStatus } from '../api';
 import { theme } from '../styles';
 
@@ -10,7 +25,7 @@ const METHODS = [
   {
     id: 'ecocash',
     label: 'EcoCash',
-    icon: '📱',
+    icon: IconSmartphone,
     desc: 'Pay using your EcoCash wallet',
     recommended: true,
     ussd: '*151#',
@@ -19,7 +34,7 @@ const METHODS = [
   {
     id: 'onemoney',
     label: 'OneMoney',
-    icon: '💳',
+    icon: IconCreditCard,
     desc: 'Pay using OneMoney',
     ussd: '*111#',
     limit: '$500 max',
@@ -27,14 +42,14 @@ const METHODS = [
   {
     id: 'bank',
     label: 'Bank Transfer',
-    icon: '🏦',
+    icon: IconLandmark,
     desc: 'CBZ / NMB / Steward Bank (1-2 days)',
     limit: '$10,000 max',
   },
   {
     id: 'cash_agent',
     label: 'Cash via Agent',
-    icon: '🤝',
+    icon: IconHandshake,
     desc: 'Pay cash to nearest ZimAgritrust agent',
     limit: 'Any amount',
   },
@@ -78,7 +93,10 @@ function SelectMethodStep({ order, token, onPay }) {
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
       {/* Order Summary */}
       <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>📋 Order Summary</Text>
+        <View style={styles.rowAlignCenter}>
+          <IconOrder size={18} color={theme.colors.black} style={{ marginRight: 8 }} />
+          <Text style={styles.summaryTitle}>Order Summary</Text>
+        </View>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Product</Text>
           <Text style={styles.summaryVal}>{order?.product || '--'}</Text>
@@ -110,7 +128,8 @@ function SelectMethodStep({ order, token, onPay }) {
         ) : null}
 
         <View style={styles.escrowBadge}>
-          <Text style={styles.escrowBadgeText}>🛡️ Funds held in escrow until delivery confirmed</Text>
+          <IconShield size={16} color="#92400e" style={{ marginRight: 8 }} />
+          <Text style={styles.escrowBadgeText}>Funds held in escrow until delivery confirmed</Text>
         </View>
       </View>
 
@@ -123,7 +142,9 @@ function SelectMethodStep({ order, token, onPay }) {
           onPress={() => setMethod(m.id)}
           activeOpacity={0.85}
         >
-          <Text style={styles.methodIcon}>{m.icon}</Text>
+          <View style={[styles.methodIconBox, method === m.id && styles.methodIconBoxActive]}>
+            <m.icon size={24} color={method === m.id ? theme.colors.green : '#94a3b8'} />
+          </View>
           <View style={{ flex: 1 }}>
             <View style={styles.methodTitleRow}>
               <Text style={[styles.methodLabel, method === m.id && styles.methodLabelActive]}>
@@ -147,7 +168,10 @@ function SelectMethodStep({ order, token, onPay }) {
       {/* Fee breakdown for seller info */}
       {fees && (
         <View style={styles.sellerFeeCard}>
-          <Text style={styles.sellerFeeTitle}>💰 Seller Payout Breakdown</Text>
+          <View style={styles.rowAlignCenter}>
+            <IconDollar size={16} color={theme.colors.black} style={{ marginRight: 8 }} />
+            <Text style={styles.sellerFeeTitle}>Seller Payout Breakdown</Text>
+          </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Gross amount</Text>
             <Text style={styles.summaryVal}>${fees.seller_receives.gross.toFixed(2)}</Text>
@@ -228,9 +252,11 @@ function InstructionsStep({ paymentResult, method, onConfirmed, onCancel }) {
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
       <View style={styles.instructionHero}>
-        <Text style={styles.instructionIcon}>{methodInfo.icon || '📱'}</Text>
+        <View style={styles.instructionIconBox}>
+          {methodInfo.icon ? <methodInfo.icon size={48} color={theme.colors.green} /> : <IconSmartphone size={48} color={theme.colors.green} />}
+        </View>
         <Text style={styles.instructionTitle}>
-          {paymentResult?.status === 'confirmed' ? '✅ Payment Confirmed!' : 'Complete Your Payment'}
+          {paymentResult?.status === 'confirmed' ? 'Payment Confirmed!' : 'Complete Your Payment'}
         </Text>
         <Text style={styles.instructionSub}>
           {paymentResult?.status === 'confirmed'
@@ -244,12 +270,18 @@ function InstructionsStep({ paymentResult, method, onConfirmed, onCancel }) {
           {/* Countdown */}
           {!expired ? (
             <View style={styles.countdownCard}>
-              <Text style={styles.countdownLabel}>⏱️ Expires in</Text>
+              <View style={styles.rowAlignCenter}>
+                <IconClock size={14} color="#15803d" style={{ marginRight: 4 }} />
+                <Text style={styles.countdownLabel}>Expires in</Text>
+              </View>
               <Text style={styles.countdownTime}>{mins}:{secs}</Text>
             </View>
           ) : (
             <View style={[styles.countdownCard, { backgroundColor: '#fef2f2', borderColor: '#fecaca' }]}>
-              <Text style={[styles.countdownLabel, { color: '#ef4444' }]}>⚠️ Payment window expired</Text>
+              <View style={styles.rowAlignCenter}>
+                <IconAlert size={14} color="#ef4444" style={{ marginRight: 4 }} />
+                <Text style={[styles.countdownLabel, { color: '#ef4444' }]}>Payment window expired</Text>
+              </View>
               <TouchableOpacity onPress={onCancel}>
                 <Text style={[styles.countdownTime, { color: '#ef4444', fontSize: 16 }]}>Start Over</Text>
               </TouchableOpacity>
@@ -300,9 +332,12 @@ function InstructionsStep({ paymentResult, method, onConfirmed, onCancel }) {
         {polling ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.payBtnText}>
-            {paymentResult?.status === 'confirmed' ? 'Continue →' : "I've Completed Payment"}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.payBtnText}>
+              {paymentResult?.status === 'confirmed' ? 'Continue' : "I've Completed Payment"}
+            </Text>
+            <IconArrowRight size={18} color="#FFF" />
+          </View>
         )}
       </TouchableOpacity>
 
@@ -324,7 +359,9 @@ function SuccessStep({ paymentResult, onTrackOrder, onBackToMarket }) {
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120, alignItems: 'center' }}>
       <Animated.View style={[styles.successIcon, { transform: [{ scale: scaleAnim }] }]}>
-        <Text style={{ fontSize: 64 }}>🎉</Text>
+        <View style={styles.successIconOuter}>
+          <IconParty size={64} color={theme.colors.green} />
+        </View>
       </Animated.View>
 
       <Text style={styles.successTitle}>Payment Successful!</Text>
@@ -343,7 +380,10 @@ function SuccessStep({ paymentResult, onTrackOrder, onBackToMarket }) {
         </View>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Status</Text>
-          <Text style={[styles.summaryVal, { color: theme.colors.green }]}>🛡️ In Escrow</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <IconShield size={14} color={theme.colors.green} style={{ marginRight: 4 }} />
+            <Text style={[styles.summaryVal, { color: theme.colors.green }]}>In Escrow</Text>
+          </View>
         </View>
       </View>
 
@@ -385,7 +425,7 @@ export default function PaymentScreen({ navigation, route }) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorState}>
-          <Text style={styles.errorIcon}>⚠️</Text>
+          <IconAlert size={64} color="#cbd5e1" style={{ marginBottom: 16 }} />
           <Text style={styles.errorTitle}>No order found</Text>
           <TouchableOpacity style={styles.payBtn} onPress={() => navigation.goBack()}>
             <Text style={styles.payBtnText}>Go Back</Text>
@@ -416,13 +456,13 @@ export default function PaymentScreen({ navigation, route }) {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => step === 'select' ? navigation.goBack() : setStep('select')}>
-          <Text style={styles.back}>← Back</Text>
+        <TouchableOpacity onPress={() => step === 'select' ? navigation.goBack() : setStep('select')} style={styles.backBtn}>
+          <IconArrowLeft size={22} color={theme.colors.black} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {step === 'select' ? '💳 Complete Payment' : step === 'instructions' ? '📱 Payment Instructions' : '🎉 Payment Complete'}
+          {step === 'select' ? 'Complete Payment' : step === 'instructions' ? 'Payment Instructions' : 'Payment Complete'}
         </Text>
-        <View style={{ width: 60 }} />
+        <View style={{ width: 44 }} />
       </View>
 
       {/* Progress dots */}
@@ -460,18 +500,18 @@ export default function PaymentScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, paddingTop: 16 },
-  back: { fontSize: 16, fontWeight: '700', color: theme.colors.sky },
-  headerTitle: { fontSize: 16, fontWeight: '900', color: theme.colors.black, flex: 1, textAlign: 'center' },
-  progressRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 8 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, paddingTop: 60, paddingBottom: 10 },
+  backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F9FAFB', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#EEE' },
+  headerTitle: { fontSize: 18, fontWeight: '900', color: theme.colors.black, flex: 1, textAlign: 'center' },
+  progressRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 16 },
   progressDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#e2e8f0' },
   progressDotActive: { backgroundColor: theme.colors.green, width: 24 },
   progressDotDone: { backgroundColor: '#86efac' },
   content: { flex: 1, paddingHorizontal: 20 },
 
-  // Summary card
+  rowAlignCenter: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   summaryCard: { backgroundColor: '#f8fafc', borderRadius: 20, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: '#e2e8f0' },
-  summaryTitle: { fontSize: 14, fontWeight: '900', color: theme.colors.black, marginBottom: 14, letterSpacing: 0.5 },
+  summaryTitle: { fontSize: 14, fontWeight: '900', color: theme.colors.black, letterSpacing: 0.5 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   summaryLabel: { fontSize: 14, color: '#64748b', fontWeight: '600' },
   summaryVal: { fontSize: 14, color: theme.colors.black, fontWeight: '700' },
@@ -479,14 +519,14 @@ const styles = StyleSheet.create({
   totalRow: { marginTop: 4 },
   totalLabel: { fontSize: 16, fontWeight: '900', color: theme.colors.black },
   totalVal: { fontSize: 20, fontWeight: '900', color: theme.colors.green },
-  escrowBadge: { backgroundColor: '#fefce8', borderRadius: 12, padding: 10, marginTop: 12, borderWidth: 1, borderColor: '#fde68a' },
-  escrowBadgeText: { fontSize: 12, color: '#92400e', fontWeight: '700', textAlign: 'center' },
+  escrowBadge: { backgroundColor: '#fefce8', borderRadius: 12, padding: 12, marginTop: 12, borderWidth: 1, borderColor: '#fde68a', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  escrowBadgeText: { fontSize: 12, color: '#92400e', fontWeight: '700' },
 
-  // Method cards
   sectionLabel: { fontSize: 11, fontWeight: '900', color: '#94a3b8', letterSpacing: 1.2, marginBottom: 12, textTransform: 'uppercase' },
   methodCard: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 16, borderWidth: 1.5, borderColor: '#e2e8f0', marginBottom: 10, backgroundColor: '#f8fafc' },
   methodCardActive: { borderColor: theme.colors.green, backgroundColor: '#f0fdf4' },
-  methodIcon: { fontSize: 28 },
+  methodIconBox: { width: 48, height: 48, borderRadius: 14, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
+  methodIconBoxActive: { borderColor: '#86efac', backgroundColor: '#FFF' },
   methodTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
   methodLabel: { fontSize: 15, fontWeight: '800', color: theme.colors.black },
   methodLabelActive: { color: theme.colors.green },
@@ -498,24 +538,21 @@ const styles = StyleSheet.create({
   radioActive: { borderColor: theme.colors.green },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: theme.colors.green },
 
-  // Seller fee card
   sellerFeeCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#e2e8f0' },
-  sellerFeeTitle: { fontSize: 13, fontWeight: '900', color: theme.colors.black, marginBottom: 12 },
+  sellerFeeTitle: { fontSize: 13, fontWeight: '900', color: theme.colors.black },
 
-  // Pay button
-  payBtn: { backgroundColor: theme.colors.green, paddingVertical: 18, borderRadius: 20, alignItems: 'center', marginTop: 8 },
+  payBtn: { backgroundColor: theme.colors.green, paddingVertical: 18, borderRadius: 20, alignItems: 'center', marginTop: 8, justifyContent: 'center' },
   payBtnDisabled: { opacity: 0.5 },
   payBtnText: { color: '#fff', fontSize: 16, fontWeight: '900' },
   cancelBtn: { paddingVertical: 14, alignItems: 'center' },
   cancelBtnText: { color: '#94a3b8', fontWeight: '700', fontSize: 14 },
 
-  // Instructions step
   instructionHero: { alignItems: 'center', paddingVertical: 24 },
-  instructionIcon: { fontSize: 56, marginBottom: 12 },
+  instructionIconBox: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#f0fdf4', alignItems: 'center', justifyContent: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#bbf7d0' },
   instructionTitle: { fontSize: 22, fontWeight: '900', color: theme.colors.black, textAlign: 'center', marginBottom: 8 },
   instructionSub: { fontSize: 14, color: '#64748b', textAlign: 'center', lineHeight: 22 },
   countdownCard: { backgroundColor: '#f0fdf4', borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#bbf7d0' },
-  countdownLabel: { fontSize: 12, fontWeight: '800', color: '#15803d', marginBottom: 4 },
+  countdownLabel: { fontSize: 12, fontWeight: '800', color: '#15803d' },
   countdownTime: { fontSize: 32, fontWeight: '900', color: theme.colors.green },
   stepsCard: { backgroundColor: '#f8fafc', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' },
   stepsTitle: { fontSize: 14, fontWeight: '900', color: theme.colors.black, marginBottom: 14 },
@@ -532,8 +569,8 @@ const styles = StyleSheet.create({
   amountValue: { fontSize: 32, fontWeight: '900', color: theme.colors.green },
   amountOrder: { fontSize: 12, color: '#64748b', marginTop: 4 },
 
-  // Success step
   successIcon: { marginTop: 32, marginBottom: 16, alignSelf: 'center' },
+  successIconOuter: { width: 120, height: 120, borderRadius: 60, backgroundColor: '#f0fdf4', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#bbf7d0' },
   successTitle: { fontSize: 28, fontWeight: '900', color: theme.colors.black, textAlign: 'center', marginBottom: 8 },
   successSub: { fontSize: 15, color: '#64748b', textAlign: 'center', marginBottom: 24, lineHeight: 22 },
   successCard: { width: '100%', backgroundColor: '#f0fdf4', borderRadius: 20, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: '#bbf7d0' },
@@ -544,8 +581,6 @@ const styles = StyleSheet.create({
   nextStepNumText: { color: '#fff', fontSize: 13, fontWeight: '900' },
   nextStepText: { flex: 1, fontSize: 14, color: '#475569', fontWeight: '600', lineHeight: 20 },
 
-  // Error state
   errorState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  errorIcon: { fontSize: 48, marginBottom: 16 },
   errorTitle: { fontSize: 20, fontWeight: '900', color: theme.colors.black, marginBottom: 24 },
 });
