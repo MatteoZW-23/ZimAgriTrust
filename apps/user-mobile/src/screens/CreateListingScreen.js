@@ -1,14 +1,65 @@
 import React, { useState } from "react";
-import { Text, TextInput, TouchableOpacity, View, ScrollView, StyleSheet } from "react-native";
+import { Text, TextInput, TouchableOpacity, View, ScrollView, StyleSheet, Alert, ActivityIndicator } from "react-native";
 import { theme } from "../styles";
 import { createListing } from "../api";
 import { appStyles } from "../styles";
 
-const SECTORS = [];
+const SECTORS = [
+  { id: 'CROPS', label: 'Crops', icon: '🌾', color: '#F0FDF4' },
+  { id: 'LIVESTOCK', label: 'Livestock', icon: '🐄', color: '#FFFBEB' },
+  { id: 'POULTRY', label: 'Poultry', icon: '🐔', color: '#FEF2F2' },
+  { id: 'DAIRY', label: 'Dairy', icon: '🥛', color: '#EFF6FF' },
+  { id: 'HORTICULTURE', label: 'Horticulture', icon: '🥬', color: '#F5F3FF' },
+  { id: 'AGRI_INPUTS', label: 'Inputs', icon: '🧪', color: '#FFF7ED' },
+];
 
 export default function CreateListingScreen({ navigation, route }) {
-  const { role = 'farmer' } = route.params || {};
-  const [form, setForm] = useState({ sector: 'CROPS', crop: '', qty: '', price: '', grade: 'A' });
+  const { role = 'farmer', token } = route.params || {};
+  const [form, setForm] = useState({ sector: 'CROPS', crop: '', qty: '', price: '', grade: 'A', location: '' });
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!form.crop || !form.qty || !form.price) {
+      Alert.alert('Missing Information', 'Please fill in product name, quantity, and price.');
+      return;
+    }
+
+    const quantity = Number(form.qty);
+    const price = Number(form.price);
+
+    if (isNaN(quantity) || quantity <= 0) {
+      Alert.alert('Invalid Quantity', 'Please enter a valid quantity.');
+      return;
+    }
+
+    if (isNaN(price) || price <= 0) {
+      Alert.alert('Invalid Price', 'Please enter a valid price.');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const payload = {
+        sector: form.sector,
+        crop: form.crop,
+        quantity: quantity,
+        quantity_unit: 'kg',
+        price_per_unit: price,
+        currency: 'USD',
+        grade: form.grade,
+        location: form.location || 'Zimbabwe',
+      };
+
+      await createListing(token, payload);
+      Alert.alert('Success', 'Your listing has been posted to the market!', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Failed to create listing. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -40,31 +91,62 @@ export default function CreateListingScreen({ navigation, route }) {
       {/* Form */}
       <View style={styles.form}>
         <Text style={styles.label}>Product Name</Text>
-        <TextInput style={styles.input} placeholder="e.g. White Maize, Beef Cattle" value={form.crop} onChangeText={v => setForm({...form, crop: v})} />
+        <TextInput 
+          style={styles.input} 
+          placeholder="e.g. White Maize, Beef Cattle" 
+          value={form.crop} 
+          onChangeText={v => setForm({...form, crop: v})} 
+        />
+
+        <Text style={styles.label}>Location</Text>
+        <TextInput 
+          style={styles.input} 
+          placeholder="e.g. Harare, Bulawayo" 
+          value={form.location} 
+          onChangeText={v => setForm({...form, location: v})} 
+        />
 
         <View style={styles.row}>
             <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={styles.label}>Quantity</Text>
-                <TextInput style={styles.input} placeholder="e.g. 500" keyboardType="numeric" />
+                <Text style={styles.label}>Quantity (kg)</Text>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="e.g. 500" 
+                  keyboardType="numeric"
+                  value={form.qty}
+                  onChangeText={v => setForm({...form, qty: v})}
+                />
             </View>
             <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Price ($/unit)</Text>
-                <TextInput style={styles.input} placeholder="e.g. 0.45" keyboardType="numeric" />
+                <Text style={styles.label}>Price ($/kg)</Text>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="e.g. 0.45" 
+                  keyboardType="numeric"
+                  value={form.price}
+                  onChangeText={v => setForm({...form, price: v})}
+                />
             </View>
         </View>
 
         <Text style={styles.label}>Quality Grade</Text>
-        <View style={styles.chipRow}>
-            <TextInput 
-              style={[styles.input, { flex: 1 }]} 
-              placeholder="e.g. Grade A, Premium, etc."
-              value={form.grade}
-              onChangeText={v => setForm({...form, grade: v})}
-            />
-        </View>
+        <TextInput 
+          style={[styles.input, { flex: 1 }]} 
+          placeholder="e.g. Grade A, Premium, etc."
+          value={form.grade}
+          onChangeText={v => setForm({...form, grade: v})}
+        />
 
-        <TouchableOpacity style={styles.primaryBtn}>
-            <Text style={styles.primaryBtnText}>Post to National Market</Text>
+        <TouchableOpacity 
+          style={styles.primaryBtn} 
+          onPress={handleSubmit}
+          disabled={submitting}
+        >
+            {submitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.primaryBtnText}>Post to National Market</Text>
+            )}
         </TouchableOpacity>
       </View>
       <View style={{ height: 100 }} />

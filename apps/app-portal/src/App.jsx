@@ -7,6 +7,7 @@ import {
   getMyOrders, confirmDelivery, raiseDispute,
   getWalletBalance, getTransactionHistory, initiateWithdrawal,
   getMarketPrices, getMyRequests, createBuyerRequest, deleteBuyerRequest, createDeposit, getLoanProducts, getLoanEligibility, applyForLoan, getMyLoans, repayLoan, getVerificationStatus, submitVerification, getUnifiedSearch, analyzeCropImage, detectCropDisease, getTradeSessions, startTradeSession, getTradeMessages, sendTradeMessage, getDeliveryStatus, setDeliveryMethod, getLogisticsTrips,
+  requestTransport, getTransportStatus, calculateTransportFee, getAvailableVehicles, estimateDistance, acceptTransport, deferTransport, startTransportNegotiation, submitNegotiationOffer, acceptNegotiation, getNegotiation, confirmTransportDelivery, getTrackingHistory,
 } from "./api.js";
 
 const AUTH_KEY = "zimagritrust_app_auth";
@@ -394,8 +395,16 @@ function MyListingsPanel() {
   const handleSubmit = async e => {
     e.preventDefault(); setMsg(""); setLoading(true);
     try {
-      if (editItem) { await updateListing(editItem.id, form); setMsg("Listing updated!"); }
-      else { await createListing(form); setMsg("Listing created!"); }
+      const payload = {
+        sector: "CROP",
+        product_type: form.crop_type,
+        quantity: parseFloat(form.quantity_kg),
+        price_per_unit: parseFloat(form.price_per_kg),
+        location_province: form.province,
+        grade: form.grade
+      };
+      if (editItem) { await updateListing(editItem.id, payload); setMsg("Listing updated!"); }
+      else { await createListing(payload); setMsg("Listing created!"); }
       resetForm(); load();
     } catch (err) { setMsg(err.message); }
     finally { setLoading(false); }
@@ -1644,6 +1653,565 @@ function SettingsPanel({ user, onProfileUpdate }) {
   );
 }
 
+// ── Transport Selection Panel ───────────────────────────────────────────────
+function TransportSelectionPanel({ user, setView, orderId, orderData }) {
+  const [selectedMode, setSelectedMode] = useState(null);
+  const [selectedVehicle, setSelectedVehicle] = useState("van");
+  const [pickupAddress, setPickupAddress] = useState("");
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [urgency, setUrgency] = useState("STANDARD");
+  const [loading, setLoading] = useState(false);
+  const [quote, setQuote] = useState(null);
+  const [calculatingQuote, setCalculatingQuote] = useState(false);
+
+  const TRANSPORT_MODES = [
+    { id: 'PLATFORM_DELIVERY_BUYER_REQUESTED', label: 'Platform Delivery (I Pay)', description: 'ZimAgriTrust driver delivers. You pay transport fee.', icon: '🚚', color: '#EFF6FF', payer: 'BUYER' },
+    { id: 'PLATFORM_DELIVERY_FARMER_REQUESTED', label: 'Platform Delivery (Farmer Pays)', description: 'ZimAgriTrust driver delivers. Farmer pays transport fee.', icon: '🚚', color: '#F0FDF4', payer: 'FARMER' },
+    { id: 'SELF_PICKUP', label: 'Self Pickup', description: 'I will collect directly from the farmer.', icon: '📦', color: '#FEF2F2', payer: 'NONE' },
+    { id: 'SELF_DELIVERY', label: 'Farmer Delivery', description: 'Farmer will deliver directly to me.', icon: '🚜', color: '#FFF7ED', payer: 'NONE' },
+    { id: 'NEGOTIATED_TRANSPORT', label: 'Negotiate Transport', description: 'Discuss transport fee and payment responsibility with farmer.', icon: '💬', color: '#F5F3FF', payer: 'NEGOTIATED' },
+    { id: 'DEFERRED', label: 'Decide Later', description: 'Let the other party decide transport method.', icon: '⏳', color: '#F3F4F6', payer: 'DEFERRED' },
+  ];
+
+  const VEHICLE_TYPES = [
+    { id: 'motorcycle', label: 'Motorcycle', icon: '🏍️', capacity: '50kg' },
+    { id: 'car', label: 'Car', icon: '🚗', capacity: '200kg' },
+    { id: 'van', label: 'Van', icon: '🚐', capacity: '500kg' },
+    { id: 'truck', label: 'Truck', icon: '🚛', capacity: '1000kg+' },
+  ];
+
+  const handleCalculateQuote = async () => {
+    if (!pickupAddress || !deliveryAddress) {
+      alert("Please enter pickup and delivery addresses.");
+      return;
+    }
+    setCalculatingQuote(true);
+    try {
+      const result = await calculateTransportFee({
+        distance_km: 15.5,
+        vehicle_type: selectedVehicle,
+        cargo_weight_kg: orderData?.quantity || 100,
+        urgency_level: urgency,
+      });
+      setQuote(result);
+    } catch (err) {
+      alert("Failed to calculate quote: " + err.message);
+    } finally {
+      setCalculatingQuote(false);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!selectedMode) {
+      alert("Please select a transport mode.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await requestTransport({
+        order_id: orderId,
+        requested_by: user?.role === 'BUYER' ? 'BUYER' : 'FARMER',
+        mode: selectedMode,
+        pickup_address: pickupAddress,
+        delivery_address: deliveryAddress,
+        vehicle_type: selectedVehicle,
+        urgency_level: urgency,
+        cargo_weight_kg: orderData?.quantity || 100,
+      });
+      alert("Transport request submitted successfully!");
+      setView("my-orders");
+    } catch (err) {
+      alert("Failed to submit transport request: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="panel-grid">
+      <div className="card" style={{ gridColumn: "span 2" }}>
+        <div className="card-title"><i className="fas fa-truck"></i> Select Transport Method</div>
+        <div style={{ marginBottom: 20 }}>
+          <label className="form-label">Transport Options</label>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12 }}>
+            {TRANSPORT_MODES.map((mode) => (
+              <div
+                key={mode.id}
+                onClick={() => setSelectedMode(mode.id)}
+                style={{
+                  border: `2px solid ${selectedMode === mode.id ? '#3B82F6' : 'transparent'}`,
+                  borderRadius: 12,
+                  padding: 16,
+                  backgroundColor: mode.color,
+                  cursor: "pointer",
+                  transition: "all 0.2s"
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ fontSize: 32 }}>{mode.icon}</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 16 }}>{mode.label}</div>
+                    <div style={{ fontSize: 13, color: "#6B7280" }}>{mode.description}</div>
+                  </div>
+                  {selectedMode === mode.id && <span style={{ marginLeft: "auto", color: "#3B82F6", fontSize: 20 }}>✓</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {(selectedMode === 'PLATFORM_DELIVERY_BUYER_REQUESTED' || selectedMode === 'PLATFORM_DELIVERY_FARMER_REQUESTED') && (
+          <>
+            <div style={{ marginBottom: 20 }}>
+              <label className="form-label">Delivery Details</label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div>
+                  <label className="form-label">Pickup Address</label>
+                  <input className="form-input" placeholder="Enter pickup address" value={pickupAddress} onChange={e => setPickupAddress(e.target.value)} />
+                </div>
+                <div>
+                  <label className="form-label">Delivery Address</label>
+                  <input className="form-input" placeholder="Enter delivery address" value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label className="form-label">Vehicle Type</label>
+              <div style={{ display: "flex", gap: 12 }}>
+                {VEHICLE_TYPES.map((vehicle) => (
+                  <div
+                    key={vehicle.id}
+                    onClick={() => setSelectedVehicle(vehicle.id)}
+                    style={{
+                      flex: 1,
+                      border: `2px solid ${selectedVehicle === vehicle.id ? '#3B82F6' : '#D1D5DB'}`,
+                      borderRadius: 8,
+                      padding: 12,
+                      textAlign: "center",
+                      cursor: "pointer",
+                      backgroundColor: selectedVehicle === vehicle.id ? '#EFF6FF' : '#fff'
+                    }}
+                  >
+                    <div style={{ fontSize: 24 }}>{vehicle.icon}</div>
+                    <div style={{ fontWeight: 500, fontSize: 14 }}>{vehicle.label}</div>
+                    <div style={{ fontSize: 12, color: "#6B7280" }}>{vehicle.capacity}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label className="form-label">Urgency</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                {['STANDARD', 'URGENT', 'EXPEDITED'].map((level) => (
+                  <button
+                    key={level}
+                    onClick={() => setUrgency(level)}
+                    style={{
+                      flex: 1,
+                      padding: 10,
+                      borderRadius: 8,
+                      border: `1px solid ${urgency === level ? '#3B82F6' : '#D1D5DB'}`,
+                      backgroundColor: urgency === level ? '#3B82F6' : '#fff',
+                      color: urgency === level ? '#fff' : '#374151',
+                      fontWeight: 500
+                    }}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button className="btn btn-secondary" onClick={handleCalculateQuote} disabled={calculatingQuote}>
+              {calculatingQuote ? <i className="fas fa-spinner fa-spin"></i> : "Calculate Quote"}
+            </button>
+          </>
+        )}
+
+        {quote && (
+          <div style={{ marginTop: 20, padding: 16, backgroundColor: "#F9FAFB", borderRadius: 8, border: "1px solid #E5E7EB" }}>
+            <div className="card-title" style={{ fontSize: 16, marginBottom: 12 }}>Transport Quote</div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+              <span>Distance:</span>
+              <span>{quote.distance_km} km</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+              <span>Base Fee:</span>
+              <span>${quote.base_fee.toFixed(2)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+              <span>Distance Fee:</span>
+              <span>${quote.distance_fee.toFixed(2)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+              <span>Subtotal:</span>
+              <span>${quote.subtotal.toFixed(2)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+              <span>Tax (15%):</span>
+              <span>${quote.tax_amount.toFixed(2)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #E5E7EB", paddingTop: 8, marginTop: 8, fontWeight: "bold" }}>
+              <span>Total:</span>
+              <span style={{ color: "#3B82F6", fontSize: 18 }}>${quote.total_amount.toFixed(2)}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="card-title"><i className="fas fa-info-circle"></i> Information</div>
+        <p style={{ fontSize: 14, color: "#6B7280", marginBottom: 12 }}>
+          <strong>Core Business Rule:</strong> Whoever requests transport pays for transport.
+        </p>
+        {selectedMode === 'NEGOTIATED_TRANSPORT' && (
+          <div style={{ padding: 12, backgroundColor: "#FEF3C7", borderRadius: 8, border: "1px solid #FCD34D" }}>
+            <p style={{ fontSize: 13, color: "#92400E", marginBottom: 8 }}>
+              You will enter a negotiation to discuss the transport fee and payment responsibility.
+            </p>
+            <ul style={{ fontSize: 13, color: "#92400E", paddingLeft: 20 }}>
+              <li>Negotiation window: 72 hours</li>
+              <li>Support for split payments</li>
+              <li>Real-time chat available</li>
+            </ul>
+          </div>
+        )}
+        {selectedMode === 'DEFERRED' && (
+          <div style={{ padding: 12, backgroundColor: "#F3F4F6", borderRadius: 8 }}>
+            <p style={{ fontSize: 13, color: "#374151", marginBottom: 8 }}>
+              The counterparty will have 48 hours to choose a transport method.
+            </p>
+            <p style={{ fontSize: 13, color: "#374151" }}>
+              If no decision is made, the system will automatically assign platform delivery.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ gridColumn: "span 3" }}>
+        <div style={{ display: "flex", gap: 12 }}>
+          <button className="btn btn-primary" onClick={handleConfirm} disabled={!selectedMode || loading}>
+            {loading ? <i className="fas fa-spinner fa-spin"></i> : "Confirm Transport"}
+          </button>
+          <button className="btn btn-secondary" onClick={() => setView("my-orders")}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Delivery Tracking Panel ───────────────────────────────────────────────────
+function DeliveryTrackingPanel({ deliveryId }) {
+  const [tracking, setTracking] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    loadTracking();
+  }, [deliveryId]);
+
+  const loadTracking = async () => {
+    setLoading(true);
+    try {
+      const data = await getTrackingHistory(deliveryId);
+      setTracking(data);
+    } catch (err) {
+      console.error("Failed to load tracking:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadTracking();
+    setRefreshing(false);
+  };
+
+  if (loading) {
+    return <div className="loading-overlay"><div className="spinner"></div><p>Loading tracking...</p></div>;
+  }
+
+  return (
+    <div className="panel-grid">
+      <div className="card" style={{ gridColumn: "span 2" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <div className="card-title"><i className="fas fa-map-marker-alt"></i> Delivery Tracking</div>
+          <button className="btn btn-secondary" onClick={handleRefresh} disabled={refreshing}>
+            {refreshing ? <i className="fas fa-spinner fa-spin"></i> : "Refresh"}
+          </button>
+        </div>
+
+        {tracking && (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 20 }}>
+              <div style={{ padding: 16, backgroundColor: "#F9FAFB", borderRadius: 8, border: "1px solid #E5E7EB" }}>
+                <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 4 }}>Status</div>
+                <div style={{ fontSize: 18, fontWeight: 600, color: "#1F2937" }}>{tracking.status}</div>
+              </div>
+              <div style={{ padding: 16, backgroundColor: "#F9FAFB", borderRadius: 8, border: "1px solid #E5E7EB" }}>
+                <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 4 }}>ETA</div>
+                <div style={{ fontSize: 18, fontWeight: 600, color: "#1F2937" }}>{tracking.eta_minutes} min</div>
+              </div>
+              <div style={{ padding: 16, backgroundColor: "#F9FAFB", borderRadius: 8, border: "1px solid #E5E7EB" }}>
+                <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 4 }}>Distance</div>
+                <div style={{ fontSize: 18, fontWeight: 600, color: "#1F2937" }}>{tracking.distance_km} km</div>
+              </div>
+            </div>
+
+            {tracking.driver && (
+              <div style={{ padding: 16, backgroundColor: "#EFF6FF", borderRadius: 8, marginBottom: 20, border: "1px solid #DBEAFE" }}>
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Driver Information</div>
+                <div style={{ fontSize: 14, color: "#374151" }}>{tracking.driver.name}</div>
+                <div style={{ fontSize: 14, color: "#6B7280" }}>{tracking.driver.vehicle} ({tracking.driver.registration})</div>
+                <div style={{ fontSize: 14, color: "#6B7280" }}>{tracking.driver.phone}</div>
+              </div>
+            )}
+
+            <div style={{ marginBottom: 20 }}>
+              <label className="form-label">Tracking Timeline</label>
+              <div style={{ padding: 16, backgroundColor: "#F9FAFB", borderRadius: 8, border: "1px solid #E5E7EB" }}>
+                {tracking.history && tracking.history.map((event, idx) => (
+                  <div key={idx} style={{ display: "flex", gap: 12, marginBottom: 16, paddingBottom: 16, borderBottom: idx < tracking.history.length - 1 ? "1px solid #E5E7EB" : "none" }}>
+                    <div style={{ width: 40, height: 40, borderRadius: "50%", backgroundColor: "#3B82F6", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 16 }}>
+                      {event.status === "PENDING" ? "⏳" : event.status === "ASSIGNED" ? "🚚" : event.status === "EN_ROUTE_PICKUP" ? "📍" : event.status === "PICKED_UP" ? "📦" : event.status === "EN_ROUTE_DELIVERY" ? "🛣️" : event.status === "ARRIVED" ? "🏁" : "✅"}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: "#1F2937" }}>{event.status.replace(/_/g, " ")}</div>
+                      <div style={{ fontSize: 12, color: "#6B7280" }}>{new Date(event.timestamp).toLocaleString()}</div>
+                      {event.location && <div style={{ fontSize: 12, color: "#6B7280" }}>{event.location}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {tracking.pickup_code && (
+              <div style={{ padding: 16, backgroundColor: "#FEF3C7", borderRadius: 8, border: "1px solid #FCD34D" }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#92400E", marginBottom: 4 }}>Pickup Code</div>
+                <div style={{ fontSize: 24, fontWeight: "bold", color: "#92400E" }}>{tracking.pickup_code}</div>
+              </div>
+            )}
+
+            {tracking.delivery_code && (
+              <div style={{ marginTop: 16, padding: 16, backgroundColor: "#D1FAE5", borderRadius: 8, border: "1px solid #6EE7B7" }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#065F46", marginBottom: 4 }}>Delivery Code</div>
+                <div style={{ fontSize: 24, fontWeight: "bold", color: "#065F46" }}>{tracking.delivery_code}</div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="card-title"><i className="fas fa-info-circle"></i> Help</div>
+        <p style={{ fontSize: 14, color: "#6B7280", marginBottom: 12 }}>
+          Track your delivery in real-time using GPS.
+        </p>
+        <ul style={{ fontSize: 13, color: "#6B7280", paddingLeft: 20 }}>
+          <li>Driver location updates every 30 seconds</li>
+          <li>ETA recalculated based on traffic</li>
+          <li>Geofence alerts for pickup/delivery</li>
+          <li>Proof of delivery available</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+// ── Transport Negotiation Panel ─────────────────────────────────────────────
+function TransportNegotiationPanel({ user, negotiationId, orderId }) {
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [currentOffer, setCurrentOffer] = useState(null);
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [offerAmount, setOfferAmount] = useState("");
+  const [offerPayer, setOfferPayer] = useState("BUYER");
+
+  useEffect(() => {
+    loadNegotiation();
+  }, []);
+
+  const loadNegotiation = async () => {
+    setLoading(true);
+    try {
+      const data = await getNegotiation(negotiationId);
+      setMessages(data.messages || []);
+      setCurrentOffer(data.currentOffer);
+    } catch (err) {
+      console.error("Failed to load negotiation:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim()) return;
+    setSending(true);
+    try {
+      await submitNegotiationOffer({
+        negotiation_id: negotiationId,
+        message_type: "TEXT",
+        content: newMessage,
+      });
+      setMessages([...messages, { sender: user.role, content: newMessage, timestamp: new Date().toISOString() }]);
+      setNewMessage("");
+    } catch (err) {
+      alert("Failed to send message: " + err.message);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleSendOffer = async () => {
+    if (!offerAmount || parseFloat(offerAmount) <= 0) {
+      alert("Please enter a valid amount.");
+      return;
+    }
+    setSending(true);
+    try {
+      await submitNegotiationOffer({
+        negotiation_id: negotiationId,
+        message_type: "COUNTER_OFFER",
+        content: `Offer: $${parseFloat(offerAmount).toFixed(2)} paid by ${offerPayer}`,
+        structured_offer: {
+          payer: offerPayer,
+          amount: parseFloat(offerAmount),
+        },
+      });
+      setCurrentOffer({ payer: offerPayer, amount: parseFloat(offerAmount) });
+      setShowOfferModal(false);
+      setOfferAmount("");
+    } catch (err) {
+      alert("Failed to send offer: " + err.message);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleAcceptOffer = async () => {
+    if (!confirm("Are you sure you want to accept this offer?")) return;
+    setSending(true);
+    try {
+      await acceptNegotiation({ negotiation_id: negotiationId });
+      alert("Offer accepted! Driver will be assigned shortly.");
+    } catch (err) {
+      alert("Failed to accept offer: " + err.message);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="loading-overlay"><div className="spinner"></div><p>Loading negotiation...</p></div>;
+  }
+
+  return (
+    <div className="panel-grid">
+      <div className="card" style={{ gridColumn: "span 2" }}>
+        <div className="card-title"><i className="fas fa-comments"></i> Transport Negotiation</div>
+        
+        {currentOffer && (
+          <div style={{ padding: 16, backgroundColor: "#EFF6FF", borderRadius: 8, marginBottom: 20, border: "1px solid #DBEAFE" }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#3B82F6", marginBottom: 4 }}>Current Offer</div>
+            <div style={{ fontSize: 28, fontWeight: "bold", color: "#1F2937" }}>${currentOffer.amount.toFixed(2)}</div>
+            <div style={{ fontSize: 14, color: "#6B7280", marginBottom: 12 }}>
+              Paid by: {currentOffer.payer === 'SPLIT' ? 'Split Payment' : currentOffer.payer}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-primary" onClick={handleAcceptOffer} disabled={sending}>Accept</button>
+              <button className="btn btn-secondary">Reject</button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ height: 400, overflowY: "auto", padding: 16, backgroundColor: "#F9FAFB", borderRadius: 8, marginBottom: 16 }}>
+          {messages.map((msg, idx) => (
+            <div key={idx} style={{
+              maxWidth: "80%",
+              marginLeft: msg.sender === user.role ? "auto" : 0,
+              marginRight: msg.sender === user.role ? 0 : "auto",
+              marginBottom: 12
+            }}>
+              <div style={{
+                backgroundColor: msg.sender === user.role ? "#3B82F6" : "#fff",
+                color: msg.sender === user.role ? "#fff" : "#1F2937",
+                padding: 12,
+                borderRadius: 12,
+                border: msg.sender !== user.role ? "1px solid #E5E7EB" : "none"
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                  {msg.sender === user.role ? "You" : "Counterparty"}
+                </div>
+                <div style={{ fontSize: 14 }}>{msg.content}</div>
+              </div>
+              <div style={{ fontSize: 10, color: "#6B7280", marginTop: 4 }}>
+                {new Date(msg.timestamp).toLocaleTimeString()}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn btn-secondary" onClick={() => setShowOfferModal(true)}>Make Offer</button>
+          <input
+            className="form-input"
+            placeholder="Type a message..."
+            value={newMessage}
+            onChange={e => setNewMessage(e.target.value)}
+            style={{ flex: 1 }}
+          />
+          <button className="btn btn-primary" onClick={handleSendMessage} disabled={!newMessage.trim() || sending}>
+            {sending ? <i className="fas fa-spinner fa-spin"></i> : "Send"}
+          </button>
+        </div>
+      </div>
+
+      {showOfferModal && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ backgroundColor: "#fff", borderRadius: 16, padding: 24, width: 400, maxWidth: "90%" }}>
+            <div className="card-title" style={{ marginBottom: 20 }}>Make an Offer</div>
+            <label className="form-label">Amount (USD)</label>
+            <input className="form-input" type="number" placeholder="0.00" value={offerAmount} onChange={e => setOfferAmount(e.target.value)} style={{ marginBottom: 16 }} />
+            <label className="form-label">Who Pays?</label>
+            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+              {['BUYER', 'FARMER', 'SPLIT'].map((payer) => (
+                <button
+                  key={payer}
+                  onClick={() => setOfferPayer(payer)}
+                  style={{
+                    flex: 1,
+                    padding: 10,
+                    borderRadius: 8,
+                    border: `1px solid ${offerPayer === payer ? '#3B82F6' : '#D1D5DB'}`,
+                    backgroundColor: offerPayer === payer ? '#3B82F6' : '#fff',
+                    color: offerPayer === payer ? '#fff' : '#374151',
+                    fontWeight: 500
+                  }}
+                >
+                  {payer}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-secondary" onClick={() => setShowOfferModal(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSendOffer} disabled={!offerAmount || sending}>
+                {sending ? <i className="fas fa-spinner fa-spin"></i> : "Submit Offer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Nav Configs ───────────────────────────────────────────────────────────────
 const FARMER_NAV = [
   { id: "overview",     icon: "fa-home",          label: "Overview" },
@@ -1669,6 +2237,8 @@ const VIEW_TITLES = {
   overview: "Dashboard", "my-listings": "My Listings", "active-orders": "Active Orders",
   "my-orders": "My Orders", marketplace: "Marketplace", messages: "Messages",
   wallet: "Wallet", settings: "Settings", procurement: "Procurement Requests",
+  "transport-selection": "Transport Selection", "transport-negotiation": "Transport Negotiation",
+  "delivery-tracking": "Delivery Tracking",
 };
 
 // ── Main App ──────────────────────────────────────────────────────────────────
@@ -1733,6 +2303,9 @@ export default function App() {
       case "messages":      return <MessagesPanel user={user} />;
       case "wallet":        return <WalletPanel />;
       case "settings":      return <SettingsPanel user={user} onProfileUpdate={handleProfileUpdate} />;
+      case "transport-selection": return <TransportSelectionPanel user={user} setView={setView} />;
+      case "transport-negotiation": return <TransportNegotiationPanel user={user} />;
+      case "delivery-tracking": return <DeliveryTrackingPanel deliveryId={view.deliveryId} />;
       default:              return isFarmer ? <FarmerOverview user={user} /> : <BuyerOverview user={user} />;
     }
   };

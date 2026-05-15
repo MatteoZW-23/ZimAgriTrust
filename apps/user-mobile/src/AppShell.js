@@ -15,7 +15,6 @@ import { setupNotificationHandler, registerForPushNotifications } from './utils/
 // Screens
 import OnboardingScreen from './screens/OnboardingScreen';
 import { LoginScreen } from './screens/LoginScreen';
-import HomeScreen from './screens/HomeScreen';
 import FarmerDashboardScreen from './screens/FarmerDashboardScreen';
 import BuyerDashboardScreen from './screens/BuyerDashboardScreen';
 import MarketplaceScreen from './screens/MarketplaceScreen';

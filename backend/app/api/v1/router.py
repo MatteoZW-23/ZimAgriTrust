@@ -22,6 +22,7 @@ api_router.include_router(disputes.router, prefix="/disputes", tags=["disputes"]
 api_router.include_router(logistics.router, prefix="/logistics", tags=["logistics"])
 api_router.include_router(drivers.router, prefix="/drivers", tags=["drivers"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
+api_router.include_router(logistics.admin_router, prefix="/admin/transport", tags=["admin-transport"])
 api_router.include_router(ussd.router, prefix="/ussd", tags=["ussd"])
 api_router.include_router(recruitment.router, prefix="/recruitment", tags=["recruitment"])
 api_router.include_router(onboarding.router, prefix="/onboarding", tags=["onboarding"])
@@ -45,5 +46,3 @@ api_router.include_router(sepsisai.router, prefix="/sepsisai", tags=["sepsisai"]
 api_router.include_router(browse.router, prefix="/browse", tags=["browse"])
 api_router.include_router(wallet.router, prefix="/wallet", tags=["wallet"])
 api_router.include_router(ml.router)
-
-

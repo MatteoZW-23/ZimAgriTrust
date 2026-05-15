@@ -10,14 +10,82 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from sqlalchemy import desc
 from app.api.deps import get_current_user, get_db, require_roles
 from app.models.logistics import DeliveryMethod, LogisticsTrip, OrderDelivery
 from app.models.user import User, UserRole
+from app.models.transaction import Order
+from app.models.driver import DriverJob
 from app.schemas.logistics import LogisticsTripCreate, LogisticsTripResponse, TripManifest
 from app.services.logistics_service import LogisticsService
 import app.services.delivery_service as delivery_svc
 
 router = APIRouter()
+admin_router = APIRouter()
+
+# ── Admin Fleet & Logistics Management ─────────────────────────────────────────
+
+@admin_router.get("/requests")
+def get_transport_requests(
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)),
+):
+    orders = db.query(Order).order_by(desc(Order.created_at)).limit(limit).all()
+    return {
+        "items": [
+            {
+                "id": str(o.id),
+                "order_id": str(o.id),
+                "status": o.status,
+                "created_at": o.created_at,
+                "buyer_id": o.buyer_id,
+                "farmer_id": o.farmer_id,
+                "transport_fee": o.transport_fee,
+            }
+            for o in orders
+        ],
+        "total": len(orders)
+    }
+
+@admin_router.get("/negotiations")
+def get_transport_negotiations(
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)),
+):
+    return {"items": [], "total": 0}
+
+@admin_router.get("/driver-assignments")
+def get_driver_assignments(
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)),
+):
+    jobs = db.query(DriverJob).order_by(desc(DriverJob.created_at)).limit(limit).all()
+    return {
+        "items": [
+            {
+                "id": str(j.id),
+                "driver_id": str(j.driver_id),
+                "order_id": str(j.order_id),
+                "status": j.status,
+                "payout": j.driver_payout,
+                "created_at": j.created_at,
+            }
+            for j in jobs
+        ],
+        "total": len(jobs)
+    }
+
+@admin_router.get("/disputes")
+def get_transport_disputes(
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)),
+):
+    return {"items": [], "total": 0}
+
 
 
 # ── Trip Marketplace ───────────────────────────────────────────────────────────

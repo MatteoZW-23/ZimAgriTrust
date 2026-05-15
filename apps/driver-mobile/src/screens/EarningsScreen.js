@@ -76,7 +76,7 @@ export default function EarningsScreen({ route }) {
   const onRefresh = useCallback(() => { setRefreshing(true); fetchEarnings(); }, [fetchEarnings]);
 
   const handleWithdraw = () => {
-    const amount = d.available || 0;
+    const amount = earnings?.available || 0;
     if (!amount) {
       Alert.alert('No Funds', 'You have no available balance to withdraw.');
       return;

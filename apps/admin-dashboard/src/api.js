@@ -1168,8 +1168,80 @@ export function rejectVerification(token, requestId, note) {
   form.append("note", note);
   return request(`/verification/${requestId}/reject`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
     body: form,
+    headers: { Authorization: `Bearer ${token}` },
   });
 }
 
+// ── TRANSPORT MANAGEMENT ───────────────────────────────────────────────────
+export function getTransportRequests(token, status = null, limit = 100) {
+  const qs = new URLSearchParams();
+  if (status) qs.set("status", status);
+  qs.set("limit", String(limit));
+  return request(`/admin/transport/requests?${qs.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function getTransportRequest(token, requestId) {
+  return request(`/admin/transport/requests/${requestId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function getNegotiations(token, status = null, limit = 100) {
+  const qs = new URLSearchParams();
+  if (status) qs.set("status", status);
+  qs.set("limit", String(limit));
+  return request(`/admin/transport/negotiations?${qs.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function resolveNegotiation(token, negotiationId, resolution) {
+  return request(`/admin/transport/negotiations/${negotiationId}/resolve`, {
+    method: "POST",
+    body: JSON.stringify(resolution),
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function getDriverAssignments(token, status = null, limit = 100) {
+  const qs = new URLSearchParams();
+  if (status) qs.set("status", status);
+  qs.set("limit", String(limit));
+  return request(`/admin/transport/driver-assignments?${qs.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function manualAssignDriver(token, assignmentId, driverId) {
+  return request(`/admin/transport/driver-assignments/${assignmentId}/assign`, {
+    method: "POST",
+    body: JSON.stringify({ driver_id: driverId }),
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function getTransportDisputes(token, status = null, limit = 100) {
+  const qs = new URLSearchParams();
+  if (status) qs.set("status", status);
+  qs.set("limit", String(limit));
+  return request(`/admin/transport/disputes?${qs.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function resolveTransportDispute(token, disputeId, resolution) {
+  return request(`/admin/transport/disputes/${disputeId}/resolve`, {
+    method: "POST",
+    body: JSON.stringify(resolution),
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function getTransportStats(token) {
+  return request("/admin/transport/stats", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}

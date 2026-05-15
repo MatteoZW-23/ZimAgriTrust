@@ -22,13 +22,14 @@ async function jsonFetch(path, options = {}) {
   const url = `${API_BASE_URL}${path}`;
 
   try {
+    const { headers, ...restOptions } = options;
     const response = await fetch(url, {
+      ...restOptions,
       headers: {
-        ...(options.headers || {}),
         "Content-Type": "application/json",
         "Accept": "application/json",
+        ...(headers || {}),
       },
-      ...options,
     });
 
     const data = await response.json();

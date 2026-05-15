@@ -45,6 +45,7 @@ import AdminMFASetup from './components/AdminMFASetup';
 import InvitationAcceptScreen from './components/InvitationAcceptScreen';
 import AdminInvitationsPanel from './components/AdminInvitationsPanel';
 import WhatsAppBotPanel from './components/WhatsAppBotPanel';
+import { TransportManagementPanel } from './components/TransportManagementPanel';
 
 // ── Access Denied Screen ───────────────────────────────────────────────────────
 function AccessDenied({ role, onLogout }) {
@@ -343,6 +344,7 @@ function App() {
     // OPERATIONS group
     { type: 'group', key: 'operations', icon: 'fa-tower-broadcast', label: 'Operations', children: [
       { view: 'logistics',   icon: 'fa-truck-fast',    label: 'Logistics Control' },
+      { view: 'transport',   icon: 'fa-truck',          label: 'Transport Management' },
       { view: 'whatsapp-bot',icon: 'fa-comment-dots',  label: 'WhatsApp Bot',  roles: ['ADMIN', 'SUPER_ADMIN', 'REGIONAL_MANAGER'] },
       { view: 'ussd',        icon: 'fa-mobile',        label: 'USSD Simulator' },
       { view: 'reports',     icon: 'fa-chart-pie',     label: 'Market Insights' },
@@ -616,6 +618,7 @@ function App() {
           {currentView === 'disputes' && <DisputeResolutionPanel disputes={disputes} onResolve={handleResolveDispute} />}
           {currentView === 'network' && <AgentPerformancePanel agents={agents} onRefresh={loadAllData} profile={profile} />}
           {currentView === 'logistics' && <LogisticsCommand token={token} role="ADMIN" transactions={transactions} />}
+          {currentView === 'transport' && <TransportManagementPanel token={token} />}
           {currentView === 'reports' && <NationalMarketHub token={token} />}
           {currentView === 'recruitment' && <AgentRecruitmentPanel token={token} />}
           {currentView === 'post-exam' && <AgentPostExamReview token={token} />}

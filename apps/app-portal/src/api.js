@@ -118,3 +118,37 @@ export const getMarketPrices = () =>
   request("/market/prices/current").catch(() => request("/market/summary"));
 
 export const getTrustScore = () => request("/auth/me").then((d) => d?.trust_score ?? 0);
+
+// ── Transport Payment System ───────────────────────────────────────────────────
+export const requestTransport = (data) =>
+  request("/transport/request", { method: "POST", body: JSON.stringify(data) });
+export const getTransportStatus = (orderId) =>
+  request(`/transport/status/${orderId}`);
+export const calculateTransportFee = (data) =>
+  request("/transport/calculate", { method: "POST", body: JSON.stringify(data) });
+export const getAvailableVehicles = () =>
+  request("/transport/vehicles");
+export const estimateDistance = (pickupLat, pickupLon, deliveryLat, deliveryLon) =>
+  request("/transport/estimate-distance", { method: "POST", body: JSON.stringify({ pickup_lat: pickupLat, pickup_lon: pickupLon, delivery_lat: deliveryLat, delivery_lon: deliveryLon }) });
+export const acceptTransport = (data) =>
+  request("/transport/accept", { method: "POST", body: JSON.stringify(data) });
+export const deferTransport = (data) =>
+  request("/transport/defer", { method: "POST", body: JSON.stringify(data) });
+export const startTransportNegotiation = (orderId, initialOffer) =>
+  request("/transport/negotiations/start", { method: "POST", body: JSON.stringify({ order_id: orderId, initial_offer: initialOffer }) });
+export const submitNegotiationOffer = (data) =>
+  request("/transport/negotiations/offer", { method: "POST", body: JSON.stringify(data) });
+export const acceptNegotiation = (data) =>
+  request("/transport/negotiations/accept", { method: "POST", body: JSON.stringify(data) });
+export const getNegotiation = (negotiationId) =>
+  request(`/transport/negotiations/${negotiationId}`);
+export const confirmPickup = (data) =>
+  request("/transport/delivery/confirm-pickup", { method: "POST", body: JSON.stringify(data) });
+export const confirmTransportDelivery = (data) =>
+  request("/transport/delivery/confirm-delivery", { method: "POST", body: JSON.stringify(data) });
+export const raiseDeliveryDispute = (data) =>
+  request("/transport/delivery/dispute", { method: "POST", body: JSON.stringify(data) });
+export const updateDriverLocation = (data) =>
+  request("/transport/tracking/location", { method: "POST", body: JSON.stringify(data) });
+export const getTrackingHistory = (deliveryId) =>
+  request(`/transport/tracking/${deliveryId}`);

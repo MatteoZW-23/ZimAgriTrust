@@ -132,29 +132,7 @@ class UpdateDeliveryStatusPayload(BaseModel):
     status: str
 
 
-class LocationUpdatePayload(BaseModel):
-    latitude: float
-    longitude: float
-    job_id: Optional[uuid.UUID] = None
 
-
-class AvailabilityPayload(BaseModel):
-    is_available: bool
-
-
-class WithdrawalPayload(BaseModel):
-    amount: float
-    method: str  # EcoCash, OneMoney
-    phone: Optional[str] = None
-
-
-class ConfirmPickupPayload(BaseModel):
-    photo_base64: str
-
-
-class ConfirmDeliveryPayload(BaseModel):
-    photo_base64: str
-    signature_base64: Optional[str] = None
 
 
 class ProfileUpdatePayload(BaseModel):
@@ -448,7 +426,7 @@ def get_my_driver_profile(db: Session = Depends(get_db), current_user: User = De
             "license_verified": driver.license_verified,
             "insurance_verified": driver.insurance_verified,
             "background_cleared": driver.background_cleared,
-            "address": driver.address,
+            "address": driver.current_district,
             "email": getattr(current_user, "email", ""),
         }
 
@@ -464,7 +442,7 @@ def update_profile(
         driver.name = payload.full_name
         current_user.full_name = payload.full_name
     if payload.address:
-        driver.address = payload.address
+        driver.current_district = payload.address
     if payload.phone_number:
         driver.phone = payload.phone_number
         current_user.phone_number = payload.phone_number
@@ -883,89 +861,7 @@ def get_driver_earnings(
     }
 
 
-@router.post("/location")
-async def update_location(
-    payload: LocationUpdatePayload,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    driver = _get_driver(db, current_user, enforce_active=True)
-    driver.current_lat = payload.latitude
-    driver.current_lon = payload.longitude
-    db.commit()
-    return {"success": True}
 
-
-@router.post("/availability")
-async def set_availability(
-    payload: AvailabilityPayload,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    driver = _get_driver(db, current_user)
-    # We can use a field like 'is_online' or status
-    if payload.is_available:
-        if driver.status == DriverStatus.SUSPENDED:
-            raise HTTPException(status_code=403, detail="Account suspended")
-        # For now we just return success
-    return {"success": True, "is_available": payload.is_available}
-
-
-@router.post("/earnings/withdraw")
-async def withdraw_earnings(
-    payload: WithdrawalPayload,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    driver = _get_driver(db, current_user, enforce_active=True)
-    # Mock withdrawal logic
-    if payload.amount < 5:
-        raise HTTPException(status_code=400, detail="Minimum withdrawal is $5")
-    
-    return {
-        "success": True,
-        "reference": f"WTR-{uuid.uuid4().hex[:8].upper()}",
-        "amount": payload.amount,
-        "method": payload.method
-    }
-
-
-@router.post("/jobs/{job_id}/pickup")
-async def confirm_pickup(
-    job_id: uuid.UUID,
-    payload: ConfirmPickupPayload,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    driver = _get_driver(db, current_user, enforce_active=True)
-    job = db.query(DriverJob).filter(DriverJob.id == job_id, DriverJob.driver_id == driver.id).first()
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    job.status = "PICKUP_DONE"
-    # In a real app, we'd save the base64 photo to disk
-    db.commit()
-    return {"success": True}
-
-
-@router.post("/jobs/{job_id}/deliver")
-async def confirm_delivery(
-    job_id: uuid.UUID,
-    payload: ConfirmDeliveryPayload,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    driver = _get_driver(db, current_user, enforce_active=True)
-    job = db.query(DriverJob).filter(DriverJob.id == job_id, DriverJob.driver_id == driver.id).first()
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    job.status = "DELIVERED"
-    job.completed_at = datetime.utcnow()
-    driver.total_deliveries += 1
-    driver.successful_deliveries += 1
-    db.commit()
-    return {"success": True, "earnings": job.driver_payout}
 
 
 # ── Rating ─────────────────────────────────────────────────────────────────────
@@ -1067,7 +963,10 @@ def approve_driver(
     driver.license_verified = True
     driver.background_cleared = True
     driver.registration_fee_paid = True
-    driver.reviewed_by = admin.id
+    try:
+        driver.reviewed_by = uuid.UUID(str(admin.id))
+    except ValueError:
+        driver.reviewed_by = None
     driver.reviewed_at = datetime.utcnow()
     db.commit()
 
@@ -1124,7 +1023,10 @@ def reject_driver(
 
     driver.status = DriverStatus.TERMINATED
     driver.rejection_note = note
-    driver.reviewed_by = admin.id
+    try:
+        driver.reviewed_by = uuid.UUID(str(admin.id))
+    except ValueError:
+        driver.reviewed_by = None
     driver.reviewed_at = datetime.utcnow()
     db.commit()
 
