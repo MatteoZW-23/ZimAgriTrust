@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 def test_health_check(client: TestClient):
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json()["status"] == "healthy"
+    assert response.json()["status"] == "alive"
 
 def test_get_listings(client: TestClient):
     response = client.get("/api/v1/listings/")

@@ -1,7 +1,19 @@
+import os
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+# Set test environment variables before importing app
+os.environ["SECRET_KEY"] = "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6"
+os.environ["REFRESH_SECRET_KEY"] = "r1s2t3u4v5w6x7y8z9a0b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6"
+os.environ["ADMIN_BOOTSTRAP_TOKEN"] = "test-bootstrap-token-not-default-value"
+os.environ["DATABASE_URL"] = "sqlite:///./test.db"
+os.environ["REDIS_URL"] = "redis://localhost:6379/0"
+os.environ["CORS_ORIGINS"] = "*"
+os.environ["ALLOWED_HOSTS"] = "*"
+os.environ["RATE_LIMIT_ENABLED"] = "false"
+
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
