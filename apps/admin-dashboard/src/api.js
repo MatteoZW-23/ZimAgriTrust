@@ -100,6 +100,33 @@ export function revokeAdminInvitation(id) {
   return request(`/admin/invitations/${id}/revoke`, { method: "DELETE" });
 }
 
+// BROADCAST
+export function createBroadcast({ subject, message, audience, channels, scheduled_for, audience_filter }) {
+  return request("/admin/broadcast", {
+    method: "POST",
+    body: JSON.stringify({ subject, message, audience, channels, scheduled_for, audience_filter }),
+  });
+}
+
+export function fetchBroadcastHistory(limit = 50) {
+  return request(`/admin/broadcast/history?limit=${limit}`);
+}
+
+// AUDIT LOGS
+export function fetchAuditLogs({ limit = 100, offset = 0, action, entity_type, admin_id } = {}) {
+  const qs = new URLSearchParams();
+  qs.set("limit", limit);
+  qs.set("offset", offset);
+  if (action) qs.set("action", action);
+  if (entity_type) qs.set("entity_type", entity_type);
+  if (admin_id) qs.set("admin_id", admin_id);
+  return request(`/admin/audit-logs?${qs.toString()}`);
+}
+
+export function verifyAuditChain(limit = 1000) {
+  return request(`/admin/audit-logs/verify?limit=${limit}`);
+}
+
 export function acceptInvitation({ email, token, password, full_name, phone_number }) {
   return request("/auth/invitation/accept", {
     method: "POST",
@@ -341,27 +368,6 @@ export function overrideDispute(token, disputeId, resolutionType, memo) {
   });
 }
 
-// FARMER / LISTINGS
-export function fetchMyListings(token) {
-  return request("/listings/me", {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-}
-
-export function createListing(token, payload) {
-  return request("/listings", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify(payload),
-  });
-}
-
-export function fetchListingOffers(token, listingId) {
-  return request(`/listings/${listingId}/offers`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-}
-
 export function acceptOffer(token, listingId, offerId) {
   return request(`/listings/${listingId}/offers/${offerId}/accept`, {
     method: "POST",
@@ -415,20 +421,6 @@ export function sendTradeMessage(token, sessionId, payload) {
 // GENERIC / FINANCE
 export function fetchTransactions(token) {
   return request("/transactions", {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-}
-
-export function submitReview(token, orderId, payload) {
-  return request(`/transactions/${orderId}/review`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify(payload),
-  });
-}
-
-export function getOrderReviews(token, orderId) {
-  return request(`/transactions/${orderId}/reviews`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
@@ -641,7 +633,7 @@ export const adjustTrustScore = async (userId, adjustment, reason, token) => {
   });
 };
 
-export function fetchAuditLogs(token) {
+export function fetchSecurityLogs(token) {
   return request("/audit/security-logs", {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -1153,6 +1145,49 @@ export function fetchRecentLogs(token, limit = 50, level = "all") {
 export function fetchVerificationQueue(token, status = "pending") {
   return request(`/verification/queue?status=${status}`, {
     headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+// SUPPLIER MANAGEMENT
+export function fetchPendingSuppliers(token) {
+  return request("/admin/suppliers/pending", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function fetchSupplierDetail(token, supplierId) {
+  return request(`/admin/suppliers/${supplierId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function fetchSupplierDocuments(token, supplierId) {
+  return request(`/admin/suppliers/${supplierId}/documents`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function approveSupplier(token, supplierId, notes) {
+  return request(`/admin/suppliers/${supplierId}/approve`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ notes }),
+  });
+}
+
+export function rejectSupplier(token, supplierId, notes) {
+  return request(`/admin/suppliers/${supplierId}/reject`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ notes }),
+  });
+}
+
+export function suspendSupplier(token, supplierId, notes) {
+  return request(`/admin/suppliers/${supplierId}/suspend`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ notes }),
   });
 }
 

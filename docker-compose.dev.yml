@@ -172,8 +172,8 @@ services:
   # ── Frontend apps (Vite dev servers) ─────────────────────────────────────
   public-website:
     build:
-      context: ./apps/public-website
-      target: development
+      context: .
+      dockerfile: apps/public-website/Dockerfile
     command: npm run dev -- --host 0.0.0.0 --port 3001
     ports:
       - "3001:3001"
@@ -185,8 +185,8 @@ services:
 
   app-portal:
     build:
-      context: ./apps/app-portal
-      target: development
+      context: .
+      dockerfile: apps/app-portal/Dockerfile
     command: npm run dev -- --host 0.0.0.0 --port 3002
     ports:
       - "3002:3002"
@@ -198,8 +198,8 @@ services:
 
   admin-dashboard:
     build:
-      context: ./apps/admin-dashboard
-      target: development
+      context: .
+      dockerfile: apps/admin-dashboard/Dockerfile
     command: npm run dev -- --host 0.0.0.0 --port 3003
     ports:
       - "3003:3003"

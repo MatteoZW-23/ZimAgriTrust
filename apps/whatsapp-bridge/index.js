@@ -23,6 +23,10 @@ const client = new Client({
     qrMaxRetries: 10,
     takeoverOnConflict: true,
     takeoverTimeoutMs: 0,
+    webVersionCache: {
+        type: 'remote',
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1018596000-alpha.html'
+    },
     puppeteer: {
         args: [
             '--no-sandbox',
@@ -39,9 +43,9 @@ const client = new Client({
             '--disable-renderer-backgrounding'
         ],
         headless: true,
-        executablePath: process.platform === 'linux'
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || (process.platform === 'linux'
             ? '/usr/bin/chromium'
-            : 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+            : 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe')
     }
 });
 

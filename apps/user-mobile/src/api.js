@@ -19,7 +19,7 @@ function resolveApiUrl() {
     }
   }
 
-  // Fallback for web or emulator
+  // Fallback for web or emulator - use consistent backend URL
   return (env || 'http://localhost:8080/api/v1').replace(/\/$/, '');
 }
 
@@ -71,6 +71,20 @@ export async function register(payload) {
   return jsonFetch("/auth/register", {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function requestOtp(phone) {
+  return jsonFetch("/auth/request-otp", {
+    method: "POST",
+    body: JSON.stringify({ phone_number: phone }),
+  });
+}
+
+export async function verifyOtp(phone, otp) {
+  return jsonFetch("/auth/verify-otp", {
+    method: "POST",
+    body: JSON.stringify({ phone_number: phone, otp }),
   });
 }
 
@@ -658,5 +672,56 @@ export async function updateLocation(token, latitude, longitude) {
 export async function getRecommendations(token, type = 'listings') {
   return jsonFetch(`/recommendations/${type}`, {
     headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+// ── Supplier Products (Buyer Facing) ────────────────────────────────────────────
+
+export async function getSupplierProducts(params = {}) {
+  const query = Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== null && value !== "")
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+    .join("&");
+  const suffix = query ? `?${query}` : "";
+  return jsonFetch(`/suppliers/public/products${suffix}`);
+}
+
+export async function getSupplierProductDetail(productId) {
+  return jsonFetch(`/suppliers/public/products/${productId}`);
+}
+
+export async function createSupplierOrder(token, payload) {
+  return jsonFetch('/suppliers/public/orders', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getSupplierOrders(token, status = null) {
+  const suffix = status ? `?status=${status}` : '';
+  return jsonFetch(`/suppliers/orders${suffix}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function getSupplierOrderDetail(token, orderId) {
+  return jsonFetch(`/suppliers/orders/${orderId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function confirmSupplierOrderReceipt(token, orderId) {
+  return jsonFetch(`/suppliers/orders/${orderId}/confirm-receipt`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function rateSupplier(token, orderId, rating, review) {
+  return jsonFetch(`/suppliers/orders/${orderId}/rate`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ rating, review }),
   });
 }

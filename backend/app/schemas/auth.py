@@ -22,6 +22,9 @@ class UserResponse(BaseModel):
     is_suspended: bool
     must_change_password: bool = False
 
+    # Agent status (trainee / active / busy / offline — None for non-agents)
+    agent_status: Optional[str] = None
+
     # Location
     province: Optional[str] = None
     district: Optional[str] = None

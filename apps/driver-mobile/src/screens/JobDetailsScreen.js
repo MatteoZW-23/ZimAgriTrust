@@ -4,11 +4,12 @@ import {
   SafeAreaView, Alert, ActivityIndicator,
 } from 'react-native';
 import {
-  ArrowLeft as IconArrowLeft, MapPin as IconMapPin, 
-  Navigation as IconNavigation, Package as IconPackage, 
-  Truck as IconTruck, Clock as IconClock, 
-  DollarSign as IconDollarSign, Wheat as IconWheat, 
-  CheckCircle as IconCheckCircle,
+  ArrowLeft as IconArrowLeft, MapPin as IconMapPin,
+  Navigation as IconNavigation, Package as IconPackage,
+  Truck as IconTruck, Clock as IconClock,
+  DollarSign as IconDollarSign, Wheat as IconWheat,
+  CheckCircle as IconCheckCircle, Phone as IconPhone,
+  User as IconUser, Fuel as IconFuel, TrendingUp as IconTrendingUp,
 } from 'lucide-react-native';
 import { theme } from '../styles';
 import { acceptJob } from '../api';
@@ -82,6 +83,86 @@ export default function JobDetailsScreen({ route, navigation }) {
                 <Text style={styles.routeLocation}>{job.delivery_location || 'TBD'}</Text>
               </View>
             </View>
+          </View>
+        </View>
+
+        {/* Pickup Section */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <IconMapPin size={18} color={theme.colors.sky} />
+            <Text style={styles.sectionTitle}>Pickup Details</Text>
+          </View>
+          <View style={styles.contactRow}>
+            <View style={styles.contactItem}>
+              <IconUser size={14} color="#666" />
+              <Text style={styles.contactText}>{job.pickup_contact_name || 'Contact on arrival'}</Text>
+            </View>
+            <TouchableOpacity style={styles.contactItem}>
+              <IconPhone size={14} color={theme.colors.sky} />
+              <Text style={[styles.contactText, styles.contactPhone]}>{job.pickup_phone || 'Call on arrival'}</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.addressBox}>
+            <Text style={styles.addressLabel}>Address</Text>
+            <Text style={styles.addressText}>{job.pickup_address || job.pickup_location || 'TBD'}</Text>
+          </View>
+          {job.pickup_instructions && (
+            <View style={styles.instructionsBox}>
+              <Text style={styles.instructionsLabel}>Special Instructions</Text>
+              <Text style={styles.instructionsText}>{job.pickup_instructions}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Delivery Section */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <IconTruck size={18} color="#4CAF50" />
+            <Text style={styles.sectionTitle}>Delivery Details</Text>
+          </View>
+          <View style={styles.contactRow}>
+            <View style={styles.contactItem}>
+              <IconUser size={14} color="#666" />
+              <Text style={styles.contactText}>{job.delivery_contact_name || 'Contact on arrival'}</Text>
+            </View>
+            <TouchableOpacity style={styles.contactItem}>
+              <IconPhone size={14} color={theme.colors.sky} />
+              <Text style={[styles.contactText, styles.contactPhone]}>{job.delivery_phone || 'Call on arrival'}</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.addressBox}>
+            <Text style={styles.addressLabel}>Address</Text>
+            <Text style={styles.addressText}>{job.delivery_address || job.delivery_location || 'TBD'}</Text>
+          </View>
+          {job.delivery_instructions && (
+            <View style={styles.instructionsBox}>
+              <Text style={styles.instructionsLabel}>Special Instructions</Text>
+              <Text style={styles.instructionsText}>{job.delivery_instructions}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Earnings Breakdown */}
+        <View style={styles.earningsCard}>
+          <View style={styles.sectionHeader}>
+            <IconTrendingUp size={18} color="#16a34a" />
+            <Text style={styles.sectionTitle}>Earnings Breakdown</Text>
+          </View>
+          <View style={styles.earningsRow}>
+            <Text style={styles.earningsLabel}>Base Payment</Text>
+            <Text style={styles.earningsValue}>${job.payment_amount || 0}</Text>
+          </View>
+          <View style={styles.earningsRow}>
+            <Text style={styles.earningsLabel}>Distance Rate</Text>
+            <Text style={styles.earningsValue}>${perKm || '0.00'}/km</Text>
+          </View>
+          <View style={styles.earningsRow}>
+            <Text style={styles.earningsLabel}>Est. Fuel Cost</Text>
+            <Text style={[styles.earningsValue, styles.earningsDeduction]}>-${((job.distance_km || 0) * 0.15).toFixed(2)}</Text>
+          </View>
+          <View style={[styles.earningsRow, styles.earningsTotal]}>
+            <Text style={styles.earningsTotalLabel}>Net Earnings</Text>
+            <Text style={styles.earningsTotalValue}>${((job.payment_amount || 0) - ((job.distance_km || 0) * 0.15)).toFixed(2)}</Text>
           </View>
         </View>
 
@@ -225,6 +306,35 @@ const styles = StyleSheet.create({
   routeStop: {},
   routeStopLabel: { fontSize: 10, fontWeight: '700', color: '#BBB', letterSpacing: 1 },
   routeLocation: { fontSize: 16, fontWeight: '700', color: theme.colors.dark, marginTop: 3 },
+
+  sectionCard: {
+    marginHorizontal: 20, marginTop: 16, backgroundColor: '#FFF',
+    borderRadius: 20, padding: 20, ...theme.shadows.xs, borderWidth: 1, borderColor: '#F0F0F0',
+  },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+  sectionTitle: { fontSize: 15, fontWeight: '800', color: theme.colors.dark },
+  contactRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
+  contactItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  contactText: { fontSize: 13, fontWeight: '600', color: '#666' },
+  contactPhone: { color: theme.colors.sky },
+  addressBox: { backgroundColor: '#F8F9FA', borderRadius: 12, padding: 14, marginBottom: 12 },
+  addressLabel: { fontSize: 10, fontWeight: '700', color: '#999', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+  addressText: { fontSize: 14, fontWeight: '600', color: theme.colors.dark, lineHeight: 20 },
+  instructionsBox: { backgroundColor: '#FFF7ED', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#FFEDD5' },
+  instructionsLabel: { fontSize: 10, fontWeight: '700', color: '#C2410C', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+  instructionsText: { fontSize: 13, fontWeight: '600', color: '#9A3412', lineHeight: 18 },
+
+  earningsCard: {
+    marginHorizontal: 20, marginTop: 16, backgroundColor: '#F0FDF4',
+    borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#BBF7D0',
+  },
+  earningsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
+  earningsLabel: { fontSize: 13, fontWeight: '600', color: '#374151' },
+  earningsValue: { fontSize: 15, fontWeight: '800', color: '#374151' },
+  earningsDeduction: { color: '#DC2626' },
+  earningsTotal: { marginTop: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#BBF7D0' },
+  earningsTotalLabel: { fontSize: 14, fontWeight: '800', color: '#16a34a' },
+  earningsTotalValue: { fontSize: 20, fontWeight: '900', color: '#16a34a' },
 
   detailsGrid: {
     flexDirection: 'row', flexWrap: 'wrap',

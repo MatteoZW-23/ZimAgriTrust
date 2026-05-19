@@ -222,7 +222,7 @@ export default function UserDirectoryPanel({ users = [], token, onGovernance, pr
              <div className="hero-actions">
                 {isAdmin && (
                   <button className="q-btn primary-btn small" onClick={() => setShowEnrollModal(true)}>
-                      <i className="fas fa-user-plus"></i> Enroll Agent
+                      <i className="fas fa-user-plus"></i> Quick Enroll
                   </button>
                 )}
                 <button className="q-btn ghost small" onClick={handleExport}>
@@ -387,9 +387,9 @@ export default function UserDirectoryPanel({ users = [], token, onGovernance, pr
                   <button className="v4-close-btn" onClick={() => setShowEnrollModal(false)} style={{ position: 'absolute', top: '40px', right: '40px', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer' }}>✕</button>
                                    <div style={{ padding: '24px' }}>
                       <div style={{ marginBottom: '24px' }}>
-                          <span className="prio-tag" style={{ background: 'rgba(59,130,246,0.2)', color: '#3b82f6', fontSize: '9px', fontWeight: 1000, padding: '3px 10px', borderRadius: '4px' }}>STAKEHOLDER_ENROLLMENT</span>
-                          <h2 style={{ fontSize: '24px', fontWeight: 1000, color: '#fff', margin: '8px 0 4px 0', letterSpacing: '-0.02em' }}>Enroll Authorized Stakeholder</h2>
-                          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>Registering regional personnel into the national verification network.</p>
+                          <span className="prio-tag" style={{ background: 'rgba(59,130,246,0.2)', color: '#3b82f6', fontSize: '9px', fontWeight: 1000, padding: '3px 10px', borderRadius: '4px' }}>QUICK_ENROLLMENT</span>
+                          <h2 style={{ fontSize: '24px', fontWeight: 1000, color: '#fff', margin: '8px 0 4px 0', letterSpacing: '-0.02em' }}>Quick Enroll User</h2>
+                          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>Create an account directly for a known stakeholder. For formal agent onboarding, use the Recruitment pipeline.</p>
                       </div>
 
                       <form onSubmit={e => { e.preventDefault(); handleEnroll(); }} className="v4-form-compact">

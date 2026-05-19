@@ -29,6 +29,10 @@ function applyAgent(payload) {
   });
 }
 
+function checkApplicationStatus(phone) {
+  return request(`/recruitment/my-status/${encodeURIComponent(phone)}`);
+}
+
 function fileToDocument(file) {
   if (!file) return Promise.resolve(null);
   return new Promise((resolve, reject) => {

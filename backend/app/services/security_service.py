@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Tuple, Dict, List
 import uuid
 
-from jose import jwt, JWTError, ExpiredSignatureError
+from jose import jwt
 from passlib.context import CryptContext
 import qrcode
 import io
@@ -21,12 +21,13 @@ from sqlalchemy import and_, or_
 
 from app.core.config import settings
 from app.models.user import User
-from app.models.session import UserSession
 from app.models.security_enhanced import (
-    PINHistory, PINLockout, PINAttempt, TokenBlacklist, TokenType,
-    MFAConfiguration, MFAStatus, MFAAttempt, MFAMethod, AuditLog, AuditLogAction,
-    SecurityThreat, RateLimit, RateLimitKey, PasswordHistory, BreachedCredential
+    PINHistory, PINLockout, PINAttempt,
+    TokenBlacklist, TokenType, MFAConfiguration, MFAStatus, MFAAttempt,
+    MFAMethod, SecurityAuditLog, AuditLogAction, SecurityThreat, RateLimit, RateLimitKey,
+    PasswordHistory, BreachedCredential
 )
+from app.models.session import UserSession
 
 
 # ============================================================================
@@ -241,7 +242,7 @@ class SessionManager:
                 UserSession.expires_at > datetime.utcnow(),
             )
         ).count()
-
+        
         if active_sessions >= max_sessions:
             # Terminate oldest session
             oldest_session = db.query(UserSession).filter(
@@ -250,15 +251,15 @@ class SessionManager:
                     UserSession.is_active == True,
                 )
             ).order_by(UserSession.created_at).first()
-
+            
             if oldest_session:
                 oldest_session.is_active = False
                 oldest_session.revoked_at = datetime.utcnow()
                 oldest_session.revoke_reason = 'max_sessions_exceeded'
                 db.commit()
-
+            
             return True
-
+        
         return False
     
     @staticmethod
@@ -416,9 +417,9 @@ class TokenManager:
                 return None
             
             return payload
-        except ExpiredSignatureError:
+        except jwt.ExpiredSignatureError:
             return None
-        except JWTError:
+        except jwt.InvalidTokenError:
             return None
     
     @staticmethod

@@ -1,3 +1,6 @@
+from app.models.admin import AdminUser, AdminRole
+from app.models.broadcast import BroadcastMessage, BroadcastStatus, BroadcastAudience
+from app.models.audit_log import AuditLog
 from app.models.user import User, UserRole, FarmerProfile, BuyerProfile, AgentProfile
 from app.models.listing import Listing, ListingStatus, Offer, OfferStatus, Sector
 from app.models.transaction import Order, OrderStatus, Transaction, TransactionType
@@ -14,7 +17,25 @@ from app.models.system_config import SystemConfig, ConfigGroup
 from app.models.notification_template import NotificationTemplate, TemplateChannel
 from app.models.ml_metadata import ModelVersion, MLJobLog, MLPrediction, MLInsight
 from app.models.academy import AgentTraining, AcademyModule, ExamAttempt
+from app.models.classroom import (
+    Course, CourseTopic, Resource, QuizQuestion, Enrollment,
+    TopicProgress, QuizAttempt, EssayAnswer, Announcement,
+    EnrollmentStatus, ResourceType, QuestionType
+)
 from app.models.review import TradeReview
+from app.models.session import UserSession
+from app.models.logistics import OrderDelivery, LogisticsTrip, AggregationBooking, DeliveryStatus, TripStatus
+from app.models.security_enhanced import (
+    MFAConfiguration,
+    MFAAttempt,
+    MFAMethod,
+    MFAStatus,
+    RateLimit,
+    RateLimitKey,
+    NotificationPreference as EnhancedNotificationPreference,
+    NotificationChannel,
+    NotificationCategory,
+)
 from app.models.listing_extras import (
     SavedListing,
     ListingReport,
@@ -67,6 +88,15 @@ from app.models.security import (
     UserTier,
     AdminActionLog,
 )
+from app.models.verification import (
+    VerificationStatus,
+    DocumentType,
+    ReviewerRole,
+    DocumentVerificationRecord,
+    UserVerificationSummary,
+    VerificationQueue,
+    VerificationAuditLog,
+)
 from app.models.rbac import (
     Role,
     Permission,
@@ -74,8 +104,28 @@ from app.models.rbac import (
     Invitation,
     InvitationStatus,
 )
+from app.models.supplier import (
+    SupplierProfile,
+    SupplierDocument,
+    SupplierProduct,
+    SupplierOrder,
+    SupplierOrderItem,
+    SupplierStockHistory,
+    SupplierWalletTransaction,
+    SupplierBusinessType,
+    SupplierVerificationStatus,
+    SupplierProductType,
+    InputCategory as SupplierInputCategory,
+    MachineryCategory,
+    ProductCondition,
+    SupplierProductStatus,
+    SupplierOrderStatus,
+    SupplierPaymentStatus,
+    SupplierWalletTxnType,
+)
 
 __all__ = [
+    "AdminUser", "AdminRole", "BroadcastMessage", "BroadcastStatus", "BroadcastAudience", "AuditLog",
     "User", "UserRole", "FarmerProfile", "BuyerProfile", "AgentProfile",
     "Listing", "ListingStatus", "Offer", "OfferStatus", "Sector",
     "Order", "OrderStatus", "Transaction", "TransactionType",
@@ -89,7 +139,14 @@ __all__ = [
     "AgentApplication", "ApplicationStatus",
     "OnboardingPhase", "TrainingModule", "AgentTrainingProgress", "AgentContract", "ShadowingLog",
     "AgentTraining", "AcademyModule", "ExamAttempt",
+    "Course", "CourseTopic", "Resource", "QuizQuestion", "Enrollment",
+    "TopicProgress", "QuizAttempt", "EssayAnswer", "Announcement",
+    "EnrollmentStatus", "ResourceType", "QuestionType",
     "TradeReview",
+    "UserSession",
+    "OrderDelivery", "LogisticsTrip", "AggregationBooking", "DeliveryStatus", "TripStatus",
+    "MFAConfiguration", "MFAAttempt", "MFAMethod", "MFAStatus", "RateLimit", "RateLimitKey",
+    "EnhancedNotificationPreference", "NotificationChannel", "NotificationCategory",
     "SystemConfig", "ConfigGroup",
     "NotificationTemplate", "TemplateChannel",
     "ModelVersion", "MLJobLog", "MLPrediction", "MLInsight",
@@ -98,6 +155,13 @@ __all__ = [
     "SuperAdmin", "AdminApproval", "ApprovalStatus", "ApprovalAction", "AdminLevel",
     "AuditChecksum", "FraudAlert", "FraudAlertType", "FraudSeverity",
     "WithdrawalLimit", "UserTier", "AdminActionLog",
+    "VerificationStatus",
+    "DocumentType",
+    "ReviewerRole",
+    "DocumentVerificationRecord",
+    "UserVerificationSummary",
+    "VerificationQueue",
+    "VerificationAuditLog",
     "PaymentMethod", "DepositIntent", "DepositChannel", "DepositIntentStatus",
     "AutoDepositRule", "RecurringDepositSchedule", "RecurrenceCadence",
     "DepositRefundRequest", "RefundStatus", "DepositLimit",
@@ -105,5 +169,11 @@ __all__ = [
     "InputOffer", "InputOfferStatus", "InputOrder", "InputOrderStatus",
     "InputReport", "InputReportReason", "InputReportStatus", "InputPriceAlert",
     "Role", "Permission", "RolePermission", "Invitation", "InvitationStatus",
+    "SupplierProfile", "SupplierDocument", "SupplierProduct", "SupplierOrder",
+    "SupplierOrderItem", "SupplierStockHistory", "SupplierWalletTransaction",
+    "SupplierBusinessType", "SupplierVerificationStatus", "SupplierProductType",
+    "SupplierInputCategory", "MachineryCategory", "ProductCondition",
+    "SupplierProductStatus", "SupplierOrderStatus", "SupplierPaymentStatus",
+    "SupplierWalletTxnType",
 ]
 

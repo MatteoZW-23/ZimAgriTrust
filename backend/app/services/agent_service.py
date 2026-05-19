@@ -42,6 +42,10 @@ class AgentService:
             if not payload.exists:
                 listing.status = ListingStatus.SUSPENDED
             
+            # Track which agent verified for commission calculation
+            listing.verified_by_agent_id = assignment.agent_id
+            listing.verified_by_ai = False
+            
             # Update quantity and grade if agent provided new info
             listing.quantity = payload.verified_quantity
             listing.grade = payload.matching_grade
@@ -89,6 +93,8 @@ class AgentService:
         if order:
             if payload.is_complete:
                 order.status = OrderStatus.DELIVERED
+                # Track which agent fulfilled for commission calculation
+                order.fulfilled_by_agent_id = assignment.agent_id
             else:
                 order.status = OrderStatus.DISPUTED # If agent flags issues
 

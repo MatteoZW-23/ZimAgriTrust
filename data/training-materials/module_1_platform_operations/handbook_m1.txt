@@ -1,95 +1,691 @@
-ZimAgritrust Module 1: Platform Operations (Core)
-========================================
+================================================================================
+                    ZIMAGRITRUST AGENT TRAINING ACADEMY
+                          MODULE 1: PLATFORM OPERATIONS
+                                AGENT HANDBOOK
+================================================================================
 
-Welcome to the ZimAgritrust Academy. This handbook provides the core operational protocols required for all Field Agents.
+Version: 1.0
+Effective Date: 2026
+Copyright: ZimAgriTrust Sovereign Ledger Group. All Rights Reserved.
 
-1.1 Mission: Sovereign Trust in Agricultural Trade
---------------------------------------------------
-Our mission is to eliminate the 'trust deficit' that plagues rural agricultural markets. In most developing regions, farmers lack access to fair markets and finance because there is no reliable way to verify their yield or quality without expensive intermediaries.
 
-ZimAgritrust solves this through:
-* Sovereign Identity: Giving every farmer a verified digital twin.
-* Verifiable Proof: Using field agents (you) to provide ground-truth data.
-* Smart Escrow: Ensuring payment is only released when quality is confirmed.
+================================================================================
+1.1 MISSION: SOVEREIGN TRUST IN AGRICULTURAL TRADE
+================================================================================
 
-1.2 The ZimAgritrust Tech Stack
-----------------------------
-ZimAgritrust is a multi-layered infrastructure designed for low-connectivity environments:
-1. Core Backend: A FastAPI-driven engine that handles the ledger, escrow, and user management.
-2. Agent Portal (Your Interface): A high-performance web application designed for mobile devices in the field.
-3. Farmer Interface: Primarily USSD and WhatsApp-based.
-4. IoT Gateway: Automated sensors in warehouses.
-5. ML Intelligence: AI models that analyze crop photos.
+Our mission is to eliminate the 'trust deficit' that plagues rural agricultural
+markets. In most developing regions, farmers lack access to fair markets and
+finance because there is no reliable way to verify their yield or quality
+without expensive intermediaries.
 
-1.3 User Roles & Responsibilities
----------------------------------
-* Farmers: The producers. They list crops and request verification.
-* Agents (You): The Verifiers. You are the ONLY source of truth for the digital system.
-* Buyers: Wholesalers who purchase listed crops.
-* Administrators: Global monitors who handle disputes.
+ZimAgriTrust solves this through:
 
-1.4 The 6 Steps of an ZimAgritrust Trade
--------------------------------------
-1. Listing: Farmer lists crops via WhatsApp.
-2. Commitment: Buyer deposits 100% of the value into the Sovereign Escrow Pool.
-3. Verification: Agent receive a notification and travels to the farm.
-4. Grading: Agent assigns a Grade based on moisture and purity.
-5. Delivery: The crop is moved to a certified warehouse.
-6. Settlement: Escrow System automatically releases funds.
++---------------------+--------------------------------------------------------+
+| Solution            | Description                                            |
++---------------------+--------------------------------------------------------+
+| Sovereign Identity  | Giving every farmer a verified digital twin           |
+| Verifiable Proof    | Using field agents (you) to provide ground-truth data |
+| Smart Escrow        | Ensuring payment is only released when quality is     |
+|                     | confirmed                                              |
++---------------------+--------------------------------------------------------+
 
-1.5 Platform Policies
----------------------
-* Zero Tolerance for Bribery: Accepting gifts results in immediate permanent ban.
-* Data Privacy: Farmer contact details must never be shared outside the platform.
-* Timeliness: Verification requests must be actioned within 24 hours.
-* Accuracy: Intentional misreporting of weight is considered fraud.
 
-1.6 Core Agent Functions (What you actually do)
-----------------------------------------------
-### 🎯 CORE FUNCTIONS
-1. VERIFY LISTINGS: Visit farms, confirm crops, check quantity/quality, and submit reports.
-2. CONFIRM DELIVERIES: Witness handovers, verify matches, and mark as delivered.
-3. RESOLVE DISPUTES: Review evidence, interview parties, and recommend resolutions.
-4. SUPPORT FARMERS: Help with registration, USSD usage, and listing creation.
-5. VERIFY LOANS: Confirm identity and assesses farm viability for financial services.
+================================================================================
+1.2 THE ZIMAGRITRUST TECH STACK
+================================================================================
 
-### 📊 QUICK SUMMARY
-* Listing Verification: 🔴 HIGH PRIORITY
-* Delivery Confirmation: 🔴 HIGH PRIORITY
-* Dispute Resolution: 🔴 HIGH PRIORITY
-* Farmer Support: 🟡 MEDIUM PRIORITY
-* Loan Verification: 🟢 LOW PRIORITY
+ZimAgriTrust is a multi-layered infrastructure designed for low-connectivity
+environments:
 
-1.7 WhatsApp AI Agent Assistant
--------------------------------
++------------------+------------------------+------------------------------------+
+| Layer            | Technology             | Purpose                            |
++------------------+------------------------+------------------------------------+
+| Core Backend     | FastAPI                | Ledger, escrow, user management    |
+| Agent Portal     | High-performance web   | Your field interface               |
+|                  | app                    | (mobile-friendly)                  |
+| Farmer Interface | USSD + WhatsApp        | Access for basic phone users       |
+| IoT Gateway      | Automated sensors      | Warehouse monitoring               |
+| ML Intelligence  | AI models              | Crop photo analysis                |
++------------------+------------------------+------------------------------------+
 
-# 🤖 WHATSAPP BOT AS AN AI AGENT – Balancing All Duties
 
-The WhatsApp bot is **ONE AI agent** that performs **multiple roles simultaneously**. It is your 24/7 technical partner in the field.
+================================================================================
+1.3 USER ROLES & RESPONSIBILITIES
+================================================================================
 
-### 📋 THE AI ASSISTANT CONCEPT
-The bot acts as a support system for Farmers, Buyers, Admins, and most importantly, YOU (The Agent). It handles routine data collection and alerts, allowing you to focus on physical verification and judgment.
++------------------+---------------------+--------------------------------------+
+| Role             | Description         | Key Responsibility                   |
++------------------+---------------------+--------------------------------------+
+| Farmers          | The producers       | List crops and request verification  |
+| Agents (You)     | The Verifiers       | ONLY source of truth for digital     |
+|                  |                     | system                               |
+| Buyers           | Wholesalers         | Purchase listed crops                |
+| Administrators   | Global monitors     | Handle disputes and platform         |
+|                  |                     | oversight                            |
++------------------+---------------------+--------------------------------------+
 
-### 🎯 HOW THE BOT SUPPORTS YOU
-| Function | Description |
-|----------|-------------|
-| **Task Assignment** | Alerts you instantly: "New verification task assigned to you." |
-| **Field Guidance** | Provides checklists: "Step 1: Take crop photo. Step 2: Verify quantity..." |
-| **Evidence Hub** | Collects photos/docs from parties during a dispute to save you time. |
-| **Earnings Tracking** | View your commissions instantly by asking the bot. |
-| **Navigation** | Send 'location' to get directions to a registered farm. |
 
-### 🧠 INTENT DETECTION
-The bot uses AI to understand user messages across Shona, Ndebele, and English. It can handle a Farmer's price check, a Buyer's search, and your task query all at the same time without mixing up the conversations.
+================================================================================
+1.4 THE 6 STEPS OF A ZIMAGRITRUST TRADE
+================================================================================
 
-### ✅ WHAT THE BOT DOES VS WHAT YOU DO
-* **WhatsApp Bot**: Handles 80% of routine inquiries, price checks, and data entry.
-* **Human Agent (You)**: Handles the physical reality—touching the grain, witnessing the delivery, and making the final decision in complex disputes.
+STEP 1: LISTING
+---------------
+Farmer lists crops via WhatsApp or USSD
+-> System creates digital record of offer
+-> Agent receives notification
 
----
+STEP 2: COMMITMENT
+------------------
+Buyer deposits 100% of value into Sovereign Escrow Pool
+-> Funds frozen in trust account
+-> Transaction secured
 
+STEP 3: VERIFICATION (YOUR ROLE)
+--------------------------------
+Agent receives notification and travels to farm
+-> Physical inspection performed
+-> Evidence collected
+-> Report submitted
+
+STEP 4: GRADING (YOUR ROLE)
+---------------------------
+Agent assigns Grade based on:
+-> Moisture content
+-> Purity percentage
+-> Visual quality assessment
+
+STEP 5: DELIVERY
+----------------
+Crop is moved to certified warehouse
+-> Chain of custody recorded
+-> Delivery confirmed
+
+STEP 6: SETTLEMENT
+------------------
+Escrow system automatically releases funds
+-> Platform fee deducted
+-> Farmer paid
+-> Trust scores updated
+
+
+================================================================================
+1.5 PLATFORM POLICIES
+================================================================================
+
++---------------------+------------------------------------------------+--------------------------------+
+| Policy              | Rule                                           | Consequence of Violation       |
++---------------------+------------------------------------------------+--------------------------------+
+| Bribery             | Zero Tolerance                                 | Immediate permanent ban        |
+| Data Privacy        | Farmer contact details never shared outside   | Termination + legal action     |
+|                     | platform                                       |                                |
+| Timeliness          | Verification requests actioned within 24      | Reduced trust score + lower    |
+|                     | hours                                          | priority                       |
+| Accuracy            | Intentional misreporting of weight is fraud   | Permanent ban + financial      |
+|                     |                                                | penalty                        |
+| Confidentiality     | Do not disclose dispute details publicly      | Warning then suspension        |
++---------------------+------------------------------------------------+--------------------------------+
+
+
+================================================================================
+1.6 CORE AGENT FUNCTIONS (WHAT YOU ACTUALLY DO)
+================================================================================
+
+PRIMARY FUNCTIONS:
+
++----------------------+----------+------------------------------------------------+------------------+
+| Function             | Priority | Description                                    | Typical Time     |
++----------------------+----------+------------------------------------------------+------------------+
+| VERIFY LISTINGS      | HIGH     | Visit farms, confirm crops, check             | 30-60 minutes    |
+|                      |          | quantity/quality, submit reports              |                  |
+| CONFIRM DELIVERIES   | HIGH     | Witness handovers, verify matches, mark as    | 15-30 minutes    |
+|                      |          | delivered                                      |                  |
+| RESOLVE DISPUTES     | HIGH     | Review evidence, interview parties, recommend | 1-2 hours        |
+|                      |          | resolutions                                    |                  |
+| SUPPORT FARMERS      | MEDIUM   | Help with registration, USSD usage, listing   | 10-20 minutes    |
+|                      |          | creation                                       |                  |
+| VERIFY LOANS         | LOW      | Confirm identity, assess farm viability for   | 20-40 minutes    |
+|                      |          | financial services                             |                  |
++----------------------+----------+------------------------------------------------+------------------+
+
+
+AGENT DAILY WORKFLOW:
+
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                    AGENT DAILY WORKFLOW                         │
+    ├─────────────────────────────────────────────────────────────────┤
+    │                                                                 │
+    │  08:00 ───► Check WhatsApp for new task assignments            │
+    │            └── Accept highest priority task                    │
+    │                                                                 │
+    │  08:30 ───► Travel to farm location                            │
+    │            └── Use 'location' command for directions           │
+    │                                                                 │
+    │  09:00 ───► Perform verification                               │
+    │            ├── Take crop photos                                │
+    │            ├── Test moisture (if equipment available)          │
+    │            ├── Estimate quantity                               │
+    │            └── Submit report via Agent Portal                  │
+    │                                                                 │
+    │  12:00 ───► Check for dispute assignments                      │
+    │            └── Review evidence, contact parties                │
+    │                                                                 │
+    │  15:00 ───► Verify delivery confirmations                      │
+    │            └── Witness handover if requested                   │
+    │                                                                 │
+    │  17:00 ───► Submit end-of-day report                           │
+    │            └── Check earnings via WhatsApp bot                 │
+    │                                                                 │
+    └─────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+1.7 WHATSAPP AI AGENT ASSISTANT
+================================================================================
+
+THE AI ASSISTANT CONCEPT
+------------------------
+The bot acts as a support system for Farmers, Buyers, Admins, and most
+importantly, YOU (The Agent). It handles routine data collection and alerts,
+allowing you to focus on physical verification and judgment.
+
+HOW THE BOT SUPPORTS YOU:
+
++------------------+------------------------------------------------+----------------------------------+
+| Function         | What the Bot Does                              | Example                          |
++------------------+------------------------------------------------+----------------------------------+
+| Task Assignment  | Alerts you instantly about new tasks           | "New verification task assigned  |
+|                  |                                                | to you. Farmer: Tendai Moyo,     |
+|                  |                                                | 5km away."                       |
+| Field Guidance   | Provides step-by-step checklists               | "Step 1: Take crop photo. Step 2:|
+|                  |                                                | Verify quantity. Step 3: Test    |
+|                  |                                                | moisture..."                     |
+| Evidence Hub     | Collects photos/docs from parties during       | Saves you from chasing evidence  |
+|                  | disputes                                       | yourself                         |
+| Earnings         | View your commissions instantly                | "Your balance: $86.00. Withdraw  |
+| Tracking         |                                                | now?"                            |
+| Navigation       | Get directions to farm location                | Send 'location' command for      |
+|                  |                                                | Google Maps link                 |
++------------------+------------------------------------------------+----------------------------------+
+
+INTENT DETECTION
+----------------
+The bot uses AI to understand user messages across Shona, Ndebele, and English.
+It can handle multiple conversation types simultaneously without mixing them up.
+
++------------------+------------------------+-----------------------------------+
+| User Type        | Example Message        | Bot Understands                   |
++------------------+------------------------+-----------------------------------+
+| Farmer (Shona)   | "Ndoda kutengesa       | Wants to sell maize               |
+|                  | chibage"               |                                   |
+| Buyer (Ndebele)  | "Ngifuna ukuthenga     | Wants to buy maize                |
+|                  | umumbu"                |                                   |
+| Agent (English)  | "Show me my pending    | Requests task list                |
+|                  | tasks"                 |                                   |
++------------------+------------------------+-----------------------------------+
+
+WHAT THE BOT DOES VS WHAT YOU DO:
+
++---------------------+--------------------------------+-------------------------------------+
+| Aspect              | WhatsApp Bot                   | Human Agent (You)                   |
++---------------------+--------------------------------+-------------------------------------+
+| Routine inquiries   | Handles 80%                    | Not needed                          |
+| Price checks        | Instant responses              | Not needed                          |
+| Data entry          | Automated                      | Not needed                          |
+| Physical inspection | Cannot do                      | YOU do this                         |
+| Touching the grain  | Cannot do                      | YOU do this                         |
+| Witnessing delivery | Cannot do                      | YOU do this                         |
+| Complex dispute     | Cannot do                      | YOU do this                         |
+| decisions           |                                |                                     |
+| Final judgment      | Cannot do                      | YOU do this                         |
+| calls               |                                |                                     |
++---------------------+--------------------------------+-------------------------------------+
+
+
+================================================================================
+1.8 AGENT EARNINGS SUMMARY
+================================================================================
+
+EARNING STREAMS:
+
++----------------------+-----------------+--------------------------------------+------------------+
+| Activity             | Base Pay        | Bonus Conditions                     | Max Per Task     |
++----------------------+-----------------+--------------------------------------+------------------+
+| Listing Verification | $0.50 - $3.00   | Fast completion (+$0.50),            | $4.50            |
+|                      |                 | High value (+$1.00)                  |                  |
+| Dispute Resolution   | $1.00 - $3.00   | Quick resolution (+$1.00),           | $6.50            |
+|                      |                 | Complex (+$3.00)                     |                  |
+| Referral Bonus       | $5.00           | New farmer completes first sale      | $5.00            |
+| Weekly Performance   | $60 max         | Accuracy (>95%), Speed (<24h),       | $60              |
+|                      |                 | Rating (>=4.8)                       |                  |
+| Training Completion  | $70 one-time    | Pass all modules and final exam      | $70              |
++----------------------+-----------------+--------------------------------------+------------------+
+
+TIER MULTIPLIERS:
+
++------------------+-----------------+-------------------+
+| Tier             | Trust Score     | Fee Multiplier    |
++------------------+-----------------+-------------------+
+| Trainee          | 0-49            | 0.5x              |
+| Junior           | 50-69           | 0.75x             |
+| Senior           | 70-89           | 1.0x              |
+| Master           | 90-100          | 1.5x              |
++------------------+-----------------+-------------------+
+
+
+================================================================================
+1.9 COMMON AGENT COMMANDS (WHATSAPP)
+================================================================================
+
++----------------------+-----------------------------------------------+
+| Command              | Purpose                                       |
++----------------------+-----------------------------------------------+
+| tasks                | View pending verification assignments        |
+| accept [task_id]     | Accept a verification task                    |
+| submit [task_id]     | Submit verification report                    |
+| disputes             | View assigned disputes                        |
+| evidence [dispute_id]| Upload evidence for dispute                   |
+| earnings             | Check current balance                         |
+| withdraw [amount]    | Request withdrawal to EcoCash                 |
+| location [farmer_id] | Get directions to farm                        |
+| help                 | Show all available commands                   |
++----------------------+-----------------------------------------------+
+
+
+================================================================================
 FINAL SUMMARY
--------------
-Field Agents are the 'Ground Truth' for ZimAgritrust. You are responsible for ensuring that the digital records in our cloud match the physical reality on the farm. By mastering the platform operations, adhering to the code of conduct, and leveraging your WhatsApp AI assistant, you ensure the success and integrity of Zimbabwe's agricultural marketplace.
+================================================================================
 
-Copyright 2026 ZimAgritrust Sovereign Ledger Group. All Rights Reserved.
+Field Agents are the 'GROUND TRUTH' for ZimAgriTrust. You are responsible for
+ensuring that the digital records in our cloud match the physical reality on
+the farm.
+
+YOUR CORE RESPONSIBILITIES:
+1. Verify listings through physical farm visits
+2. Witness deliveries and confirm matches
+3. Resolve disputes by reviewing evidence and interviewing parties
+4. Support farmers with platform usage
+5. Maintain integrity through accurate reporting
+
+YOUR TOOLS:
+- Agent Portal (web-based dashboard)
+- WhatsApp AI Assistant (24/7 support)
+- Mobile phone with camera
+
+YOUR EARNINGS:
+- Verification fees ($0.50 - $4.50 per listing)
+- Dispute resolution fees ($1.00 - $6.50 per dispute)
+- Weekly performance bonuses (up to $60/week)
+- Referral bonuses ($5 per new active farmer)
+
+By mastering the platform operations, adhering to the code of conduct, and
+leveraging your WhatsApp AI assistant, you ensure the success and integrity of
+Zimbabwe's agricultural marketplace.
+
+
+================================================================================
+CONTACT & SUPPORT
+================================================================================
+
+WhatsApp Support:    +263 71 234 5678
+Email:               agents@zimagritrust.co.zw
+Agent Portal:        agent.zimagritrust.co.zw
+Training Academy:    academy.zimagritrust.co.zw
+
+
+================================================================================
+END OF MODULE 1: PLATFORM OPERATIONS
+================================================================================
+
+Copyright (C) 2026 ZimAgriTrust Sovereign Ledger Group. All Rights Reserved.
+
+This document contains proprietary information. Unauthorized distribution,
+copying, or sharing of this material is strictly prohibited and may result in
+immediate termination of agent status and legal action.
+
+================================================================================================================================================================
+                    ZIMAGRITRUST AGENT TRAINING ACADEMY
+                          MODULE 1: PLATFORM OPERATIONS
+                                AGENT HANDBOOK
+================================================================================
+
+Version: 1.0
+Effective Date: 2026
+Copyright: ZimAgriTrust Sovereign Ledger Group. All Rights Reserved.
+
+
+================================================================================
+1.1 MISSION: SOVEREIGN TRUST IN AGRICULTURAL TRADE
+================================================================================
+
+Our mission is to eliminate the 'trust deficit' that plagues rural agricultural
+markets. In most developing regions, farmers lack access to fair markets and
+finance because there is no reliable way to verify their yield or quality
+without expensive intermediaries.
+
+ZimAgriTrust solves this through:
+
++---------------------+--------------------------------------------------------+
+| Solution            | Description                                            |
++---------------------+--------------------------------------------------------+
+| Sovereign Identity  | Giving every farmer a verified digital twin           |
+| Verifiable Proof    | Using field agents (you) to provide ground-truth data |
+| Smart Escrow        | Ensuring payment is only released when quality is     |
+|                     | confirmed                                              |
++---------------------+--------------------------------------------------------+
+
+
+================================================================================
+1.2 THE ZIMAGRITRUST TECH STACK
+================================================================================
+
+ZimAgriTrust is a multi-layered infrastructure designed for low-connectivity
+environments:
+
++------------------+------------------------+------------------------------------+
+| Layer            | Technology             | Purpose                            |
++------------------+------------------------+------------------------------------+
+| Core Backend     | FastAPI                | Ledger, escrow, user management    |
+| Agent Portal     | High-performance web   | Your field interface               |
+|                  | app                    | (mobile-friendly)                  |
+| Farmer Interface | USSD + WhatsApp        | Access for basic phone users       |
+| IoT Gateway      | Automated sensors      | Warehouse monitoring               |
+| ML Intelligence  | AI models              | Crop photo analysis                |
++------------------+------------------------+------------------------------------+
+
+
+================================================================================
+1.3 USER ROLES & RESPONSIBILITIES
+================================================================================
+
++------------------+---------------------+--------------------------------------+
+| Role             | Description         | Key Responsibility                   |
++------------------+---------------------+--------------------------------------+
+| Farmers          | The producers       | List crops and request verification  |
+| Agents (You)     | The Verifiers       | ONLY source of truth for digital     |
+|                  |                     | system                               |
+| Buyers           | Wholesalers         | Purchase listed crops                |
+| Administrators   | Global monitors     | Handle disputes and platform         |
+|                  |                     | oversight                            |
++------------------+---------------------+--------------------------------------+
+
+
+================================================================================
+1.4 THE 6 STEPS OF A ZIMAGRITRUST TRADE
+================================================================================
+
+STEP 1: LISTING
+---------------
+Farmer lists crops via WhatsApp or USSD
+-> System creates digital record of offer
+-> Agent receives notification
+
+STEP 2: COMMITMENT
+------------------
+Buyer deposits 100% of value into Sovereign Escrow Pool
+-> Funds frozen in trust account
+-> Transaction secured
+
+STEP 3: VERIFICATION (YOUR ROLE)
+--------------------------------
+Agent receives notification and travels to farm
+-> Physical inspection performed
+-> Evidence collected
+-> Report submitted
+
+STEP 4: GRADING (YOUR ROLE)
+---------------------------
+Agent assigns Grade based on:
+-> Moisture content
+-> Purity percentage
+-> Visual quality assessment
+
+STEP 5: DELIVERY
+----------------
+Crop is moved to certified warehouse
+-> Chain of custody recorded
+-> Delivery confirmed
+
+STEP 6: SETTLEMENT
+------------------
+Escrow system automatically releases funds
+-> Platform fee deducted
+-> Farmer paid
+-> Trust scores updated
+
+
+================================================================================
+1.5 PLATFORM POLICIES
+================================================================================
+
++---------------------+------------------------------------------------+--------------------------------+
+| Policy              | Rule                                           | Consequence of Violation       |
++---------------------+------------------------------------------------+--------------------------------+
+| Bribery             | Zero Tolerance                                 | Immediate permanent ban        |
+| Data Privacy        | Farmer contact details never shared outside   | Termination + legal action     |
+|                     | platform                                       |                                |
+| Timeliness          | Verification requests actioned within 24      | Reduced trust score + lower    |
+|                     | hours                                          | priority                       |
+| Accuracy            | Intentional misreporting of weight is fraud   | Permanent ban + financial      |
+|                     |                                                | penalty                        |
+| Confidentiality     | Do not disclose dispute details publicly      | Warning then suspension        |
++---------------------+------------------------------------------------+--------------------------------+
+
+
+================================================================================
+1.6 CORE AGENT FUNCTIONS (WHAT YOU ACTUALLY DO)
+================================================================================
+
+PRIMARY FUNCTIONS:
+
++----------------------+----------+------------------------------------------------+------------------+
+| Function             | Priority | Description                                    | Typical Time     |
++----------------------+----------+------------------------------------------------+------------------+
+| VERIFY LISTINGS      | HIGH     | Visit farms, confirm crops, check             | 30-60 minutes    |
+|                      |          | quantity/quality, submit reports              |                  |
+| CONFIRM DELIVERIES   | HIGH     | Witness handovers, verify matches, mark as    | 15-30 minutes    |
+|                      |          | delivered                                      |                  |
+| RESOLVE DISPUTES     | HIGH     | Review evidence, interview parties, recommend | 1-2 hours        |
+|                      |          | resolutions                                    |                  |
+| SUPPORT FARMERS      | MEDIUM   | Help with registration, USSD usage, listing   | 10-20 minutes    |
+|                      |          | creation                                       |                  |
+| VERIFY LOANS         | LOW      | Confirm identity, assess farm viability for   | 20-40 minutes    |
+|                      |          | financial services                             |                  |
++----------------------+----------+------------------------------------------------+------------------+
+
+
+AGENT DAILY WORKFLOW:
+
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                    AGENT DAILY WORKFLOW                         │
+    ├─────────────────────────────────────────────────────────────────┤
+    │                                                                 │
+    │  08:00 ───► Check WhatsApp for new task assignments            │
+    │            └── Accept highest priority task                    │
+    │                                                                 │
+    │  08:30 ───► Travel to farm location                            │
+    │            └── Use 'location' command for directions           │
+    │                                                                 │
+    │  09:00 ───► Perform verification                               │
+    │            ├── Take crop photos                                │
+    │            ├── Test moisture (if equipment available)          │
+    │            ├── Estimate quantity                               │
+    │            └── Submit report via Agent Portal                  │
+    │                                                                 │
+    │  12:00 ───► Check for dispute assignments                      │
+    │            └── Review evidence, contact parties                │
+    │                                                                 │
+    │  15:00 ───► Verify delivery confirmations                      │
+    │            └── Witness handover if requested                   │
+    │                                                                 │
+    │  17:00 ───► Submit end-of-day report                           │
+    │            └── Check earnings via WhatsApp bot                 │
+    │                                                                 │
+    └─────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+1.7 WHATSAPP AI AGENT ASSISTANT
+================================================================================
+
+THE AI ASSISTANT CONCEPT
+------------------------
+The bot acts as a support system for Farmers, Buyers, Admins, and most
+importantly, YOU (The Agent). It handles routine data collection and alerts,
+allowing you to focus on physical verification and judgment.
+
+HOW THE BOT SUPPORTS YOU:
+
++------------------+------------------------------------------------+----------------------------------+
+| Function         | What the Bot Does                              | Example                          |
++------------------+------------------------------------------------+----------------------------------+
+| Task Assignment  | Alerts you instantly about new tasks           | "New verification task assigned  |
+|                  |                                                | to you. Farmer: Tendai Moyo,     |
+|                  |                                                | 5km away."                       |
+| Field Guidance   | Provides step-by-step checklists               | "Step 1: Take crop photo. Step 2:|
+|                  |                                                | Verify quantity. Step 3: Test    |
+|                  |                                                | moisture..."                     |
+| Evidence Hub     | Collects photos/docs from parties during       | Saves you from chasing evidence  |
+|                  | disputes                                       | yourself                         |
+| Earnings         | View your commissions instantly                | "Your balance: $86.00. Withdraw  |
+| Tracking         |                                                | now?"                            |
+| Navigation       | Get directions to farm location                | Send 'location' command for      |
+|                  |                                                | Google Maps link                 |
++------------------+------------------------------------------------+----------------------------------+
+
+INTENT DETECTION
+----------------
+The bot uses AI to understand user messages across Shona, Ndebele, and English.
+It can handle multiple conversation types simultaneously without mixing them up.
+
++------------------+------------------------+-----------------------------------+
+| User Type        | Example Message        | Bot Understands                   |
++------------------+------------------------+-----------------------------------+
+| Farmer (Shona)   | "Ndoda kutengesa       | Wants to sell maize               |
+|                  | chibage"               |                                   |
+| Buyer (Ndebele)  | "Ngifuna ukuthenga     | Wants to buy maize                |
+|                  | umumbu"                |                                   |
+| Agent (English)  | "Show me my pending    | Requests task list                |
+|                  | tasks"                 |                                   |
++------------------+------------------------+-----------------------------------+
+
+WHAT THE BOT DOES VS WHAT YOU DO:
+
++---------------------+--------------------------------+-------------------------------------+
+| Aspect              | WhatsApp Bot                   | Human Agent (You)                   |
++---------------------+--------------------------------+-------------------------------------+
+| Routine inquiries   | Handles 80%                    | Not needed                          |
+| Price checks        | Instant responses              | Not needed                          |
+| Data entry          | Automated                      | Not needed                          |
+| Physical inspection | Cannot do                      | YOU do this                         |
+| Touching the grain  | Cannot do                      | YOU do this                         |
+| Witnessing delivery | Cannot do                      | YOU do this                         |
+| Complex dispute     | Cannot do                      | YOU do this                         |
+| decisions           |                                |                                     |
+| Final judgment      | Cannot do                      | YOU do this                         |
+| calls               |                                |                                     |
++---------------------+--------------------------------+-------------------------------------+
+
+
+================================================================================
+1.8 AGENT EARNINGS SUMMARY
+================================================================================
+
+EARNING STREAMS:
+
++----------------------+-----------------+--------------------------------------+------------------+
+| Activity             | Base Pay        | Bonus Conditions                     | Max Per Task     |
++----------------------+-----------------+--------------------------------------+------------------+
+| Listing Verification | $0.50 - $3.00   | Fast completion (+$0.50),            | $4.50            |
+|                      |                 | High value (+$1.00)                  |                  |
+| Dispute Resolution   | $1.00 - $3.00   | Quick resolution (+$1.00),           | $6.50            |
+|                      |                 | Complex (+$3.00)                     |                  |
+| Referral Bonus       | $5.00           | New farmer completes first sale      | $5.00            |
+| Weekly Performance   | $60 max         | Accuracy (>95%), Speed (<24h),       | $60              |
+|                      |                 | Rating (>=4.8)                       |                  |
+| Training Completion  | $70 one-time    | Pass all modules and final exam      | $70              |
++----------------------+-----------------+--------------------------------------+------------------+
+
+TIER MULTIPLIERS:
+
++------------------+-----------------+-------------------+
+| Tier             | Trust Score     | Fee Multiplier    |
++------------------+-----------------+-------------------+
+| Trainee          | 0-49            | 0.5x              |
+| Junior           | 50-69           | 0.75x             |
+| Senior           | 70-89           | 1.0x              |
+| Master           | 90-100          | 1.5x              |
++------------------+-----------------+-------------------+
+
+
+================================================================================
+1.9 COMMON AGENT COMMANDS (WHATSAPP)
+================================================================================
+
++----------------------+-----------------------------------------------+
+| Command              | Purpose                                       |
++----------------------+-----------------------------------------------+
+| tasks                | View pending verification assignments        |
+| accept [task_id]     | Accept a verification task                    |
+| submit [task_id]     | Submit verification report                    |
+| disputes             | View assigned disputes                        |
+| evidence [dispute_id]| Upload evidence for dispute                   |
+| earnings             | Check current balance                         |
+| withdraw [amount]    | Request withdrawal to EcoCash                 |
+| location [farmer_id] | Get directions to farm                        |
+| help                 | Show all available commands                   |
++----------------------+-----------------------------------------------+
+
+
+================================================================================
+FINAL SUMMARY
+================================================================================
+
+Field Agents are the 'GROUND TRUTH' for ZimAgriTrust. You are responsible for
+ensuring that the digital records in our cloud match the physical reality on
+the farm.
+
+YOUR CORE RESPONSIBILITIES:
+1. Verify listings through physical farm visits
+2. Witness deliveries and confirm matches
+3. Resolve disputes by reviewing evidence and interviewing parties
+4. Support farmers with platform usage
+5. Maintain integrity through accurate reporting
+
+YOUR TOOLS:
+- Agent Portal (web-based dashboard)
+- WhatsApp AI Assistant (24/7 support)
+- Mobile phone with camera
+
+YOUR EARNINGS:
+- Verification fees ($0.50 - $4.50 per listing)
+- Dispute resolution fees ($1.00 - $6.50 per dispute)
+- Weekly performance bonuses (up to $60/week)
+- Referral bonuses ($5 per new active farmer)
+
+By mastering the platform operations, adhering to the code of conduct, and
+leveraging your WhatsApp AI assistant, you ensure the success and integrity of
+Zimbabwe's agricultural marketplace.
+
+
+================================================================================
+CONTACT & SUPPORT
+================================================================================
+
+WhatsApp Support:    +263 71 234 5678
+Email:               agents@zimagritrust.co.zw
+Agent Portal:        agent.zimagritrust.co.zw
+Training Academy:    academy.zimagritrust.co.zw
+
+
+================================================================================
+END OF MODULE 1: PLATFORM OPERATIONS
+================================================================================
+
+Copyright (C) 2026 ZimAgriTrust Sovereign Ledger Group. All Rights Reserved.
+
+This document contains proprietary information. Unauthorized distribution,
+copying, or sharing of this material is strictly prohibited and may result in
+immediate termination of agent status and legal action.
+
+================================================================================

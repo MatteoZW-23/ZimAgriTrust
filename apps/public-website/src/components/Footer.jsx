@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, Phone, MapPin, X, Leaf, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
+import { Mail, Phone, MapPin, X, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import logo from "../assets/logo.png";
 
 const WhatsAppIcon = ({ className }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -59,11 +60,15 @@ export default function Footer({ onOpenAuth }) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 lg:gap-8">
           {/* Brand Column */}
           <div className="lg:col-span-4">
-            <Link to="/" className="flex items-center gap-2 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center">
-                <Leaf className="w-6 h-6 text-white" />
+            <Link to="/" className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 rounded-xl bg-primary-600 flex items-center justify-center overflow-hidden">
+                <img 
+                  src={logo} 
+                  alt="ZimAgritrust Logo" 
+                  className="w-8 h-8 object-contain"
+                />
               </div>
-              <span className="font-display font-bold text-xl text-white">
+              <span className="font-display font-bold text-2xl text-white">
                 Zim<span className="text-primary-400">Agri</span>trust
               </span>
             </Link>

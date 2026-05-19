@@ -3,6 +3,7 @@
 Thin delegation layer on top of the existing wallet_service and payment_service.
 """
 from __future__ import annotations
+import logging
 
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -14,6 +15,7 @@ from app.models.user import User
 from app.services.wallet_service import wallet_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # ── Schemas ──────────────────────────────────────────────────────────────────
@@ -50,8 +52,11 @@ def get_wallet_balance(
             held_in_escrow=data["held_in_escrow"],
             available=data["available"],
         )
+    except HTTPException:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.error(f"Get wallet balance error: {str(exc)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve wallet balance")
 
 
 @router.get("", response_model=WalletBalanceOut, summary="Get wallet balance")
@@ -76,10 +81,13 @@ def withdraw(
             phone_number=payload.phone_number or current_user.phone_number,
         )
         return {"status": "initiated", "reference": result.get("reference"), "amount": payload.amount}
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.error(f"Withdrawal error: {str(exc)}")
+        raise HTTPException(status_code=500, detail="Failed to process withdrawal")
 
 
 @router.post("/deposit", summary="Initiate wallet deposit via EcoCash/OneMoney")
@@ -112,10 +120,13 @@ def top_up(
             "provider": result.get("provider"),
             "expires_in_minutes": 30,
         }
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.error(f"Top-up error: {str(exc)}")
+        raise HTTPException(status_code=500, detail="Failed to process top-up")
 
 
 @router.get("/transactions", summary="Get wallet transaction history")

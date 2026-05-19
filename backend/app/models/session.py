@@ -40,4 +40,4 @@ class UserSession(Base):
     revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     revoke_reason: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
-    user = relationship("User", backref="sessions")
+    user = relationship("User", back_populates="sessions")

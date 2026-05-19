@@ -12,8 +12,8 @@ import {
 } from 'lucide-react-native';
 import { theme } from "../styles";
 
-export default function HomeScreen({ route }) {
-  const { profile = {}, role = 'farmer' } = route.params || {};
+export default function HomeScreen({ route, navigation }) {
+  const { profile = {}, role = 'farmer', token } = route.params || {};
   const name = profile.name || "User";
   const trustScore = profile.trust_score || 0;
   const balance = profile.balance || 0;
@@ -29,7 +29,7 @@ export default function HomeScreen({ route }) {
                 <Text style={styles.nameText}>{name.split(' ')[0]}</Text>
             </View>
             <View style={styles.headerIcons}>
-                <TouchableOpacity style={styles.iconBtn}>
+                <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Notifications', { token })}>
                     <IconBell size={24} color={theme.colors.black} />
                 </TouchableOpacity>
                 <View style={styles.walletBox}>
@@ -70,11 +70,11 @@ export default function HomeScreen({ route }) {
         {/* Quick Actions */}
         <Text style={styles.sectionTitle}>Operational Hub</Text>
         <View style={styles.row}>
-            <TouchableOpacity style={styles.actionBtn}>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('CreateListing', { token })}>
                 <IconPlus size={18} color={theme.colors.green} style={{ marginRight: 8 }} />
                 <Text style={styles.actionText}>New Listing</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#F0F0F0' }]}>
+            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#F0F0F0' }]} onPress={() => navigation.navigate('Analytics', { token })}>
                 <IconAnalytics size={18} color="#333" style={{ marginRight: 8 }} />
                 <Text style={[styles.actionText, { color: '#333' }]}>Analytics</Text>
             </TouchableOpacity>

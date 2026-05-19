@@ -53,7 +53,7 @@ export default function RaiseDisputeScreen({ route, navigation }) {
       setSaving(true);
       const dispute = await raiseOrderDispute(token, orderId, { reason, type: reason, description });
       if (photos.length > 0) await uploadDisputeEvidence(token, dispute.id, photos);
-      Alert.alert('Dispute raised', 'Your case has been submitted.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
+      Alert.alert('Dispute raised', 'Your case has been submitted.', [{ text: 'OK', onPress: () => navigation.navigate('MyOrders', { token }) }]);
     } catch (err) {
       Alert.alert('Submit failed', err.message || 'Could not raise dispute.');
     } finally {

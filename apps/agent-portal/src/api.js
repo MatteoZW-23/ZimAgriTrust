@@ -6,7 +6,11 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 
 export async function request(path, options = {}) {
   let storedAuth = null;
-  try { storedAuth = JSON.parse(localStorage.getItem("zimagritrust_agent_auth")); } catch {}
+  // Read token from whichever session is active (academy takes priority if present)
+  try { storedAuth = JSON.parse(localStorage.getItem("zimagritrust_academy_auth")); } catch {}
+  if (!storedAuth?.access_token) {
+    try { storedAuth = JSON.parse(localStorage.getItem("zimagritrust_agent_auth")); } catch {}
+  }
   const token = storedAuth?.access_token;
   const headers = {
     ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
@@ -102,20 +106,7 @@ export const getMarketPrices = () =>
 export const getWalletBalance = () => request("/payments/balance");
 export const getTransactions = () => request("/transactions");
 export const getAgentEarnings = () => request("/agent/earnings").catch(() => request("/payments/balance"));
-
-// ── Academy (Training) ────────────────────────────────────────────────────────
-export const getAcademyProgress = () => request("/academy/my-progress");
-export const getModuleContent = (moduleNumber) =>
-  request(`/academy/modules/${moduleNumber}/content`);
-export const getTopicContent = (moduleNumber, topicId) =>
-  request(`/academy/modules/${moduleNumber}/topics/${topicId}/content`);
-export const markTopicComplete = (moduleNumber, topicId) =>
-  request(`/academy/modules/${moduleNumber}/topics/${topicId}/complete`, { method: "POST" });
-export const submitModuleQuiz = (moduleNumber, answers) =>
-  request(`/academy/modules/${moduleNumber}/quiz/submit`, { method: "POST", body: JSON.stringify({ answers }) });
-export const submitExam = (moduleId, answers) =>
-  submitModuleQuiz(moduleId, answers);
-export const getCertificates = () => request("/academy/certificates");
+export const getAgentEarningsBreakdown = () => request("/agent/earnings");
 
 // ── Practical Assessment (post-final-exam) ────────────────────────────────────
 export const submitGradingTest = (payload) =>
@@ -145,3 +136,50 @@ export const reviewSupervisedTask = (reviewId, payload) =>
 // ── Application resubmit (after rejection) ────────────────────────────────────
 export const resubmitApplication = (payload) =>
   request("/agents/application/resubmit", { method: "POST", body: JSON.stringify(payload) });
+
+// ── Recruitment Pipeline (unified onboarding) ─────────────────────────────────
+export const submitAgentApplication = (payload) =>
+  request("/recruitment/apply", { method: "POST", body: JSON.stringify(payload) });
+export const getApplicationStatusByPhone = (phone_number) =>
+  request(`/recruitment/my-status/${encodeURIComponent(phone_number)}`);
+
+// ── Academy / Classroom ───────────────────────────────────────────────────────
+export const getAcademyCourses = () => request("/agent/classroom/courses");
+export const getAcademyCourseDetail = (courseId) => request(`/agent/classroom/courses/${courseId}`);
+export const enrollInAcademyCourse = (courseId) =>
+  request(`/agent/classroom/courses/${courseId}/enroll`, { method: "POST" });
+export const completeAcademyTopic = (topicId) =>
+  request(`/agent/classroom/topics/${topicId}/complete`, { method: "POST" });
+export const startAcademyQuiz = (resourceId) =>
+  request(`/agent/classroom/quizzes/${resourceId}/start`, { method: "POST" });
+export const submitAcademyQuiz = (resourceId, answers) =>
+  request(`/agent/classroom/quizzes/${resourceId}/submit`, { method: "POST", body: JSON.stringify({ answers }) });
+export const getAcademyProgress = () => request("/agent/classroom/progress");
+
+// ── Academy Certification ──────────────────────────────────────────────────────
+export const getAcademyMyProgress = () => request("/academy/my-progress");
+export const submitFinalExam = (answers) =>
+  request("/academy/exam/final/submit", { method: "POST", body: JSON.stringify({ answers }) });
+
+export async function getCertificate() {
+  let storedAuth = null;
+  try { storedAuth = JSON.parse(localStorage.getItem("zimagritrust_academy_auth")); } catch {}
+  if (!storedAuth?.access_token) {
+    try { storedAuth = JSON.parse(localStorage.getItem("zimagritrust_agent_auth")); } catch {}
+  }
+  const token = storedAuth?.access_token;
+  const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
+  const res = await fetch(`${API}/agent/classroom/certificate`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data?.detail || "Certificate not available yet");
+  }
+  const html = await res.text();
+  // Open the HTML certificate in a new tab
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  return { certificate_url: url };
+}

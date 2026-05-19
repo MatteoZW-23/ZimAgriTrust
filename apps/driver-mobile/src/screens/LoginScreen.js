@@ -1,9 +1,9 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Text, TextInput, TouchableOpacity, View, StyleSheet, ScrollView,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Animated
+  KeyboardAvoidingView, Platform, ActivityIndicator, Animated, Alert
 } from "react-native";
-import { Eye, EyeOff, Phone, Lock, Shield, Truck, ArrowRight } from 'lucide-react-native';
+import { Eye, EyeOff, Phone, Lock, Shield, Truck, ArrowRight, Fingerprint } from 'lucide-react-native';
 import { theme } from "../styles";
 import { driverLogin, getProfile } from "../api";
 
@@ -16,8 +16,29 @@ export default function LoginScreen({ onAuthenticated, onRegister }) {
   const [phoneFocused, setPhoneFocused] = useState(false);
   const [pinFocused, setPinFocused] = useState(false);
   const pinRef = useRef(null);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
 
   const isValid = phone.length >= 9 && password.length >= 4;
+
+  useEffect(() => {
+    // Check for biometric availability (simulated for web)
+    setBiometricAvailable(Platform.OS !== 'web');
+  }, []);
+
+  const handleBiometricLogin = async () => {
+    setBiometricLoading(true);
+    try {
+      // Simulate biometric authentication
+      // In production, this would use expo-local-authentication or similar
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      Alert.alert('Biometric Auth', 'Biometric authentication would be implemented here using expo-local-authentication');
+    } catch (err) {
+      Alert.alert('Biometric Failed', err.message || 'Could not authenticate with biometrics.');
+    } finally {
+      setBiometricLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!isValid) return;
@@ -102,7 +123,7 @@ export default function LoginScreen({ onAuthenticated, onRegister }) {
             <TextInput
               ref={pinRef}
               style={[styles.input, { flex: 1 }]}
-              placeholder="Enter Password"
+              placeholder="Enter Pin"
               value={password}
               onChangeText={(t) => { setPassword(t); setError(''); }}
               secureTextEntry={!showPassword}
@@ -120,6 +141,25 @@ export default function LoginScreen({ onAuthenticated, onRegister }) {
           <TouchableOpacity style={styles.forgotRow}>
             <Text style={styles.forgotText}>Forgot Password?</Text>
           </TouchableOpacity>
+
+          {/* Biometric Login Button */}
+          {biometricAvailable && (
+            <TouchableOpacity
+              style={styles.biometricBtn}
+              onPress={handleBiometricLogin}
+              disabled={biometricLoading}
+              activeOpacity={0.8}
+            >
+              {biometricLoading ? (
+                <ActivityIndicator color={theme.colors.sky} size="small" />
+              ) : (
+                <>
+                  <Fingerprint size={20} color={theme.colors.sky} />
+                  <Text style={styles.biometricText}>Sign in with Biometrics</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
 
           {/* Sign In Button */}
           <TouchableOpacity
@@ -205,6 +245,9 @@ const styles = StyleSheet.create({
 
   forgotRow: { alignSelf: 'flex-end', marginBottom: 20, marginTop: 2 },
   forgotText: { color: theme.colors.sky, fontSize: 13, fontWeight: '700' },
+
+  biometricBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#F0F9FF', borderWidth: 2, borderColor: theme.colors.sky, paddingVertical: 14, borderRadius: 16, marginBottom: 12 },
+  biometricText: { color: theme.colors.sky, fontSize: 15, fontWeight: '700' },
 
   signInBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: theme.colors.sky, paddingVertical: 16, borderRadius: 16, ...theme.shadows.md },
   signInBtnDisabled: { backgroundColor: '#D0D0D0' },

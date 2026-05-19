@@ -1,242 +1,426 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  SafeAreaView, RefreshControl, ActivityIndicator
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
 } from 'react-native';
-import { 
-  CheckCircle2 as IconCheckCircle, 
-  PackageCheck as IconPackageCheck, 
-  ShieldCheck as IconShieldCheck, 
-  AlertCircle as IconAlertCircle, 
-  Clock as IconClock, 
-  XCircle as IconXCircle, 
-  Circle as IconCircle,
-  Package as IconPackage,
-  Check as IconCheck,
-  Star as IconStar,
-  AlertTriangle as IconAlertTriangle
-} from 'lucide-react-native';
-import { getTransactions } from '../api';
+
 import { theme } from '../styles';
 
-const STATUS_CONFIG = {
-  COMPLETED:  { color: '#22c55e', bg: '#f0fdf4', icon: IconCheckCircle, label: 'COMPLETED' },
-  DELIVERED:  { color: '#3b82f6', bg: '#eff6ff', icon: IconPackageCheck, label: 'DELIVERED' },
-  IN_ESCROW:  { color: '#f59e0b', bg: '#fffbeb', icon: IconShieldCheck, label: 'IN ESCROW' },
-  DISPUTED:   { color: '#ef4444', bg: '#fef2f2', icon: IconAlertCircle, label: 'DISPUTED' },
-  PENDING:    { color: '#f59e0b', bg: '#fffbeb', icon: IconClock, label: 'PENDING' },
-  CANCELLED:  { color: '#94a3b8', bg: '#f8fafc', icon: IconXCircle, label: 'CANCELLED' },
-};
-
-function getStatusConfig(status = '') {
-  return STATUS_CONFIG[status.toUpperCase()] || { color: '#64748b', bg: '#f8fafc', icon: IconCircle, label: status };
-}
-
-export default function MyOrdersScreen({ navigation, route }) {
-  const { token, role = 'farmer' } = route.params || {};
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('all');
-
-  const load = useCallback(async () => {
-    try {
-      setError('');
-      const data = await getTransactions(token);
-      setOrders(Array.isArray(data) ? data : data?.data || []);
-    } catch (err) {
-      setError(err.message || 'Failed to load orders.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [token]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const onRefresh = () => { setRefreshing(true); load(); };
-
-  const tabs = [
-    { key: 'all', label: 'All' },
-    { key: 'active', label: 'Active' },
-    { key: 'completed', label: 'Done' },
-    { key: 'disputed', label: 'Disputed' },
-  ];
-
-  const filtered = orders.filter(o => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'active') return ['PENDING', 'IN_ESCROW', 'DELIVERED'].includes((o.status || '').toUpperCase());
-    if (activeTab === 'completed') return (o.status || '').toUpperCase() === 'COMPLETED';
-    if (activeTab === 'disputed') return (o.status || '').toUpperCase() === 'DISPUTED';
-    return true;
-  });
+export default function OrderDetailsScreen({ navigation, route }) {
+  const { role = 'buyer', orderId = '0000', order = {} } =
+    route.params || {};
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: 40 }}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.back}>← Back</Text>
+          <Text style={styles.backBtn}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>My Orders</Text>
+
+        <Text style={styles.headerTitle}>Order #{orderId}</Text>
+
         <View style={{ width: 60 }} />
       </View>
 
-      {/* Tabs */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabs}>
-        {tabs.map(tab => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.tab, activeTab === tab.key && styles.tabActive]}
-            onPress={() => setActiveTab(tab.key)}
-          >
-            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>{tab.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={theme.colors.green} />
-          <Text style={styles.loadingText}>Loading orders...</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.center}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={load}>
-            <Text style={styles.retryText}>Try Again</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.green} />}
-          contentContainerStyle={{ paddingBottom: 120 }}
+      {/* Role Banner */}
+      <View
+        style={[
+          styles.roleBanner,
+          {
+            backgroundColor:
+              role === 'farmer' ? '#E8F5E9' : '#E1F5FE',
+          },
+        ]}
+      >
+        <Text
+          style={[
+            styles.roleTextBanner,
+            {
+              color:
+                role === 'farmer' ? '#2E7D32' : '#0288D1',
+            },
+          ]}
         >
-          {filtered.length === 0 ? (
-            <View style={styles.empty}>
-              <IconPackage size={64} color="#CBD5E1" style={{ marginBottom: 16 }} />
-              <Text style={styles.emptyTitle}>No orders here</Text>
-              <Text style={styles.emptyText}>Your orders will appear once you start trading.</Text>
+          Viewing as: {role.toUpperCase()}
+        </Text>
+      </View>
+
+      {/* Order Status */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>ORDER STATUS</Text>
+
+        <View style={styles.stepperBox}>
+          <View style={styles.stepperRow}>
+            {/* Paid */}
+            <View style={[styles.stepCircle, styles.stepActive]}>
+              <Text style={styles.stepText}>✓</Text>
             </View>
-          ) : (
-            filtered.map(order => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                role={role}
-                onPress={() => navigation.navigate('OrderDetails', { orderId: order.id, role, token })}
-                onConfirm={() => navigation.navigate('ConfirmDelivery', { orderId: order.id, token })}
-                onRate={() => navigation.navigate('RateUser', { orderId: order.id, token, role })}
-                onDispute={() => navigation.navigate('OrderDetails', { orderId: order.id, role, token })}
-              />
-            ))
-          )}
-        </ScrollView>
-      )}
-    </SafeAreaView>
-  );
-}
 
-function OrderCard({ order, role, onPress, onConfirm, onRate, onDispute }) {
-  const status = order.status || 'PENDING';
-  const cfg = getStatusConfig(status);
-  const crop = order.product_type || order.crop || 'Order';
-  const qty = order.quantity ? `${Number(order.quantity).toLocaleString()} ${order.quantity_unit || 'kg'}` : '';
-  const amount = order.total_amount ? `$${Number(order.total_amount).toFixed(2)}` : order.amount ? `$${Number(order.amount).toFixed(2)}` : '—';
-  const counterparty = role === 'farmer' ? (order.buyer_name || 'Buyer') : (order.seller_name || order.farmer_name || 'Farmer');
-  const date = order.created_at ? new Date(order.created_at).toLocaleDateString('en-ZW', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-  const shortId = order.id ? `#TRX-${String(order.id).slice(0, 6).toUpperCase()}` : '#—';
-  const isReviewed = order.is_reviewed || order.reviewed;
+            <View style={styles.stepLineActive} />
 
-  return (
-    <TouchableOpacity style={[styles.card, { borderLeftColor: cfg.color, borderLeftWidth: 4 }]} onPress={onPress} activeOpacity={0.85}>
-      <View style={styles.cardTop}>
-        <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
-          <cfg.icon size={12} color={cfg.color} style={{ marginRight: 4 }} />
-          <Text style={[styles.statusText, { color: cfg.color }]}>{cfg.label}</Text>
-        </View>
-        <Text style={styles.orderId}>{shortId}</Text>
-      </View>
+            {/* Pending */}
+            <View style={[styles.stepCircle, styles.stepOngoing]}>
+              <Text style={styles.stepText}>•</Text>
+            </View>
 
-      <Text style={styles.cropName}>{crop}{qty ? ` | ${qty}` : ''}</Text>
-      <Text style={styles.counterparty}>{role === 'farmer' ? 'Buyer' : 'Farmer'}: {counterparty}</Text>
-      {date ? <Text style={styles.date}>{date}</Text> : null}
+            <View style={styles.stepLine} />
 
-      <View style={styles.amountRow}>
-        <Text style={styles.amount}>{amount}</Text>
-        {order.escrow_held && (
-          <View style={styles.escrowTagContainer}>
-            <IconShieldCheck size={14} color="#f59e0b" />
-            <Text style={styles.escrowTag}>In Escrow</Text>
+            {/* Delivered */}
+            <View style={styles.stepCircle}>
+              <Text style={styles.stepText}>○</Text>
+            </View>
+
+            <View style={styles.stepLine} />
+
+            {/* Completed */}
+            <View style={styles.stepCircle}>
+              <Text style={styles.stepText}>○</Text>
+            </View>
           </View>
-        )}
+
+          {/* Labels */}
+          <View style={styles.labelsRow}>
+            <Text style={styles.stepLabel}>Paid</Text>
+            <Text style={styles.stepLabel}>Pending</Text>
+            <Text style={styles.stepLabel}>Delivered</Text>
+            <Text style={styles.stepLabel}>Completed</Text>
+          </View>
+
+          {/* Escrow */}
+          <View style={styles.escrowBanner}>
+            <Text style={styles.escrowText}>
+              🛡️ Funds in Escrow:{' '}
+              <Text style={styles.bold}>
+                {order?.escrow_amount
+                  ? `$${order.escrow_amount}`
+                  : '--'}
+              </Text>
+            </Text>
+
+            {!!order?.expected_delivery && (
+              <Text style={styles.deliveryDate}>
+                Expected: {order.expected_delivery}
+              </Text>
+            )}
+          </View>
+        </View>
       </View>
 
-      <View style={styles.actions}>
-        {status.toUpperCase() === 'DELIVERED' && (
-          <TouchableOpacity style={styles.primaryAction} onPress={onConfirm}>
-            <IconCheck size={14} color="#fff" style={{ marginRight: 4 }} />
-            <Text style={styles.primaryActionText}>Confirm Delivery</Text>
-          </TouchableOpacity>
-        )}
-        {status.toUpperCase() === 'COMPLETED' && !isReviewed && (
-          <TouchableOpacity style={[styles.primaryAction, { backgroundColor: '#f59e0b' }]} onPress={onRate}>
-            <IconStar size={14} color="#fff" style={{ marginRight: 4 }} />
-            <Text style={styles.primaryActionText}>Rate {role === 'farmer' ? 'Buyer' : 'Farmer'}</Text>
-          </TouchableOpacity>
-        )}
-        {['PENDING', 'IN_ESCROW', 'DELIVERED'].includes(status.toUpperCase()) && (
-          <TouchableOpacity style={styles.secondaryAction} onPress={onDispute}>
-            <IconAlertTriangle size={14} color="#ef4444" style={{ marginRight: 4 }} />
-            <Text style={styles.secondaryActionText}>Dispute</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity style={styles.detailAction} onPress={onPress}>
-          <Text style={styles.detailActionText}>View Details →</Text>
-        </TouchableOpacity>
+      {/* Product Details */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>PRODUCT DETAILS</Text>
+
+        <View style={styles.card}>
+          <Text style={styles.cardRow}>
+            <Text style={styles.cardLabel}>Product:</Text>{' '}
+            {order?.product_type || '--'}
+          </Text>
+
+          <Text style={styles.cardRow}>
+            <Text style={styles.cardLabel}>Quantity:</Text>{' '}
+            {order?.quantity
+              ? `${order.quantity} ${order.unit || ''}`
+              : '--'}
+          </Text>
+
+          <Text style={styles.cardRow}>
+            <Text style={styles.cardLabel}>Price:</Text>{' '}
+            {order?.price_per_unit
+              ? `$${order.price_per_unit}/unit`
+              : '--'}
+          </Text>
+
+          <Text style={styles.cardRow}>
+            <Text style={styles.cardLabel}>
+              {role === 'buyer' ? 'Seller' : 'Buyer'}:
+            </Text>{' '}
+            {role === 'buyer'
+              ? order?.seller_name || '--'
+              : order?.buyer_name || '--'}
+          </Text>
+        </View>
       </View>
-    </TouchableOpacity>
+
+      {/* Actions */}
+      <View style={styles.actionGrid}>
+        {role === 'buyer' ? (
+          <>
+            <TouchableOpacity style={styles.secondaryBtn}>
+              <Text style={styles.secondaryBtnText}>
+                Message Seller
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.secondaryBtn,
+                styles.dangerBtn,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.secondaryBtnText,
+                  { color: theme.colors.red },
+                ]}
+              >
+                Raise Dispute
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.primaryBtn}
+              onPress={() =>
+                navigation.navigate('ConfirmDelivery', {
+                  orderId,
+                })
+              }
+            >
+              <Text style={styles.primaryBtnText}>
+                Confirm Delivery
+              </Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity style={styles.secondaryBtn}>
+              <Text style={styles.secondaryBtnText}>
+                Message Buyer
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.secondaryBtn,
+                styles.dangerBtn,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.secondaryBtnText,
+                  { color: theme.colors.red },
+                ]}
+              >
+                Raise Dispute
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.primaryBtn,
+                { backgroundColor: theme.colors.gold },
+              ]}
+            >
+              <Text style={styles.primaryBtnText}>
+                Scan Delivery QR
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 24, paddingTop: 60 },
-  back: { fontSize: 16, fontWeight: '700', color: theme.colors.sky },
-  title: { fontSize: 18, fontWeight: '900', color: theme.colors.black },
-  tabsScroll: { maxHeight: 56 },
-  tabs: { paddingHorizontal: 20, gap: 8, alignItems: 'center' },
-  tab: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0' },
-  tabActive: { backgroundColor: theme.colors.green, borderColor: theme.colors.green },
-  tabText: { fontSize: 13, fontWeight: '800', color: '#64748b' },
-  tabTextActive: { color: '#fff' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  loadingText: { marginTop: 12, color: '#64748b', fontWeight: '600' },
-  errorText: { color: '#ef4444', fontWeight: '700', textAlign: 'center', marginBottom: 16 },
-  retryBtn: { backgroundColor: theme.colors.green, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
-  retryText: { color: '#fff', fontWeight: '800' },
-  empty: { alignItems: 'center', paddingTop: 80, paddingHorizontal: 40 },
-  emptyIcon: { fontSize: 64, marginBottom: 16 },
-  emptyTitle: { fontSize: 22, fontWeight: '900', color: theme.colors.black, marginBottom: 8 },
-  emptyText: { fontSize: 14, color: '#64748b', textAlign: 'center', lineHeight: 22 },
-  card: { marginHorizontal: 20, marginBottom: 14, backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: '#e5e7eb', padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 3 },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, flexDirection: 'row', alignItems: 'center' },
-  statusText: { fontSize: 11, fontWeight: '900' },
-  orderId: { fontSize: 11, fontWeight: '800', color: '#94a3b8' },
-  cropName: { fontSize: 17, fontWeight: '900', color: theme.colors.black, marginBottom: 4 },
-  counterparty: { fontSize: 13, color: '#475569', fontWeight: '600', marginBottom: 2 },
-  date: { fontSize: 12, color: '#94a3b8', fontWeight: '600', marginBottom: 8 },
-  amountRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
-  amount: { fontSize: 20, fontWeight: '900', color: theme.colors.black },
-  escrowTagContainer: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  escrowTag: { fontSize: 12, color: '#f59e0b', fontWeight: '800' },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  primaryAction: { backgroundColor: theme.colors.green, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center' },
-  primaryActionText: { color: '#fff', fontWeight: '900', fontSize: 12 },
-  secondaryAction: { backgroundColor: '#fef2f2', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#fecaca', flexDirection: 'row', alignItems: 'center' },
-  secondaryActionText: { color: '#ef4444', fontWeight: '900', fontSize: 12 },
-  detailAction: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' },
-  detailActionText: { color: '#475569', fontWeight: '800', fontSize: 12 },
+  container: {
+    flex: 1,
+    backgroundColor: '#FFF',
+  },
+
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 60,
+    paddingBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  backBtn: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.colors.sky,
+  },
+
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: theme.colors.black,
+  },
+
+  roleBanner: {
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+
+  roleTextBanner: {
+    fontSize: 12,
+    fontWeight: '900',
+  },
+
+  section: {
+    marginTop: 24,
+    paddingHorizontal: 24,
+  },
+
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#999',
+    letterSpacing: 1,
+    marginBottom: 12,
+  },
+
+  stepperBox: {
+    padding: 20,
+    backgroundColor: '#F9F9F9',
+    borderRadius: 16,
+  },
+
+  stepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  stepCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EEE',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  stepActive: {
+    backgroundColor: theme.colors.green,
+  },
+
+  stepOngoing: {
+    backgroundColor: theme.colors.gold,
+  },
+
+  stepLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: '#DDD',
+    marginHorizontal: 4,
+  },
+
+  stepLineActive: {
+    flex: 1,
+    height: 2,
+    backgroundColor: theme.colors.green,
+    marginHorizontal: 4,
+  },
+
+  stepText: {
+    color: '#FFF',
+    fontWeight: '700',
+  },
+
+  labelsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+
+  stepLabel: {
+    fontSize: 10,
+    color: '#666',
+    width: 60,
+    textAlign: 'center',
+  },
+
+  escrowBanner: {
+    marginTop: 18,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: theme.colors.gold,
+  },
+
+  escrowText: {
+    fontSize: 14,
+    color: theme.colors.gold,
+  },
+
+  bold: {
+    fontWeight: '800',
+  },
+
+  deliveryDate: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#999',
+  },
+
+  card: {
+    padding: 20,
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#EEE',
+  },
+
+  cardRow: {
+    fontSize: 14,
+    color: theme.colors.black,
+    marginBottom: 10,
+    fontWeight: '600',
+  },
+
+  cardLabel: {
+    color: '#999',
+    fontWeight: '800',
+  },
+
+  actionGrid: {
+    paddingHorizontal: 24,
+    marginTop: 24,
+  },
+
+  secondaryBtn: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DDD',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+
+  dangerBtn: {
+    backgroundColor: '#FFF0F0',
+    borderColor: '#FFBABA',
+  },
+
+  secondaryBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#666',
+  },
+
+  primaryBtn: {
+    width: '100%',
+    paddingVertical: 18,
+    borderRadius: 12,
+    backgroundColor: theme.colors.green,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+
+  primaryBtnText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFF',
+  },
 });

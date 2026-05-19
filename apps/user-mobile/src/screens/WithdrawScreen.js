@@ -57,7 +57,7 @@ export default function WithdrawScreen({ navigation, route }) {
                 account_number: accountNumber.trim(),
               });
               Alert.alert('Withdrawal Requested', 'Your payout has been initiated. Funds will arrive shortly.', [
-                { text: 'OK', onPress: () => navigation.goBack() }
+                { text: 'OK', onPress: () => navigation.navigate('Wallet', { token }) }
               ]);
             } catch (err) {
               Alert.alert('Error', err.message || 'Withdrawal failed. Please try again.');

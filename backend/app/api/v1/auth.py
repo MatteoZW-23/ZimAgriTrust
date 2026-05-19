@@ -20,9 +20,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.user import User, UserRole, UserStatus
-from app.models.session import UserSession
 from app.models.security_enhanced import (
-    PINLockout, TokenBlacklist, AuditLog, AuditLogAction,
+    PINLockout, UserSession, TokenBlacklist, SecurityAuditLog, AuditLogAction,
     MFAConfiguration
 )
 from app.services.security_service import (

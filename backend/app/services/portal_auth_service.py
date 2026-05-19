@@ -15,6 +15,7 @@ from app.models.user import User, UserRole, UserStatus
 from app.schemas.auth import Token, UserResponse
 from app.services.auth_service import authenticate_user, build_phone_lookup_candidates
 from app.services.cache_service import cache_service
+from app.services.mfa_service import MFAService
 from app.services.notification_service import NotificationService
 from app.services.rate_limit_service import (
     clear_login_failures,
@@ -26,20 +27,59 @@ from app.services.session_service import create_session
 
 OTP_TTL_SECONDS = 300
 
+# ── Role sets for portal gate checks ─────────────────────────────────────────
 PUBLIC_APP_ROLES = {UserRole.FARMER, UserRole.BUYER}
-DRIVER_ROLES = {UserRole.TRANSPORTER}
-ADMIN_PORTAL_ROLES = {UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.REGIONAL_MANAGER}
+DRIVER_ROLES = {UserRole.DRIVER, UserRole.TRANSPORTER}
+SUPPLIER_ROLES = {UserRole.SUPPLIER}
+STAFF_ROLES = {UserRole.STAFF}
 AGENT_PORTAL_ROLES = {UserRole.AGENT}
+ADMIN_PORTAL_ROLES = {
+    UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN,
+    UserRole.FINANCE_ADMIN, UserRole.REGIONAL_ADMIN, UserRole.REGIONAL_MANAGER,
+    UserRole.SUPPORT_ADMIN, UserRole.BRANCH_ADMIN,
+}
 PUBLIC_MOBILE_ROLES = PUBLIC_APP_ROLES | DRIVER_ROLES
 
+# ── Portal routing by role ───────────────────────────────────────────────────
 ROLE_PORTALS = {
     UserRole.FARMER: ("app", "/app"),
     UserRole.BUYER: ("app", "/app"),
+    UserRole.DRIVER: ("driver", "/driver"),
     UserRole.TRANSPORTER: ("driver", "/driver"),
+    UserRole.STAFF: ("admin", "/admin"),
     UserRole.AGENT: ("agent", "/agent"),
+    UserRole.SUPPLIER: ("supplier", "/supplier"),
+    UserRole.BRANCH_ADMIN: ("admin", "/admin"),
+    UserRole.SUPPORT_ADMIN: ("admin", "/admin"),
+    UserRole.REGIONAL_ADMIN: ("admin", "/admin"),
+    UserRole.REGIONAL_MANAGER: ("admin", "/admin"),
+    UserRole.FINANCE_ADMIN: ("admin", "/admin"),
+    UserRole.SYSTEM_ADMIN: ("admin", "/admin"),
     UserRole.ADMIN: ("admin", "/admin"),
     UserRole.SUPER_ADMIN: ("admin", "/admin"),
-    UserRole.REGIONAL_MANAGER: ("admin", "/admin"),
+}
+
+# ── Role-based token expiry (minutes) ────────────────────────────────────────
+ACCESS_TOKEN_EXPIRY_BY_ROLE = {
+    UserRole.SUPER_ADMIN: 15, UserRole.ADMIN: 15,
+    UserRole.SYSTEM_ADMIN: 30, UserRole.FINANCE_ADMIN: 30,
+    UserRole.REGIONAL_ADMIN: 30, UserRole.REGIONAL_MANAGER: 30,
+    UserRole.SUPPORT_ADMIN: 60, UserRole.BRANCH_ADMIN: 60,
+    UserRole.SUPPLIER: 60, UserRole.STAFF: 60,
+    UserRole.AGENT: 480,  # 8 hours
+    UserRole.DRIVER: 60, UserRole.TRANSPORTER: 60,
+    UserRole.FARMER: 60, UserRole.BUYER: 60,
+}
+
+REFRESH_TOKEN_EXPIRY_DAYS_BY_ROLE = {
+    UserRole.SUPER_ADMIN: 7, UserRole.ADMIN: 7,
+    UserRole.SYSTEM_ADMIN: 7, UserRole.FINANCE_ADMIN: 7,
+    UserRole.REGIONAL_ADMIN: 7, UserRole.REGIONAL_MANAGER: 7,
+    UserRole.SUPPORT_ADMIN: 14, UserRole.BRANCH_ADMIN: 14,
+    UserRole.SUPPLIER: 30, UserRole.STAFF: 14,
+    UserRole.AGENT: 30,
+    UserRole.DRIVER: 30, UserRole.TRANSPORTER: 30,
+    UserRole.FARMER: 30, UserRole.BUYER: 30,
 }
 
 
@@ -101,7 +141,12 @@ async def issue_session_token(
     request: Request,
     response: Response,
     must_change_password: bool = False,
+    mfa_required: bool = False,
 ) -> Token:
+    # Role-based token expiry
+    access_minutes = ACCESS_TOKEN_EXPIRY_BY_ROLE.get(user.role, settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    refresh_days = REFRESH_TOKEN_EXPIRY_DAYS_BY_ROLE.get(user.role, _refresh_days())
+
     access_token = create_access_token(str(user.id), user.role.value)
     refresh_token = create_refresh_token(str(user.id))
     access_payload = decode_token(access_token)
@@ -114,13 +159,13 @@ async def issue_session_token(
         refresh_token_jti=refresh_payload.get("jti"),
         request_headers=dict(request.headers),
         ip_address=request.client.host if request.client else "unknown",
-        access_expiry_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
-        refresh_expiry_days=_refresh_days(),
+        access_expiry_minutes=access_minutes,
+        refresh_expiry_days=refresh_days,
     )
 
     cookie_secure = _cookie_secure()
-    access_max_age = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
-    refresh_max_age = settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60
+    access_max_age = access_minutes * 60
+    refresh_max_age = refresh_days * 24 * 3600
     response.set_cookie(
         key="access_token",
         value=access_token,
@@ -227,9 +272,30 @@ async def begin_mfa_login(
 
     ensure_role(user, allowed_roles, portal_name)
     ensure_active_user(user)
+# Check if TOTP MFA is required and not set up
+    if MFAService.needs_mfa_setup(db, user):
+        return {
+            "status": "MFA_SETUP_REQUIRED",
+            "message": "Multi-factor authentication is required for your role. Please set up TOTP authenticator app.",
+            "phone": user.phone_number,
+            "portal": portal_name,
+            "mfa_required": True,
+        }
 
+    # Check if TOTP MFA is enabled
+    mfa_enabled = MFAService.is_mfa_enabled(db, user.id)
+    if mfa_enabled:
+        return {
+            "status": "TOTP_REQUIRED",
+            "message": "Enter your TOTP code from your authenticator app.",
+            "phone": user.phone_number,
+            "portal": portal_name,
+            "mfa_method": "totp",
+        }
+
+    # Send OTP via SMS and WhatsApp
     otp = str(random.randint(100000, 999999))
-    await set_otp(f"{portal_name}:mfa:{user.phone_number}", otp)
+    await set_otp(f"{portal_name}:mfa:{phone_number}", otp)
     await NotificationService.send_verification_code(user.phone_number, otp)
 
     return {
@@ -247,8 +313,8 @@ async def complete_mfa_login(
     response: Response,
     phone_number: str,
     otp: str,
-    allowed_roles: set[UserRole],
     portal_name: str,
+    allowed_roles: set[UserRole],
 ) -> Token:
     cached_otp = await get_otp(f"{portal_name}:mfa:{phone_number}")
     if not cached_otp or otp != cached_otp:

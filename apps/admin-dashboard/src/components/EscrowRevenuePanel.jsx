@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  fetchTransactions, fetchAuditLogs, fetchNationalRevenue,
+  fetchTransactions, fetchSecurityLogs, fetchNationalRevenue,
   fetchRevenueBreakdown,
   reconcilePlatform, downloadReceipt, listAdminTransactions,
   forceEscrowRelease, forceEscrowRefund,
@@ -126,7 +126,7 @@ export default function EscrowRevenuePanel({ token, onEscrowAction }) {
   const auditExport = async () => {
     setBusy(true);
     try {
-      const data = await fetchAuditLogs(token);
+      const data = await fetchSecurityLogs(token);
       exportToCSV(data, `ZimAgritrust_Audit_${Date.now()}.csv`);
     } catch (e) { alert(e.message); }
     finally { setBusy(false); }

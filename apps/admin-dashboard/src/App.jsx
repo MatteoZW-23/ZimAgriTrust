@@ -8,7 +8,7 @@ import {
   fetchOverview, fetchReviewQueue, fetchTransactions, verifyListing,
   fetchDisputes, fetchMarketActivities, updateUserStatus, adjustTrustScore,
   verifyUser, resolveDispute, deleteUser, fetchEscrowStats, fetchAgentStats,
-  fetchNationalPulse, fetchMarketNews, proposeAdjustment, fetchUsers, updateProfile,
+  fetchMarketNews, proposeAdjustment, fetchUsers, updateProfile,
   storeSAToken,
 } from './api';
 import './styles.css';
@@ -20,13 +20,11 @@ import { OverviewPanel } from './components/OverviewPanel';
 import UserDirectoryPanel from './components/UserDirectoryPanel';
 import MarketAdvisory from './components/MarketAdvisory';
 import { VerificationPanel } from './components/VerificationPanel';
-import ActivityHistoryPanel from './components/ActivityHistoryPanel';
 import { SettingsPanel, TermsModal } from './components/SettingsPanel';
 import USSDSimulator from './components/USSDSimulator';
 import EscrowRevenuePanel from './components/EscrowRevenuePanel';
 import DisputeResolutionPanel from './components/DisputeResolutionPanel';
 import { AgentPerformancePanel } from './components/AgentPerformancePanel';
-import LogisticsCommand from './components/LogisticsCommand';
 import MessagingPanel from './components/MessagingPanel';
 import SupportConcierge from './components/SupportConcierge';
 import AgentRecruitmentPanel from './components/AgentRecruitmentPanel';
@@ -46,6 +44,10 @@ import InvitationAcceptScreen from './components/InvitationAcceptScreen';
 import AdminInvitationsPanel from './components/AdminInvitationsPanel';
 import WhatsAppBotPanel from './components/WhatsAppBotPanel';
 import { TransportManagementPanel } from './components/TransportManagementPanel';
+import AuditLogScreen from './components/AuditLogScreen';
+import BroadcastScreen from './components/BroadcastScreen';
+import SupplierManagementPanel from './components/SupplierManagementPanel';
+import AcademyManagement from './components/AcademyManagement';
 
 // ── Access Denied Screen ───────────────────────────────────────────────────────
 function AccessDenied({ role, onLogout }) {
@@ -152,11 +154,10 @@ function App() {
     setLoading(true);
     try {
       const safe = (p, fb) => p.catch(e => { if (e.status === 401) throw e; return fb; });
-      const [marketRes, newsRes, pulseRes, transRes, statsRes, listingRes, userRes, escrowRes, disputeRes, agentRes] =
+      const [marketRes, newsRes, transRes, statsRes, listingRes, userRes, escrowRes, disputeRes, agentRes] =
         await Promise.all([
           safe(fetchMarketActivities(token), { listings: [], offers: [], deals: [] }),
           safe(fetchMarketNews(token), []),
-          safe(fetchNationalPulse(token), null),
           safe(fetchTransactions(token), []),
           safe(fetchOverview(token), { stats: {} }),
           safe(fetchReviewQueue(token), []),
@@ -299,10 +300,14 @@ function App() {
 
   const role = profile?.role?.toUpperCase() || 'USER';
 
-  // ── Role guard: staff only ───────────────────────────────────────────────────
-  if (role !== 'ADMIN' && role !== 'SUPER_ADMIN' && role !== 'REGIONAL_MANAGER') {
+  // ── Role guard: admin roles only ───────────────────────────────────────────────
+  const ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN', 'SYSTEM_ADMIN', 'FINANCE_ADMIN', 'REGIONAL_ADMIN', 'SUPPORT_ADMIN', 'BRANCH_ADMIN'];
+  if (!ADMIN_ROLES.includes(role)) {
     return <AccessDenied role={role} onLogout={handleLogout} />;
   }
+
+  // Normalize legacy "ADMIN" to "SUPER_ADMIN" for permissions
+  const effectiveRole = role === 'ADMIN' ? 'SUPER_ADMIN' : role;
 
   // ── Admin nav groups (nested, collapsible) ──────────────────────────────────
   const toggleGroup = (key) => {
@@ -313,67 +318,99 @@ function App() {
     });
   };
 
+  // ── Role-based Navigation ──────────────────────────────────────────────────
+  // Each view specifies which roles can access it. Empty roles = all admin roles.
+  const SA = ['SUPER_ADMIN'];
+  const TECH = ['SUPER_ADMIN', 'SYSTEM_ADMIN'];
+  const FIN = ['SUPER_ADMIN', 'FINANCE_ADMIN'];
+  const REG = ['SUPER_ADMIN', 'REGIONAL_ADMIN'];
+  const SUP = ['SUPER_ADMIN', 'SUPPORT_ADMIN'];
+  const ALL_ADMINS = ADMIN_ROLES;
+
   const allNavGroups = [
-    // Standalone top-level items (no group)
+    // Dashboard — all roles
     { type: 'item', view: 'overview', icon: 'fa-home', label: 'Dashboard' },
 
-    // PLATFORM group
-    { type: 'group', key: 'platform', icon: 'fa-layer-group', label: 'Platform', children: [
-      { view: 'users',               icon: 'fa-users',             label: 'User Directory' },
-      { view: 'id-verification',     icon: 'fa-id-card',           label: 'ID Verification' },
-      { view: 'driver-verification', icon: 'fa-truck',             label: 'Driver Verification' },
-      { view: 'marketplace',         icon: 'fa-clipboard-check',   label: 'Listing Review' },
-      { view: 'marketplace-buyer',   icon: 'fa-basket-shopping',   label: 'Browse Market' },
-      { view: 'market-monitor',      icon: 'fa-tower-observation', label: 'Market Monitor' },
+    // ── PLATFORM MANAGEMENT ──
+    { type: 'group', key: 'platform', icon: 'fa-layer-group', label: 'Platform',
+      roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN', 'REGIONAL_ADMIN', 'SUPPORT_ADMIN', 'BRANCH_ADMIN'],
+      children: [
+        { view: 'users',               icon: 'fa-users',           label: 'User Directory',      roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN', 'REGIONAL_ADMIN', 'BRANCH_ADMIN'] },
+        { view: 'suppliers',           icon: 'fa-boxes-stacked',   label: 'Supplier Management', roles: ['SUPER_ADMIN', 'REGIONAL_ADMIN', 'SUPPORT_ADMIN', 'BRANCH_ADMIN'] },
+        { view: 'id-verification',     icon: 'fa-id-card',         label: 'ID Verification',     roles: ['SUPER_ADMIN', 'REGIONAL_ADMIN', 'SUPPORT_ADMIN', 'BRANCH_ADMIN'] },
+        { view: 'driver-verification', icon: 'fa-truck',           label: 'Driver Verification', roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN', 'REGIONAL_ADMIN'] },
+        { view: 'marketplace',         icon: 'fa-clipboard-check', label: 'Listing Review',      roles: ['SUPER_ADMIN', 'REGIONAL_ADMIN', 'SUPPORT_ADMIN'] },
+        { view: 'marketplace-buyer',   icon: 'fa-basket-shopping', label: 'Browse Market',       roles: ['SUPER_ADMIN', 'REGIONAL_ADMIN', 'BRANCH_ADMIN'] },
+        { view: 'market-monitor',      icon: 'fa-tower-observation', label: 'Market Monitor',   roles: ['SUPER_ADMIN', 'REGIONAL_ADMIN'] },
     ]},
 
-    // FINANCE group
-    { type: 'group', key: 'finance', icon: 'fa-coins', label: 'Finance', children: [
-      { view: 'transactions-admin', icon: 'fa-wallet',  label: 'Escrow & Revenue' },
-      { view: 'disputes',           icon: 'fa-gavel',  label: 'Arbitration' },
-      { view: 'wallet',             icon: 'fa-credit-card', label: 'My Wallet' },
+    // ── FINANCE & TRANSACTIONS ──
+    { type: 'group', key: 'finance', icon: 'fa-coins', label: 'Finance',
+      roles: ['SUPER_ADMIN', 'FINANCE_ADMIN', 'BRANCH_ADMIN'],
+      children: [
+        { view: 'transactions-admin', icon: 'fa-wallet',      label: 'Escrow & Revenue',  roles: ['SUPER_ADMIN', 'FINANCE_ADMIN'] },
+        { view: 'disputes',           icon: 'fa-gavel',       label: 'Arbitration',       roles: ['SUPER_ADMIN', 'FINANCE_ADMIN', 'SUPPORT_ADMIN'] },
+        { view: 'wallet',             icon: 'fa-credit-card', label: 'My Wallet' },
+        { view: 'reports',            icon: 'fa-chart-pie',   label: 'Financial Reports', roles: ['SUPER_ADMIN', 'FINANCE_ADMIN'] },
     ]},
 
-    // AGENTS group
-    { type: 'group', key: 'agents', icon: 'fa-user-tie', label: 'Agents', children: [
-      { view: 'network',     icon: 'fa-handshake',   label: 'Agent Network' },
-      { view: 'recruitment', icon: 'fa-user-plus',   label: 'Recruitment' },
-      { view: 'post-exam',   icon: 'fa-user-shield', label: 'Post-Exam Review' },
+    // ── AGENT MANAGEMENT ──
+    { type: 'group', key: 'agents', icon: 'fa-user-tie', label: 'Agents',
+      roles: ['SUPER_ADMIN', 'REGIONAL_ADMIN'],
+      children: [
+        { view: 'network',     icon: 'fa-handshake',   label: 'Agent Network',     roles: ['SUPER_ADMIN', 'REGIONAL_ADMIN'] },
+        { view: 'recruitment', icon: 'fa-user-plus',   label: 'Recruitment',       roles: ['SUPER_ADMIN', 'REGIONAL_ADMIN'] },
+        { view: 'academy',    icon: 'fa-graduation-cap', label: 'Training Academy', roles: ['SUPER_ADMIN', 'REGIONAL_ADMIN'] },
+        { view: 'post-exam',   icon: 'fa-user-shield', label: 'Post-Exam Review',  roles: ['SUPER_ADMIN', 'REGIONAL_ADMIN'] },
     ]},
 
-    // OPERATIONS group
-    { type: 'group', key: 'operations', icon: 'fa-tower-broadcast', label: 'Operations', children: [
-      { view: 'logistics',   icon: 'fa-truck-fast',    label: 'Logistics Control' },
-      { view: 'transport',   icon: 'fa-truck',          label: 'Transport Management' },
-      { view: 'whatsapp-bot',icon: 'fa-comment-dots',  label: 'WhatsApp Bot',  roles: ['ADMIN', 'SUPER_ADMIN', 'REGIONAL_MANAGER'] },
-      { view: 'ussd',        icon: 'fa-mobile',        label: 'USSD Simulator' },
-      { view: 'reports',     icon: 'fa-chart-pie',     label: 'Market Insights' },
+    // ── SUPPORT & DISPUTES ──
+    { type: 'group', key: 'support', icon: 'fa-headset', label: 'Support',
+      roles: ['SUPER_ADMIN', 'SUPPORT_ADMIN'],
+      children: [
+        { view: 'disputes',    icon: 'fa-gavel',         label: 'Dispute Resolution', roles: ['SUPER_ADMIN', 'SUPPORT_ADMIN'] },
+        { view: 'messages',    icon: 'fa-comment-dots',  label: 'Messaging',          roles: ['SUPER_ADMIN', 'SUPPORT_ADMIN'] },
+        { view: 'broadcast',   icon: 'fa-bullhorn',      label: 'Announcements',      roles: ['SUPER_ADMIN', 'SUPPORT_ADMIN', 'REGIONAL_ADMIN'] },
     ]},
 
-    // GOVERNANCE group (ADMIN+ only)
-    { type: 'group', key: 'governance', icon: 'fa-shield-halved', label: 'Governance', roles: ['ADMIN', 'SUPER_ADMIN'], children: [
-      { view: 'ai-models',         icon: 'fa-brain',         label: 'AI Core Control',     roles: ['ADMIN', 'SUPER_ADMIN'] },
-      { view: 'data-pipeline',     icon: 'fa-spider',        label: 'Market Intelligence', roles: ['ADMIN', 'SUPER_ADMIN'] },
-      { view: 'command-center',    icon: 'fa-terminal',      label: 'Central Command',     roles: ['ADMIN', 'SUPER_ADMIN'] },
-      { view: 'admin-invitations', icon: 'fa-user-plus',     label: 'Admin Invitations',   roles: ['SUPER_ADMIN'] },
-      { view: 'logs',              icon: 'fa-shield-halved', label: 'Audit Logs',          roles: ['ADMIN', 'SUPER_ADMIN'] },
-      { view: 'system-config',     icon: 'fa-gears',         label: 'System Config',       roles: ['ADMIN', 'SUPER_ADMIN'] },
+    // ── OPERATIONS & LOGISTICS ──
+    { type: 'group', key: 'operations', icon: 'fa-tower-broadcast', label: 'Operations',
+      roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN', 'REGIONAL_ADMIN'],
+      children: [
+        { view: 'transport',    icon: 'fa-truck',        label: 'Transport & Freight', roles: ['SUPER_ADMIN', 'REGIONAL_ADMIN'] },
+        { view: 'whatsapp-bot', icon: 'fa-comment-dots', label: 'WhatsApp Bot',         roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN'] },
+        { view: 'ussd',         icon: 'fa-mobile',       label: 'USSD Simulator',       roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN'] },
     ]},
 
-    // PERSONAL group
+    // ── SYSTEM & GOVERNANCE (Technical + Super Admin) ──
+    { type: 'group', key: 'governance', icon: 'fa-shield-halved', label: 'System',
+      roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN'],
+      children: [
+        { view: 'system-config',     icon: 'fa-gears',         label: 'System Config',       roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN'] },
+        { view: 'ai-models',         icon: 'fa-brain',         label: 'AI Models',           roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN'] },
+        { view: 'data-pipeline',     icon: 'fa-spider',        label: 'Data Pipeline',       roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN'] },
+        { view: 'command-center',    icon: 'fa-terminal',      label: 'Command Center',      roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN'] },
+        { view: 'audit-logs',        icon: 'fa-shield-halved', label: 'Audit Logs',          roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN'] },
+        { view: 'admin-invitations', icon: 'fa-user-plus',     label: 'Admin Invitations',   roles: SA },
+    ]},
+
+    // ── PERSONAL ──
     { type: 'group', key: 'personal', icon: 'fa-circle-user', label: 'Personal', children: [
       { view: 'settings', icon: 'fa-user-gear', label: 'Settings' },
+      { view: 'wallet',   icon: 'fa-credit-card', label: 'My Wallet' },
     ]},
   ];
 
   const navGroups = allNavGroups
-    .filter(g => !g.roles || g.roles.includes(role))
+    .filter(g => !g.roles || g.roles.includes(effectiveRole))
     .map(g => {
       if (g.type === 'group') {
-        return { ...g, children: g.children.filter(c => !c.roles || c.roles.includes(role)) };
+        const filtered = g.children.filter(c => !c.roles || c.roles.includes(effectiveRole));
+        return filtered.length > 0 ? { ...g, children: filtered } : null;
       }
       return g;
-    });
+    })
+    .filter(Boolean);
 
   return (
     <main className={`shell-v4 theme-admin ${isSidebarCollapsed ? 'sidebar-hidden' : ''}`}>
@@ -470,7 +507,7 @@ function App() {
             {!isSidebarCollapsed && (
               <div className="u-meta">
                 <strong>{profile.full_name}</strong>
-                <span>ADMIN</span>
+                <span>{effectiveRole.replace('_', ' ')}</span>
               </div>
             )}
           </div>
@@ -598,6 +635,7 @@ function App() {
               profile={profile} token={token} onGovernance={handleGovernance} onRefresh={loadAllData}
             />
           )}
+          {currentView === 'suppliers' && <SupplierManagementPanel token={token} />}
           {currentView === 'marketplace' && (
             <VerificationPanel
               listings={reviewQueue.filter(l =>
@@ -617,16 +655,17 @@ function App() {
           {currentView === 'transactions-admin' && <EscrowRevenuePanel token={token} onEscrowAction={handleGovernance} />}
           {currentView === 'disputes' && <DisputeResolutionPanel disputes={disputes} onResolve={handleResolveDispute} />}
           {currentView === 'network' && <AgentPerformancePanel agents={agents} onRefresh={loadAllData} profile={profile} />}
-          {currentView === 'logistics' && <LogisticsCommand token={token} role="ADMIN" transactions={transactions} />}
           {currentView === 'transport' && <TransportManagementPanel token={token} />}
           {currentView === 'reports' && <NationalMarketHub token={token} />}
           {currentView === 'recruitment' && <AgentRecruitmentPanel token={token} />}
+          {currentView === 'academy' && <AcademyManagement token={token} />}
           {currentView === 'post-exam' && <AgentPostExamReview token={token} />}
           {currentView === 'ai-models' && <AIModelPanel token={token} />}
           {currentView === 'data-pipeline' && <DataPipelinePanel token={token} />}
           {currentView === 'command-center' && <AdminCommandCenter token={token} />}
           {currentView === 'admin-invitations' && <AdminInvitationsPanel />}
-          {currentView === 'logs' && <ActivityHistoryPanel activities={[]} />}
+          {currentView === 'audit-logs' && <AuditLogScreen token={token} />}
+          {currentView === 'broadcast' && <BroadcastScreen token={token} />}
           {currentView === 'system-config' && <SystemConfigPanel token={token} />}
           {currentView === 'ussd' && <USSDSimulator profile={profile} />}
           {currentView === 'wallet' && <WalletPanel token={token} profile={profile} />}

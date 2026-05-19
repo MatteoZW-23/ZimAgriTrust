@@ -1,4 +1,5 @@
 import uuid
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -34,6 +35,7 @@ from app.domain.orders.exceptions import (
 # ---------------------------------------------------------------------------
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class OrderDisputeRequest(BaseModel):
@@ -59,12 +61,16 @@ def _raise_http_for_domain_error(exc: OrderDomainError) -> None:
 def list_orders(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ) -> list[Order]:
-    if current_user.role == UserRole.BUYER:
-        return db.query(Order).filter(Order.buyer_id == current_user.id).all()
-    elif current_user.role == UserRole.FARMER:
-        return db.query(Order).filter(Order.seller_id == current_user.id).all()
-    else:
-        return db.query(Order).all()
+    try:
+        if current_user.role == UserRole.BUYER:
+            return db.query(Order).filter(Order.buyer_id == current_user.id).all()
+        elif current_user.role == UserRole.FARMER:
+            return db.query(Order).filter(Order.seller_id == current_user.id).all()
+        else:
+            return db.query(Order).all()
+    except Exception as e:
+        logger.error(f"List orders error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve orders")
 
 
 @router.get("/{order_id}", response_model=OrderResponse)
@@ -73,14 +79,20 @@ def get_order_details(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Order:
-    order = db.query(Order).filter(Order.id == order_id).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-    
-    if current_user.role not in {UserRole.ADMIN, UserRole.SUPER_ADMIN} and order.buyer_id != current_user.id and order.seller_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    return order
+    try:
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        if current_user.role not in {UserRole.ADMIN, UserRole.SUPER_ADMIN} and order.buyer_id != current_user.id and order.seller_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        return order
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get order details error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve order details")
 
 
 @router.post("/{order_id}/confirm-delivery", response_model=OrderResponse)

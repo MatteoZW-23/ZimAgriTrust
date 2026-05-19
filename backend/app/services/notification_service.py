@@ -214,12 +214,6 @@ class NotificationService:
             return False
 
     @staticmethod
-    async def _notify_both_channels(phone: str, message: str):
-        """Send notification via both SMS and WhatsApp"""
-        NotificationService._send_sms(phone, message)
-        await NotificationService._send_whatsapp(phone, message)
-
-    @staticmethod
     async def _send_email(email: str, subject: str, body: str):
         """Send email"""
         try:
@@ -229,7 +223,14 @@ class NotificationService:
         except Exception as e:
             logger.error(f"Email failed to {email}: {e}")
             return False
-    
+
+    @staticmethod
+    async def _notify_both_channels(phone: str, message: str):
+        """Send notification via both SMS and WhatsApp for maximum reliability."""
+        sms_ok = NotificationService._send_sms(phone, message)
+        wa_ok = await NotificationService._send_whatsapp(phone, message)
+        return {"sms": sms_ok, "whatsapp": wa_ok}
+
     @staticmethod
     async def send_notification(
         db: Session,

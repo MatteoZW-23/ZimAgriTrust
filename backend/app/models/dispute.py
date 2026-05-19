@@ -25,7 +25,7 @@ class Dispute(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id"), nullable=False, index=True)
     raised_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
-    agent_assigned: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    resolved_by_agent_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("agents.id"), nullable=True)  # Agent who resolved dispute
     
     type: Mapped[str] = mapped_column(String(30))
     description: Mapped[str] = mapped_column(Text)
@@ -45,7 +45,7 @@ class Dispute(Base):
 
     order = relationship("Order", back_populates="disputes")
     raised_by_user = relationship("User", foreign_keys=[raised_by])
-    assigned_agent = relationship("User", foreign_keys=[agent_assigned])
+    resolved_by_agent = relationship("Agent", foreign_keys=[resolved_by_agent_id])
 
     @property
     def product(self) -> str:

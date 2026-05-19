@@ -23,6 +23,8 @@ from app.core.security import get_password_hash
 from app.services.startup_scraper import run_startup_scrape, start_scheduler
 from app.db.schema_patch import apply_schema_patches
 from app.core.security_middleware import SecurityMiddleware, AuditLoggingMiddleware
+from app.core.logging_config import configure_logging
+from app.core.tracing_middleware import RequestTracingMiddleware
 from app.models.session import UserSession  # noqa: F401 — registers session table
 from app.core.health import router as health_router
 from app.core.error_tracking import init_sentry
@@ -32,75 +34,83 @@ from app.ml.model_loader import model_loader
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("SYSLOG | Initializing Strategic Database Schema...")
-    
-    # Initialize Sentry error tracking
-    init_sentry()
-    
-    try:
-        Base.metadata.create_all(bind=engine)
-        print(f"SYSLOG | Tables Confirmed: {list(Base.metadata.tables.keys())}")
+    configure_logging(log_level="INFO")
+    logger = logging.getLogger("startup")
+    logger.info("SYSLOG | Starting ZimAgriTrust backend...")
 
-        # Patch any columns added to ORM models after the table was first created
-        apply_schema_patches(engine)
+    init_sentry()
+
+    try:
+        # Schema is managed EXCLUSIVELY by Alembic migrations.
+        # create_all() is intentionally removed — it bypasses migration history
+        # and causes schema drift in multi-pod deployments.
+        # Run `alembic upgrade head` in the Docker entrypoint before starting.
 
         with SessionLocal() as db:
-            print("SYSLOG | Seeding RBAC roles and permissions...")
+            logger.info("SYSLOG | Seeding RBAC roles and permissions...")
             from app.services.rbac_service import RBACService
             RBACService.create_default_roles(db)
-            print("SYSLOG | Finalizing Production Environment...")
-            settlement_worker.run_settlement_sweep(db)
-            print("SYSLOG | Platform Live and Ready for Market Deployment.")
 
         # Load ONNX and sklearn inference models (non-fatal if weights missing)
         model_loader.load_all()
-        print("SYSLOG | ML model loader initialized.")
+        logger.info("SYSLOG | ML model loader initialized.")
 
-    except Exception as e:
-        print(f"BOOT_ERROR | Managed startup failure: {str(e)}")
-        # Capture startup errors in Sentry
+    except Exception as exc:
+        logger.error("BOOT_ERROR | Startup failure: %s", exc, exc_info=True)
         from app.core.error_tracking import capture_exception
-        capture_exception(e, {"context": "startup"})
+        capture_exception(exc, {"context": "startup"})
 
-    # ── SCRAPING STARTUP ──────────────────────────────────────────────────
-    import asyncio
-    loop = asyncio.get_event_loop()
-    loop.run_in_executor(None, run_startup_scrape)
+    # Distributed scheduler: only one pod should run the scheduler.
+    # Uses Redis SET NX to elect a leader for the lifetime of this process.
+    from app.services.cache_service import cache_service as _cs
+    import asyncio as _asyncio
+    import os as _os
+    _pod_id = _os.environ.get("HOSTNAME", str(id(app)))
+    _scheduler_lock_key = "scheduler:leader"
+    _scheduler_lock_ttl = 120  # seconds; worker must renew before expiry
+    _is_scheduler = False
+    try:
+        _is_scheduler = bool(
+            await _cs.set(_scheduler_lock_key, _pod_id, expire=_scheduler_lock_ttl, nx=True)
+        )
+    except Exception:
+        pass
 
-    start_scheduler()
-    print("SYSLOG | Background scraper and scheduler started.")
-    # ─────────────────────────────────────────────────────────────────────
+    if _is_scheduler:
+        start_scheduler()
+        logger.info("SYSLOG | This pod is the scheduler leader (%s). Scheduler started.", _pod_id)
 
+        async def _renew_scheduler_lock():
+            while True:
+                await _asyncio.sleep(_scheduler_lock_ttl // 2)
+                try:
+                    await _cs.set(_scheduler_lock_key, _pod_id, expire=_scheduler_lock_ttl)
+                except Exception:
+                    pass
+        _asyncio.create_task(_renew_scheduler_lock())
+    else:
+        logger.info("SYSLOG | Scheduler leader already elected. This pod is a follower.")
+
+    logger.info("SYSLOG | Platform Live and Ready for Market Deployment.")
     yield
 
 
 app = FastAPI(title=settings.APP_NAME, version="1.0.0", lifespan=lifespan)
 
 # 1. CORS Middleware (Must be at the very top to handle preflights before security)
-# Allow credentials with specific origins for admin dashboard, wildcard for mobile apps
+# Restrict to specific frontend origins for security
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:3002",
-        "http://localhost:3003",
-        "http://localhost:5173",  # Admin dashboard Vite dev server
-        "http://localhost:19000",
-        "http://localhost:19001",
-        "http://localhost:19002",
-        "http://localhost:19006",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:19000",
-        "http://127.0.0.1:19002",
-        "*",  # Fallback for mobile apps with dynamic IPs
-    ],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
+    allow_methods=settings.CORS_ALLOW_METHODS,
+    allow_headers=settings.CORS_ALLOW_HEADERS,
+    expose_headers=["X-Request-ID", "X-Process-Time", "X-Idempotency-Replayed", "X-CSRF-Token"],
 )
+
+# 1.5 Idempotency Middleware (after CORS, before security)
+from app.core.idempotency import IdempotencyMiddleware
+app.add_middleware(IdempotencyMiddleware)
 
 # 2. Trusted Host Middleware (Skip if wildcard is used)
 if settings.ALLOWED_HOSTS.strip() != "*":
@@ -117,6 +127,9 @@ if settings.ADMIN_AUDIT_LOGGING:
 
 app.add_middleware(MetricsMiddleware)
 
+# Outermost middleware — sets correlation_id ContextVar before everything else fires
+app.add_middleware(RequestTracingMiddleware)
+
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 app.include_router(health_router, prefix="/health", tags=["health"])
@@ -125,8 +138,15 @@ app.include_router(metrics_router)
 # --- INDUSTRIAL STRENGTH MIDDLEWARE ---
 
 class EmergencyShutdownMiddleware(BaseHTTPMiddleware):
+    """
+    Checks SYSTEM_LOCKDOWN flag with a 5-second Redis cache to avoid
+    opening a new DB connection on every single mutating request.
+    Falls back to allowing the request if Redis is unavailable.
+    """
+    _CACHE_KEY = "system:lockdown"
+    _CACHE_TTL = 5  # seconds
+
     async def dispatch(self, request: Request, call_next):
-        # Skip preflight requests
         if request.method == "OPTIONS":
             return await call_next(request)
 
@@ -135,13 +155,21 @@ class EmergencyShutdownMiddleware(BaseHTTPMiddleware):
             if path.startswith("/api/v1/super-admin"):
                 return await call_next(request)
             try:
-                with SessionLocal() as db:
-                    cfg = db.query(SystemConfig).filter(SystemConfig.key == "SYSTEM_LOCKDOWN").first()
-                    if cfg and str(cfg.value).lower() == "true":
-                        return JSONResponse(
-                            status_code=503,
-                            content={"detail": "PLATFORM_LOCKDOWN: System under emergency read-only lockdown."},
-                        )
+                from app.services.cache_service import cache_service as _cs
+                cached = await _cs.get(self._CACHE_KEY)
+                if cached is None:
+                    with SessionLocal() as db:
+                        cfg = db.query(SystemConfig).filter(
+                            SystemConfig.key == "SYSTEM_LOCKDOWN"
+                        ).first()
+                        val = str(cfg.value).lower() if cfg else "false"
+                    await _cs.set(self._CACHE_KEY, val, expire=self._CACHE_TTL)
+                    cached = val
+                if cached == "true":
+                    return JSONResponse(
+                        status_code=503,
+                        content={"detail": "PLATFORM_LOCKDOWN: System under emergency read-only lockdown."},
+                    )
             except Exception:
                 pass
         return await call_next(request)

@@ -57,7 +57,22 @@ def create_refresh_token(subject: str) -> str:
 
 
 def decode_token(token: str) -> dict:
-    return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    """
+    Decode and validate JWT with strict algorithm enforcement.
+    Explicitly rejects alg=none and requires all security claims.
+    """
+    return jwt.decode(
+        token,
+        settings.SECRET_KEY,
+        algorithms=[settings.ALGORITHM],  # Only HS256 allowed - explicit whitelist
+        options={
+            "require": ["exp", "iat", "sub", "type"],
+            "verify_signature": True,
+            "verify_exp": True,
+            "verify_iat": True,
+            "verify_nbf": True,
+        }
+    )
 
 
 def generate_secure_token(length: int = 32) -> str:

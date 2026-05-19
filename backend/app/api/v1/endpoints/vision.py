@@ -6,7 +6,10 @@ from fastapi import APIRouter, UploadFile, File, Form, Depends
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_current_user
-from app.ml.vision.core.vision_engine import vision_engine
+try:
+    from app.ml.vision.core.vision_engine import vision_engine
+except ImportError:
+    vision_engine = None  # type: ignore[assignment]
 from app.models.user import User
 
 router = APIRouter(prefix="/vision", tags=["AI Vision"])

@@ -41,6 +41,7 @@ export const register = (full_name, phone_number, role, password) =>
 export const verifyRegOtp = (phone_number, otp) =>
   request("/auth/verify-registration-otp", { method: "POST", body: JSON.stringify({ phone_number, otp }) });
 export const getProfile = () => request("/auth/me");
+export const updateProfile = (data) => request("/auth/me", { method: "PATCH", body: JSON.stringify(data) });
 export const logout = () => request("/auth/logout", { method: "POST" }).catch(() => {});
 
 // ── Listings & Browse ─────────────────────────────────────────────────────────

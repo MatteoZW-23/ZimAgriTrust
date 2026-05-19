@@ -5,6 +5,7 @@ Covers: registration, job management, rating, admin controls.
 import uuid
 import os
 import shutil
+import logging
 from datetime import datetime
 from typing import Optional
 
@@ -64,6 +65,7 @@ def _save_driver_file(file: UploadFile, driver_id: str, slot: str) -> Optional[s
     return dest
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/login", response_model=Token)
@@ -73,15 +75,21 @@ async def login_driver_alias(
     response: Response,
     db: Session = Depends(get_db),
 ) -> Token:
-    return await login_with_pin(
-        db=db,
-        request=request,
-        response=response,
-        phone_number=payload.phone_number,
-        pin=payload.password,
-        allowed_roles=DRIVER_ROLES,
-        portal_name="driver",
-    )
+    try:
+        return await login_with_pin(
+            db=db,
+            request=request,
+            response=response,
+            phone_number=payload.phone_number,
+            pin=payload.password,
+            allowed_roles=DRIVER_ROLES,
+            portal_name="driver",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Driver login error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Driver login failed")
 
 
 # Global OPTIONS handler for all routes in this router

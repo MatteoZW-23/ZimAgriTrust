@@ -30,7 +30,10 @@ from app.models.user import User, UserRole
 from app.models.listing import Listing, ListingStatus, Offer, OfferStatus
 from app.models.transaction import Order, OrderStatus
 from app.models.price_history import PriceHistory
-from app.ml.vision.vision_service import vision_service
+try:
+    from app.ml.vision.vision_service import vision_service
+except ImportError:
+    vision_service = None  # type: ignore[assignment]
 from app.services.media_service import media_service
 from app.core.config import settings
 from sqlalchemy import func
@@ -1125,9 +1128,12 @@ class WhatsAppService:
             crop_name = body.strip()
             
             # Validate crop is supported
-            from app.ml.vision.crop_classifier import crop_classifier
-            supported_crops = list(crop_classifier.CROPS.keys())
-            
+            try:
+                from app.ml.vision.crop_classifier import crop_classifier
+                supported_crops = list(crop_classifier.CROPS.keys())
+            except ImportError:
+                supported_crops = ["maize", "tomato", "mango", "tobacco", "soybean", "wheat", "groundnut", "cotton"]
+
             matched_crop = None
             for crop in supported_crops:
                 if crop in crop_name.lower() or crop_name.lower() in crop:

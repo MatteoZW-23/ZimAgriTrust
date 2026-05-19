@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '0015'
-down_revision = '0014_add_password_reset_tokens'
+down_revision = None
 branch_labels = None
 depends_on = None
 

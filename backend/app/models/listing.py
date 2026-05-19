@@ -109,7 +109,8 @@ class Listing(Base):
     
     # Verification tracking
     verification_status: Mapped[str] = mapped_column(String(20), default="pending") # pending, verified, rejected
-    verified_by: Mapped[Optional[str]] = mapped_column(String(100))  # 'ai' or agent user_id
+    verified_by_agent_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("agents.id"), nullable=True)  # Agent who verified
+    verified_by_ai: Mapped[bool] = mapped_column(Boolean, default=False)  # True if verified by AI
     verification_notes: Mapped[Optional[str]] = mapped_column(Text)
     
     is_boosted: Mapped[bool] = mapped_column(Boolean, default=False)

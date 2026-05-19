@@ -11,17 +11,16 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 
 from fastapi import HTTPException, status, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer, HTTPAuthCredentials
 
 from app.models.user import User, UserRole
 from app.models.rbac import Role, Permission, RolePermission
-from app.models.session import UserSession
 from app.models.security_enhanced import (
-    AuditLog, AuditLogAction, TokenBlacklist
+    SecurityAuditLog, AuditLogAction, TokenBlacklist
 )
+from app.models.session import UserSession
 from app.services.security_service import TokenManager
 from app.core.config import settings
-from app.db.session import get_db as get_database
 from jose import jwt
 
 
@@ -189,6 +188,17 @@ DEFAULT_ROLE_PERMISSIONS = {
     "DRIVER": [
         "transaction:read",
     ],
+    
+    "TRANSPORTER": [
+        "transaction:read",
+    ],
+    
+    "SUPPLIER": [
+        "listing:create", "listing:read", "listing:update", "listing:delete",
+        "input:create", "input:read", "input:update", "input:delete",
+        "transaction:read",
+        "payment:initiate",
+    ],
 }
 
 
@@ -239,14 +249,18 @@ class RBACService:
         levels = {
             "FARMER": 10,
             "BUYER": 10,
-            "DRIVER": 10,
+            "DRIVER": 20,
+            "TRANSPORTER": 20,
             "STAFF": 30,
             "AGENT": 40,
+            "SUPPLIER": 60,
             "BRANCH_ADMIN": 70,
             "SUPPORT_ADMIN": 75,
             "REGIONAL_ADMIN": 80,
+            "REGIONAL_MANAGER": 80,
             "FINANCE_ADMIN": 85,
             "SYSTEM_ADMIN": 90,
+            "ADMIN": 100,
             "SUPER_ADMIN": 100,
         }
         return levels.get(role_name, 1)
@@ -299,7 +313,7 @@ class JWTBearer(HTTPBearer):
     """JWT Bearer token authentication"""
     
     async def __call__(self, request):
-        credentials: HTTPAuthorizationCredentials = await super().__call__(request)
+        credentials: HTTPAuthCredentials = await super().__call__(request)
         
         if not credentials:
             raise HTTPException(

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Dict
 from app.api.deps import get_db
 from sqlalchemy.orm import Session
-from app.services.recruitment_service import recruitment_service
+from app.services.agent_onboarding_service import agent_onboarding_service
 from app.schemas.recruitment import AgentApplicationCreate
 
 router = APIRouter()
@@ -11,9 +11,9 @@ router = APIRouter()
 @router.get("/my-status/{user_id}")
 async def get_agent_status(user_id: uuid.UUID, db: Session = Depends(get_db)):
     """
-    Returns current position in the 10-step recruitment pipeline.
+    Returns current position in the 10-step recruitment pipeline - uses unified onboarding service.
     """
-    return recruitment_service.get_application_status(db, user_id)
+    return agent_onboarding_service.get_application_status(db, user_id)
 
 
 @router.post("/application/resubmit")
@@ -50,7 +50,7 @@ async def resubmit_application(
         prior.national_id = f"{prior.national_id}::ARCHIVED::{prior.id}"
         db.commit()
 
-    return await recruitment_service.submit_application(db, payload)
+    return await agent_onboarding_service.submit_application(db, payload)
 
 @router.get("/{agent_code}/verify")
 def verify_agent_public(agent_code: str, db: Session = Depends(get_db)):

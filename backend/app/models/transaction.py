@@ -9,9 +9,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
+# Import at module level to avoid circular import issues
+from app.models.listing import LogisticsType
+
 
 class OrderStatus(str, enum.Enum):
     PENDING = "PENDING"
+    PAYMENT_INITIATED = "PAYMENT_INITIATED"  # Added: payment flow started
     ESCROW_HELD = "ESCROW_HELD"
     DELIVERED = "DELIVERED"
     COMPLETED = "COMPLETED"
@@ -19,6 +23,7 @@ class OrderStatus(str, enum.Enum):
     CANCELLED = "REFUNDED"   # alias — maps to REFUNDED in DB
     SETTLED = "SETTLED"      # Resolved via agent mediation
     DISPUTED = "DISPUTED"
+    PAYMENT_FAILED = "PAYMENT_FAILED"  # Added: for failed payment attempts
 
 
 class Order(Base):
@@ -38,9 +43,12 @@ class Order(Base):
     currency: Mapped[str] = mapped_column(String(5), default="USD")
     
     status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), default=OrderStatus.PENDING)
-    
+
+    # Payment tracking fields (referenced in payment_service.py)
+    payment_reference: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    payment_confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
     # Logistics Tracking
-    from app.models.listing import LogisticsType
     logistics_type: Mapped[LogisticsType] = mapped_column(Enum(LogisticsType), default=LogisticsType.PLATFORM)
     handover_code: Mapped[Optional[str]] = mapped_column(String(10))
 
@@ -56,6 +64,10 @@ class Order(Base):
     # Post-Mediation Adjustments
     refunded_amount: Mapped[float] = mapped_column(Float, default=0.0) # For settlements
     adjustment_memo: Mapped[Optional[str]] = mapped_column(Text)
+    
+    # Agent Service Tracking
+    fulfilled_by_agent_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("agents.id"), nullable=True)  # Agent who fulfilled order
+    field_support_by_agent_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("agents.id"), nullable=True)  # Agent who provided field support
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     
@@ -117,6 +129,8 @@ class Transaction(Base):
     status: Mapped[str] = mapped_column(String(20), default="completed") # pending, completed, failed
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    ledger_entries = relationship("LedgerEntry", back_populates="transaction")
 
 
 class TransportSurvey(Base):

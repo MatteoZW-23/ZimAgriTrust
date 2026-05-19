@@ -1,7 +1,8 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Leaf, Users, Target, Globe, Mail, Phone, MapPin, CheckCircle } from "lucide-react";
+import { Users, Target, Globe, Mail, Phone, MapPin, CheckCircle } from "lucide-react";
+import logo from "../assets/logo.png";
 
 function AboutUs() {
   const stats = [
@@ -37,7 +38,11 @@ function AboutUs() {
             className="text-center max-w-3xl mx-auto"
           >
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm mb-6">
-              <Leaf className="w-4 h-4" />
+              <img 
+                src={logo} 
+                alt="ZimAgritrust Logo" 
+                className="w-4 h-4 object-contain"
+              />
               <span className="text-sm font-medium">Our Story</span>
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">

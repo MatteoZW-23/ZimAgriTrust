@@ -13,6 +13,10 @@ from app.models.listing import Listing
 from app.models.transaction import Transaction
 from app.models.dispute import Dispute
 from app.models.agent import Agent, AgentAssignment
+from app.models.classroom import (
+    Course, CourseTopic, Resource, QuizQuestion, Enrollment,
+    TopicProgress, QuizAttempt, EssayAnswer, Announcement
+)
 from app.api.v1.endpoints.verification import IDVerificationRequest  # noqa: F401
 
 config = context.config

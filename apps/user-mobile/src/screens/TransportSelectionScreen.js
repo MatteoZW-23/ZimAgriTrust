@@ -140,7 +140,7 @@ export default function TransportSelectionScreen({ navigation, route }) {
       await new Promise(resolve => setTimeout(resolve, 1500));
 
       Alert.alert('Success', 'Transport request submitted successfully.', [
-        { text: 'OK', onPress: () => navigation.goBack() }
+        { text: 'OK', onPress: () => navigation.navigate('OrderDetails', { orderId: orderDetails?.id || listing?.order_id, role, token }) }
       ]);
     } catch (error) {
       Alert.alert('Error', error.message || 'Failed to submit transport request.');

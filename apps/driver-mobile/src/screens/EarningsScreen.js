@@ -2,13 +2,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   SafeAreaView, ActivityIndicator, RefreshControl, Alert,
+  Modal, TextInput,
 } from 'react-native';
 import {
   TrendingUp as IconTrendingUp, ArrowDownCircle as IconArrowDownCircle, 
   Wallet as IconWallet, ChevronRight as IconChevronRight, 
   CheckCircle as IconCheckCircle, Truck as IconTruck, 
   CreditCard as IconCreditCard, DollarSign as IconDollarSign, 
-  Clock as IconClock,
+  Clock as IconClock, X as IconX, Star as IconStar,
+  MapPin as IconMapPin, Calendar as IconCalendar,
 } from 'lucide-react-native';
 import { theme } from '../styles';
 import { getEarnings, withdrawEarnings } from '../api';
@@ -49,12 +51,16 @@ const DEMO_TRANSACTIONS = [
   { id: '5', route: 'Chinhoyi → Kariba', amount: 75,  status: 'paid',    date: 'Apr 29',          type: 'delivery' },
 ];
 
-export default function EarningsScreen({ route }) {
+export default function EarningsScreen({ route, navigation }) {
   const { token } = route.params || {};
   const [earnings, setEarnings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('EcoCash');
+  const [phoneNumber, setPhoneNumber] = useState('+26377');
 
   const fetchEarnings = useCallback(async () => {
     try {
@@ -81,28 +87,37 @@ export default function EarningsScreen({ route }) {
       Alert.alert('No Funds', 'You have no available balance to withdraw.');
       return;
     }
-    Alert.alert(
-      'Withdraw Funds',
-      `Transfer $${amount} to your EcoCash account?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: async () => {
-            setWithdrawing(true);
-            try {
-              const res = await withdrawEarnings(token, amount, 'EcoCash', '+263770000000');
-              Alert.alert('Success', `Funds withdrawn successfully. Reference: ${res.reference}`);
-              fetchEarnings();
-            } catch (err) {
-              Alert.alert('Failed', err.message || 'Withdrawal failed. Try again.');
-            } finally {
-              setWithdrawing(false);
-            }
-          },
-        },
-      ],
-    );
+    setWithdrawAmount(String(amount));
+    setShowWithdrawModal(true);
+  };
+
+  const handleConfirmWithdraw = async () => {
+    const amount = parseFloat(withdrawAmount);
+    if (!amount || amount <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid withdrawal amount.');
+      return;
+    }
+    if (amount > (earnings?.available || 0)) {
+      Alert.alert('Insufficient Funds', 'You cannot withdraw more than your available balance.');
+      return;
+    }
+    if (phoneNumber.length < 10) {
+      Alert.alert('Invalid Phone', 'Please enter a valid phone number.');
+      return;
+    }
+
+    setWithdrawing(true);
+    try {
+      const res = await withdrawEarnings(token, amount, selectedPaymentMethod, phoneNumber);
+      Alert.alert('Success', `Funds withdrawn successfully. Reference: ${res.reference}`);
+      setShowWithdrawModal(false);
+      setWithdrawAmount('');
+      fetchEarnings();
+    } catch (err) {
+      Alert.alert('Failed', err.message || 'Withdrawal failed. Try again.');
+    } finally {
+      setWithdrawing(false);
+    }
   };
 
   if (loading) {
@@ -178,6 +193,41 @@ export default function EarningsScreen({ route }) {
           </View>
         </View>
 
+        {/* Performance Stats */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Performance Stats</Text>
+          <View style={styles.perfGrid}>
+            <View style={styles.perfCard}>
+              <View style={styles.perfIcon}>
+                <IconStar size={18} color="#F59E0B" />
+              </View>
+              <Text style={styles.perfValue}>4.8</Text>
+              <Text style={styles.perfLabel}>Rating</Text>
+            </View>
+            <View style={styles.perfCard}>
+              <View style={styles.perfIcon}>
+                <IconTruck size={18} color={theme.colors.sky} />
+              </View>
+              <Text style={styles.perfValue}>{d.completed_deliveries || 0}</Text>
+              <Text style={styles.perfLabel}>Deliveries</Text>
+            </View>
+            <View style={styles.perfCard}>
+              <View style={styles.perfIcon}>
+                <IconMapPin size={18} color="#4CAF50" />
+              </View>
+              <Text style={styles.perfValue}>1,240</Text>
+              <Text style={styles.perfLabel}>km Traveled</Text>
+            </View>
+            <View style={styles.perfCard}>
+              <View style={styles.perfIcon}>
+                <IconCalendar size={18} color="#9C27B0" />
+              </View>
+              <Text style={styles.perfValue}>98%</Text>
+              <Text style={styles.perfLabel}>On-Time</Text>
+            </View>
+          </View>
+        </View>
+
         {/* Quick stats */}
         <View style={styles.statsRow}>
           <View style={[styles.statCard, { backgroundColor: '#F0FDF4' }]}>
@@ -201,7 +251,7 @@ export default function EarningsScreen({ route }) {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Activity</Text>
-            <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => navigation.navigate('Transactions', { token })}>
               <Text style={styles.seeAll}>See All</Text>
             </TouchableOpacity>
           </View>
@@ -257,6 +307,102 @@ export default function EarningsScreen({ route }) {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Withdrawal Modal */}
+      <Modal visible={showWithdrawModal} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Withdraw Funds</Text>
+            <TouchableOpacity onPress={() => setShowWithdrawModal(false)} style={styles.modalCloseBtn}>
+              <IconX size={20} color="#666" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent}>
+            <View style={styles.balanceInfo}>
+              <Text style={styles.balanceInfoLabel}>Available Balance</Text>
+              <Text style={styles.balanceInfoAmount}>${(earnings?.available || 0).toLocaleString()}</Text>
+            </View>
+
+            <Text style={styles.modalSectionTitle}>Amount</Text>
+            <View style={styles.amountInputContainer}>
+              <Text style={styles.currencySymbol}>$</Text>
+              <TextInput
+                style={styles.amountInput}
+                value={withdrawAmount}
+                onChangeText={setWithdrawAmount}
+                placeholder="0.00"
+                keyboardType="decimal-pad"
+                placeholderTextColor="#CCC"
+              />
+            </View>
+
+            <Text style={styles.modalSectionTitle}>Payment Method</Text>
+            <View style={styles.paymentMethods}>
+              {['EcoCash', 'OneMoney', 'Bank Transfer'].map(method => (
+                <TouchableOpacity
+                  key={method}
+                  style={[
+                    styles.paymentMethodCard,
+                    selectedPaymentMethod === method && styles.paymentMethodSelected,
+                  ]}
+                  onPress={() => setSelectedPaymentMethod(method)}
+                >
+                  <View style={styles.paymentMethodRadio}>
+                    {selectedPaymentMethod === method && (
+                      <View style={styles.paymentMethodRadioInner} />
+                    )}
+                  </View>
+                  <Text style={[
+                    styles.paymentMethodText,
+                    selectedPaymentMethod === method && styles.paymentMethodTextSelected,
+                  ]}>
+                    {method}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.modalSectionTitle}>Phone Number</Text>
+            <TextInput
+              style={styles.phoneInput}
+              value={phoneNumber}
+              onChangeText={setPhoneNumber}
+              placeholder="+263 77 123 4567"
+              keyboardType="phone-pad"
+              placeholderTextColor="#CCC"
+            />
+
+            <View style={styles.feeInfo}>
+              <Text style={styles.feeLabel}>Processing Fee</Text>
+              <Text style={styles.feeValue}>$0.00</Text>
+            </View>
+            <View style={styles.feeInfo}>
+              <Text style={styles.feeLabel}>You'll Receive</Text>
+              <Text style={[styles.feeValue, styles.feeValueHighlight]}>
+                ${withdrawAmount || '0.00'}
+              </Text>
+            </View>
+          </ScrollView>
+
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={[styles.confirmBtn, withdrawing && styles.confirmBtnDisabled]}
+              onPress={handleConfirmWithdraw}
+              disabled={withdrawing}
+            >
+              {withdrawing ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <>
+                  <IconArrowDownCircle size={18} color="#FFF" />
+                  <Text style={styles.confirmBtnText}>Confirm Withdrawal</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -347,4 +493,79 @@ const styles = StyleSheet.create({
   paymentNum: { fontSize: 12, color: '#999', marginTop: 2 },
   primaryBadge: { backgroundColor: '#F0FDF4', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
   primaryText: { fontSize: 11, fontWeight: '700', color: '#4CAF50' },
+
+  perfGrid: { flexDirection: 'row', gap: 10 },
+  perfCard: {
+    flex: 1, backgroundColor: '#FFF', borderRadius: 16, padding: 14,
+    alignItems: 'center', borderWidth: 1, borderColor: '#F0F0F0', ...theme.shadows.xs,
+  },
+  perfIcon: {
+    width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F5F5',
+    justifyContent: 'center', alignItems: 'center', marginBottom: 8,
+  },
+  perfValue: { fontSize: 18, fontWeight: '900', color: theme.colors.dark },
+  perfLabel: { fontSize: 11, fontWeight: '600', color: '#999', marginTop: 2 },
+
+  modalContainer: { flex: 1, backgroundColor: '#F8F9FA' },
+  modalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#FFF',
+    borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
+  },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: theme.colors.dark },
+  modalCloseBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: '#F5F5F5', justifyContent: 'center', alignItems: 'center',
+  },
+  modalContent: { flex: 1, padding: 20 },
+  modalSectionTitle: {
+    fontSize: 15, fontWeight: '700', color: theme.colors.dark, marginBottom: 10, marginTop: 8,
+  },
+  balanceInfo: {
+    backgroundColor: theme.colors.sky, borderRadius: 16, padding: 20,
+    alignItems: 'center', marginBottom: 24, ...theme.shadows.md,
+  },
+  balanceInfoLabel: { fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
+  balanceInfoAmount: { fontSize: 32, fontWeight: '900', color: '#FFF', marginTop: 4 },
+  amountInputContainer: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF',
+    borderRadius: 14, borderWidth: 2, borderColor: '#F0F0F0', paddingHorizontal: 16, paddingVertical: 4,
+  },
+  currencySymbol: { fontSize: 24, fontWeight: '700', color: theme.colors.dark, marginRight: 8 },
+  amountInput: { flex: 1, fontSize: 24, fontWeight: '700', color: theme.colors.dark, paddingVertical: 8 },
+  paymentMethods: { flexDirection: 'row', gap: 10, marginBottom: 20 },
+  paymentMethodCard: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#FFF', borderRadius: 12, borderWidth: 2, borderColor: '#F0F0F0',
+    paddingHorizontal: 12, paddingVertical: 10,
+  },
+  paymentMethodSelected: { borderColor: theme.colors.sky, backgroundColor: '#F0F9FF' },
+  paymentMethodRadio: {
+    width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#D0D0D0',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  paymentMethodRadioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: theme.colors.sky },
+  paymentMethodText: { fontSize: 13, fontWeight: '600', color: '#666' },
+  paymentMethodTextSelected: { color: theme.colors.sky, fontWeight: '700' },
+  phoneInput: {
+    backgroundColor: '#FFF', borderRadius: 14, borderWidth: 2, borderColor: '#F0F0F0',
+    paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, fontWeight: '600', color: theme.colors.dark,
+    marginBottom: 20,
+  },
+  feeInfo: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
+  },
+  feeLabel: { fontSize: 14, fontWeight: '600', color: '#666' },
+  feeValue: { fontSize: 15, fontWeight: '700', color: theme.colors.dark },
+  feeValueHighlight: { fontSize: 18, fontWeight: '900', color: '#4CAF50' },
+  modalFooter: {
+    padding: 20, backgroundColor: '#FFF', borderTopWidth: 1, borderTopColor: '#F0F0F0',
+  },
+  confirmBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    backgroundColor: theme.colors.sky, paddingVertical: 16, borderRadius: 16, ...theme.shadows.md,
+  },
+  confirmBtnDisabled: { backgroundColor: '#D0D0D0' },
+  confirmBtnText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
 });

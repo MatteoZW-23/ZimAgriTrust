@@ -104,33 +104,37 @@ class MarketDemandRequest(BaseModel):
 @router.post("/webhook")
 async def whatsapp_webhook(data: Dict[str, Any] = Body(...), db: Session = Depends(get_db)):
     """Handles incoming messages from the WhatsApp bridge"""
-    sender_phone = data.get("from")
-    
-    # Ignore broadcasts, newsletters, and groups
-    if sender_phone == "status@broadcast" or (sender_phone and (sender_phone.endswith("@newsletter") or sender_phone.endswith("@g.us"))):
-        return {"status": "ignored", "reason": "broadcast_newsletter_or_group"}
+    try:
+        sender_phone = data.get("from")
+        
+        # Ignore broadcasts, newsletters, and groups
+        if sender_phone == "status@broadcast" or (sender_phone and (sender_phone.endswith("@newsletter") or sender_phone.endswith("@g.us"))):
+            return {"status": "ignored", "reason": "broadcast_newsletter_or_group"}
 
-    body = data.get("body", "").strip()
-    has_media = data.get("hasMedia", False)
-    media = data.get("media")
-    
-    candidates = _whatsapp_lookup_candidates(data)
-    user = db.query(User).filter(User.phone_number.in_(candidates)).first() if candidates else None
-    if not user:
-        logger.warning(
-            "WhatsApp user lookup failed from=%s phone=%s contactNumber=%s contactId=%s candidates=%s",
-            data.get("from"),
-            data.get("phone"),
-            data.get("contactNumber"),
-            data.get("contactId"),
-            sorted(candidates),
-        )
-    
-    if not user:
-        return {"reply": "Welcome to ZimAgritrust! I see you're not registered yet. Please register via our USSD (*232#) or visit our website to get started."}
+        body = data.get("body", "").strip()
+        has_media = data.get("hasMedia", False)
+        media = data.get("media")
+        
+        candidates = _whatsapp_lookup_candidates(data)
+        user = db.query(User).filter(User.phone_number.in_(candidates)).first() if candidates else None
+        if not user:
+            logger.warning(
+                "WhatsApp user lookup failed from=%s phone=%s contactNumber=%s contactId=%s candidates=%s",
+                data.get("from"),
+                data.get("phone"),
+                data.get("contactNumber"),
+                data.get("contactId"),
+                sorted(candidates),
+            )
+        
+        if not user:
+            return {"reply": "Welcome to ZimAgritrust! I see you're not registered yet. Please register via our USSD (*232#) or visit our website to get started."}
 
-    reply_text = await whatsapp_service.process_message(db, user, body, has_media, media)
-    return {"reply": reply_text}
+        reply_text = await whatsapp_service.process_message(db, user, body, has_media, media)
+        return {"reply": reply_text}
+    except Exception as e:
+        logger.error(f"WhatsApp webhook error: {str(e)}")
+        raise HTTPException(status_code=500, detail="WhatsApp service error")
 
 
 @router.get("/webhook")

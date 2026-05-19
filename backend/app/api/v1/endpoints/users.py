@@ -1,4 +1,5 @@
 import uuid
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,6 +12,7 @@ from app.models.user import User, UserRole, UserStatus
 from app.schemas.auth import UserResponse
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class UserProfileUpdate(BaseModel):
@@ -50,7 +52,11 @@ def _settings_for(user: User) -> dict:
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)) -> User:
-    return current_user
+    try:
+        return current_user
+    except Exception as e:
+        logger.error(f"Get user error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve user")
 
 
 @router.put("/me", response_model=UserResponse)
@@ -59,22 +65,28 @@ def update_me(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> User:
-    updates = payload.model_dump(exclude_unset=True)
-    phone = updates.get("phone_number")
-    if phone and phone != current_user.phone_number:
-        duplicate = db.query(User).filter(User.phone_number == phone, User.id != current_user.id).first()
-        if duplicate:
-            raise HTTPException(status_code=400, detail="Phone number is already in use.")
+    try:
+        updates = payload.model_dump(exclude_unset=True)
+        phone = updates.get("phone_number")
+        if phone and phone != current_user.phone_number:
+            duplicate = db.query(User).filter(User.phone_number == phone, User.id != current_user.id).first()
+            if duplicate:
+                raise HTTPException(status_code=400, detail="Phone number is already in use.")
 
-    address = updates.pop("address", None)
-    for field, value in updates.items():
-        setattr(current_user, field, value)
-    if address:
-        current_user.district = address[:50]
+        address = updates.pop("address", None)
+        for field, value in updates.items():
+            setattr(current_user, field, value)
+        if address:
+            current_user.district = address[:50]
 
-    db.commit()
-    db.refresh(current_user)
-    return current_user
+        db.commit()
+        db.refresh(current_user)
+        return current_user
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update user error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update user")
 
 
 @router.get("/trust-score")

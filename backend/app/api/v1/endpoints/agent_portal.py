@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
 from app.models.agent import Agent, AgentAssignment
 from app.models.user import User, UserRole
+from app.services.agent_earnings_service import AgentEarningsService
+from app.services.fee_engine import FeeEngine, FeeConfig, AgentTier
 
 router = APIRouter()
 
@@ -145,13 +147,74 @@ def submit_agent_report(
 
 
 @router.get("/earnings")
-def agent_earnings(
+def get_agent_earnings(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.AGENT)),
-) -> dict[str, float]:
+) -> dict[str, Any]:
+    """Get agent earnings breakdown including commission details."""
     agent = _current_agent(db, current_user)
+    
+    # Get agent tier
+    agent_tier = FeeEngine.determine_agent_tier(agent.rating)
+    tier_multiplier = FeeConfig.AGENT_TIER_MULTIPLIERS.get(agent_tier, 1.0)
+    
+    # Get completed assignments with earnings
+    completed_assignments = (
+        db.query(AgentAssignment)
+        .filter(AgentAssignment.agent_id == agent.id, AgentAssignment.status == "completed")
+        .order_by(AgentAssignment.completed_at.desc())
+        .limit(50)
+        .all()
+    )
+    
+    # Group by service type
+    earnings_by_service = {
+        "verification": {"count": 0, "total": 0.0, "assignments": []},
+        "dispute_resolution": {"count": 0, "total": 0.0, "assignments": []},
+        "order_fulfillment": {"count": 0, "total": 0.0, "assignments": []},
+        "field_support": {"count": 0, "total": 0.0, "assignments": []},
+        "onboarding": {"count": 0, "total": 0.0, "assignments": []},
+    }
+    
+    for assignment in completed_assignments:
+        service_type = assignment.assignment_type
+        if service_type == "listing":
+            service_type = "verification"
+        elif service_type == "dispute":
+            service_type = "dispute_resolution"
+        
+        if service_type in earnings_by_service:
+            earnings_by_service[service_type]["count"] += 1
+            earnings_by_service[service_type]["total"] += assignment.bounty_amount or 0.0
+            earnings_by_service[service_type]["assignments"].append({
+                "id": str(assignment.id),
+                "amount": assignment.bounty_amount or 0.0,
+                "bonus": assignment.bonus_amount or 0.0,
+                "completed_at": assignment.completed_at,
+            })
+    
+    # Calculate totals
+    total_earnings = sum(s["total"] for s in earnings_by_service.values())
+    total_assignments = sum(s["count"] for s in earnings_by_service.values())
+    
     return {
-        "wallet_balance": float(agent.wallet_balance or 0),
+        "agent_id": str(agent.id),
+        "agent_code": agent.agent_code,
+        "rating": agent.rating,
+        "tier": agent_tier.value,
+        "tier_multiplier": tier_multiplier,
+        "wallet_balance": agent.wallet_balance,
+        "pending_earnings": agent.pending_earnings or 0.0,
+        "total_earnings": total_earnings,
+        "total_assignments": total_assignments,
+        "earnings_by_service": earnings_by_service,
+        "commission_rates": {
+            "verification": FeeConfig.AGENT_VERIFICATION_COMMISSION_PERCENT,
+            "dispute_resolution": FeeConfig.AGENT_DISPUTE_RESOLUTION_COMMISSION_PERCENT,
+            "order_fulfillment": FeeConfig.AGENT_ORDER_FULFILLMENT_COMMISSION_PERCENT,
+            "field_support": FeeConfig.AGENT_FIELD_SUPPORT_COMMISSION_PERCENT,
+            "onboarding": FeeConfig.AGENT_ONBOARDING_COMMISSION_PERCENT,
+        },
         "pending_earnings": float(agent.pending_earnings or 0),
         "total": float((agent.wallet_balance or 0) + (agent.pending_earnings or 0)),
     }

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LogIn, Menu, X, ChevronRight, Leaf } from 'lucide-react';
+import { LogIn, Menu, X, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import logo from "../assets/logo.png";
 
 export default function Header({ onOpenAuth, isAuthenticated, onSignUp }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -42,16 +43,20 @@ export default function Header({ onOpenAuth, isAuthenticated, onSignUp }) {
   };
 
   const navItems = [
-    { label: 'Marketplace', href: '#marketplace', id: 'marketplace' },
+    { label: 'Marketplace', to: '/marketplace', isLink: true },
     { label: 'Features', href: '#features', id: 'features' },
     { label: 'How It Works', href: '#how-it-works', id: 'how-it-works' },
   ];
 
   const dropdownItems = [
     { label: 'About Us', to: '/about' },
+    { label: 'Pricing', to: '/pricing' },
+    { label: 'Help Center', to: '/help-center' },
     { label: 'Company Profile', to: '/company-profile' },
     { label: 'Drive with Us', to: '/driver-join' },
     { label: 'Become an Agent', to: '/agent-join' },
+    { label: 'Suppliers', to: '/suppliers' },
+    { label: 'Supplier Products', to: '/supplier-products' },
   ];
 
   return (
@@ -67,33 +72,51 @@ export default function Header({ onOpenAuth, isAuthenticated, onSignUp }) {
           <div className="flex items-center justify-between h-16 lg:h-20">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2 group" onClick={() => setMobileMenuOpen(false)}>
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden transition-colors ${
                 scrolled ? 'bg-primary-600' : 'bg-white/20 backdrop-blur-sm'
               }`}>
-                <Leaf className={`w-6 h-6 ${scrolled ? 'text-white' : 'text-white'}`} />
+                <img 
+                  src={logo} 
+                  alt="ZimAgritrust Logo" 
+                  className="w-6 h-6 object-contain"
+                />
               </div>
               <span className={`font-display font-bold text-xl transition-colors ${
                 scrolled ? 'text-earth-900' : 'text-white'
               }`}>
-                Zim<span className="text-primary-500">Agri</span>trust
+                Zim<span className={scrolled ? 'text-primary-600' : 'text-primary-400'}>Agri</span>trust
               </span>
             </Link>
 
             {/* Desktop Navigation */}
             <nav className="hidden lg:flex items-center gap-1">
               {navItems.map((item) => (
-                <a 
-                  key={item.id}
-                  href={item.href} 
-                  onClick={(e) => handleNavClick(e, item.id)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    scrolled 
-                      ? 'text-earth-600 hover:text-primary-600 hover:bg-primary-50' 
-                      : 'text-white/80 hover:text-white hover:bg-white/10'
-                  }`}
-                >
-                  {item.label}
-                </a>
+                item.isLink ? (
+                  <Link
+                    key={item.label}
+                    to={item.to}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      scrolled 
+                        ? 'text-earth-600 hover:text-primary-600 hover:bg-primary-50' 
+                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                ) : (
+                  <a 
+                    key={item.id}
+                    href={item.href} 
+                    onClick={(e) => handleNavClick(e, item.id)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      scrolled 
+                        ? 'text-earth-600 hover:text-primary-600 hover:bg-primary-50' 
+                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    {item.label}
+                  </a>
+                )
               ))}
               
               {/* More Dropdown */}
@@ -183,8 +206,12 @@ export default function Header({ onOpenAuth, isAuthenticated, onSignUp }) {
             >
               <div className="flex items-center justify-between p-4 border-b border-earth-100">
                 <Link to="/" className="flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
-                  <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center">
-                    <Leaf className="w-6 h-6 text-white" />
+                  <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center overflow-hidden">
+                    <img 
+                      src={logo} 
+                      alt="ZimAgritrust Logo" 
+                      className="w-6 h-6 object-contain"
+                    />
                   </div>
                   <span className="font-display font-bold text-xl text-earth-900">
                     Zim<span className="text-primary-500">Agri</span>trust
@@ -200,14 +227,25 @@ export default function Header({ onOpenAuth, isAuthenticated, onSignUp }) {
 
               <nav className="p-4 space-y-1">
                 {navItems.map((item) => (
-                  <a 
-                    key={item.id}
-                    href={item.href} 
-                    onClick={(e) => handleNavClick(e, item.id)}
-                    className="block px-4 py-3 rounded-lg text-earth-700 font-medium hover:bg-primary-50 hover:text-primary-600 transition-colors"
-                  >
-                    {item.label}
-                  </a>
+                  item.isLink ? (
+                    <Link
+                      key={item.label}
+                      to={item.to}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block px-4 py-3 rounded-lg text-earth-700 font-medium hover:bg-primary-50 hover:text-primary-600 transition-colors"
+                    >
+                      {item.label}
+                    </Link>
+                  ) : (
+                    <a 
+                      key={item.id}
+                      href={item.href} 
+                      onClick={(e) => handleNavClick(e, item.id)}
+                      className="block px-4 py-3 rounded-lg text-earth-700 font-medium hover:bg-primary-50 hover:text-primary-600 transition-colors"
+                    >
+                      {item.label}
+                    </a>
+                  )
                 ))}
                 <div className="pt-4 mt-4 border-t border-earth-100">
                   <p className="px-4 text-xs font-semibold text-earth-400 uppercase tracking-wider mb-2">More</p>

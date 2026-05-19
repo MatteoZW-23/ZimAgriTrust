@@ -1,10 +1,208 @@
+---
 groups:
-  - name: AppAlerts
+
+  # ── Financial Safety ────────────────────────────────────────────────────────
+  - name: FinancialAlerts
     rules:
-      - alert: HighCPUUsage
-        expr: process_cpu_seconds_total > 0.8
+      - alert: EscrowReleaseFailureSpike
+        expr: |
+          increase(http_requests_total{path=~".*/release-payment.*", status="500"}[5m]) > 2
+        for: 1m
+        labels:
+          severity: critical
+          team: payments
+        annotations:
+          summary: "Escrow release failures spiking on {{ $labels.instance }}"
+          description: "More than 2 escrow release 500s in the last 5 minutes. Possible ledger or DB issue."
+
+      - alert: WebhookDuplicateProcessingDetected
+        expr: |
+          increase(http_requests_total{path=~".*/callback.*", status="200"}[1m]) > 10
+        for: 30s
+        labels:
+          severity: warning
+          team: payments
+        annotations:
+          summary: "Webhook flood detected — {{ $labels.instance }}"
+          description: "More than 10 webhook 200s/min. Verify idempotency is blocking re-processing."
+
+      - alert: WithdrawalErrorSpike
+        expr: |
+          increase(http_requests_total{path=~".*/wallet/withdraw.*", status=~"4[0-9]{2}"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          team: payments
+        annotations:
+          summary: "Elevated withdrawal errors on {{ $labels.instance }}"
+
+  # ── API SLO (95th percentile latency + error rate) ───────────────────────────
+  - name: APIAlerts
+    rules:
+      - alert: HighAPILatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(http_request_duration_seconds_bucket{path=~"/api/.*"}[5m])
+          ) > 3.0
         for: 5m
         labels:
           severity: warning
+          team: backend
         annotations:
-          summary: "High CPU usage detected component {{ $labels.instance }}"
+          summary: "API p95 latency > 3s on {{ $labels.instance }}"
+          description: "p95={{ $value }}s — investigate DB queries, pool exhaustion, or ML inference."
+
+      - alert: HighAPIErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5[0-9]{2}"}[5m])) /
+          sum(rate(http_requests_total[5m])) > 0.05
+        for: 3m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "API error rate > 5% on {{ $labels.instance }}"
+
+      - alert: APIDown
+        expr: up{job="backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: sre
+        annotations:
+          summary: "Backend API is DOWN — {{ $labels.instance }}"
+
+  # ── Authentication & Security ─────────────────────────────────────────────────
+  - name: SecurityAlerts
+    rules:
+      - alert: BruteForceLoginAttempts
+        expr: |
+          increase(http_requests_total{path=~".*/auth.*login.*", status="429"}[5m]) > 20
+        for: 1m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Rate-limit 429s on auth endpoint — possible brute force"
+          description: "{{ $value }} rate-limited auth requests in 5 minutes."
+
+      - alert: JWTTokenAbuseDetected
+        expr: |
+          increase(http_requests_total{path=~"/api/.*", status="401"}[5m]) > 50
+        for: 2m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "High 401 rate — possible token replay or abuse"
+
+      - alert: CSRFViolationSpike
+        expr: |
+          increase(http_requests_total{status="403"}[5m]) > 15
+        for: 2m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Elevated 403s — possible CSRF or IP block activity"
+
+  # ── Database & Connection Pool ───────────────────────────────────────────────
+  - name: DatabaseAlerts
+    rules:
+      - alert: DBConnectionPoolExhaustion
+        expr: |
+          sqlalchemy_pool_checkedout / sqlalchemy_pool_size > 0.90
+        for: 2m
+        labels:
+          severity: critical
+          team: sre
+        annotations:
+          summary: "DB connection pool >90% used — risk of connection timeouts"
+          description: "Checked-out: {{ $value * 100 | printf \"%.0f\" }}% of pool."
+
+      - alert: DBQuerySlowdown
+        expr: |
+          histogram_quantile(0.99, rate(sqlalchemy_query_duration_seconds_bucket[5m])) > 5
+        for: 3m
+        labels:
+          severity: warning
+          team: sre
+        annotations:
+          summary: "DB p99 query time > 5s — check for missing indexes or lock contention"
+
+  # ── Redis ────────────────────────────────────────────────────────────────────
+  - name: RedisAlerts
+    rules:
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: sre
+        annotations:
+          summary: "Redis is DOWN — idempotency, rate limiting, and caching unavailable"
+
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          team: sre
+        annotations:
+          summary: "Redis memory >85% — risk of OOM eviction of idempotency keys"
+
+  # ── Infrastructure ────────────────────────────────────────────────────────────
+  - name: InfraAlerts
+    rules:
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+          team: sre
+        annotations:
+          summary: "CPU >85% on {{ $labels.instance }}"
+
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"} /
+           node_filesystem_size_bytes{mountpoint="/"}) < 0.15
+        for: 5m
+        labels:
+          severity: warning
+          team: sre
+        annotations:
+          summary: "Disk < 15% free on {{ $labels.instance }}"
+
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.90
+        for: 5m
+        labels:
+          severity: critical
+          team: sre
+        annotations:
+          summary: "Memory >90% on {{ $labels.instance }}"
+
+  # ── Celery / Background Workers ───────────────────────────────────────────────
+  - name: WorkerAlerts
+    rules:
+      - alert: CeleryQueueBacklog
+        expr: celery_queue_length{queue="default"} > 500
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Celery default queue backlog > 500 tasks"
+
+      - alert: DeadLetterQueueGrowing
+        expr: increase(redis_list_length{key="dead_letter_queue"}[10m]) > 10
+        for: 3m
+        labels:
+          severity: critical
+          team: payments
+        annotations:
+          summary: "Dead-letter queue growing — retried operations exhausted"
+          description: "Check retry_service logs for payment processing failures."

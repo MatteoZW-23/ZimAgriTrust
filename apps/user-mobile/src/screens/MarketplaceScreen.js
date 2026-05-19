@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Modal, FlatList } from 'react-native';
 import { searchListings } from '../api';
 import { theme } from '../styles';
 import { formatMoney, parseNumber, formatCropName, formatLocation, formatGrade } from '../utils/formatters';
+import { Search as IconSearch, Filter as IconFilter, SlidersHorizontal as IconSliders, X, ArrowUpDown, TrendingUp, TrendingDown, ChevronDown } from 'lucide-react-native';
 
 const INITIAL_FILTERS = {
   crop: '',
@@ -56,9 +57,14 @@ export default function MarketplaceScreen({ navigation, route }) {
   const [listings, setListings] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showSortModal, setShowSortModal] = useState(false);
+  const [sortBy, setSortBy] = useState('newest');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  async function loadListings(nextFilters = filters) {
+  async function loadListings(nextFilters = filters, offset = 0, append = false) {
     const minPrice = parseNumber(nextFilters.minPrice);
     const maxPrice = parseNumber(nextFilters.maxPrice);
 
@@ -70,7 +76,7 @@ export default function MarketplaceScreen({ navigation, route }) {
       return;
     }
 
-    setLoading(true);
+    if (!append) setLoading(true);
     setError('');
 
     try {
@@ -81,19 +87,47 @@ export default function MarketplaceScreen({ navigation, route }) {
         max_price: maxPrice,
         grade: nextFilters.grade || undefined,
         limit: 20,
-        offset: 0,
+        offset: offset,
       });
 
-      setListings(response?.data || []);
+      const newData = response?.data || [];
+      if (append) {
+        setListings(prev => [...prev, ...newData]);
+      } else {
+        setListings(newData);
+      }
       setPagination(response?.pagination || null);
     } catch (err) {
       setError(err.message || 'Unable to load live listings.');
-      setListings([]);
-      setPagination(null);
+      if (!append) {
+        setListings([]);
+        setPagination(null);
+      }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }
+
+  const loadMore = useCallback(() => {
+    if (loadingMore || !pagination || listings.length >= pagination.total) return;
+    setLoadingMore(true);
+    loadListings(filters, listings.length, true);
+  }, [loadingMore, pagination, listings.length, filters]);
+
+  const sortListings = useCallback((data) => {
+    const sorted = [...data];
+    if (sortBy === 'newest') {
+      return sorted.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    } else if (sortBy === 'oldest') {
+      return sorted.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    } else if (sortBy === 'highest') {
+      return sorted.sort((a, b) => (b.price_per_unit || 0) - (a.price_per_unit || 0));
+    } else if (sortBy === 'lowest') {
+      return sorted.sort((a, b) => (a.price_per_unit || 0) - (b.price_per_unit || 0));
+    }
+    return sorted;
+  }, [sortBy]);
 
   useEffect(() => {
     loadListings(INITIAL_FILTERS);
@@ -125,105 +159,100 @@ export default function MarketplaceScreen({ navigation, route }) {
     loadListings(next);
   }
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-      <View style={styles.heroCard}>
-        <Text style={styles.heroKicker}>LIVE MARKET SEARCH</Text>
-        <Text style={styles.heroTitle}>Search active crop listings from the backend.</Text>
-        <Text style={styles.heroSub}>
-          Filter by crop, location, price range, and grade. Results are pulled from the FastAPI marketplace API.
-        </Text>
-      </View>
+  function handleSearch() {
+    setFilters(prev => ({ ...prev, crop: searchQuery }));
+    loadListings({ ...filters, crop: searchQuery });
+  }
 
-      <View style={styles.searchCard}>
-        <Text style={styles.cardLabel}>Crop or keyword</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g. maize"
-          placeholderTextColor="#94a3b8"
-          value={filters.crop}
-          onChangeText={(text) => updateFilter('crop', text)}
-          returnKeyType="search"
-          onSubmitEditing={applySearch}
-          autoCapitalize="none"
-        />
+  const sortedListings = sortListings(listings);
 
-        <Text style={[styles.cardLabel, { marginTop: 14 }]}>Location</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Province, district, or town"
-          placeholderTextColor="#94a3b8"
-          value={filters.location}
-          onChangeText={(text) => updateFilter('location', text)}
-          returnKeyType="search"
-          onSubmitEditing={applySearch}
-        />
-
-        <View style={styles.priceRow}>
-          <View style={styles.priceField}>
-            <Text style={styles.cardLabel}>Min price</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="0.00"
-              placeholderTextColor="#94a3b8"
-              value={filters.minPrice}
-              onChangeText={(text) => updateFilter('minPrice', text)}
-              keyboardType="decimal-pad"
-            />
-          </View>
-
-          <View style={styles.priceField}>
-            <Text style={styles.cardLabel}>Max price</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="0.00"
-              placeholderTextColor="#94a3b8"
-              value={filters.maxPrice}
-              onChangeText={(text) => updateFilter('maxPrice', text)}
-              keyboardType="decimal-pad"
-            />
-          </View>
+  const renderListing = ({ item }) => (
+    <TouchableOpacity
+      style={styles.listingCard}
+      activeOpacity={0.9}
+      onPress={() => navigation.navigate('ListingDetail', { listing: item, role, token, profile })}
+    >
+      <View style={styles.cardTop}>
+        <View style={{ flex: 1, paddingRight: 12 }}>
+          <Text style={styles.listingTitle}>{formatCropName(item)}</Text>
+          <Text style={styles.listingLocation}>{formatLocation(item)}</Text>
         </View>
 
-        {QUICK_CROPS.length > 0 && (
-          <>
-            <Text style={[styles.cardLabel, { marginTop: 14 }]}>Popular crops</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillRow}>
-              {QUICK_CROPS.map((item) => (
-                <FilterPill
-                  key={item.value}
-                  label={item.label}
-                  selected={filters.crop.toLowerCase() === item.value}
-                  onPress={() => applyQuickCrop(item.value)}
-                />
-              ))}
-            </ScrollView>
-          </>
-        )}
+        <View style={styles.gradeBadge}>
+          <Text style={styles.gradeBadgeText}>{formatGrade(item.grade || item.ai_grade_estimate)}</Text>
+        </View>
+      </View>
 
-        {GRADE_OPTIONS.length > 1 && (
-          <>
-            <Text style={[styles.cardLabel, { marginTop: 14 }]}>Grade</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillRow}>
-              {GRADE_OPTIONS.map((item) => (
-                <FilterPill
-                  key={item.label}
-                  label={item.label}
-                  selected={filters.grade === item.value}
-                  onPress={() => applyGrade(item.value)}
-                />
-              ))}
-            </ScrollView>
-          </>
-        )}
+      <View style={styles.metricRow}>
+        <StatCard
+          label="Price per unit"
+          value={formatMoney(item.price_per_unit, item.currency) + `/${item.quantity_unit || 'kg'}`}
+        />
+        <StatCard
+          label="Quantity"
+          value={`${Number(item.quantity || 0).toLocaleString()} ${item.quantity_unit || 'kg'}`}
+        />
+      </View>
 
-        <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.primaryButton} onPress={applySearch} activeOpacity={0.9}>
-            <Text style={styles.primaryButtonText}>Search Listings</Text>
+      <View style={styles.footerRow}>
+        <View>
+          <Text style={styles.footerLabel}>Seller</Text>
+          <Text style={styles.footerValue}>{item.seller_name || 'Anonymous'}</Text>
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={styles.footerLabel}>Trust score</Text>
+          <Text style={styles.footerValue}>{item.seller_trust_score || 0}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderFooter = () => {
+    if (loadingMore) {
+      return (
+        <View style={styles.loadingMore}>
+          <ActivityIndicator size="small" color={theme.colors.green} />
+          <Text style={styles.loadingMoreText}>Loading more...</Text>
+        </View>
+      );
+    }
+    if (pagination && listings.length >= pagination.total) {
+      return (
+        <View style={styles.endOfList}>
+          <Text style={styles.endOfListText}>No more listings</Text>
+        </View>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.searchBar}>
+          <IconSearch size={20} color="#64748b" style={{ marginRight: 12 }} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search crops, locations..."
+            placeholderTextColor="#94a3b8"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            onSubmitEditing={handleSearch}
+            autoCapitalize="none"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => { setSearchQuery(''); setFilters(INITIAL_FILTERS); loadListings(INITIAL_FILTERS); }}>
+              <X size={20} color="#64748b" />
+            </TouchableOpacity>
+          )}
+        </View>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.headerBtn} onPress={() => setShowFilterModal(true)}>
+            <IconFilter size={20} color={theme.colors.green} />
           </TouchableOpacity>
-
-          <TouchableOpacity style={styles.secondaryButton} onPress={clearFilters} activeOpacity={0.9}>
-            <Text style={styles.secondaryButtonText}>Clear</Text>
+          <TouchableOpacity style={styles.headerBtn} onPress={() => setShowSortModal(true)}>
+            <ArrowUpDown size={20} color={theme.colors.green} />
           </TouchableOpacity>
         </View>
       </View>
@@ -236,7 +265,7 @@ export default function MarketplaceScreen({ navigation, route }) {
           </Text>
         </View>
         <View style={styles.countBadge}>
-          <Text style={styles.countBadgeText}>{loading ? '...' : String(listings.length)}</Text>
+          <Text style={styles.countBadgeText}>{loading ? '...' : String(sortedListings.length)}</Text>
         </View>
       </View>
 
@@ -254,59 +283,133 @@ export default function MarketplaceScreen({ navigation, route }) {
             <Text style={styles.primaryButtonText}>Try Again</Text>
           </TouchableOpacity>
         </View>
-      ) : listings.length === 0 ? (
+      ) : sortedListings.length === 0 ? (
         <View style={styles.stateCard}>
           <Text style={styles.stateTitle}>No listings matched</Text>
           <Text style={styles.stateText}>Try a broader crop name, another district, or a different grade.</Text>
         </View>
       ) : (
-        <View style={styles.results}>
-          {listings.map((listing) => (
-            <TouchableOpacity
-              key={listing.id}
-              style={styles.listingCard}
-              activeOpacity={0.9}
-              onPress={() => navigation.navigate('ListingDetail', { listing, role, token, profile })}
-            >
-              <View style={styles.cardTop}>
-                <View style={{ flex: 1, paddingRight: 12 }}>
-                  <Text style={styles.listingTitle}>{formatCropName(listing)}</Text>
-                  <Text style={styles.listingLocation}>{formatLocation(listing)}</Text>
-                </View>
-
-                <View style={styles.gradeBadge}>
-                  <Text style={styles.gradeBadgeText}>{formatGrade(listing.grade || listing.ai_grade_estimate)}</Text>
-                </View>
-              </View>
-
-              <View style={styles.metricRow}>
-                <StatCard
-                  label="Price per unit"
-                  value={formatMoney(listing.price_per_unit, listing.currency) + `/${listing.quantity_unit || 'kg'}`}
-                />
-                <StatCard
-                  label="Quantity"
-                  value={`${Number(listing.quantity || 0).toLocaleString()} ${listing.quantity_unit || 'kg'}`}
-                />
-              </View>
-
-              <View style={styles.footerRow}>
-                <View>
-                  <Text style={styles.footerLabel}>Seller</Text>
-                  <Text style={styles.footerValue}>{listing.seller_name || 'Anonymous'}</Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.footerLabel}>Trust score</Text>
-                  <Text style={styles.footerValue}>{listing.seller_trust_score || 0}</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <FlatList
+          data={sortedListings}
+          renderItem={renderListing}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.results}
+          showsVerticalScrollIndicator={false}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={renderFooter}
+        />
       )}
 
-      <View style={{ height: 100 }} />
-    </ScrollView>
+      {/* Filter Modal */}
+      <Modal
+        visible={showFilterModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowFilterModal(false)}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Filters</Text>
+              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
+                <X size={24} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.cardLabel}>Crop or keyword</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. maize"
+              placeholderTextColor="#94a3b8"
+              value={filters.crop}
+              onChangeText={(text) => updateFilter('crop', text)}
+              autoCapitalize="none"
+            />
+
+            <Text style={[styles.cardLabel, { marginTop: 14 }]}>Location</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Province, district, or town"
+              placeholderTextColor="#94a3b8"
+              value={filters.location}
+              onChangeText={(text) => updateFilter('location', text)}
+            />
+
+            <View style={styles.priceRow}>
+              <View style={styles.priceField}>
+                <Text style={styles.cardLabel}>Min price</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="0.00"
+                  placeholderTextColor="#94a3b8"
+                  value={filters.minPrice}
+                  onChangeText={(text) => updateFilter('minPrice', text)}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+
+              <View style={styles.priceField}>
+                <Text style={styles.cardLabel}>Max price</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="0.00"
+                  placeholderTextColor="#94a3b8"
+                  value={filters.maxPrice}
+                  onChangeText={(text) => updateFilter('maxPrice', text)}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.secondaryButton} onPress={clearFilters} activeOpacity={0.9}>
+                <Text style={styles.secondaryButtonText}>Clear</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.primaryButton} onPress={() => { setShowFilterModal(false); applySearch(); }} activeOpacity={0.9}>
+                <Text style={styles.primaryButtonText}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Sort Modal */}
+      <Modal
+        visible={showSortModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowSortModal(false)}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowSortModal(false)}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Sort By</Text>
+              <TouchableOpacity onPress={() => setShowSortModal(false)}>
+                <X size={24} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={[styles.sortOption, sortBy === 'newest' && styles.sortOptionActive]} onPress={() => { setSortBy('newest'); setShowSortModal(false); }}>
+              <TrendingUp size={18} color={sortBy === 'newest' ? '#fff' : '#64748b'} />
+              <Text style={[styles.sortOptionText, sortBy === 'newest' && styles.sortOptionTextActive]}>Newest First</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.sortOption, sortBy === 'oldest' && styles.sortOptionActive]} onPress={() => { setSortBy('oldest'); setShowSortModal(false); }}>
+              <TrendingDown size={18} color={sortBy === 'oldest' ? '#fff' : '#64748b'} />
+              <Text style={[styles.sortOptionText, sortBy === 'oldest' && styles.sortOptionTextActive]}>Oldest First</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.sortOption, sortBy === 'highest' && styles.sortOptionActive]} onPress={() => { setSortBy('highest'); setShowSortModal(false); }}>
+              <TrendingUp size={18} color={sortBy === 'highest' ? '#fff' : '#64748b'} />
+              <Text style={[styles.sortOptionText, sortBy === 'highest' && styles.sortOptionTextActive]}>Highest Price</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.sortOption, sortBy === 'lowest' && styles.sortOptionActive]} onPress={() => { setSortBy('lowest'); setShowSortModal(false); }}>
+              <TrendingDown size={18} color={sortBy === 'lowest' ? '#fff' : '#64748b'} />
+              <Text style={[styles.sortOptionText, sortBy === 'lowest' && styles.sortOptionTextActive]}>Lowest Price</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
   );
 }
 
@@ -314,6 +417,46 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F6F0DE',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  searchBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.colors.black,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  headerBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    backgroundColor: '#f0fdf4',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   content: {
     paddingHorizontal: 20,
@@ -579,5 +722,87 @@ const styles = StyleSheet.create({
     color: '#111827',
     fontWeight: '800',
     marginTop: 4,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 14,
+  },
+  results: {
+    paddingHorizontal: 20,
+    paddingBottom: 100,
+    gap: 14,
+  },
+  loadingMore: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 20,
+    gap: 8,
+  },
+  loadingMoreText: {
+    color: '#64748b',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  endOfList: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  endOfListText: {
+    color: '#94a3b8',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#111827',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 24,
+  },
+  sortOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: '#F8FAFC',
+  },
+  sortOptionActive: {
+    backgroundColor: theme.colors.green,
+  },
+  sortOptionText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#64748b',
+    marginLeft: 12,
+  },
+  sortOptionTextActive: {
+    color: '#fff',
   },
 });

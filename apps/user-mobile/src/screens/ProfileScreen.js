@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Alert, Platform, Share } from 'react-native';
-import { 
-  User as IconUser, MapPin as IconMapPin, Phone as IconPhone, 
-  Shield as IconShield, Star as IconStar, LogOut as IconLogOut, 
-  ChevronRight as IconChevronRight, Bell as IconBell, 
-  HelpCircle as IconHelpCircle, FileText as IconFileText, 
-  Settings as IconSettings, Briefcase as IconBriefcase, 
-  Download as IconDownload, Trash2 as IconTrash2, 
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Alert, Platform, Share, Image } from 'react-native';
+import {
+  User as IconUser, MapPin as IconMapPin, Phone as IconPhone,
+  Shield as IconShield, Star as IconStar, LogOut as IconLogOut,
+  ChevronRight as IconChevronRight, Bell as IconBell,
+  HelpCircle as IconHelpCircle, FileText as IconFileText,
+  Settings as IconSettings, Briefcase as IconBriefcase,
+  Download as IconDownload, Trash2 as IconTrash2,
   PowerOff as IconPowerOff, ShoppingCart as IconShopping,
-  Sprout as IconSprout
+  Sprout as IconSprout, CheckCircle, Clock, TrendingUp, Award
 } from 'lucide-react-native';
 import { theme } from '../styles';
 import { deactivateAccount, deleteAccount, exportPersonalData, getProfile } from '../api';
@@ -118,7 +118,6 @@ export default function ProfileScreen({ route, navigation }) {
   const trustScore = profile.trust_score || 50;
   const trustColor = trustScore >= 80 ? '#4CAF50' : trustScore >= 50 ? '#FFC107' : '#D32F2F';
   const trustLabel = trustScore >= 80 ? 'Excellent' : trustScore >= 50 ? 'Good' : 'Needs Improvement';
-  const RoleIcon = role === 'farmer' ? IconSprout : role === 'buyer' ? IconShopping : role === 'agent' ? IconBriefcase : IconUser;
   const accent = role === 'farmer' ? theme.colors.green : theme.colors.sky;
 
   return (
@@ -132,7 +131,7 @@ export default function ProfileScreen({ route, navigation }) {
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <View style={[styles.avatar, { backgroundColor: `${accent}15`, borderColor: `${accent}30` }]}>
-            <RoleIcon size={40} color={accent} />
+            <Image source={require('../../assets/logo.png')} style={{ width: 40, height: 40, resizeMode: 'contain' }} />
           </View>
           <Text style={styles.name}>{profile.full_name || profile.name || 'User'}</Text>
           <Text style={styles.roleLabel}>{(role || 'user').charAt(0).toUpperCase() + (role || 'user').slice(1)}</Text>
@@ -148,12 +147,11 @@ export default function ProfileScreen({ route, navigation }) {
             </View>
           )}
 
-          {/* Verification Badge */}
-          <View style={[styles.badge, { backgroundColor: profile.verified ? '#E8F5E9' : '#FFF3E0' }]}>
-            <IconShield size={14} color={profile.verified ? '#4CAF50' : '#FF9800'} />
-            <Text style={[styles.badgeText, { color: profile.verified ? '#4CAF50' : '#FF9800' }]}>
-              {profile.verified ? 'Verified' : 'Not Verified'}
-            </Text>
+          {/* Verification Badges */}
+          <View style={styles.verificationBadges}>
+            <VerificationBadge icon={<CheckCircle size={14} color="#4CAF50" />} label="ID Verified" verified={profile.id_verified} />
+            <VerificationBadge icon={<IconPhone size={14} color="#4CAF50" />} label="Phone Verified" verified={profile.phone_verified} />
+            <VerificationBadge icon={<IconShield size={14} color="#4CAF50" />} label="Email Verified" verified={profile.email_verified} />
           </View>
         </View>
 
@@ -187,6 +185,25 @@ export default function ProfileScreen({ route, navigation }) {
           <View style={styles.statCard}>
             <Text style={styles.statValue}>${profile.total_sales || 0}</Text>
             <Text style={styles.statLabel}>Sales</Text>
+          </View>
+        </View>
+
+        {/* Additional Stats */}
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <TrendingUp size={20} color={accent} style={{ marginBottom: 8 }} />
+            <Text style={styles.statValue}>{profile.offers_made || 0}</Text>
+            <Text style={styles.statLabel}>Offers Made</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Clock size={20} color={accent} style={{ marginBottom: 8 }} />
+            <Text style={styles.statValue}>{profile.offers_received || 0}</Text>
+            <Text style={styles.statLabel}>Offers Received</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Award size={20} color={accent} style={{ marginBottom: 8 }} />
+            <Text style={styles.statValue}>{profile.response_rate || 0}%</Text>
+            <Text style={styles.statLabel}>Response Rate</Text>
           </View>
         </View>
 
@@ -244,6 +261,17 @@ function MenuItem({ icon, label, onPress }) {
   );
 }
 
+function VerificationBadge({ icon, label, verified }) {
+  return (
+    <View style={[styles.verificationBadge, { backgroundColor: verified ? '#E8F5E9' : '#F5F5F5' }]}>
+      {icon}
+      <Text style={[styles.verificationBadgeText, { color: verified ? '#4CAF50' : '#999' }]}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   header: { padding: 24, paddingTop: 16 },
@@ -271,6 +299,16 @@ const styles = StyleSheet.create({
   roleLabel: { fontSize: 14, color: '#999', fontWeight: '600', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
   infoText: { fontSize: 14, color: '#666', fontWeight: '500' },
+  verificationBadges: { flexDirection: 'row', gap: 8, marginTop: 16, flexWrap: 'wrap', justifyContent: 'center' },
+  verificationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  verificationBadgeText: { fontSize: 11, fontWeight: '700' },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',

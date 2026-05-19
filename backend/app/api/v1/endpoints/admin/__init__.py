@@ -16,6 +16,9 @@ from . import (
     scraping,
     command_center,
     invitations,
+    broadcast,
+    audit,
+    classroom,
 )
 
 router = APIRouter()
@@ -36,4 +39,7 @@ router.include_router(permissions.router, prefix="/permissions", tags=["admin-pe
 router.include_router(scraping.router, prefix="/scraping", tags=["admin-scraping"])
 router.include_router(command_center.router, prefix="/command-center", tags=["admin-command-center"])
 router.include_router(invitations.router, prefix="/invitations", tags=["admin-invitations"])
+router.include_router(broadcast.router, prefix="/broadcast", tags=["admin-broadcast"])
+router.include_router(audit.router, prefix="/audit-logs", tags=["admin-audit-logs"])
+router.include_router(classroom.router, prefix="/classroom", tags=["admin-classroom"])
 

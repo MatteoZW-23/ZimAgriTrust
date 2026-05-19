@@ -46,6 +46,15 @@ import SupportScreen from './screens/SupportScreen';
 import DisputesScreen from './screens/DisputesScreen';
 import RaiseDisputeScreen from './screens/RaiseDisputeScreen';
 import VerificationScreen from './screens/VerificationScreen';
+import AgentVerificationScreen from './screens/AgentVerificationScreen';
+import AnalyticsScreen from './screens/AnalyticsScreen';
+import ChatScreen from './screens/ChatScreen';
+import HomeScreen from './screens/HomeScreen';
+import RiskScoreScreen from './screens/RiskScoreScreen';
+import TransactionsScreen from './screens/TransactionsScreen';
+import TransportNegotiationScreen from './screens/TransportNegotiationScreen';
+import TransportSelectionScreen from './screens/TransportSelectionScreen';
+import RegistrationScreen from './screens/RegistrationScreen';
 
 let Stack = null;
 if (Platform.OS !== 'web') {
@@ -213,6 +222,7 @@ export default function AppShell() {
   const [authenticated, setAuthenticated] = useState(false);
   const [session, setSession] = useState(null);
   const [webTab, setWebTab] = useState('Home');
+  const [showRegister, setShowRegister] = useState(false);
 
   // Sync webTab if role changes
   useEffect(() => {
@@ -295,7 +305,10 @@ export default function AppShell() {
   }
 
   if (!authenticated) {
-    return <LoginScreen role={role || 'buyer'} onAuthenticated={handleAuth} onGuest={handleGuest} />;
+    if (showRegister) {
+      return <RegistrationScreen onRegistered={handleAuth} onBack={() => setShowRegister(false)} />;
+    }
+    return <LoginScreen role={role || 'buyer'} onAuthenticated={handleAuth} onGuest={handleGuest} onRegister={() => setShowRegister(true)} />;
   }
 
   if (!onboardedState && !session?.guest) {
@@ -355,6 +368,14 @@ export default function AppShell() {
         <Stack.Screen name="Disputes" component={DisputesScreen} />
         <Stack.Screen name="RaiseDispute" component={RaiseDisputeScreen} />
         <Stack.Screen name="Verification" component={VerificationScreen} />
+        <Stack.Screen name="AgentVerification" component={AgentVerificationScreen} />
+        <Stack.Screen name="Analytics" component={AnalyticsScreen} />
+        <Stack.Screen name="Chat" component={ChatScreen} />
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="RiskScore" component={RiskScoreScreen} />
+        <Stack.Screen name="Transactions" component={TransactionsScreen} />
+        <Stack.Screen name="TransportNegotiation" component={TransportNegotiationScreen} />
+        <Stack.Screen name="TransportSelection" component={TransportSelectionScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { Text, TextInput, TouchableOpacity, View, ScrollView, StyleSheet } from "react-native";
+import logo from "../../assets/logo.png";
+import { Text, TextInput, TouchableOpacity, View, ScrollView, StyleSheet, ActivityIndicator, Platform, KeyboardAvoidingView, Alert, Image } from "react-native";
 import { theme } from "../styles";
 import { getProfile, login, register, forgotPassword, resetPassword } from "../api";
+import * as LocalAuthentication from 'expo-local-authentication';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Fingerprint, Eye, EyeOff, Lock, AlertCircle } from 'lucide-react-native';
 
-export function LoginScreen({ role, onAuthenticated, onGuest }) {
-  const [subStep, setSubStep] = useState('phone'); // 'phone', 'otp', 'profile', 'forgot', 'forgot-reset'
+export function LoginScreen({ role, onAuthenticated, onGuest, onRegister }) {
+  const [subStep, setSubStep] = useState('phone');
   const [phone, setPhone] = useState("");
   const [loginPin, setLoginPin] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
@@ -13,6 +17,16 @@ export function LoginScreen({ role, onAuthenticated, onGuest }) {
   const [timer, setTimer] = useState(45);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+
+  // Biometric state
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [showPin, setShowPin] = useState(false);
+
+  // Account lockout state
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutTime, setLockoutTime] = useState(0);
+  const [isLocked, setIsLocked] = useState(false);
 
   // Forgot PIN state
   const [forgotPhone, setForgotPhone] = useState("");
@@ -26,6 +40,59 @@ export function LoginScreen({ role, onAuthenticated, onGuest }) {
       return () => clearTimeout(t);
     }
   }, [subStep, timer]);
+
+  // Check biometric availability on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const compatible = await LocalAuthentication.hasHardwareAsync();
+        const enrolled = await LocalAuthentication.isEnrolledAsync();
+        setBiometricAvailable(compatible && enrolled);
+        
+        const biometricPref = await AsyncStorage.getItem('biometric_enabled');
+        setBiometricEnabled(biometricPref === 'true');
+      } catch (err) {
+        console.warn('Biometric check failed:', err);
+      }
+    })();
+  }, []);
+
+  // Check account lockout status
+  useEffect(() => {
+    (async () => {
+      try {
+        const lockoutData = await AsyncStorage.getItem('account_lockout');
+        if (lockoutData) {
+          const { timestamp, attempts } = JSON.parse(lockoutData);
+          const elapsed = Date.now() - timestamp;
+          
+          if (elapsed < 15 * 60 * 1000) {
+            setFailedAttempts(attempts);
+            setLockoutTime(Math.ceil((15 * 60 * 1000 - elapsed) / 1000));
+            setIsLocked(true);
+          } else {
+            await AsyncStorage.removeItem('account_lockout');
+            setFailedAttempts(0);
+            setIsLocked(false);
+          }
+        }
+      } catch (err) {
+        console.warn('Lockout check failed:', err);
+      }
+    })();
+  }, []);
+
+  // Lockout countdown
+  useEffect(() => {
+    if (isLocked && lockoutTime > 0) {
+      const timer = setTimeout(() => setLockoutTime(lockoutTime - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (isLocked && lockoutTime === 0) {
+      setIsLocked(false);
+      setFailedAttempts(0);
+      AsyncStorage.removeItem('account_lockout');
+    }
+  }, [isLocked, lockoutTime]);
 
   const handleForgotRequest = async () => {
     if (forgotPhone.length < 9) return;
@@ -62,15 +129,98 @@ export function LoginScreen({ role, onAuthenticated, onGuest }) {
 
   const handleSecureLogin = async () => {
     if (phone.length < 9 || loginPin.length < 4) return;
+    
+    if (isLocked) {
+      setError(`Account locked. Try again in ${Math.floor(lockoutTime / 60)}:${(lockoutTime % 60).toString().padStart(2, '0')}`);
+      return;
+    }
+    
     setLoading(true);
     setError("");
     try {
       const fullPhone = phone.startsWith('+') ? phone : `+263${phone.replace(/^0/, '')}`;
       const data = await login(fullPhone, loginPin);
       const loadedProfile = await getProfile(data.access_token);
+      
+      await AsyncStorage.removeItem('account_lockout');
+      setFailedAttempts(0);
+      setIsLocked(false);
+      
+      if (biometricAvailable && !biometricEnabled) {
+        Alert.alert(
+          'Enable Biometric Login?',
+          'Use your fingerprint or Face ID for faster, secure access to your account.',
+          [
+            { text: 'Not Now', style: 'cancel' },
+            { 
+              text: 'Enable', 
+              onPress: async () => {
+                try {
+                  const result = await LocalAuthentication.authenticateAsync({
+                    promptMessage: 'Verify your identity',
+                    fallbackLabel: 'Use PIN',
+                  });
+                  if (result.success) {
+                    await AsyncStorage.setItem('biometric_enabled', 'true');
+                    await AsyncStorage.setItem('biometric_phone', fullPhone);
+                    await AsyncStorage.setItem('biometric_pin', loginPin);
+                    setBiometricEnabled(true);
+                  }
+                } catch (err) {
+                  console.warn('Biometric setup failed:', err);
+                }
+              }
+            }
+          ]
+        );
+      }
+      
       onAuthenticated({ ...data, profile: loadedProfile });
     } catch (e) {
-      setError(e.message || "Login failed. Check your phone and PIN.");
+      const errorMsg = e.message || "Login failed. Check your phone and PIN.";
+      setError(errorMsg);
+      
+      const newAttempts = failedAttempts + 1;
+      setFailedAttempts(newAttempts);
+      
+      if (newAttempts >= 3) {
+        setIsLocked(true);
+        setLockoutTime(15 * 60);
+        await AsyncStorage.setItem('account_lockout', JSON.stringify({
+          timestamp: Date.now(),
+          attempts: newAttempts
+        }));
+      } else {
+        await AsyncStorage.setItem('account_lockout', JSON.stringify({
+          timestamp: Date.now(),
+          attempts: newAttempts
+        }));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleBiometricLogin = async () => {
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Login to ZimAgriTrust',
+        fallbackLabel: 'Use PIN',
+      });
+      
+      if (result.success) {
+        setLoading(true);
+        const savedPhone = await AsyncStorage.getItem('biometric_phone');
+        const savedPin = await AsyncStorage.getItem('biometric_pin');
+        
+        if (savedPhone && savedPin) {
+          const data = await login(savedPhone, savedPin);
+          const loadedProfile = await getProfile(data.access_token);
+          onAuthenticated({ ...data, profile: loadedProfile });
+        }
+      }
+    } catch (err) {
+      setError('Biometric authentication failed. Please use your PIN.');
     } finally {
       setLoading(false);
     }
@@ -163,65 +313,120 @@ export function LoginScreen({ role, onAuthenticated, onGuest }) {
     );
   }
 
-  // --- Step 5: Phone ---
+  // --- Login Screen ---
   if (subStep === 'phone') {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.header}>
             <View style={styles.iconContainer}>
-              <Text style={styles.iconText}>PHONE</Text>
+              <Image
+                source={logo}
+                style={styles.logo}
+                resizeMode="contain"
+              />
             </View>
-            <Text style={styles.title}>Secure Login</Text>
-            <Text style={styles.subTitle}>Use your phone and PIN, or browse public listings as a guest.</Text>
-        </View>
-        <View style={styles.form}>
-            {error ? <Text style={{ color: '#ef4444', fontWeight: '700', marginBottom: 16, textAlign: 'center' }}>{error}</Text> : null}
+            <Text style={styles.title}>Welcome Back</Text>
+            <Text style={styles.subTitle}>Login to access your ZimAgriTrust account</Text>
+          </View>
+          
+          <View style={styles.form}>
+            {error ? (
+              <View style={styles.errorBanner}>
+                <AlertCircle size={20} color="#ef4444" />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+            
+            {isLocked && (
+              <View style={styles.lockoutBanner}>
+                <AlertCircle size={20} color="#f59e0b" />
+                <Text style={styles.lockoutText}>
+                  Account locked. Try again in {Math.floor(lockoutTime / 60)}:{(lockoutTime % 60).toString().padStart(2, '0')}
+                </Text>
+              </View>
+            )}
+            
+            {biometricEnabled && (
+              <TouchableOpacity 
+                style={styles.biometricButton}
+                onPress={handleBiometricLogin}
+                disabled={loading}
+              >
+                <Fingerprint size={32} color={theme.colors.green} />
+                <Text style={styles.biometricButtonText}>Use Biometric Login</Text>
+              </TouchableOpacity>
+            )}
+            
             <View style={styles.phoneInputRow}>
-                <View style={styles.countryCode}><Text style={styles.codeText}>+263</Text></View>
-                <TextInput 
-                    style={styles.phoneInput} 
-                    placeholder="77 123 4567"
-                    keyboardType="phone-pad"
-                    value={phone}
-                    onChangeText={setPhone}
-                />
+              <View style={styles.countryCode}><Text style={styles.codeText}>+263</Text></View>
+              <TextInput 
+                style={styles.phoneInput} 
+                placeholder="77 123 4567"
+                keyboardType="phone-pad"
+                value={phone}
+                onChangeText={setPhone}
+                maxLength={10}
+              />
             </View>
+            
             <Text style={styles.label}>Security PIN</Text>
-            <TextInput
-                style={styles.input}
+            <View style={styles.pinInputContainer}>
+              <TextInput
+                style={styles.pinInput}
                 placeholder="4-6 digit PIN"
                 keyboardType="number-pad"
                 maxLength={6}
-                secureTextEntry
+                secureTextEntry={!showPin}
                 value={loginPin}
                 onChangeText={v => setLoginPin(v.replace(/[^0-9]/g, ''))}
-            />
+              />
+              <TouchableOpacity onPress={() => setShowPin(!showPin)} style={styles.eyeButton}>
+                {showPin ? <EyeOff size={20} color="#999" /> : <Eye size={20} color="#999" />}
+              </TouchableOpacity>
+            </View>
+            
+            {!isLocked && failedAttempts > 0 && (
+              <Text style={styles.attemptsText}>
+                {3 - failedAttempts} attempts remaining
+              </Text>
+            )}
+            
             <TouchableOpacity 
-                style={[styles.primaryBtn, (phone.length < 9 || loginPin.length < 4) && { backgroundColor: '#CCC' }, { marginTop: 20 }]} 
-                onPress={handleSecureLogin}
-                disabled={phone.length < 9 || loginPin.length < 4 || loading}
+              style={[styles.primaryBtn, (phone.length < 9 || loginPin.length < 4 || isLocked) && styles.disabledBtn]} 
+              onPress={handleSecureLogin}
+              disabled={phone.length < 9 || loginPin.length < 4 || isLocked || loading}
             >
-                <Text style={styles.primaryBtnText}>{loading ? "Checking..." : "Secure Login"}</Text>
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.primaryBtnText}>Login</Text>
+              )}
             </TouchableOpacity>
+            
             <TouchableOpacity 
-                style={[styles.secondaryBtn, phone.length < 9 && { opacity: 0.5 }]} 
-                onPress={handleSendCode}
-                disabled={phone.length < 9 || loading}
+              style={styles.registerBtn}
+              onPress={onRegister}
             >
-                <Text style={styles.secondaryBtnText}>Create New Account</Text>
+              <Text style={styles.registerBtnText}>Create New Account</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.guestBtn} onPress={onGuest}>
-              <Text style={styles.guestBtnText}>Browse as Guest</Text>
+            
+            {onGuest && (
+              <TouchableOpacity style={styles.guestBtn} onPress={onGuest}>
+                <Text style={styles.guestBtnText}>Browse as Guest</Text>
+              </TouchableOpacity>
+            )}
+            
+            <TouchableOpacity style={styles.forgotBtn} onPress={() => { setSubStep('forgot'); setError(""); }}>
+              <Text style={styles.forgotBtnText}>Forgot PIN?</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={{ marginTop: 16, alignItems: 'center' }} onPress={() => { setSubStep('forgot'); setError(""); }}>
-              <Text style={{ color: '#64748b', fontSize: 13, fontWeight: '700' }}>Forgot PIN? Reset via WhatsApp</Text>
-            </TouchableOpacity>
-        </View>
-      </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     );
   }
 
-  // --- Step 6: OTP ---
+  // --- OTP Screen ---
   if (subStep === 'otp') {
     return (
       <View style={styles.container}>
@@ -260,7 +465,7 @@ export function LoginScreen({ role, onAuthenticated, onGuest }) {
     );
   }
 
-  // --- Step 7: Profile ---
+  // --- Profile Screen ---
   return (
     <ScrollView style={styles.container}>
         <View style={[styles.header, { paddingTop: 60 }]}>
@@ -304,28 +509,43 @@ export function LoginScreen({ role, onAuthenticated, onGuest }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFF' },
-  header: { alignItems: 'center', paddingTop: 100, paddingHorizontal: 32 },
-  iconContainer: { width: 90, height: 90, borderRadius: 45, backgroundColor: 'rgba(46, 125, 50, 0.1)', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'rgba(46, 125, 50, 0.15)' },
+  scrollContent: { flexGrow: 1 },
+  header: { alignItems: 'center', paddingTop: 80, paddingHorizontal: 32, paddingBottom: 20 },
+  iconContainer: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(46, 125, 50, 0.1)', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'rgba(46, 125, 50, 0.15)' },
+  logo: { width: 50, height: 50 },
   iconText: { fontSize: 18, fontWeight: '800', color: theme.colors.green, letterSpacing: 1 },
-  title: { fontSize: 28, fontWeight: '800', color: theme.colors.black, marginTop: 28, textAlign: 'center', letterSpacing: 0.5 },
+  title: { fontSize: 28, fontWeight: '800', color: theme.colors.black, marginTop: 24, textAlign: 'center', letterSpacing: 0.5 },
   subTitle: { fontSize: 16, color: '#666', marginTop: 12, textAlign: 'center', fontWeight: '500', lineHeight: 24 },
-  form: { padding: 32 },
-  phoneInputRow: { flexDirection: 'row', height: 64, borderRadius: 12, borderWeight: 1, borderColor: '#E0E0E0', backgroundColor: '#FFF', overflow: 'hidden', marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
-  countryCode: { width: 90, justifyContent: 'center', alignItems: 'center', borderRightWidth: 1, borderRightColor: '#E0E0E0', backgroundColor: '#F9F9F9' },
+  form: { padding: 32, paddingTop: 0 },
+  errorBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fee2e2', padding: 12, borderRadius: 8, marginBottom: 20 },
+  errorText: { color: '#dc2626', marginLeft: 8, flex: 1, fontSize: 14, fontWeight: '600' },
+  lockoutBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fef3c7', padding: 12, borderRadius: 8, marginBottom: 20 },
+  lockoutText: { color: '#d97706', marginLeft: 8, flex: 1, fontSize: 14, fontWeight: '600' },
+  biometricButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0fdf4', padding: 16, borderRadius: 12, borderWidth: 2, borderColor: theme.colors.green, marginBottom: 24 },
+  biometricButtonText: { color: theme.colors.green, fontSize: 16, fontWeight: '700', marginLeft: 12 },
+  phoneInputRow: { flexDirection: 'row', height: 56, borderRadius: 12, borderWidth: 1, borderColor: '#E0E0E0', backgroundColor: '#FFF', overflow: 'hidden', marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
+  countryCode: { width: 80, justifyContent: 'center', alignItems: 'center', borderRightWidth: 1, borderRightColor: '#E0E0E0', backgroundColor: '#F9F9F9' },
   codeText: { fontWeight: '700', color: theme.colors.black, fontSize: 16 },
   phoneInput: { flex: 1, paddingHorizontal: 16, fontSize: 16, fontWeight: '500' },
+  label: { fontSize: 14, fontWeight: '700', color: theme.colors.black, marginBottom: 8, letterSpacing: 0.5 },
+  pinInputContainer: { flexDirection: 'row', alignItems: 'center', height: 56, borderRadius: 12, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E0E0E0', marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
+  pinInput: { flex: 1, paddingHorizontal: 16, fontSize: 16, fontWeight: '500' },
+  eyeButton: { padding: 16 },
+  attemptsText: { fontSize: 12, color: '#ef4444', marginBottom: 16, textAlign: 'center', fontWeight: '600' },
   primaryBtn: { backgroundColor: theme.colors.green, paddingVertical: 18, borderRadius: 12, alignItems: 'center', shadowColor: theme.colors.green, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  disabledBtn: { backgroundColor: '#CCC', shadowOpacity: 0 },
   primaryBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700', letterSpacing: 1 },
-  secondaryBtn: { marginTop: 12, paddingVertical: 16, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#DDE5D8', backgroundColor: '#FFF' },
-  secondaryBtnText: { color: theme.colors.green, fontSize: 15, fontWeight: '800' },
+  registerBtn: { marginTop: 12, paddingVertical: 16, borderRadius: 12, alignItems: 'center', borderWidth: 2, borderColor: theme.colors.green, backgroundColor: '#FFF' },
+  registerBtnText: { color: theme.colors.green, fontSize: 15, fontWeight: '800' },
   guestBtn: { marginTop: 12, paddingVertical: 14, borderRadius: 12, alignItems: 'center', backgroundColor: '#F8FAFC' },
   guestBtnText: { color: '#475569', fontSize: 14, fontWeight: '800' },
+  forgotBtn: { marginTop: 16, alignItems: 'center' },
+  forgotBtnText: { color: '#64748b', fontSize: 13, fontWeight: '700' },
   otpRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
   otpBox: { width: 48, height: 56, borderRadius: 12, borderWidth: 2, borderColor: '#E0E0E0', justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF' },
   otpInput: { fontSize: 24, fontWeight: '800', textAlign: 'center' },
   timerText: { textAlign: 'center', color: '#999', marginBottom: 32, fontWeight: '500', fontSize: 14 },
   avatarPlaceholder: { width: 110, height: 110, borderRadius: 55, backgroundColor: 'rgba(46, 125, 50, 0.1)', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'rgba(46, 125, 50, 0.15)' },
-  label: { fontSize: 14, fontWeight: '700', color: theme.colors.black, marginBottom: 10, marginTop: 20, letterSpacing: 0.5 },
   input: { height: 56, borderRadius: 12, backgroundColor: '#FFF', paddingHorizontal: 18, fontSize: 16, fontWeight: '500', borderWidth: 1, borderColor: '#E0E0E0', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
   chipRow: { flexDirection: 'row', gap: 10, marginTop: 12, marginBottom: 24 },
   chip: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: '#E0E0E0' }

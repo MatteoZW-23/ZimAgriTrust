@@ -5,7 +5,10 @@ Single endpoint for all vision processing
 
 from fastapi import APIRouter, Request, BackgroundTasks
 from datetime import datetime
-from app.ml.vision.core.vision_engine import vision_engine
+try:
+    from app.ml.vision.core.vision_engine import vision_engine
+except ImportError:
+    vision_engine = None  # type: ignore[assignment]
 from app.services.notification_service import NotificationService
 
 router = APIRouter(prefix="/webhooks/vision", tags=["Webhooks"])

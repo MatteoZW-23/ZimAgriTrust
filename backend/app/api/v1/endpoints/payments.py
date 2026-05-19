@@ -2,8 +2,9 @@ import hmac
 import hashlib
 import os
 import uuid as _uuid
+import logging
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel
@@ -16,6 +17,7 @@ from app.models.transaction import Transaction, TransactionType, Order, OrderSta
 from app.core.policy import calculate_platform_fees, calculate_seller_settlement, calculate_full_order_breakdown
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 class EcoCashCallbackPayload(BaseModel):
     request_id: str
@@ -46,47 +48,100 @@ class OneMoneyCBPayload(BaseModel):
 
 @router.post("/ecocash/callback")
 async def ecocash_webhook(payload: EcoCashCallbackPayload, request: Request, db: Session = Depends(get_db)):
-    """Production EcoCash callback receiver with HMAC signature verification."""
+    """Production EcoCash callback receiver with MANDATORY HMAC signature verification."""
     signature = request.headers.get("X-EcoCash-Signature")
     secret_key = os.getenv("ECOCASH_WEBHOOK_SECRET", "").encode("utf-8")
-    if secret_key and signature:
+    
+    # MANDATORY verification - fail closed (reject if not configured)
+    if not secret_key:
+        logger.error("ECOCASH_WEBHOOK_SECRET not configured - rejecting webhook")
+        raise HTTPException(status_code=500, detail="Webhook verification not configured")
+    
+    if not signature:
+        logger.warning(f"EcoCash webhook missing signature from {request.client.host if request.client else 'unknown'}")
+        raise HTTPException(status_code=401, detail="Missing signature header")
+    
+    # Verify signature before any processing
+    try:
         raw_body = await request.body()
         expected = hmac.new(secret_key, raw_body, hashlib.sha256).hexdigest()
         if not hmac.compare_digest(signature, expected):
+            logger.warning(f"EcoCash webhook invalid signature from {request.client.host if request.client else 'unknown'}")
             raise HTTPException(status_code=401, detail="Invalid signature")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"EcoCash signature verification error: {e}")
+        raise HTTPException(status_code=401, detail="Signature verification failed")
 
-    success = process_ecocash_callback(
-        db,
-        payload.request_id,
-        "PAID" if payload.status == "SUCCESS" else "FAILED",
-        payload.merchant_reference,
-    )
-    if not success:
-        raise HTTPException(status_code=400, detail="Callback failed to process")
-    return {"status": "accepted", "message": "Transaction state updated"}
+    # Process only after successful verification
+    try:
+        success = process_ecocash_callback(
+            db,
+            payload.request_id,
+            "PAID" if payload.status == "SUCCESS" else "FAILED",
+            payload.merchant_reference,
+        )
+        if not success:
+            raise HTTPException(status_code=400, detail="Callback failed to process")
+        return {"status": "accepted", "message": "Transaction state updated"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"EcoCash webhook processing error: {str(e)}")
+        raise HTTPException(status_code=500, detail="EcoCash service error")
 
 
 @router.post("/onemoney/callback")
-async def onemoney_webhook(payload: OneMoneyCBPayload, request: Request, db: Session = Depends(get_db)):
-    """OneMoney webhook — same escrow logic as EcoCash."""
-    success = process_ecocash_callback(
-        db,
-        payload.reference,
-        "PAID" if payload.status in ("SUCCESS", "COMPLETED") else "FAILED",
-        payload.reference,
-    )
-    if not success:
-        raise HTTPException(status_code=400, detail="OneMoney callback failed")
-    return {"status": "accepted"}
+async def onemoney_webhook(
+    payload: OneMoneyCBPayload,
+    request: Request,
+    db: Session = Depends(get_db),
+    x_signature: str = Header(None, alias="X-Signature")
+):
+    """OneMoney webhook with signature verification."""
+    try:
+        # Verify webhook signature
+        if x_signature:
+            payload_bytes = await request.body()
+            from app.services.webhook_verification import WebhookVerifier
+            secret_key = os.getenv("ONEMONEY_WEBHOOK_SECRET", "")
+            if secret_key:
+                is_valid = WebhookVerifier.verify_onemoney(payload_bytes, x_signature, secret_key)
+                if not is_valid:
+                    raise HTTPException(status_code=401, detail="Invalid signature")
+
+        success = process_ecocash_callback(
+            db,
+            payload.reference,
+            "PAID" if payload.status in ("SUCCESS", "COMPLETED") else "FAILED",
+            payload.reference,
+        )
+        if not success:
+            raise HTTPException(status_code=400, detail="OneMoney callback failed")
+        return {"status": "accepted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"OneMoney webhook error: {str(e)}")
+        raise HTTPException(status_code=500, detail="OneMoney service error")
 
 
 @router.get("/balance", response_model=WalletBalanceResponse)
-def get_wallet_balance(current_user: User = Depends(get_current_user)):
+def get_wallet_balance(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from app.services.ledger_service import LedgerService
+    available_usd = LedgerService.get_balance(db, current_user.id, "USD")
+    pending_usd = LedgerService.get_pending_balance(db, current_user.id, "USD")
+    available_zig = LedgerService.get_balance(db, current_user.id, "ZIG")
+    pending_zig = LedgerService.get_pending_balance(db, current_user.id, "ZIG")
     return {
-        "balance_usd": current_user.balance_usd,
-        "balance_zig": current_user.balance_zig,
-        "pending_usd": current_user.pending_usd,
-        "pending_zig": current_user.pending_zig,
+        "balance_usd": round(available_usd, 6),
+        "balance_zig": round(available_zig, 6),
+        "pending_usd": round(pending_usd, 6),
+        "pending_zig": round(pending_zig, 6),
     }
 
 

@@ -153,7 +153,7 @@ export default function TransportNegotiationScreen({ navigation, route }) {
                 'Offer Accepted',
                 'Transport fee agreement reached. Driver will be assigned shortly.',
                 [
-                  { text: 'OK', onPress: () => navigation.goBack() }
+                  { text: 'OK', onPress: () => navigation.navigate('OrderDetails', { orderId, role, token }) }
                 ]
               );
             } catch (error) {

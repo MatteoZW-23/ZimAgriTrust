@@ -7,7 +7,9 @@ import {
   getTransportRequests, getTransportRequest, getNegotiations, resolveNegotiation,
   getDriverAssignments, manualAssignDriver, getTransportDisputes, resolveTransportDispute,
   getTransportStats,
+  fetchLogisticsTrips, createLogisticsTrip, fetchManifest,
 } from '../api';
+import { exportToCSV } from '../utils/dataTransfer';
 
 export function TransportManagementPanel({ token }) {
   const [activeTab, setActiveTab] = useState('overview');
@@ -19,8 +21,15 @@ export function TransportManagementPanel({ token }) {
   const [loading, setLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
 
+  // Freight routes state (merged from LogisticsCommand)
+  const [trips, setTrips] = useState([]);
+  const [manifest, setManifest] = useState(null);
+  const [showAddTrip, setShowAddTrip] = useState(false);
+  const [newTrip, setNewTrip] = useState({ origin_district: '', destination_city: '', available_capacity_kg: 3000, price_per_kg: 0.05, departure_date: '' });
+
   useEffect(() => {
     loadStats();
+    loadTrips();
   }, [token]);
 
   useEffect(() => {
@@ -28,6 +37,7 @@ export function TransportManagementPanel({ token }) {
     if (activeTab === 'negotiations') loadNegotiations();
     if (activeTab === 'assignments') loadAssignments();
     if (activeTab === 'disputes') loadDisputes();
+    if (activeTab === 'freight') loadTrips();
   }, [activeTab, token]);
 
   const loadStats = async () => {
@@ -110,8 +120,34 @@ export function TransportManagementPanel({ token }) {
     }
   };
 
+  const loadTrips = async () => {
+    try {
+      const data = await fetchLogisticsTrips(token);
+      setTrips(Array.isArray(data) ? data : []);
+    } catch { setTrips([]); }
+  };
+
+  const handleTripCreate = async (e) => {
+    e.preventDefault();
+    try {
+      await createLogisticsTrip(token, newTrip);
+      setShowAddTrip(false);
+      setNewTrip({ origin_district: '', destination_city: '', available_capacity_kg: 3000, price_per_kg: 0.05, departure_date: '' });
+      loadTrips();
+    } catch (err) {
+      console.error('Trip Broadcast Failed');
+    }
+  };
+
+  const viewManifest = (tripId) => {
+    fetchManifest(token, tripId)
+      .then(data => setManifest(data?.items || []))
+      .catch(() => setManifest([]));
+  };
+
   const TABS = [
     { id: 'overview', label: 'Overview', icon: 'fa-chart-line' },
+    { id: 'freight', label: 'Freight Routes', icon: 'fa-truck-fast' },
     { id: 'requests', label: 'Transport Requests', icon: 'fa-truck' },
     { id: 'negotiations', label: 'Negotiations', icon: 'fa-comments' },
     { id: 'assignments', label: 'Driver Assignments', icon: 'fa-user-tag' },
@@ -178,6 +214,115 @@ export function TransportManagementPanel({ token }) {
             <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '8px' }}>Avg Delivery Time</div>
             <div style={{ fontSize: '32px', fontWeight: 900, color: '#06b6d4' }}>{stats.avg_delivery_time || 0} min</div>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'freight' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div>
+              <div style={{ fontSize: '14px', color: '#94a3b8' }}>Network Capacity: <strong style={{ color: '#3b82f6' }}>{(trips.reduce((acc, t) => acc + (t.available_capacity_kg || 0), 0) / 1000).toFixed(1)}T</strong> across <strong style={{ color: '#3b82f6' }}>{trips.length}</strong> active corridors</div>
+            </div>
+            <button onClick={() => setShowAddTrip(true)} style={{ padding: '10px 20px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '14px' }}>
+              <i className="fas fa-plus" style={{ marginRight: '8px' }}></i>Register Route
+            </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: manifest ? '1fr 380px' : '1fr', gap: '16px' }}>
+            <div style={{ background: '#1e293b', borderRadius: '12px', border: '1px solid #334155', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead style={{ background: '#0f172a' }}>
+                  <tr>
+                    <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>Corridor</th>
+                    <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>Capacity</th>
+                    <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>Tariff</th>
+                    <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>Status</th>
+                    <th style={{ padding: '16px', textAlign: 'right', fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>Manifest</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trips.map((trip) => (
+                    <tr key={trip.id} style={{ borderBottom: '1px solid #334155', cursor: 'pointer' }} onClick={() => viewManifest(trip.id)}>
+                      <td style={{ padding: '16px' }}>
+                        <strong style={{ fontSize: '14px' }}>{trip.origin_district}</strong>
+                        <div style={{ fontSize: '12px', color: '#94a3b8' }}>→ {trip.destination_city}</div>
+                      </td>
+                      <td style={{ padding: '16px', fontSize: '14px', fontWeight: 600 }}>{(trip.available_capacity_kg || 0).toLocaleString()} KG</td>
+                      <td style={{ padding: '16px', fontSize: '14px', fontWeight: 600 }}>${(trip.price_per_kg || 0).toFixed(2)}/kg</td>
+                      <td style={{ padding: '16px' }}>
+                        <span style={{
+                          padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600,
+                          background: trip.status === 'IN_TRANSIT' ? '#7f1d1d' : '#1e293b',
+                          color: trip.status === 'IN_TRANSIT' ? '#fca5a5' : '#94a3b8',
+                        }}>{trip.status}</span>
+                      </td>
+                      <td style={{ padding: '16px', textAlign: 'right' }}>
+                        <button style={{ padding: '6px 12px', background: '#1e293b', color: '#94a3b8', border: '1px solid #334155', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>View</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {trips.length === 0 && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>No freight routes registered yet</div>}
+            </div>
+            {manifest && (
+              <div style={{ background: '#1e293b', borderRadius: '12px', border: '1px solid #334155', padding: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}><i className="fas fa-file-invoice" style={{ marginRight: '8px', color: '#3b82f6' }}></i>Trip Manifest</h3>
+                  <button onClick={() => setManifest(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+                </div>
+                {manifest.map((item, idx) => (
+                  <div key={idx} style={{ padding: '12px', borderRadius: '8px', background: '#0f172a', border: '1px solid #334155', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <strong style={{ fontSize: '13px' }}>{item.farmer}</strong>
+                      <span style={{ fontSize: '12px', fontWeight: 600 }}>{item.quantity}</span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>Pickup: {item.pickup_point}</div>
+                  </div>
+                ))}
+                <button onClick={() => exportToCSV(manifest, `manifest_${new Date().toISOString()}.csv`)} style={{ marginTop: '12px', width: '100%', padding: '10px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
+                  <i className="fas fa-download" style={{ marginRight: '8px' }}></i>Export CSV
+                </button>
+              </div>
+            )}
+          </div>
+
+          {showAddTrip && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+              <div style={{ background: '#1e293b', borderRadius: '16px', border: '1px solid #334155', padding: '32px', maxWidth: '600px', width: '100%' }}>
+                <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '24px' }}>Register Freight Corridor</h2>
+                <form onSubmit={handleTripCreate}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', fontWeight: 600, marginBottom: '6px' }}>Origin District</label>
+                      <input type="text" value={newTrip.origin_district} onChange={e => setNewTrip({...newTrip, origin_district: e.target.value})} style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '10px', color: '#fff', fontSize: '14px' }} required />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', fontWeight: 600, marginBottom: '6px' }}>Destination Depot</label>
+                      <input type="text" value={newTrip.destination_city} onChange={e => setNewTrip({...newTrip, destination_city: e.target.value})} style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '10px', color: '#fff', fontSize: '14px' }} required />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', fontWeight: 600, marginBottom: '6px' }}>Capacity (KG)</label>
+                      <input type="number" value={newTrip.available_capacity_kg} onChange={e => setNewTrip({...newTrip, available_capacity_kg: e.target.value})} style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '10px', color: '#fff', fontSize: '14px' }} required />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', fontWeight: 600, marginBottom: '6px' }}>Rate ($/KG)</label>
+                      <input type="number" step="0.01" value={newTrip.price_per_kg} onChange={e => setNewTrip({...newTrip, price_per_kg: e.target.value})} style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '10px', color: '#fff', fontSize: '14px' }} required />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', fontWeight: 600, marginBottom: '6px' }}>Departure Date</label>
+                      <input type="date" value={newTrip.departure_date} onChange={e => setNewTrip({...newTrip, departure_date: e.target.value})} style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '10px', color: '#fff', fontSize: '14px' }} required />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button type="button" onClick={() => setShowAddTrip(false)} style={{ flex: 1, padding: '12px', background: '#0f172a', color: '#94a3b8', border: '1px solid #334155', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+                    <button type="submit" style={{ flex: 2, padding: '12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '14px' }}>
+                      <i className="fas fa-plus" style={{ marginRight: '8px' }}></i>Add Route
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

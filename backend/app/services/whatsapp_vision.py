@@ -4,7 +4,7 @@ WhatsApp Vision Adapter - Handles vision features for WhatsApp bot
 
 import logging
 from typing import Dict, Any, Optional
-from app.ml.vision.core.vision_engine import vision_engine
+from app.services.ml_service import classify_crop, detect_disease
 from app.services.media_service import media_service
 
 logger = logging.getLogger(__name__)
@@ -20,28 +20,25 @@ class WhatsAppVisionAdapter:
         Process listing photo from farmer
         Returns WhatsApp-friendly response
         """
-        # Use core engine for verification
-        result = await vision_engine.verify_crop_match(image_data, claimed_crop)
+        # Use new ONNX-based classifier
+        result = await classify_crop(image_data)
         
-        if result["verified"]:
-            # Get grade for response
-            grade_result = await vision_engine.estimate_grade(image_data, 
-                {"crop_type": result["detected_crop"], "confidence": result["confidence"]})
-            
+        if result.get("success") and result.get("crop_type", "").lower() == claimed_crop.lower():
+            # Verified match
             return {
                 "verified": True,
                 "message": f"✅ *Crop Verified!*\n\n"
-                          f"Detected: **{result['detected_crop_name']}**\n"
-                          f"Grade: **{grade_result['grade']}**\n"
-                          f"Confidence: {int(result['confidence']*100)}%\n\n"
+                          f"Detected: **{result.get('crop_name', 'Unknown')}**\n"
+                          f"Confidence: {int(result.get('confidence', 0)*100)}%\n\n"
                           f"Now, please share your farm location.",
-                "grade": grade_result["grade"],
-                "confidence": result["confidence"]
+                "confidence": result.get("confidence", 0)
             }
         else:
             return {
                 "verified": False,
-                "message": result["message"],
+                "message": f"⚠️ Could not verify crop as {claimed_crop}\n\n"
+                          f"Detected: **{result.get('crop_name', 'Unknown')}**\n"
+                          f"Please try again with a clearer photo.",
                 "requires_retry": True
             }
     
@@ -49,27 +46,23 @@ class WhatsAppVisionAdapter:
         """
         Analyze crop photo for advisory purposes
         """
-        analysis = await vision_engine.full_analysis(image_data)
+        # Use new ONNX-based classifier
+        result = await classify_crop(image_data)
         
-        if not analysis["success"]:
+        if not result.get("success"):
             return {
-                "message": f"⚠️ {analysis.get('error', 'Could not analyze image')}\n\n"
+                "message": f"⚠️ {result.get('message', 'Could not analyze image')}\n\n"
                           f"Please try again with a clearer photo."
             }
         
-        crop = analysis["crop"]
-        grade = analysis["grade"]
+        crop_name = result.get("crop_name", "Unknown")
+        confidence = result.get("confidence", 0)
         
         message = (f"🔬 *ZimAgritrust AI Analysis*\n\n"
-                   f"🌿 **Crop:** {crop['crop_name']}\n"
-                   f"📊 **Confidence:** {int(crop['confidence']*100)}%\n"
-                   f"⭐ **Grade:** {grade['grade']}\n"
-                   f"💬 **Note:** {grade['description']}\n\n")
+                   f"🌿 **Crop:** {crop_name}\n"
+                   f"📊 **Confidence:** {int(confidence*100)}%\n\n")
         
-        if analysis["recommendations"]:
-            message += f"💡 **Tip:** {analysis['recommendations'][0]}\n\n"
-        
-        message += f"Type 'sell' to list this {crop['crop_name']} on the marketplace."
+        message += f"Type 'sell' to list this {crop_name} on the marketplace."
         
         return {"message": message}
 

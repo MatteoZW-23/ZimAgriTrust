@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  SafeAreaView, RefreshControl, Alert, ActivityIndicator
+  SafeAreaView, RefreshControl, Alert, ActivityIndicator, Animated
 } from 'react-native';
 import { 
   Sprout as IconSprout, 
@@ -11,10 +11,14 @@ import {
   Trash2 as IconDelete, 
   Plus as IconPlus,
   Leaf as IconLeaf,
-  AlertCircle as IconAlert
+  AlertCircle as IconAlert,
+  Filter,
+  Clock,
+  CheckCircle
 } from 'lucide-react-native';
 import { getMyListings } from '../api';
 import { theme } from '../styles';
+import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
 
 function statusColor(status = '') {
   const s = status.toUpperCase();
@@ -31,6 +35,12 @@ export default function MyListingsScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [index, setIndex] = useState(0);
+  const [routes] = useState([
+    { key: 'active', title: 'Active' },
+    { key: 'sold', title: 'Sold' },
+    { key: 'expired', title: 'Expired' },
+  ]);
 
   const load = useCallback(async () => {
     try {
@@ -58,6 +68,84 @@ export default function MyListingsScreen({ navigation, route }) {
     ]);
   };
 
+  const filterListings = (status) => {
+    const s = status.toUpperCase();
+    return listings.filter(l => {
+      const lStatus = (l.status || 'ACTIVE').toUpperCase();
+      if (s === 'ACTIVE') return lStatus === 'ACTIVE' || lStatus === 'PENDING';
+      if (s === 'SOLD') return lStatus === 'SOLD' || lStatus === 'COMPLETED';
+      if (s === 'EXPIRED') return lStatus === 'EXPIRED' || lStatus === 'PAUSED';
+      return true;
+    });
+  };
+
+  const renderScene = ({ route }) => {
+    const filteredListings = filterListings(route.key);
+    
+    if (loading) {
+      return (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={theme.colors.green} />
+          <Text style={styles.loadingText}>Loading listings...</Text>
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.center}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={load}>
+            <Text style={styles.retryText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (filteredListings.length === 0) {
+      return (
+        <View style={styles.empty}>
+          <IconLeaf size={64} color="#CBD5E1" style={{ marginBottom: 16 }} />
+          <Text style={styles.emptyTitle}>No {route.key.toLowerCase()} listings</Text>
+          <Text style={styles.emptyText}>
+            {route.key === 'active' ? 'Your active listings will appear here.' : 
+             route.key === 'sold' ? 'Your sold listings will appear here.' :
+             'Your expired listings will appear here.'}
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.green} />}
+        contentContainerStyle={{ paddingBottom: 120 }}
+      >
+        {filteredListings.map((listing) => (
+          <ListingCard
+            key={listing.id}
+            listing={listing}
+            onDelete={() => handleDelete(listing.id)}
+            onEdit={() => navigation.navigate('CreateListing', { token, listing })}
+            onViewOffers={() => navigation.navigate('OrderDetails', { orderId: listing.id, role: 'farmer', token })}
+          />
+        ))}
+      </ScrollView>
+    );
+  };
+
+  const renderTabBar = (props) => (
+    <TabBar
+      {...props}
+      style={styles.tabBar}
+      labelStyle={styles.tabLabel}
+      indicatorStyle={styles.tabIndicator}
+      activeColor={theme.colors.green}
+      inactiveColor="#94a3b8"
+    />
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -74,49 +162,13 @@ export default function MyListingsScreen({ navigation, route }) {
         </TouchableOpacity>
       </View>
 
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={theme.colors.green} />
-          <Text style={styles.loadingText}>Loading your listings...</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.center}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={load}>
-            <Text style={styles.retryText}>Try Again</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.green} />}
-          contentContainerStyle={{ paddingBottom: 120 }}
-        >
-          {listings.length === 0 ? (
-            <View style={styles.empty}>
-              <IconLeaf size={64} color="#CBD5E1" style={{ marginBottom: 16 }} />
-              <Text style={styles.emptyTitle}>No listings yet</Text>
-              <Text style={styles.emptyText}>Create your first listing to start selling.</Text>
-              <TouchableOpacity
-                style={styles.createBtn}
-                onPress={() => navigation.navigate('CreateListing', { token })}
-              >
-                <Text style={styles.createBtnText}>Create Listing</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            listings.map((listing) => (
-              <ListingCard
-                key={listing.id}
-                listing={listing}
-                onDelete={() => handleDelete(listing.id)}
-                onEdit={() => navigation.navigate('CreateListing', { token, listing })}
-                onViewOffers={() => navigation.navigate('OrderDetails', { orderId: listing.id, role: 'farmer', token })}
-              />
-            ))
-          )}
-        </ScrollView>
-      )}
+      <TabView
+        navigationState={{ index, routes }}
+        renderScene={renderScene}
+        onIndexChange={setIndex}
+        renderTabBar={renderTabBar}
+        swipeEnabled
+      />
     </SafeAreaView>
   );
 }
@@ -183,6 +235,9 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: '900', color: theme.colors.black },
   addBtn: { backgroundColor: theme.colors.green, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center' },
   addBtnText: { color: '#fff', fontWeight: '900', fontSize: 12 },
+  tabBar: { backgroundColor: '#fff', elevation: 0, shadowOpacity: 0, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
+  tabLabel: { fontSize: 14, fontWeight: '700' },
+  tabIndicator: { backgroundColor: theme.colors.green, height: 3 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   loadingText: { marginTop: 12, color: '#64748b', fontWeight: '600' },
   errorText: { color: '#ef4444', fontWeight: '700', textAlign: 'center', marginBottom: 16 },

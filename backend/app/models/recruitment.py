@@ -64,4 +64,4 @@ class AgentApplication(Base):
     reviewer_notes = Column(JSON, default=[])
     reviewed_at = Column(DateTime, nullable=True)
     
-    user = relationship("User", backref="application", foreign_keys=[user_id])
+    user = relationship("User", back_populates="application", foreign_keys=[user_id])

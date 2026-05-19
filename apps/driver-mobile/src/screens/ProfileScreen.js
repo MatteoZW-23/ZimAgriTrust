@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, Alert, Platform,
+  SafeAreaView, Alert, Platform, Modal, ActivityIndicator, Image,
 } from 'react-native';
 import {
-  Phone as IconPhone, MapPin as IconMapPin, Truck as IconTruck, 
-  Shield as IconShield, Star as IconStar, LogOut as IconLogOut, 
-  ChevronRight as IconChevronRight, Bell as IconBell, 
-  HelpCircle as IconHelpCircle, Settings as IconSettings, 
+  Phone as IconPhone, MapPin as IconMapPin, Truck as IconTruck,
+  Shield as IconShield, Star as IconStar, LogOut as IconLogOut,
+  ChevronRight as IconChevronRight, Bell as IconBell,
+  HelpCircle as IconHelpCircle, Settings as IconSettings,
   Award as IconAward, FileText as IconFileText, Camera as IconCamera,
-  CheckCircle as IconCheckCircle, Clock as IconClock, 
+  CheckCircle as IconCheckCircle, Clock as IconClock,
   XCircle as IconXCircle, User as IconUser, Package as IconPackage,
+  Upload as IconUpload, X as IconX, Calendar as IconCalendar,
 } from 'lucide-react-native';
 import { theme } from '../styles';
-import { getDriverProfile, updateAvailability } from '../api';
+import { getDriverProfile, updateAvailability, uploadDocument } from '../api';
 import { clearSession } from '../utils/auth';
 
 // Simple arc-based completion ring using border trick
@@ -47,10 +48,23 @@ const DOC_STATUS = {
 };
 
 const DOCUMENTS = [
-  { key: 'license',  label: "Driver's License",    status: 'verified', icon: IconFileText },
-  { key: 'vehicle',  label: 'Vehicle Registration', status: 'verified', icon: IconTruck },
-  { key: 'insurance',label: 'Insurance Certificate',status: 'pending',  icon: IconShield },
-  { key: 'photo',    label: 'Profile Photo',        status: 'missing',  icon: IconCamera },
+  { key: 'license',  label: "Driver's License",    status: 'verified', icon: IconFileText, uploadDate: '2024-01-15' },
+  { key: 'vehicle',  label: 'Vehicle Registration', status: 'verified', icon: IconTruck, uploadDate: '2024-01-15' },
+  { key: 'insurance',label: 'Insurance Certificate',status: 'pending',  icon: IconShield, uploadDate: '2024-04-20' },
+  { key: 'photo',    label: 'Profile Photo',        status: 'missing',  icon: IconCamera, uploadDate: null },
+  { key: 'id_proof', label: 'National ID',         status: 'verified', icon: IconUser, uploadDate: '2024-01-10' },
+];
+
+const VERIFICATION_TIMELINE = [
+  { date: '2024-01-10', event: 'Account Created', status: 'completed' },
+  { date: '2024-01-10', event: 'National ID Uploaded', status: 'completed' },
+  { date: '2024-01-12', event: 'ID Verified', status: 'completed' },
+  { date: '2024-01-15', event: 'Driver\'s License Uploaded', status: 'completed' },
+  { date: '2024-01-17', event: 'License Verified', status: 'completed' },
+  { date: '2024-01-15', event: 'Vehicle Registration Uploaded', status: 'completed' },
+  { date: '2024-01-18', event: 'Vehicle Verified', status: 'completed' },
+  { date: '2024-04-20', event: 'Insurance Certificate Uploaded', status: 'completed' },
+  { date: '2024-04-22', event: 'Insurance Under Review', status: 'pending' },
 ];
 
 const ACHIEVEMENTS = [
@@ -60,17 +74,13 @@ const ACHIEVEMENTS = [
   { label: 'Night Shift',    icon: IconTruck,       earned: false },
 ];
 
-const MENU_ITEMS = [
-  { icon: IconSettings,    color: theme.colors.sky, label: 'Account Settings', sub: 'Name, phone, password' },
-  { icon: IconBell,        color: '#F59E0B',         label: 'Notifications',    sub: 'Push, SMS, email' },
-  { icon: IconShield,      color: '#4CAF50',         label: 'Privacy & Security', sub: 'Data, permissions' },
-  { icon: IconHelpCircle,  color: '#9C27B0',         label: 'Help & Support',   sub: 'FAQ, contact us' },
-];
-
 export default function ProfileScreen({ route, navigation, onLogout: onLogoutProp }) {
   const { token, profile: initialProfile = {}, onLogout: onLogoutParam } = route.params || {};
   const onLogout = onLogoutProp || onLogoutParam;
   const [profile, setProfile] = useState(initialProfile);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedDoc, setSelectedDoc] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (token) {
@@ -108,6 +118,27 @@ export default function ProfileScreen({ route, navigation, onLogout: onLogoutPro
     );
   };
 
+  const handleUploadDocument = (doc) => {
+    setSelectedDoc(doc);
+    setShowUploadModal(true);
+  };
+
+  const handleConfirmUpload = async () => {
+    if (!selectedDoc) return;
+    setUploading(true);
+    try {
+      // Simulate document upload
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      Alert.alert('Success', `${selectedDoc.label} uploaded successfully. It will be reviewed shortly.`);
+      setShowUploadModal(false);
+      setSelectedDoc(null);
+    } catch (err) {
+      Alert.alert('Upload Failed', err.message || 'Could not upload document. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const rating = profile.rating || 4.8;
   const completionPercent = 75;
 
@@ -123,7 +154,7 @@ export default function ProfileScreen({ route, navigation, onLogout: onLogoutPro
         <View style={styles.heroCard}>
           <View style={styles.avatarRow}>
             <View style={styles.avatar}>
-              <IconTruck size={32} color={theme.colors.sky} />
+              <Image source={require('../../assets/logo.png')} style={{ width: 32, height: 32, resizeMode: 'contain' }} />
             </View>
             <View style={styles.avatarInfo}>
               <Text style={styles.name}>{profile.full_name || 'Driver'}</Text>
@@ -233,13 +264,23 @@ export default function ProfileScreen({ route, navigation, onLogout: onLogoutPro
 
         {/* Documents */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Documents</Text>
-          {DOCUMENTS.map(doc => {
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Documents</Text>
+            <TouchableOpacity onPress={() => {}}>
+              <Text style={styles.seeAllText}>View All</Text>
+            </TouchableOpacity>
+          </View>
+          {DOCUMENTS.map((doc, idx) => {
             const Icon = doc.icon;
             const st = DOC_STATUS[doc.status];
             const StatusIcon = st.icon;
             return (
-              <TouchableOpacity key={doc.key} style={styles.docRow} activeOpacity={0.75}>
+              <TouchableOpacity
+                key={doc.key + idx}
+                style={styles.docRow}
+                activeOpacity={0.75}
+                onPress={() => doc.status === 'missing' && handleUploadDocument(doc)}
+              >
                 <View style={[styles.docIcon, { backgroundColor: st.bg }]}>
                   <Icon size={16} color={st.color} />
                 </View>
@@ -249,11 +290,47 @@ export default function ProfileScreen({ route, navigation, onLogout: onLogoutPro
                     <StatusIcon size={11} color={st.color} />
                     <Text style={[styles.docStatus, { color: st.color }]}>{st.label}</Text>
                   </View>
+                  {doc.uploadDate && (
+                    <Text style={styles.uploadDate}>Uploaded: {doc.uploadDate}</Text>
+                  )}
                 </View>
-                <IconChevronRight size={16} color="#DDD" />
+                {doc.status === 'missing' ? (
+                  <View style={styles.uploadBadge}>
+                    <IconUpload size={14} color={theme.colors.sky} />
+                  </View>
+                ) : (
+                  <IconChevronRight size={16} color="#DDD" />
+                )}
               </TouchableOpacity>
             );
           })}
+        </View>
+
+        {/* Verification Timeline */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Verification Timeline</Text>
+          <View style={styles.timelineCard}>
+            {VERIFICATION_TIMELINE.map((item, index) => (
+              <View key={index} style={styles.timelineItem}>
+                <View style={styles.timelineLeft}>
+                  <View style={[
+                    styles.timelineDot,
+                    item.status === 'completed' ? styles.timelineDotComplete : styles.timelineDotPending,
+                  ]}>
+                    {item.status === 'completed' && <IconCheckCircle size={10} color="#FFF" />}
+                    {item.status === 'pending' && <IconClock size={10} color="#F59E0B" />}
+                  </View>
+                  {index < VERIFICATION_TIMELINE.length - 1 && (
+                    <View style={styles.timelineLine} />
+                  )}
+                </View>
+                <View style={styles.timelineContent}>
+                  <Text style={styles.timelineEvent}>{item.event}</Text>
+                  <Text style={styles.timelineDate}>{item.date}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
         </View>
 
         {/* Achievements */}
@@ -276,9 +353,10 @@ export default function ProfileScreen({ route, navigation, onLogout: onLogoutPro
           </View>
         </View>
 
-        {/* Settings */}
+        {/* Settings Menu */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Settings</Text>
+          
           <TouchableOpacity 
             style={styles.menuItem} 
             activeOpacity={0.75}
@@ -339,6 +417,59 @@ export default function ProfileScreen({ route, navigation, onLogout: onLogoutPro
 
         <Text style={styles.version}>ZimAgriTrust Driver v1.0.0</Text>
       </ScrollView>
+
+      {/* Document Upload Modal */}
+      <Modal visible={showUploadModal} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Upload Document</Text>
+            <TouchableOpacity onPress={() => setShowUploadModal(false)} style={styles.modalCloseBtn}>
+              <IconX size={20} color="#666" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent}>
+            <View style={styles.docPreview}>
+              <View style={styles.docPreviewIcon}>
+                {selectedDoc && <selectedDoc.icon size={32} color={theme.colors.sky} />}
+              </View>
+              <Text style={styles.docPreviewLabel}>{selectedDoc?.label}</Text>
+              <Text style={styles.docPreviewSub}>Upload a clear photo or scan of your document</Text>
+            </View>
+
+            <TouchableOpacity style={styles.uploadArea} activeOpacity={0.8}>
+              <IconCamera size={40} color="#CCC" />
+              <Text style={styles.uploadAreaText}>Tap to take a photo</Text>
+              <Text style={styles.uploadAreaSub}>or drag and drop a file</Text>
+            </TouchableOpacity>
+
+            <View style={styles.uploadTips}>
+              <Text style={styles.tipsTitle}>Upload Tips</Text>
+              <Text style={styles.tipsText}>• Ensure all text is clearly visible</Text>
+              <Text style={styles.tipsText}>• Use good lighting</Text>
+              <Text style={styles.tipsText}>• Avoid glare and shadows</Text>
+              <Text style={styles.tipsText}>• File size should be under 5MB</Text>
+            </View>
+          </ScrollView>
+
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={[styles.uploadBtn, uploading && styles.uploadBtnDisabled]}
+              onPress={handleConfirmUpload}
+              disabled={uploading}
+            >
+              {uploading ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <>
+                  <IconUpload size={18} color="#FFF" />
+                  <Text style={styles.uploadBtnText}>Upload Document</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -364,7 +495,8 @@ const styles = StyleSheet.create({
 
   heroCard: {
     marginHorizontal: 20, backgroundColor: '#FFF', borderRadius: 24,
-    padding: 20, ...theme.shadows.sm, borderWidth: 1, borderColor: '#F0F0F0',
+    padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    borderWidth: 1, borderColor: '#F0F0F0',
   },
   avatarRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   avatar: {
@@ -390,7 +522,9 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, backgroundColor: '#E8E8E8' },
 
   section: { marginHorizontal: 20, marginTop: 24 },
-  sectionTitle: { fontSize: 12, fontWeight: '800', color: '#BBB', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sectionTitle: { fontSize: 12, fontWeight: '800', color: '#BBB', textTransform: 'uppercase', letterSpacing: 1 },
+  seeAllText: { fontSize: 13, fontWeight: '700', color: theme.colors.sky },
 
   completionCard: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF',
@@ -422,6 +556,27 @@ const styles = StyleSheet.create({
   docLabel: { fontSize: 14, fontWeight: '700', color: theme.colors.dark },
   docStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
   docStatus: { fontSize: 11, fontWeight: '600' },
+  uploadDate: { fontSize: 10, color: '#999', marginTop: 2 },
+  uploadBadge: {
+    width: 32, height: 32, borderRadius: 16, backgroundColor: '#F0F9FF',
+    justifyContent: 'center', alignItems: 'center',
+  },
+
+  timelineCard: {
+    backgroundColor: '#FFF', borderRadius: 20, padding: 20,
+    borderWidth: 1, borderColor: '#F0F0F0',
+  },
+  timelineItem: { flexDirection: 'row', marginBottom: 16 },
+  timelineLeft: { alignItems: 'center', width: 24, marginRight: 12 },
+  timelineDot: {
+    width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center',
+  },
+  timelineDotComplete: { backgroundColor: '#4CAF50' },
+  timelineDotPending: { backgroundColor: '#FFFBEB', borderWidth: 2, borderColor: '#F59E0B' },
+  timelineLine: { width: 2, flex: 1, backgroundColor: '#E0E0E0', marginTop: 4 },
+  timelineContent: { flex: 1, paddingBottom: 16 },
+  timelineEvent: { fontSize: 14, fontWeight: '700', color: theme.colors.dark },
+  timelineDate: { fontSize: 11, color: '#999', marginTop: 2 },
 
   badgesRow: { flexDirection: 'row', gap: 10 },
   badgeItem: {
@@ -462,4 +617,28 @@ const styles = StyleSheet.create({
   dotGray: { backgroundColor: '#9CA3AF' },
   onlineText: { fontSize: 16, fontWeight: '900', color: theme.colors.dark },
   toggleHint: { fontSize: 11, fontWeight: '700', color: '#999', marginTop: 4, textTransform: 'uppercase' },
+
+  // Modal styles
+  modalContainer: { flex: 1, backgroundColor: '#FFF' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: theme.colors.dark },
+  modalCloseBtn: { padding: 8 },
+  modalContent: { flex: 1, padding: 20 },
+  modalFooter: { padding: 20, borderTopWidth: 1, borderTopColor: '#F0F0F0' },
+  docPreview: { alignItems: 'center', marginBottom: 24 },
+  docPreviewIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#F0F9FF', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  docPreviewLabel: { fontSize: 18, fontWeight: '700', color: theme.colors.dark },
+  docPreviewSub: { fontSize: 13, color: '#999', marginTop: 4 },
+  uploadArea: {
+    borderWidth: 2, borderColor: '#E0E0E0', borderStyle: 'dashed', borderRadius: 16,
+    padding: 32, alignItems: 'center', backgroundColor: '#F9FAFB', marginBottom: 24,
+  },
+  uploadAreaText: { fontSize: 14, fontWeight: '600', color: theme.colors.dark, marginTop: 12 },
+  uploadAreaSub: { fontSize: 12, color: '#999', marginTop: 4 },
+  uploadTips: { backgroundColor: '#F8F9FA', borderRadius: 16, padding: 16 },
+  tipsTitle: { fontSize: 14, fontWeight: '700', color: theme.colors.dark, marginBottom: 12 },
+  tipsText: { fontSize: 12, color: '#666', marginBottom: 6 },
+  uploadBtn: { backgroundColor: theme.colors.sky, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12 },
+  uploadBtnDisabled: { backgroundColor: '#CCC' },
+  uploadBtnText: { color: '#FFF', fontSize: 15, fontWeight: '600' },
 });

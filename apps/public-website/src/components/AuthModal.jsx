@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { X, User, Smartphone, Lock, Loader2, AlertCircle, Leaf, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { X, User, Smartphone, Lock, Loader2, AlertCircle, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import logo from "../assets/logo.png";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 const APP_PORTAL = import.meta.env.VITE_APP_PORTAL_URL || "http://localhost:3003";
@@ -190,8 +191,12 @@ export default function AuthModal({ isOpen, onClose, initialMode = "login", onAu
             {/* Header */}
             <div className="sticky top-0 bg-white px-6 py-4 border-b border-earth-100 flex items-center justify-between z-10">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center">
-                  <Leaf className="w-6 h-6 text-white" />
+                <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center overflow-hidden">
+                  <img 
+                    src={logo} 
+                    alt="ZimAgritrust Logo" 
+                    className="w-6 h-6 object-contain"
+                  />
                 </div>
                 <div>
                   <h2 className="font-bold text-earth-900">

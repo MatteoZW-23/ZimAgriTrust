@@ -15,8 +15,6 @@ from app.services.cache_service import cache_service
 
 logger = logging.getLogger(__name__)
 
-# Rate limiting storage (in production, use Redis)
-rate_limit_store = {}
 
 class SecurityMiddleware(BaseHTTPMiddleware):
     """
@@ -91,18 +89,31 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                         content={"detail": "Unsupported Media Type."}
                     )
 
-        # 5. CSRF validation for state-changing requests (skip if cookie absent)
+        # 5. CSRF validation for state-changing requests.
+        # Rules:
+        #   - API clients using Bearer tokens are exempt (they cannot be CSRF'd via browser).
+        #   - Cookie-based browser sessions MUST provide X-CSRF-Token header.
+        #   - If cookie is present but header is absent → reject (not silently skip).
         if method in ("POST", "PUT", "PATCH", "DELETE"):
-            csrf_header = request.headers.get("X-CSRF-Token")
-            csrf_cookie = request.cookies.get("csrf_token")
-            if csrf_cookie and csrf_header:
-                import secrets
-                if not secrets.compare_digest(csrf_header, csrf_cookie):
-                    logger.warning(f"SECURITY | CSRF mismatch | ip={client_ip} | path={path}")
-                    return JSONResponse(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        content={"detail": "CSRF token invalid."}
-                    )
+            auth_header = request.headers.get("Authorization", "")
+            is_bearer = auth_header.lower().startswith("bearer ")
+            if not is_bearer:
+                import secrets as _secrets
+                csrf_header = request.headers.get("X-CSRF-Token")
+                csrf_cookie = request.cookies.get("csrf_token")
+                if csrf_cookie:
+                    if not csrf_header:
+                        logger.warning("SECURITY | CSRF header missing | ip=%s | path=%s", client_ip, path)
+                        return JSONResponse(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            content={"detail": "CSRF token missing."}
+                        )
+                    if not _secrets.compare_digest(csrf_header, csrf_cookie):
+                        logger.warning("SECURITY | CSRF mismatch | ip=%s | path=%s", client_ip, path)
+                        return JSONResponse(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            content={"detail": "CSRF token invalid."}
+                        )
 
         # 6. Rate limiting
         if settings.RATE_LIMIT_ENABLED:
@@ -124,19 +135,40 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         skip = {"/", "/health", "/api/v1/auth/login", "/api/v1/auth/verify-login-2fa", "/api/v1/auth/refresh"}
         if path in skip:
             return True
-        for prefix in ("/health", "/api/v1/auth/forgot-password", "/api/v1/auth/reset-password", "/api/v1/public"):
+        for prefix in (
+            "/health",
+            "/api/v1/auth/forgot-password",
+            "/api/v1/auth/reset-password",
+            "/api/v1/auth/app/login",
+            "/api/v1/auth/driver/",
+            "/api/v1/auth/supplier/login",
+            "/api/v1/auth/staff/login",
+            "/api/v1/public",
+        ):
             if path.startswith(prefix):
                 return True
         return False
 
     def _get_client_ip(self, request: Request) -> str:
-        """Extract real client IP considering X-Forwarded-For / X-Real-IP."""
+        """
+        Extract real client IP from Nginx-set headers.
+
+        Security note: X-Forwarded-For is ATTACKER-CONTROLLED on the left side.
+        The rightmost IP in X-Forwarded-For is the one added by our trusted
+        Nginx reverse proxy and cannot be spoofed by the client.
+        X-Real-IP is set by Nginx directly from $remote_addr and is trustworthy.
+
+        We use X-Real-IP first (single Nginx hop), then fall back to the
+        rightmost non-empty X-Forwarded-For entry (chained proxies).
+        """
+        real_ip = request.headers.get("X-Real-IP")
+        if real_ip and real_ip.strip():
+            return real_ip.strip()
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
-            return forwarded.split(",")[0].strip()
-        real_ip = request.headers.get("X-Real-IP")
-        if real_ip:
-            return real_ip.strip()
+            ips = [ip.strip() for ip in forwarded.split(",") if ip.strip()]
+            if ips:
+                return ips[-1]
         return request.client.host if request.client else "unknown"
 
     def _is_admin_route(self, request: Request) -> bool:
@@ -187,35 +219,30 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             pass
     
     async def _check_rate_limit(self, request: Request, client_ip: str) -> bool:
-        """Check if request is within rate limits"""
-        now = time.time()
+        """Distributed rate limiting via Redis. No in-memory fallback — Redis is required."""
         window = settings.RATE_LIMIT_WINDOW_SECONDS
-        
-        # Use stricter limits for admin routes
-        if self._is_admin_route(request):
-            limit = settings.RATE_LIMIT_API_GENERAL // 2  # Stricter for admin
-            window = settings.RATE_LIMIT_WINDOW_SECONDS
-        else:
-            limit = settings.RATE_LIMIT_API_GENERAL
-        
-        # Get or create rate limit entry
-        key = f"{client_ip}:{request.url.path}"
-        if key not in rate_limit_store:
-            rate_limit_store[key] = {"count": 0, "window_start": now}
-        
-        # Reset if window expired
-        if now - rate_limit_store[key]["window_start"] > window:
-            rate_limit_store[key] = {"count": 0, "window_start": now}
-        
-        # Increment counter
-        rate_limit_store[key]["count"] += 1
-        
-        # Check if over limit
-        if rate_limit_store[key]["count"] > limit:
-            logger.warning(f"Rate limit exceeded for {key}: {rate_limit_store[key]['count']}/{limit}")
+        limit = (
+            settings.RATE_LIMIT_API_GENERAL // 2
+            if self._is_admin_route(request)
+            else settings.RATE_LIMIT_API_GENERAL
+        )
+        key = f"rate_limit:{client_ip}:{request.url.path}"
+        try:
+            count = await cache_service.increment_counter(key, window)
+            if int(count) > limit:
+                logger.warning(
+                    "rate_limit_exceeded",
+                    extra={"key": key, "count": count, "limit": limit, "ip": client_ip},
+                )
+                return False
+            return True
+        except Exception as exc:
+            logger.error(
+                "rate_limit_redis_unavailable",
+                extra={"error": str(exc), "ip": client_ip, "path": request.url.path},
+            )
+            # Fail closed: deny the request rather than bypass rate limiting
             return False
-        
-        return True
 
 
 class AuditLoggingMiddleware(BaseHTTPMiddleware):

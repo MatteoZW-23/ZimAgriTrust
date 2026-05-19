@@ -1,4 +1,5 @@
 import uuid
+import logging
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -36,6 +37,7 @@ from app.schemas.transaction import OrderResponse
 from app.services.marketplace_service import marketplace_core
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Boost pricing (F#57). $2 per 7-day cycle, prorated by duration.
 BOOST_FEE_PER_DAY_USD = 2.0 / 7.0
@@ -49,7 +51,13 @@ def create_market_listing(
     seller: User = Depends(require_roles(UserRole.FARMER, UserRole.BUYER)),
     lockdown: bool = Depends(check_lockdown)
 ) -> Listing:
-    return marketplace_core.create_listing(db, seller, payload)
+    try:
+        return marketplace_core.create_listing(db, seller, payload)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Create listing error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create listing")
 
 
 @router.get("/search", response_model=ListingSearchResponse)
@@ -63,48 +71,63 @@ def search_market_listings(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> ListingSearchResponse:
-    if min_price is not None and max_price is not None and min_price > max_price:
-        raise HTTPException(status_code=400, detail="min_price cannot be greater than max_price")
+    try:
+        if min_price is not None and max_price is not None and min_price > max_price:
+            raise HTTPException(status_code=400, detail="min_price cannot be greater than max_price")
 
-    listings, total = marketplace_core.search_listings(
-        db=db,
-        crop=crop,
-        location=location,
-        min_price=min_price,
-        max_price=max_price,
-        grade=grade,
-        limit=limit,
-        offset=offset,
-    )
-
-    return ListingSearchResponse(
-        success=True,
-        data=listings,
-        pagination=PaginationMeta(
+        listings, total = marketplace_core.search_listings(
+            db=db,
+            crop=crop,
+            location=location,
+            min_price=min_price,
+            max_price=max_price,
+            grade=grade,
             limit=limit,
             offset=offset,
-            total=total,
-            has_more=(offset + len(listings)) < total,
-        ),
-    )
+        )
+
+        return ListingSearchResponse(
+            success=True,
+            data=listings,
+            pagination=PaginationMeta(
+                limit=limit,
+                offset=offset,
+                total=total,
+                has_more=(offset + len(listings)) < total,
+            ),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Search listings error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to search listings")
 
 
 @router.get("", response_model=list[ListingResponse])
 @router.get("/", response_model=list[ListingResponse], include_in_schema=False)
 def list_market_listings(db: Session = Depends(get_db)) -> list[Listing]:
-    return (
-        db.query(Listing)
-        .filter(Listing.status == ListingStatus.ACTIVE)
-        .all()
-    )
+    try:
+        return (
+            db.query(Listing)
+            .filter(Listing.status == ListingStatus.ACTIVE)
+            .all()
+        )
+    except Exception as e:
+        logger.error(f"List listings error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve listings")
 
 
-@router.get("/me", response_model=list[ListingResponse])
+@router.get("/my", response_model=list[ListingResponse])
+@router.get("/me", response_model=list[ListingResponse], include_in_schema=False)
 def my_listings(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.FARMER, UserRole.BUYER)),
 ) -> list[Listing]:
-    return db.query(Listing).filter(Listing.seller_id == current_user.id).all()
+    try:
+        return db.query(Listing).filter(Listing.seller_id == current_user.id).all()
+    except Exception as e:
+        logger.error(f"My listings error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve listings")
 
 
 @router.post("/{listing_id}/offers", response_model=OfferResponse)
@@ -115,11 +138,13 @@ def place_offer(
     current_user: User = Depends(require_roles(UserRole.FARMER, UserRole.BUYER)),
     lockdown: bool = Depends(check_lockdown)
 ) -> Offer:
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
-    if not listing:
-        raise HTTPException(status_code=404, detail="Listing not found")
-    
-    return marketplace_core.create_offer(db, current_user, listing, payload)
+    try:
+        return marketplace_core.place_offer(db, listing_id, current_user, payload)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Place offer error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to place offer")
 
 
 @router.get("/{listing_id}/offers", response_model=list[OfferResponse])
@@ -433,7 +458,8 @@ def unsave_listing(
     return None
 
 
-@router.get("/me/saved", response_model=list[SavedListingResponse])
+@router.get("/my/saved", response_model=list[SavedListingResponse])
+@router.get("/me/saved", response_model=list[SavedListingResponse], include_in_schema=False)
 def list_saved_listings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

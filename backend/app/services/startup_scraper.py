@@ -144,16 +144,15 @@ def _job_scrape_news() -> None:
 def _job_warm_vision_model() -> None:
     """
     Ensures the vision model is loaded and ready.
-    If custom weights are missing, downloads YOLOv8n base model once.
+    Uses the new ONNX-based model loader.
     """
     try:
-        from app.ml.vision.crop_classifier import CropClassifier
-        # Instantiating triggers the three-tier load logic
-        clf = CropClassifier()
-        if clf.model is not None:
-            logger.info("VISION | Model ready: %s", type(clf.model).__name__)
-        else:
-            logger.info("VISION | Using OpenCV fallback classifier (no YOLO weights available)")
+        from app.ml.model_loader import model_loader
+        # Ensure ONNX models are loaded
+        if model_loader._crop_classifier is not None:
+            logger.info("VISION | ONNX crop classifier loaded")
+        if model_loader._disease_detector is not None:
+            logger.info("VISION | ONNX disease detector loaded")
     except Exception as e:
         logger.warning("VISION | Model warm-up failed: %s", e)
 

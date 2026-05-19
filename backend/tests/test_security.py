@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from unittest.mock import patch, AsyncMock
 import time
-import jwt
+from jose import jwt
 
 from app.main import app
 from app.core.config import settings

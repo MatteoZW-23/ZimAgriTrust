@@ -288,8 +288,121 @@ def get_templates_by_channel(channel: NotificationChannel) -> List[NotificationT
     return [t for t in _ALL for _ in [0] if t.channel == channel]
 
 
-# Sanity check on import: spec mandates 18+15+10 = 43 templates.
+# ---------------------------------------------------------------------------
+# Supplier Notification Templates  (spec 288-310)
+# ---------------------------------------------------------------------------
+_SUPPLIER_SMS: List[NotificationTemplate] = [
+    NotificationTemplate(288, "sms.supplier_application_received", NotificationChannel.SMS,
+        "Supplier application received",
+        "ZimAgriTrust: Your supplier application for {business_name} has been received. We'll review it within 48h.",
+        required_context=["business_name"]),
+    NotificationTemplate(289, "sms.supplier_approved", NotificationChannel.SMS,
+        "Supplier application approved",
+        "ZimAgriTrust: Congratulations! Your supplier account for {business_name} is APPROVED. Login to start selling.",
+        required_context=["business_name"]),
+    NotificationTemplate(290, "sms.supplier_rejected", NotificationChannel.SMS,
+        "Supplier application rejected",
+        "ZimAgriTrust: Your supplier application was rejected. Reason: {reason}. Contact support for assistance.",
+        required_context=["reason"]),
+    NotificationTemplate(291, "sms.supplier_suspended", NotificationChannel.SMS,
+        "Supplier account suspended",
+        "ZimAgriTrust: Your supplier account has been SUSPENDED. Reason: {reason}. Contact support to appeal.",
+        required_context=["reason"]),
+    NotificationTemplate(292, "sms.supplier_order_received", NotificationChannel.SMS,
+        "New supplier order received",
+        "ZimAgriTrust: New order #{order_number} for {product_name} (Qty: {quantity}). Confirm within 24h.",
+        required_context=["order_number", "product_name", "quantity"]),
+    NotificationTemplate(293, "sms.supplier_order_shipped", NotificationChannel.SMS,
+        "Supplier order shipped",
+        "ZimAgriTrust: Order #{order_number} has been shipped. Tracking: {tracking_number}. ETA: {eta}.",
+        required_context=["order_number", "tracking_number", "eta"]),
+    NotificationTemplate(294, "sms.supplier_order_delivered", NotificationChannel.SMS,
+        "Supplier order delivered",
+        "ZimAgriTrust: Order #{order_number} delivered. Payment will be released to your wallet within 24h.",
+        required_context=["order_number"]),
+    NotificationTemplate(295, "sms.supplier_payment_received", NotificationChannel.SMS,
+        "Supplier payment received",
+        "ZimAgriTrust: ${amount} received for order #{order_number}. Available for withdrawal.",
+        required_context=["amount", "order_number"]),
+    NotificationTemplate(296, "sms.supplier_low_stock", NotificationChannel.SMS,
+        "Low stock alert",
+        "ZimAgriTrust: {product_name} is low on stock ({remaining}). Restock to avoid missed sales.",
+        required_context=["product_name", "remaining"]),
+    NotificationTemplate(297, "sms.supplier_withdrawal_complete", NotificationChannel.SMS,
+        "Supplier withdrawal complete",
+        "ZimAgriTrust: Withdrawal of ${amount} to {account} complete. Ref: {ref}.",
+        required_context=["amount", "account", "ref"]),
+]
+
+_SUPPLIER_WHATSAPP: List[NotificationTemplate] = [
+    NotificationTemplate(298, "whatsapp.supplier_application_received", NotificationChannel.WHATSAPP,
+        "Supplier application received (rich)",
+        "📦 *Supplier Application Received*\n\nBusiness: {business_name}\nApplication ID: {app_id}\n\nWe'll review within 48h. Track status in supplier portal.",
+        required_context=["business_name", "app_id"]),
+    NotificationTemplate(299, "whatsapp.supplier_approved", NotificationChannel.WHATSAPP,
+        "Supplier application approved (with portal link)",
+        "✅ *Supplier Account Approved*\n\nWelcome to ZimAgriTrust, {business_name}!\n\nYour supplier portal is ready:\n🔗 {portal_link}\n\nStart listing your products today!",
+        required_context=["business_name", "portal_link"],
+        has_buttons=True),
+    NotificationTemplate(300, "whatsapp.supplier_order_received", NotificationChannel.WHATSAPP,
+        "New supplier order (with details)",
+        "🛒 *New Order Received*\n\nOrder #{order_number}\nProduct: {product_name}\nQty: {quantity}\nTotal: ${total}\n\nConfirm shipment in supplier portal.",
+        required_context=["order_number", "product_name", "quantity", "total"],
+        has_buttons=True),
+    NotificationTemplate(301, "whatsapp.supplier_order_shipped", NotificationChannel.WHATSAPP,
+        "Order shipped (with tracking)",
+        "🚚 *Order Shipped*\n\nOrder #{order_number}\nCarrier: {carrier}\nTracking: {tracking_number}\nETA: {eta}\n\nTrack live: {tracking_link}",
+        required_context=["order_number", "carrier", "tracking_number", "eta", "tracking_link"]),
+    NotificationTemplate(302, "whatsapp.supplier_payment_received", NotificationChannel.WHATSAPP,
+        "Payment received (with receipt)",
+        "💰 *Payment Received*\n\nOrder #{order_number}\nAmount: ${amount}\n\nFunds available for withdrawal. Receipt attached.",
+        required_context=["order_number", "amount"],
+        has_attachment=True),
+    NotificationTemplate(303, "whatsapp.supplier_monthly_summary", NotificationChannel.WHATSAPP,
+        "Monthly supplier summary",
+        "📊 *Monthly Supplier Summary*\n\nPeriod: {month}\nTotal Sales: ${sales}\nOrders: {orders}\nTop Product: {top_product}\n\nView full report in portal.",
+        required_context=["month", "sales", "orders", "top_product"]),
+]
+
+_SUPPLIER_EMAIL: List[NotificationTemplate] = [
+    NotificationTemplate(304, "email.supplier_application_received", NotificationChannel.EMAIL,
+        "Supplier application received email",
+        "supplier_application_received.html",
+        subject_template="Application Received - {business_name}",
+        required_context=["business_name", "app_id"]),
+    NotificationTemplate(305, "email.supplier_approved", NotificationChannel.EMAIL,
+        "Supplier approval email (with onboarding guide)",
+        "supplier_approved.html",
+        subject_template="Welcome to ZimAgriTrust Supplier Portal - {business_name}",
+        required_context=["business_name", "portal_link"],
+        has_attachment=True),
+    NotificationTemplate(306, "email.supplier_order_confirmation", NotificationChannel.EMAIL,
+        "Supplier order confirmation",
+        "supplier_order_confirmation.html",
+        subject_template="New Order #{order_number} - {business_name}",
+        required_context=["order_number", "business_name", "items", "total"],
+        has_attachment=True),
+    NotificationTemplate(307, "email.supplier_payment_statement", NotificationChannel.EMAIL,
+        "Monthly payment statement",
+        "supplier_payment_statement.html",
+        subject_template="Payment Statement - {month} - {business_name}",
+        required_context=["month", "business_name", "summary"],
+        has_attachment=True),
+    NotificationTemplate(308, "email.supplier_performance_report", NotificationChannel.EMAIL,
+        "Supplier performance report",
+        "supplier_performance_report.html",
+        subject_template="Performance Report - {business_name}",
+        required_context=["business_name", "metrics", "recommendations"],
+        has_attachment=True),
+]
+
+_ALL = _SMS + _WHATSAPP + _EMAIL + _SUPPLIER_SMS + _SUPPLIER_WHATSAPP + _SUPPLIER_EMAIL
+
+# Sanity check on import: spec mandates 18+15+10 = 43 templates + 21 supplier templates = 64 total
 assert len(_SMS) == 18, f"SMS templates: expected 18 (spec 245-262), got {len(_SMS)}"
 assert len(_WHATSAPP) == 15, f"WhatsApp templates: expected 15 (spec 263-277), got {len(_WHATSAPP)}"
 assert len(_EMAIL) == 10, f"Email templates: expected 10 (spec 278-287), got {len(_EMAIL)}"
-assert len(_ALL) == 43, f"Total templates: expected 43, got {len(_ALL)}"
+assert len(_SUPPLIER_SMS) == 10, f"Supplier SMS templates: expected 10 (spec 288-297), got {len(_SUPPLIER_SMS)}"
+assert len(_SUPPLIER_WHATSAPP) == 6, f"Supplier WhatsApp templates: expected 6 (spec 298-303), got {len(_SUPPLIER_WHATSAPP)}"
+assert len(_SUPPLIER_EMAIL) == 5, f"Supplier Email templates: expected 5 (spec 304-308), got {len(_SUPPLIER_EMAIL)}"
+assert len(_ALL) == 64, f"Total templates: expected 64, got {len(_ALL)}"

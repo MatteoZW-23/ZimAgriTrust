@@ -4,12 +4,14 @@ This directory contains utility scripts for backend operations and maintenance.
 
 ## Scripts
 
-- `calibrate_ai_core.py` - Calibrate AI core models
-- `calibrate_models.py` - Calibrate ML models
 - `recreate_db.py` - Recreate database schema
 - `reset_limits.py` - Reset user limits
 - `seed.py` - Seed database with initial data
+- `seed_super_admin.py` - Seed super admin user
+- `seed_supplier.py` - Seed supplier data
 - `sync_recruitment_schema.py` - Sync recruitment schema
+- `sync_ussd_pins.py` - Sync USSD PINs
+- `migrate_training_materials.py` - Migrate training materials
 
 ## Usage
 

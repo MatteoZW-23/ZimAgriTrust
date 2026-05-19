@@ -37,14 +37,17 @@ class RoleLevel(int, enum.Enum):
     """Role hierarchy levels - higher number = more privileged"""
     FARMER = 10
     BUYER = 10
-    DRIVER = 10
+    DRIVER = 20
+    TRANSPORTER = 20
     STAFF = 30
     AGENT = 40
+    SUPPLIER = 60
     BRANCH_ADMIN = 70
-    REGIONAL_ADMIN = 80
     SUPPORT_ADMIN = 75
+    REGIONAL_ADMIN = 80
     FINANCE_ADMIN = 85
     SYSTEM_ADMIN = 90
+    ADMIN = 100
     SUPER_ADMIN = 100
 
 
@@ -241,9 +244,9 @@ class AuditLogAction(str, enum.Enum):
     DATA_DELETE = "data_delete"
 
 
-class AuditLog(Base):
+class SecurityAuditLog(Base):
     """Immutable audit trail of all security events"""
-    __tablename__ = "audit_logs"
+    __tablename__ = "security_audit_logs"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     action: Mapped[AuditLogAction] = mapped_column(Enum(AuditLogAction), nullable=False, index=True)

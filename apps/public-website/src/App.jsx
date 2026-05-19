@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Menu, X, ChevronDown, ChevronRight, Leaf, TrendingUp, Shield, Truck, Phone, Users, Star, ArrowRight, CheckCircle2, MapPin, Zap, Award, PhoneCall, Smartphone
+  Menu, X, ChevronDown, ChevronRight, TrendingUp, Shield, Truck, Phone, Users, Star, ArrowRight, CheckCircle2, MapPin, Zap, Award, PhoneCall, Smartphone
 } from "lucide-react";
+import logo from "./assets/logo.png";
 
 // Components
 import Header from "./components/Header";
@@ -21,10 +22,41 @@ import CompanyHierarchy from "./pages/CompanyHierarchy";
 import DriverJoin from "./pages/DriverJoin";
 import AgentJoin from "./pages/AgentJoin";
 import DisputeResolution from "./pages/DisputeResolution";
+import Pricing from "./pages/Pricing";
+import HelpCenter from "./pages/HelpCenter";
+import Suppliers from "./pages/Suppliers";
+import SupplierDetail from "./pages/SupplierDetail";
+import SupplierProducts from "./pages/SupplierProducts";
+import Marketplace from "./pages/Marketplace";
+import ProductDetail from "./pages/ProductDetail";
 import Dashboard from "./dashboard/Dashboard";
 import DownloadMobileApp from "./dashboard/DownloadMobileApp";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
+
+// Unified API fetch with error handling
+async function apiFetch(endpoint, options = {}) {
+  try {
+    const response = await fetch(`${API}${endpoint}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || `API Error: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(`API Error [${endpoint}]:`, error);
+    throw error;
+  }
+}
 
 // Scroll to top on route change
 function ScrollToTop() {
@@ -90,6 +122,8 @@ function App() {
             />
             <Route path="/about" element={<About onOpenAuth={openAuth} />} />
             <Route path="/about-us" element={<AboutUs />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/help-center" element={<HelpCenter />} />
             <Route path="/terms" element={<TermsConditions />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/returns" element={<ReturnsPolicy />} />
@@ -98,6 +132,11 @@ function App() {
             <Route path="/driver-join" element={<DriverJoin />} />
             <Route path="/agent-join" element={<AgentJoin />} />
             <Route path="/dispute-resolution" element={<DisputeResolution onOpenAuth={openAuth} />} />
+            <Route path="/marketplace" element={<Marketplace />} />
+            <Route path="/products/:productId" element={<ProductDetail />} />
+            <Route path="/suppliers" element={<Suppliers />} />
+            <Route path="/suppliers/:supplierId" element={<SupplierDetail />} />
+            <Route path="/supplier-products" element={<SupplierProducts />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/download-mobile-app" element={<DownloadMobileApp />} />
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -125,6 +164,9 @@ function LandingPage({ stats, onOpenAuth, isAuthenticated }) {
       <FeaturesSection />
       <HowItWorksSection />
       <MarketplaceSection onOpenAuth={onOpenAuth} isAuthenticated={isAuthenticated} />
+      <FeaturedInputsSection />
+      <FeaturedMachinerySection />
+      <BecomeSupplierSection />
       <TrustSection />
       <TestimonialsSection />
       <CTASection onOpenAuth={onOpenAuth} />
@@ -263,7 +305,7 @@ function HeroSection({ stats, onOpenAuth }) {
 function StatsSection({ stats }) {
   const statItems = [
     { label: "Active Farmers", value: stats.farmers.toLocaleString(), icon: Users },
-    { label: "Registered Buyers", value: stats.buyers.toLocaleString(), icon: Leaf },
+    { label: "Registered Buyers", value: stats.buyers.toLocaleString(), icon: null, isLogo: true },
     { label: "Transactions", value: stats.transactions.toLocaleString(), icon: TrendingUp },
     { label: "Provinces Covered", value: "10", icon: MapPin },
   ];
@@ -281,8 +323,12 @@ function StatsSection({ stats }) {
               transition={{ delay: i * 0.1 }}
               className="bg-white rounded-2xl p-6 text-center shadow-lg shadow-earth-200/50"
             >
-              <div className="w-14 h-14 rounded-xl bg-primary-100 flex items-center justify-center mx-auto mb-4">
-                <stat.icon className="w-7 h-7 text-primary-600" />
+              <div className="w-14 h-14 rounded-xl bg-primary-100 flex items-center justify-center mx-auto mb-4 overflow-hidden">
+                {stat.isLogo ? (
+                  <img src={logo} alt="ZimAgritrust Logo" className="w-7 h-7 object-contain" />
+                ) : (
+                  <stat.icon className="w-7 h-7 text-primary-600" />
+                )}
               </div>
               <p className="text-3xl font-bold text-earth-800 mb-1">{stat.value}</p>
               <p className="text-sm text-earth-500">{stat.label}</p>
@@ -371,62 +417,72 @@ function FeaturesSection() {
 }
 
 function HowItWorksSection() {
-  const steps = [
-    {
-      number: "01",
-      title: "Create Account",
-      description: "Sign up in 2 minutes. Verify your phone number. Choose farmer or buyer profile.",
-    },
-    {
-      number: "02",
-      title: "List or Browse",
-      description: "Farmers list crops with photos and prices. Buyers browse verified listings by province.",
-    },
-    {
-      number: "03",
-      title: "Secure Payment",
-      description: "Buyer pays into escrow. Funds held safely until delivery is confirmed.",
-    },
-    {
-      number: "04",
-      title: "Verified Delivery",
-      description: "GPS-tracked transport. Quality checks at pickup and delivery. Release payment on confirmation.",
-    },
-  ];
+  const [activeRole, setActiveRole] = useState('farmers');
+
+  const content = {
+    farmers: [
+      { title: "Register", desc: "Create your farmer profile and verify your phone number." },
+      { title: "List Crops", desc: "Upload photos and set your price for your harvest." },
+      { title: "Receive Offers", desc: "Negotiate directly with buyers through secure messaging." },
+      { title: "Get Paid", desc: "Funds are released instantly once delivery is confirmed." },
+    ],
+    buyers: [
+      { title: "Browse", desc: "Search for specific crops or browse by region and grade." },
+      { title: "Make Offer", desc: "Submit a price offer or accept the farmer's asking price." },
+      { title: "Pay Escrow", desc: "Funds are held safely in escrow until you receive the goods." },
+      { title: "Confirm", desc: "Verify quality at pickup/delivery to release payment." },
+    ],
+    drivers: [
+      { title: "Join", desc: "Register your vehicle and upload your driver's license." },
+      { title: "Get Approved", desc: "Pass our safety and background check to start working." },
+      { title: "Accept Jobs", desc: "Receive trip requests from farmers and buyers near you." },
+      { title: "Earn", desc: "Get paid weekly for every successful delivery." },
+    ],
+    agents: [
+      { title: "Apply", desc: "Submit your application to become a certified community agent." },
+      { title: "Train", desc: "Complete our digital training modules and pass the exam." },
+      { title: "Verify", desc: "Help farmers with onboarding and quality verification." },
+      { title: "Reward", desc: "Earn commissions for every verified listing and user." },
+    ]
+  };
 
   return (
-    <section className="section-padding bg-white">
+    <section id="how-it-works" className="section-padding bg-white">
       <div className="container-custom">
         <div className="text-center max-w-2xl mx-auto mb-16">
-          <span className="badge badge-secondary mb-4">How It Works</span>
+          <span className="badge badge-secondary mb-4">The Platform</span>
           <h2 className="text-3xl sm:text-4xl font-bold text-earth-900 mb-4">
-            Trade in 4 Simple Steps
+            How ZimAgriTrust Works
           </h2>
           <p className="text-earth-600 text-lg">
-            From listing to delivery, we've made agricultural trading straightforward and secure.
+            Empowering every participant in the agricultural value chain.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {steps.map((step, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.15 }}
-              className="relative"
+        <div className="flex flex-wrap justify-center gap-4 mb-12">
+          {['farmers', 'buyers', 'drivers', 'agents'].map(role => (
+            <button
+              key={role}
+              onClick={() => setActiveRole(role)}
+              className={`px-8 py-3 rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${activeRole === role ? 'bg-primary-600 text-white shadow-xl shadow-primary-200' : 'bg-earth-50 text-earth-400 hover:bg-earth-100'}`}
             >
-              <span className="text-6xl font-bold text-earth-100 absolute -top-4 -left-2 select-none">
-                {step.number}
-              </span>
-              <div className="relative pt-8">
-                <h3 className="text-xl font-bold text-earth-800 mb-3">{step.title}</h3>
-                <p className="text-earth-600 leading-relaxed">{step.description}</p>
-              </div>
-              {i < 3 && (
-                <div className="hidden lg:block absolute top-12 -right-4 w-8 h-px bg-earth-300" />
-              )}
+              For {role}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          {content[activeRole].map((step, i) => (
+            <motion.div
+              key={activeRole + i}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              className="relative p-8 rounded-3xl bg-earth-50 border-2 border-transparent hover:border-primary-200 transition-all group"
+            >
+              <span className="text-4xl font-black text-primary-200 mb-4 block group-hover:text-primary-500 transition-colors">0{i+1}</span>
+              <h3 className="text-xl font-bold text-earth-800 mb-3">{step.title}</h3>
+              <p className="text-earth-600 leading-relaxed font-medium">{step.desc}</p>
             </motion.div>
           ))}
         </div>
@@ -631,6 +687,253 @@ function CTASection({ onOpenAuth }) {
             </div>
           </div>
         </motion.div>
+      </div>
+    </section>
+  );
+}
+
+function FeaturedInputsSection() {
+  const [inputs, setInputs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchFeaturedInputs();
+  }, []);
+
+  const fetchFeaturedInputs = async () => {
+    try {
+      const response = await fetch(`${API}/suppliers/public/products?product_type=input&limit=6`);
+      const data = await response.json();
+      setInputs(data.slice(0, 6));
+    } catch (error) {
+      console.error("Error fetching inputs:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getCategoryEmoji = (category) => {
+    const emojis = {
+      seeds: "🌱",
+      fertilizer: "💚",
+      pesticides: "🛡️",
+      herbicides: "🧪",
+      fungicides: "🍄",
+      animal_feed: "�",
+    };
+    return emojis[category] || "🌽";
+  };
+
+  return (
+    <section className="section-padding bg-white">
+      <div className="container-custom">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <span className="badge badge-primary mb-4">Agricultural Inputs</span>
+          <h2 className="text-3xl sm:text-4xl font-bold text-earth-900 mb-4">
+            Featured Agricultural Inputs
+          </h2>
+          <p className="text-earth-600 text-lg">
+            Trusted seeds, fertilizers, and pesticides from verified suppliers
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary-600 border-t-transparent"></div>
+          </div>
+        ) : inputs.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-earth-600">No inputs available at the moment.</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {inputs.map((item, i) => (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className="bg-earth-50 rounded-2xl p-6 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+                  onClick={() => (window.location.href = `/products/${item.id}`)}
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <span className="text-4xl">{getCategoryEmoji(item.input_category)}</span>
+                    <div className="flex items-center gap-1 text-yellow-500">
+                      <Star className="w-4 h-4 fill-current" />
+                      <span className="text-sm font-medium">{item.supplier_rating?.toFixed(1) || "N/A"}</span>
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-bold text-earth-800 mb-1">{item.name}</h3>
+                  <p className="text-sm text-earth-500 mb-4">{item.supplier_name || "Verified Supplier"}</p>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-2xl font-bold text-primary-600">${item.price?.toFixed(2)}</p>
+                      <p className="text-xs text-earth-500">{item.quantity_available || 0} in stock</p>
+                    </div>
+                  </div>
+                  <button className="w-full btn btn-primary btn-sm">View Details</button>
+                </motion.div>
+              ))}
+            </div>
+
+            <div className="text-center">
+              <Link to="/marketplace" className="btn btn-outline">
+                View All Inputs →
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function FeaturedMachinerySection() {
+  const [machinery, setMachinery] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchFeaturedMachinery();
+  }, []);
+
+  const fetchFeaturedMachinery = async () => {
+    try {
+      const response = await fetch(`${API}/suppliers/public/products?product_type=machinery&limit=6`);
+      const data = await response.json();
+      setMachinery(data.slice(0, 6));
+    } catch (error) {
+      console.error("Error fetching machinery:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getCategoryEmoji = (category) => {
+    const emojis = {
+      tractor: "🚜",
+      sprayer: "🚿",
+      irrigation: "💧",
+      tiller: "⚙️",
+      harvester: "🌾",
+      tools: "🔧",
+    };
+    return emojis[category] || "�";
+  };
+
+  return (
+    <section className="section-padding bg-earth-50">
+      <div className="container-custom">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <span className="badge badge-primary mb-4">Machinery & Equipment</span>
+          <h2 className="text-3xl sm:text-4xl font-bold text-earth-900 mb-4">
+            Featured Machinery & Equipment
+          </h2>
+          <p className="text-earth-600 text-lg">
+            New and used tractors, irrigation systems, and farming tools
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary-600 border-t-transparent"></div>
+          </div>
+        ) : machinery.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-earth-600">No machinery available at the moment.</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {machinery.map((item, i) => (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className="bg-white rounded-2xl p-6 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+                  onClick={() => (window.location.href = `/products/${item.id}`)}
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <span className="text-4xl">{getCategoryEmoji(item.machinery_category)}</span>
+                    <div className="flex items-center gap-1 text-yellow-500">
+                      <Star className="w-4 h-4 fill-current" />
+                      <span className="text-sm font-medium">{item.supplier_rating?.toFixed(1) || "N/A"}</span>
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-bold text-earth-800 mb-1">{item.name}</h3>
+                  <p className="text-sm text-earth-500 mb-4">{item.supplier_name || "Verified Supplier"}</p>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-2xl font-bold text-primary-600">${item.price?.toFixed(2)}</p>
+                      <p className="text-xs text-earth-500">{item.condition || "Standard"}</p>
+                    </div>
+                  </div>
+                  <button className="w-full btn btn-primary btn-sm">View Details</button>
+                </motion.div>
+              ))}
+            </div>
+
+            <div className="text-center">
+              <Link to="/marketplace" className="btn btn-outline">
+                View All Machinery →
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function BecomeSupplierSection() {
+  return (
+    <section className="section-padding bg-gradient-to-r from-green-600 to-emerald-700 text-white">
+      <div className="container-custom">
+        <div className="max-w-4xl mx-auto text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+              🏪 Sell on ZimAgritrust
+            </h2>
+            <p className="text-xl text-green-100 mb-8">
+              Are you a supplier of agricultural inputs or machinery?
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 text-left">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                <CheckCircle2 className="w-6 h-6 mb-2" />
+                <p>Reach thousands of farmers and buyers across Zimbabwe</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                <CheckCircle2 className="w-6 h-6 mb-2" />
+                <p>List your products for FREE</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                <CheckCircle2 className="w-6 h-6 mb-2" />
+                <p>Pay only 5% commission when you sell</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                <CheckCircle2 className="w-6 h-6 mb-2" />
+                <p>Get verified badge for trust</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-4">
+              <Link to="/suppliers" className="btn btn-lg bg-white text-green-700 hover:bg-white/90 shadow-xl">
+                Become a Supplier
+              </Link>
+              <Link to="/suppliers" className="btn btn-lg border-2 border-white/30 text-white hover:bg-white/10">
+                Learn More
+              </Link>
+            </div>
+          </motion.div>
+        </div>
       </div>
     </section>
   );

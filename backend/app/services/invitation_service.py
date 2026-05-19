@@ -13,7 +13,7 @@ from sqlalchemy import and_
 
 from app.models.rbac import Invitation, Role, InvitationStatus
 from app.models.user import User, UserStatus
-from app.models.security_enhanced import AuditLog, AuditLogAction
+from app.models.security_enhanced import SecurityAuditLog, AuditLogAction
 from app.core.config import settings
 
 
@@ -28,6 +28,7 @@ class InvitationService:
         'SYSTEM_ADMIN',
         'FINANCE_ADMIN',
         'REGIONAL_ADMIN',
+        'REGIONAL_MANAGER',
         'SUPPORT_ADMIN',
         'BRANCH_ADMIN',
         'AGENT',
@@ -87,10 +88,6 @@ class InvitationService:
         
         # Generate token
         token, token_hash = InvitationService.generate_invitation_token()
-        try:
-            inviter_user_id = uuid.UUID(str(invited_by.id)) if invited_by.id else None
-        except (TypeError, ValueError):
-            inviter_user_id = None
         
         # Create invitation
         invitation = Invitation(
@@ -98,25 +95,25 @@ class InvitationService:
             role_id=role.id,
             token_hash=token_hash,
             expires_at=datetime.utcnow() + timedelta(hours=expires_hours),
-            created_by=inviter_user_id,
+            created_by=invited_by.id,
             status=InvitationStatus.PENDING,
         )
         
         db.add(invitation)
         
         # Log audit event
-        log_entry = AuditLog(
+        log_entry = SecurityAuditLog(
             action=AuditLogAction.PERMISSION_GRANT,
-            user_id=None,  # Not a user yet
-            actor_id=inviter_user_id,
+            user_id=None,
+            actor_id=invited_by.id,
             resource_type='invitation',
             resource_id=invitation.id,
             details={
                 'email': email,
                 'role': role_name,
                 'expires_hours': expires_hours,
-                'invited_by': str(invited_by.id) if invited_by.id else None,
-            }
+            },
+            status='success',
         )
         db.add(log_entry)
         
@@ -148,10 +145,7 @@ class InvitationService:
         if not invitation:
             return False, "Invalid or expired invitation", None
         
-        from datetime import timezone
-        now_utc = datetime.now(timezone.utc)
-        expires = invitation.expires_at if invitation.expires_at.tzinfo else invitation.expires_at.replace(tzinfo=timezone.utc)
-        if expires < now_utc:
+        if invitation.expires_at < datetime.utcnow():
             invitation.status = InvitationStatus.EXPIRED
             db.commit()
             return False, "Invitation has expired", None
@@ -176,24 +170,25 @@ class InvitationService:
             return False, "Email does not match invitation"
         
         # Update invitation
-        from datetime import timezone
         invitation.status = InvitationStatus.ACCEPTED
-        invitation.used_at = datetime.now(timezone.utc)
+        invitation.used_at = datetime.utcnow()
         
         # Assign role to user
         user.role_id = invitation.role_id
         user.status = UserStatus.ACTIVE
         
         # Log audit event
-        log_entry = AuditLog(
+        log_entry = SecurityAuditLog(
             action=AuditLogAction.PERMISSION_GRANT,
             user_id=user.id,
+            actor_id=user.id,
             resource_type='user_role',
             resource_id=user.id,
             details={
                 'role_id': str(invitation.role_id),
                 'via_invitation': str(invitation.id),
-            }
+            },
+            status='success',
         )
         db.add(log_entry)
         

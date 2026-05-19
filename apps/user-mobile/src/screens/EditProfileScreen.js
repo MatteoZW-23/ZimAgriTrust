@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
-import { Save as IconSave, X as IconX } from 'lucide-react-native';
-import { updateProfile } from '../api';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, Image, Platform } from 'react-native';
+import { Save as IconSave, X as IconX, Camera, Upload } from 'lucide-react-native';
+import { updateProfile, uploadProfilePhoto } from '../api';
 import { theme } from '../styles';
 
 export default function EditProfileScreen({ route, navigation }) {
@@ -12,6 +12,8 @@ export default function EditProfileScreen({ route, navigation }) {
   const [district, setDistrict] = useState(profile.district || '');
   const [preferredLanguage, setPreferredLanguage] = useState(profile.preferred_language || 'en');
   const [saving, setSaving] = useState(false);
+  const [photoUri, setPhotoUri] = useState(profile.photo_url || null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const handleSave = async () => {
     if (!fullName.trim() || fullName.trim().length < 2) {
@@ -27,6 +29,7 @@ export default function EditProfileScreen({ route, navigation }) {
         province: province.trim() || null,
         district: district.trim() || null,
         preferred_language: preferredLanguage.trim() || 'en',
+        photo_url: photoUri,
       });
       if (onProfileUpdated) onProfileUpdated(updated);
       Alert.alert('Profile updated', 'Your personal details were saved securely.', [
@@ -37,6 +40,18 @@ export default function EditProfileScreen({ route, navigation }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handlePhotoUpload = async () => {
+    Alert.alert(
+      'Upload Photo',
+      'Choose photo source',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Camera', onPress: () => Alert.alert('Camera', 'Camera functionality would be implemented here') },
+        { text: 'Gallery', onPress: () => Alert.alert('Gallery', 'Gallery functionality would be implemented here') },
+      ]
+    );
   };
 
   return (
@@ -51,6 +66,22 @@ export default function EditProfileScreen({ route, navigation }) {
         </View>
 
         <View style={styles.card}>
+          <View style={styles.photoSection}>
+            <View style={styles.photoContainer}>
+              {photoUri ? (
+                <Image source={{ uri: photoUri }} style={styles.photo} />
+              ) : (
+                <View style={styles.photoPlaceholder}>
+                  <Upload size={32} color="#cbd5e1" />
+                </View>
+              )}
+            </View>
+            <TouchableOpacity style={styles.photoBtn} onPress={handlePhotoUpload}>
+              <Camera size={16} color={theme.colors.green} />
+              <Text style={styles.photoBtnText}>Change Photo</Text>
+            </TouchableOpacity>
+          </View>
+
           <Field label="Full name" value={fullName} onChangeText={setFullName} autoCapitalize="words" />
           <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
           <Field label="Province" value={province} onChangeText={setProvince} autoCapitalize="words" />
@@ -83,6 +114,12 @@ const styles = StyleSheet.create({
   iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#EEE' },
   title: { fontSize: 22, fontWeight: '800', color: theme.colors.black },
   card: { backgroundColor: '#FFF', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: '#F0F0F0' },
+  photoSection: { alignItems: 'center', marginBottom: 24, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  photoContainer: { width: 100, height: 100, borderRadius: 50, overflow: 'hidden', marginBottom: 12 },
+  photo: { width: '100%', height: '100%' },
+  photoPlaceholder: { width: '100%', height: '100%', backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center' },
+  photoBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#F0FDF4', borderRadius: 12, borderWidth: 1, borderColor: '#BBF7D0' },
+  photoBtnText: { fontSize: 13, fontWeight: '700', color: theme.colors.green },
   field: { marginBottom: 16 },
   label: { fontSize: 13, fontWeight: '800', color: '#666', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 },
   input: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: theme.colors.black, backgroundColor: '#FAFAFA' },

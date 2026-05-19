@@ -259,6 +259,22 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+        {/* Live Map */}
+        <View style={styles.mapCard}>
+          <View style={styles.mapHeader}>
+            <IconNavigation size={18} color={theme.colors.sky} />
+            <Text style={styles.mapTitle}>Live Route Map</Text>
+          </View>
+          <View style={styles.mapPlaceholder}>
+            <IconMapPin size={40} color="#CBD5E1" />
+            <Text style={styles.mapPlaceholderText}>Map view would display here</Text>
+            <Text style={styles.mapPlaceholderSub}>Using react-native-maps or MapView component</Text>
+            <TouchableOpacity style={styles.openMapBtn} onPress={handleNavigate}>
+              <Text style={styles.openMapText}>Open in Google Maps</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Route Card */}
         <View style={styles.routeCard}>
           <View style={styles.routeRow}>
@@ -567,6 +583,61 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
   backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F0F0F0', justifyContent: 'center', alignItems: 'center' },
   topTitle: { fontSize: 18, fontWeight: '800', color: theme.colors.dark },
+  mapCard: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    overflow: 'hidden',
+    ...theme.shadows.xs,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  mapHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#F8F9FA',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  mapTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.dark,
+  },
+  mapPlaceholder: {
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    padding: 20,
+  },
+  mapPlaceholderText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#999',
+    marginTop: 12,
+  },
+  mapPlaceholderSub: {
+    fontSize: 12,
+    color: '#CCC',
+    marginTop: 4,
+  },
+  openMapBtn: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: theme.colors.sky,
+    borderRadius: 12,
+  },
+  openMapText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   routeCard: {
     marginHorizontal: 20,
     backgroundColor: '#FFF',

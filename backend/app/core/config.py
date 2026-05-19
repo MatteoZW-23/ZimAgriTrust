@@ -1,4 +1,5 @@
-from pydantic import field_validator
+import os
+from pydantic import field_validator, ValidationInfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,11 +8,12 @@ class Settings(BaseSettings):
 
     APP_NAME: str = "Agri Trust Marketplace API"
     API_V1_STR: str = "/api/v1"
-    SECRET_KEY: str = "change-me-to-a-high-entropy-string-for-production"
+    SECRET_KEY: str = "CHANGE_ME_IN_PRODUCTION_USE_ENV_VAR_OR_VAULT"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 10080
-    DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/agri_trust"
+    DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@db:5432/agri_trust"
+    REDIS_URL: str = "redis://redis:6379/0"
     ADMIN_BOOTSTRAP_TOKEN: str = "secret-bootstrap-token"
     
     # --- AUTHENTICATION CONFIG ---
@@ -25,6 +27,52 @@ class Settings(BaseSettings):
     def assemble_db_connection(cls, v: str) -> str:
         if isinstance(v, str) and v.startswith("postgres://"):
             return v.replace("postgres://", "postgresql://", 1)
+        return v
+
+    @field_validator("SECRET_KEY", "REFRESH_SECRET_KEY", "PIN_PEPPER")
+    @classmethod
+    def validate_secrets(cls, v: str, info: ValidationInfo) -> str:
+        """Ensure secrets are properly configured and not default/placeholder values."""
+        field_name = info.field_name
+        
+        # Check for default/placeholder values
+        placeholders = [
+            "CHANGE_ME", "CHANGE-ME", "CHANGE ME",
+            "default", "secret", "password", "admin",
+            "123456", "12345678", "qwerty", "abc123"
+        ]
+        
+        v_lower = v.lower()
+        if any(p in v_lower for p in placeholders):
+            raise ValueError(f"{field_name} cannot contain placeholder/default values. Set a secure secret via environment variable.")
+        
+        # Minimum length requirements
+        min_lengths = {
+            "SECRET_KEY": 32,
+            "REFRESH_SECRET_KEY": 32,
+            "PIN_PEPPER": 16,
+        }
+        
+        if len(v) < min_lengths.get(field_name, 16):
+            raise ValueError(f"{field_name} must be at least {min_lengths.get(field_name, 16)} characters for security")
+        
+        return v
+
+    @field_validator("MASTER_TEST_LOGIN_ENABLED")
+    @classmethod
+    def validate_master_test(cls, v: bool) -> bool:
+        """Prevent master test account in production."""
+        app_env = os.getenv("APP_ENV", "development")
+        if v and app_env == "production":
+            raise ValueError("MASTER_TEST_LOGIN_ENABLED cannot be True in production environment")
+        return v
+
+    @field_validator("ADMIN_BOOTSTRAP_TOKEN")
+    @classmethod
+    def validate_bootstrap_token(cls, v: str) -> str:
+        """Ensure bootstrap token is not a default value."""
+        if v.lower() in ["secret-bootstrap-token", "admin", "password", "123456"]:
+            raise ValueError("ADMIN_BOOTSTRAP_TOKEN must be changed from default value")
         return v
 
     # --- SMS CONFIG (AfricasTalking) ---
@@ -54,8 +102,8 @@ class Settings(BaseSettings):
     # --- SENTRY CONFIG ---
     SENTRY_DSN: str = ""
 
-    REDIS_URL: str = "redis://localhost:6379/0"
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:19000,http://localhost:19001,http://localhost:19002,http://localhost:19006,http://localhost:5000,http://localhost:5173"
+    REDIS_URL: str = "redis://redis:6379/0"
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004"
     ALLOWED_HOSTS: str = "localhost,127.0.0.1,host.docker.internal"
     FORCE_HTTPS: bool = False
 
@@ -64,7 +112,7 @@ class Settings(BaseSettings):
     # ============================================================================
     
     # JWT Configuration
-    REFRESH_SECRET_KEY: str = "change-me-to-a-high-entropy-string-for-production"
+    REFRESH_SECRET_KEY: str = "CHANGE_ME_IN_PRODUCTION_USE_ENV_VAR_OR_VAULT"
     TOKEN_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRY_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRY_DAYS: int = 30
@@ -74,7 +122,7 @@ class Settings(BaseSettings):
     # Unified PIN System (USSD + App)
     PIN_MIN_LENGTH: int = 4
     PIN_MAX_LENGTH: int = 6
-    PIN_PEPPER: str = "changeme-pepper-for-pin-hashing"
+    PIN_PEPPER: str = "CHANGE_ME_IN_PRODUCTION_USE_ENV_VAR_OR_VAULT"
     PIN_LOCKOUT_ATTEMPTS: int = 3
     PIN_LOCKOUT_DURATION_MINUTES: int = 15
     PIN_HISTORY_COUNT: int = 3  # Prevent reuse of last 3 PINs
@@ -89,9 +137,9 @@ class Settings(BaseSettings):
     PASSWORD_EXPIRY_DAYS: int = 90  # Force password change after 90 days
     PASSWORD_BREACH_CHECK: bool = True  # Check against HaveIBeenPwned
     
-    # Rate Limiting
-    RATE_LIMIT_ENABLED: bool = True  # Master switch for rate limiting
-    RATE_LIMIT_WINDOW_SECONDS: int = 60  # General rate limit window (1 minute)
+    # Rate Limiting by Endpoint
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_WINDOW_SECONDS: int = 60
     RATE_LIMIT_LOGIN_ATTEMPTS: int = 5  # per hour
     RATE_LIMIT_PASSWORD_RESET: int = 3  # per hour
     RATE_LIMIT_PIN_ATTEMPTS: int = 5  # per hour (locked after 3)
@@ -124,8 +172,8 @@ class Settings(BaseSettings):
     }
     
     # Multi-Factor Authentication (MFA)
-    MFA_REQUIRED_ROLES: list = ['SUPER_ADMIN', 'SYSTEM_ADMIN', 'FINANCE_ADMIN']
-    MFA_OPTIONAL_ROLES: list = ['REGIONAL_ADMIN', 'SUPPORT_ADMIN', 'BRANCH_ADMIN', 'STAFF']
+    MFA_REQUIRED_ROLES: list = ['SUPER_ADMIN', 'ADMIN', 'SYSTEM_ADMIN', 'FINANCE_ADMIN', 'REGIONAL_ADMIN', 'REGIONAL_MANAGER']
+    MFA_OPTIONAL_ROLES: list = ['SUPPORT_ADMIN', 'BRANCH_ADMIN', 'STAFF']
     TOTP_WINDOW: int = 1  # Time step window for TOTP (30 seconds)
     BACKUP_CODES_COUNT: int = 10
     
@@ -134,18 +182,16 @@ class Settings(BaseSettings):
     IP_CHANGE_ALERT: bool = True
     NEW_DEVICE_ALERT: bool = True
     DEVICE_FINGERPRINT_ENFORCEMENT: bool = False  # Strict mode: reject if fingerprint changes
-    ADMIN_IP_WHITELIST: str = ""  # comma-separated; empty = disabled
     
     # Advanced Threat Detection
     ANOMALY_DETECTION_ENABLED: bool = True
-    ANOMALY_THRESHOLD: int = 20
     BRUTE_FORCE_DETECTION_ENABLED: bool = True
     LOCATION_CHANGE_DETECTION_ENABLED: bool = True
     DEVICE_CHANGE_DETECTION_ENABLED: bool = True
     
     # Audit Logging
+    ADMIN_AUDIT_LOGGING: bool = False
     AUDIT_LOGGING_ENABLED: bool = True
-    ADMIN_AUDIT_LOGGING: bool = True
     AUDIT_LOG_RETENTION_DAYS: int = 365
     AUDIT_LOG_SENSITIVE_ENDPOINTS: list = [
         '/api/v1/auth/',
@@ -218,6 +264,7 @@ class Settings(BaseSettings):
     ADMIN_DASHBOARD_URL: str = "http://localhost:3001"
     AGENT_PORTAL_URL: str = "http://localhost:3002"
     APP_PORTAL_URL: str = "http://localhost:3003"
+    SUPPLIER_PORTAL_URL: str = "http://localhost:3004"
     
     # ============================================================================
     # SECURITY HEADERS & CORS
@@ -225,7 +272,16 @@ class Settings(BaseSettings):
     
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_ALLOW_METHODS: list = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-    CORS_ALLOW_HEADERS: list = ["*"]
+    CORS_ALLOW_HEADERS: list = [
+        "Authorization",
+        "Content-Type",
+        "X-CSRF-Token",
+        "X-Request-ID",
+        "Idempotency-Key",
+        "Accept",
+        "Origin",
+        "Cache-Control",
+    ]
     
     # Security Headers
     SECURE_HEADERS_ENABLED: bool = True
@@ -242,6 +298,9 @@ class Settings(BaseSettings):
     SUPER_ADMIN_PATH_PREFIX: str = "/api/v1/super-admin"
     SUPER_ADMIN_ALERT_PHONE: str = ""  # SMS target for critical alerts
     SUPER_ADMIN_ALERT_EMAIL: str = ""  # email target for daily reports
+
+    # --- ADMIN IP WHITELIST ---
+    ADMIN_IP_WHITELIST: str = ""  # comma-separated; empty = disabled
 
     # --- TRANSACTION SIGNING (financial integrity) ---
     TRANSACTION_SIGNING_KEY: str = ""  # HMAC key for signing every fund movement
@@ -311,6 +370,22 @@ class Settings(BaseSettings):
 
     # --- EMERGENCY SHUTDOWN ---
     PLATFORM_SHUTDOWN: bool = False  # toggled by super-admin emergency endpoint
+
+    # --- PAYMENT SAFETY ---
+    # CRITICAL: Must be False in production. True only for local dev/test.
+    AUTO_CONFIRM_PAYMENTS: bool = False
+
+    # --- MASTER TEST ACCOUNT (MUST be False in production) ---
+    MASTER_TEST_LOGIN_ENABLED: bool = False
+    MASTER_TEST_PHONE: str = ""
+    MASTER_TEST_PASSWORD: str = ""
+
+    # --- DATABASE POOL ---
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 40
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 3600
+    DB_STATEMENT_TIMEOUT_MS: int = 30000
 
     @property
     def super_admin_ip_whitelist_list(self) -> list[str]:

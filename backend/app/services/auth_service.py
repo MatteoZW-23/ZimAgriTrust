@@ -13,11 +13,27 @@ logger = logging.getLogger(__name__)
 def register_user(db: Session, payload: UserRegister) -> User:
     from app.models.user import UserStatus
 
-    public_roles = {UserRole.FARMER, UserRole.BUYER, UserRole.TRANSPORTER}
-    initial_status = UserStatus.ACTIVE if payload.role in public_roles else UserStatus.PENDING_VERIFICATION
+    # Roles that self-register and are immediately active
+    public_roles = {UserRole.FARMER, UserRole.BUYER}
+    # Roles that self-register but need admin approval
+    approval_roles = {UserRole.DRIVER, UserRole.TRANSPORTER, UserRole.SUPPLIER}
+    # Roles that use Email + Password (not PIN)
+    password_roles = {
+        UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN,
+        UserRole.FINANCE_ADMIN, UserRole.REGIONAL_ADMIN, UserRole.REGIONAL_MANAGER,
+        UserRole.SUPPORT_ADMIN, UserRole.BRANCH_ADMIN,
+        UserRole.AGENT, UserRole.SUPPLIER, UserRole.STAFF,
+    }
 
-    if payload.role in {UserRole.ADMIN, UserRole.AGENT, UserRole.SUPER_ADMIN, UserRole.REGIONAL_MANAGER}:
-        # Staff: Set password_hash only (for password + MFA login)
+    if payload.role in public_roles:
+        initial_status = UserStatus.ACTIVE
+    elif payload.role in approval_roles:
+        initial_status = UserStatus.PENDING_VERIFICATION
+    else:
+        initial_status = UserStatus.PENDING_VERIFICATION
+
+    if payload.role in password_roles:
+        # Staff/Admin/Supplier: Set password_hash only (for password + MFA login)
         hashed_password = get_password_hash(payload.password)
         user = User(
             full_name=payload.full_name,
@@ -26,10 +42,11 @@ def register_user(db: Session, payload: UserRegister) -> User:
             password_hash=hashed_password,
             role=payload.role,
             status=initial_status,
-            is_active=True # Legacy flag
+            is_active=True,
+            trust_score=50,
         )
     else:
-        # Farmers/Buyers: Set ussd_pin_hash only (for PIN-only login)
+        # Farmers/Buyers/Drivers: Set ussd_pin_hash (for PIN-only login)
         hashed_pin = get_password_hash(payload.password)
         user = User(
             full_name=payload.full_name,
@@ -39,7 +56,8 @@ def register_user(db: Session, payload: UserRegister) -> User:
             password_hash=hashed_pin,
             role=payload.role,
             status=initial_status,
-            is_active=True
+            is_active=True,
+            trust_score=50,
         )
     db.add(user)
     db.commit()

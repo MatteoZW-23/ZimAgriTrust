@@ -10,12 +10,31 @@ from app.db.base import Base
 
 
 class UserRole(str, enum.Enum):
+    # Level 10 — Self-registration, PIN-based auth
     FARMER = "farmer"
     BUYER = "buyer"
+    # Level 20 — Self-registration + admin approval, PIN-based auth
+    DRIVER = "driver"
+    TRANSPORTER = "transporter"  # Legacy alias for DRIVER
+    # Level 30 — Invitation only, Email + Password
+    STAFF = "staff"
+    # Level 40 — Invitation + Academy, Agent Code + PIN
     AGENT = "agent"
-    ADMIN = "admin" # Acts as Super Admin / HQ
-    REGIONAL_MANAGER = "regional_manager"
-    TRANSPORTER = "transporter"
+    # Level 60 — Self-registration + approval, Email + Password
+    SUPPLIER = "supplier"
+    # Level 70 — Invitation only, Email + Password, MFA optional
+    BRANCH_ADMIN = "branch_admin"
+    # Level 75 — Invitation only, Email + Password, MFA optional
+    SUPPORT_ADMIN = "support_admin"
+    # Level 80 — Invitation only, Email + Password + TOTP
+    REGIONAL_ADMIN = "regional_admin"
+    REGIONAL_MANAGER = "regional_manager"  # Legacy alias for REGIONAL_ADMIN
+    # Level 85 — Invitation only, Email + Password + TOTP
+    FINANCE_ADMIN = "finance_admin"
+    # Level 90 — Invitation only, Email + Password + TOTP
+    SYSTEM_ADMIN = "system_admin"
+    # Level 100 — DB seed only, Email + Password + Hardware MFA
+    ADMIN = "admin"  # Legacy alias for SUPER_ADMIN
     SUPER_ADMIN = "super_admin"
 
 
@@ -136,7 +155,9 @@ class User(Base):
     farmer_profile = relationship("FarmerProfile", back_populates="user", uselist=False)
     buyer_profile = relationship("BuyerProfile", back_populates="user", uselist=False)
     agent_profile = relationship("AgentProfile", back_populates="user", uselist=False)
+    agent = relationship("Agent", foreign_keys="Agent.user_id", primaryjoin="User.id == Agent.user_id", uselist=False, lazy="joined")
     transporter_profile = relationship("TransporterProfile", back_populates="user", uselist=False)
+    supplier_profile = relationship("SupplierProfile", back_populates="user", uselist=False)
     
     listings = relationship("Listing", back_populates="seller")
     offers_made = relationship("Offer", back_populates="buyer", foreign_keys="Offer.buyer_id")
@@ -145,6 +166,15 @@ class User(Base):
     orders_as_seller = relationship("Order", back_populates="seller", foreign_keys="Order.seller_id")
 
     dynamic_role = relationship("Role", back_populates="users")
+    sessions = relationship("UserSession", back_populates="user", lazy="dynamic")
+    application = relationship("AgentApplication", back_populates="user", uselist=False, foreign_keys="AgentApplication.user_id")
+
+    @property
+    def agent_status(self) -> Optional[str]:
+        """Returns the AgentStatus string for agent users, None for everyone else."""
+        if self.agent is not None:
+            return self.agent.status.value if hasattr(self.agent.status, 'value') else str(self.agent.status)
+        return None
 
     @property
     def masked_phone(self) -> str:

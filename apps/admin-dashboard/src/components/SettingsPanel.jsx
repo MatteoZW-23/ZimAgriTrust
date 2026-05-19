@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchAuditLogs, updateProfile, updateNotificationPrefs, deactivateAccount } from "../api";
+import { fetchSecurityLogs, updateProfile, updateNotificationPrefs, deactivateAccount } from "../api";
 
 export function TermsOfService({ onClose }) {
   return (
@@ -73,7 +73,7 @@ export function SecurityAuditLogs({ token, onClose }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchAuditLogs(token)
+    fetchSecurityLogs(token)
       .then(setLogs)
       .catch(console.error)
       .finally(() => setLoading(false));

@@ -42,7 +42,7 @@ export default function RateUserScreen({ navigation, route }) {
         tags: selectedTags.length > 0 ? selectedTags : undefined,
       });
       Alert.alert('Review submitted!', 'Thank you for your feedback.', [
-        { text: 'OK', onPress: () => navigation.goBack() }
+        { text: 'OK', onPress: () => navigation.navigate('MyOrders', { token, role }) }
       ]);
     } catch (err) {
       Alert.alert('Error', err.message || 'Failed to submit review. Please try again.');
@@ -151,7 +151,7 @@ export default function RateUserScreen({ navigation, route }) {
               <Text style={styles.submitBtnText}>Submit Review</Text>
             )}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.skipBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={styles.skipBtn} onPress={() => navigation.navigate('MyOrders', { token, role })}>
             <Text style={styles.skipText}>Skip for now</Text>
           </TouchableOpacity>
         </View>

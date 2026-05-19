@@ -2,35 +2,51 @@
 
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16-alpine
     environment:
       POSTGRES_DB: agri_trust
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5434:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-agritrust}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_production}
+    expose:
+      - "5432"  # Internal only - no host port mapping in production
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 10s
       retries: 5
       timeout: 5s
+    # NO ports: mapping in production - use docker-compose exec for access
 
   redis:
-    image: redis:7
-    ports:
-      - "6380:6379"
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD:-changeme_in_production} --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    expose:
+      - "6379"  # Internal only - no host port mapping
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      retries: 3
+      timeout: 5s
+    restart: unless-stopped
 
   whatsapp-service:
     build: ./apps/whatsapp-service
     ports:
       - "8001:8000"
     environment:
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: redis://:${REDIS_PASSWORD:-changeme_in_production}@redis:6379/0
       WHATSAPP_BRIDGE_URL: http://whatsapp-bridge:3006
       MAIN_BACKEND_URL: http://backend:8000
       LOG_LEVEL: INFO
+    networks:
+      - backend-network
     depends_on:
       - redis
     restart: unless-stopped
@@ -41,16 +57,16 @@ services:
       target: production-slim
     ports:
       - "8080:8000"
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/agri_trust
-      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-agritrust}:${POSTGRES_PASSWORD:-changeme_in_production}@postgres:5432/agri_trust
+      REDIS_URL: redis://:${REDIS_PASSWORD:-changeme_in_production}@redis:6379/0
       WHATSAPP_SERVICE_URL: http://whatsapp-service:8000
       WHATSAPP_USE_REDIS: "false"
-      SECRET_KEY: test-key-replace-in-prod
-      CORS_ORIGINS: "*"
-      ALLOWED_HOSTS: "*"
-      # Force polling needed on Windows — inotify events don't cross WSL2/Hyper-V volume boundary
-      WATCHFILES_FORCE_POLLING: "true"
+      APP_ENV: development
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003"
+      ALLOWED_HOSTS: "localhost,127.0.0.1"
       # Security Configuration
       RATE_LIMIT_ENABLED: "true"
       RATE_LIMIT_REQUESTS: "100"
@@ -72,16 +88,30 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: "60"
       REFRESH_TOKEN_EXPIRE_MINUTES: "10080"
       REQUIRE_MFA_ADMIN: "true"
+      # Gunicorn tuning
+      GUNICORN_WORKERS: "4"
+      GUNICORN_TIMEOUT: "60"
+      GUNICORN_MAX_REQUESTS: "1000"
+      GUNICORN_MAX_REQUESTS_JITTER: "100"
+      # DB pool
+      DB_POOL_SIZE: "10"
+      DB_MAX_OVERFLOW: "20"
+      DB_POOL_TIMEOUT: "30"
+      DB_STATEMENT_TIMEOUT_MS: "30000"
+      AUTO_CONFIRM_PAYMENTS: "false"
+      MASTER_TEST_LOGIN_ENABLED: "false"
     volumes:
-      - ./backend:/app
       - ./data/ml-weights:/app/ml_weights
+      - ./data/training-materials:/app/data/training-materials
       - shared_models:/app/models
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    networks:
+      - backend-network
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
 
   public-website:
     build:
@@ -138,6 +168,20 @@ services:
       - VITE_API_URL=http://localhost:8080/api/v1
     volumes:
       - ./apps/app-portal:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+  supplier-portal:
+    build:
+      context: .
+      dockerfile: apps/supplier-portal/Dockerfile
+    ports:
+      - "3004:3004"
+    environment:
+      - VITE_API_URL=http://localhost:8080/api/v1
+    volumes:
+      - ./apps/supplier-portal:/app
       - /app/node_modules
     depends_on:
       - backend
@@ -239,3 +283,8 @@ volumes:
   wwebjs_cache:
   shared_models:
     driver: local
+  redis_data:
+
+networks:
+  backend-network:
+    driver: bridge

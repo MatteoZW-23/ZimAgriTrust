@@ -1,37 +1,37 @@
-# @agritrust/shared
+# ZimAgriTrust Shared Package
 
-Shared utilities, types, and API clients for Agritrust applications.
+This package contains the core logic and UI components shared across the ZimAgriTrust platform (Web Portal, Mobile App, and Public Website).
 
-## Installation
+## Architecture
 
-```bash
-npm install
-```
+- **api/**: Axios client and base configuration.
+- **stores/**: Zustand stores for state management.
+- **components/**: Common UI components (React).
+- **types/**: Shared TypeScript interfaces.
+- **utils/**: Common validators and formatters.
 
-## Build
+## Shared Stores
 
-```bash
-npm run build
-```
+- `useAuthStore`: Handles authentication, user session, and role management.
+- `useListingStore`: Manages marketplace listings and farmer-specific listings.
+- `useOfferStore`: Handles making and receiving offers.
+- `useOrderStore`: Manages the lifecycle of orders.
+- `useWalletStore`: Handles balances and transactions.
 
-## Watch mode
+## Shared Components
 
-```bash
-npm run watch
-```
-
-## Contents
-
-- **types**: TypeScript type definitions for User, Listing, Order, Transaction, etc.
-- **api**: Axios-based API client with authentication
-- **utils**: Authentication and permission utilities
-- **constants**: Shared constants (routes, roles, status, etc.)
+- `Button`: Versatile button with variants and loading states.
+- `Input`: Branded input with icons and validation support.
+- `Card`: Premium card container with hover effects.
+- `Modal`: Clean modal for confirmations and forms.
 
 ## Usage
 
-```typescript
-import { getApiClient, USER_ROLES } from '@agritrust/shared';
+```tsx
+import { useAuthStore, Button } from '@agritrust/shared';
 
-const api = getApiClient();
-const user = await api.getCurrentUser();
+const MyComponent = () => {
+  const { user } = useAuthStore();
+  return <Button>Welcome, {user.full_name}</Button>;
+};
 ```

@@ -5,7 +5,6 @@ import {
   recomputeTrustScores, 
   fetchUsers,
   fetchTransactions,
-  fetchAuditLogs,
   fetchWhatsAppStatus,
   fetchModelStatuses,
   fetchScraperStatus,
