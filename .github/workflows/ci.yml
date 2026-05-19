@@ -128,42 +128,48 @@ jobs:
       - name: Build and push public-website
         uses: docker/build-push-action@v4
         with:
-          context: ./apps/public-website
+          context: .
+          file: ./apps/public-website/Dockerfile
           push: true
           tags: agritrust/public-website:latest,agritrust/public-website:${{ github.sha }}
       
       - name: Build and push admin-dashboard
         uses: docker/build-push-action@v4
         with:
-          context: ./apps/admin-dashboard
+          context: .
+          file: ./apps/admin-dashboard/Dockerfile
           push: true
           tags: agritrust/admin-dashboard:latest,agritrust/admin-dashboard:${{ github.sha }}
       
       - name: Build and push agent-portal
         uses: docker/build-push-action@v4
         with:
-          context: ./apps/agent-portal
+          context: .
+          file: ./apps/agent-portal/Dockerfile
           push: true
           tags: agritrust/agent-portal:latest,agritrust/agent-portal:${{ github.sha }}
       
       - name: Build and push app-portal
         uses: docker/build-push-action@v4
         with:
-          context: ./apps/app-portal
+          context: .
+          file: ./apps/app-portal/Dockerfile
           push: true
           tags: agritrust/app-portal:latest,agritrust/app-portal:${{ github.sha }}
       
       - name: Build and push user-mobile
         uses: docker/build-push-action@v4
         with:
-          context: ./apps/user-mobile
+          context: .
+          file: ./apps/user-mobile/Dockerfile
           push: true
           tags: agritrust/user-mobile:latest,agritrust/user-mobile:${{ github.sha }}
       
       - name: Build and push driver-mobile
         uses: docker/build-push-action@v4
         with:
-          context: ./apps/driver-mobile
+          context: .
+          file: ./apps/driver-mobile/Dockerfile
           push: true
           tags: agritrust/driver-mobile:latest,agritrust/driver-mobile:${{ github.sha }}
 
