@@ -104,7 +104,7 @@ def create_trip(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.AGENT, UserRole.ADMIN)),
 ):
-    trip = LogisticsTrip(transporter_id=current_user.id, **payload.model_dump())
+    trip = LogisticsTrip(driver_id=current_user.id, **payload.model_dump())
     db.add(trip)
     db.commit()
     db.refresh(trip)

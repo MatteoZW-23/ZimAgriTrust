@@ -836,7 +836,7 @@ class WhatsAppService:
             "buyer": "🛒",
             "agent": "👨‍💼",
             "admin": "👨‍💻",
-            "transporter": "🚛"
+            "driver": "🚛"
         }
         emoji = role_emojis.get(user.role.value, "👤")
         

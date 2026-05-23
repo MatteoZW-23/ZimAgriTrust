@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 10080
-    DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@db:5432/agri_trust"
+    DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@db:5432/zimagritrust"
     REDIS_URL: str = "redis://redis:6379/0"
     ADMIN_BOOTSTRAP_TOKEN: str = "secret-bootstrap-token"
     

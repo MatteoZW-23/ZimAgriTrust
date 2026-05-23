@@ -2,7 +2,7 @@ FROM node:20-slim
 WORKDIR /app
 
 COPY packages/shared /packages/shared
-RUN cd /packages/shared && npm install --legacy-peer-deps
+RUN cd /packages/shared && npm install --legacy-peer-deps && npm run build
 
 COPY apps/agent-portal/package*.json ./
 RUN rm -f package-lock.json && npm install --legacy-peer-deps --fetch-retry-maxtimeout=600000 --fetch-retry-mintimeout=20000 --fetch-retries=5

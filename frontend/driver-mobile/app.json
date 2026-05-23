@@ -1,0 +1,96 @@
+{
+  "expo": {
+    "name": "ZimAgriTrust Driver",
+    "slug": "zimagritrust-driver-mobile",
+    "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "scheme": "zimagritrust-driver",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#29B6F6"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.zimagritrust.drivermobile",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "ZimAgriTrust Driver needs camera access to photograph proof of delivery.",
+        "NSPhotoLibraryUsageDescription": "ZimAgriTrust Driver needs photo library access to upload delivery proof.",
+        "NSLocationWhenInUseUsageDescription": "ZimAgriTrust Driver uses your location for route navigation and delivery tracking.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "ZimAgriTrust Driver uses background location to provide real-time delivery tracking to customers.",
+        "UIBackgroundModes": ["location", "remote-notification"]
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.zimagritrust.drivermobile",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#29B6F6"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "INTERNET"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-camera",
+      "expo-image-picker",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "ZimAgriTrust Driver uses background location to provide real-time delivery tracking."
+        }
+      ],
+      "expo-notifications",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34,
+            "minSdkVersion": 24,
+            "buildToolsVersion": "34.0.0"
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ]
+    ],
+    "updates": {
+      "url": "https://u.expo.dev/zimagritrust-driver-mobile"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+      }
+    }
+  }
+}

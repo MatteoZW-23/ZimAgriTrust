@@ -353,3 +353,119 @@ class PublicSupplierResponse(BaseModel):
     product_categories: Optional[List[str]] = None
     physical_address: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
+
+
+# ============================================================================
+# BULK CSV IMPORT
+# ============================================================================
+
+class CSVImportResponse(BaseModel):
+    import_id: uuid.UUID
+    status: str
+    total_rows: int
+    successful: int
+    failed: int
+    errors: List[Dict[str, Any]] = []
+    created_at: datetime
+
+
+class CSVImportError(BaseModel):
+    row_number: int
+    field: str
+    error: str
+    value: Optional[str] = None
+
+
+# ============================================================================
+# SUPPLIER REVIEWS
+# ============================================================================
+
+class SupplierReviewCreate(BaseModel):
+    order_id: uuid.UUID
+    rating: int = Field(ge=1, le=5)
+    comment: Optional[str] = Field(None, max_length=1000)
+
+
+class SupplierReviewResponse(BaseModel):
+    id: uuid.UUID
+    supplier_id: uuid.UUID
+    buyer_id: uuid.UUID
+    order_id: uuid.UUID
+    rating: int
+    comment: Optional[str] = None
+    supplier_response: Optional[str] = None
+    supplier_responseed_at: Optional[datetime] = None
+    is_flagged: bool
+    is_hidden: bool
+    created_at: datetime
+    # Buyer info (for display)
+    buyer_name: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SupplierReviewUpdate(BaseModel):
+    supplier_response: Optional[str] = Field(None, max_length=1000)
+
+
+class SupplierReviewListResponse(BaseModel):
+    reviews: List[SupplierReviewResponse]
+    total: int
+    average_rating: float
+    rating_distribution: Dict[int, int]  # {1: count, 2: count, ...}
+
+
+# ============================================================================
+# SUPPLIER DISCOUNTS/PROMOTIONS
+# ============================================================================
+
+class SupplierDiscountCreate(BaseModel):
+    code: str = Field(min_length=3, max_length=50)
+    discount_type: str = Field(..., description="percentage, fixed_amount, buy_x_get_y")
+    discount_value: float = Field(gt=0)
+    min_order_value: Optional[float] = Field(None, ge=0)
+    max_discount_amount: Optional[float] = Field(None, ge=0)
+    applicable_products: Optional[List[str]] = None
+    applicable_categories: Optional[List[str]] = None
+    max_uses: Optional[int] = Field(None, ge=1)
+    max_uses_per_user: Optional[int] = Field(None, ge=1)
+    start_date: datetime
+    end_date: datetime
+    description: Optional[str] = Field(None, max_length=500)
+
+
+class SupplierDiscountUpdate(BaseModel):
+    discount_value: Optional[float] = Field(None, gt=0)
+    min_order_value: Optional[float] = Field(None, ge=0)
+    max_discount_amount: Optional[float] = Field(None, ge=0)
+    max_uses: Optional[int] = Field(None, ge=1)
+    max_uses_per_user: Optional[int] = Field(None, ge=1)
+    end_date: Optional[datetime] = None
+    is_active: Optional[bool] = None
+    description: Optional[str] = Field(None, max_length=500)
+
+
+class SupplierDiscountResponse(BaseModel):
+    id: uuid.UUID
+    supplier_id: uuid.UUID
+    code: str
+    discount_type: str
+    discount_value: float
+    min_order_value: Optional[float] = None
+    max_discount_amount: Optional[float] = None
+    applicable_products: Optional[List[str]] = None
+    applicable_categories: Optional[List[str]] = None
+    max_uses: Optional[int] = None
+    max_uses_per_user: Optional[int] = None
+    current_uses: int
+    start_date: datetime
+    end_date: datetime
+    is_active: bool
+    description: Optional[str] = None
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DiscountValidationRequest(BaseModel):
+    code: str
+    order_total: float
+    product_ids: Optional[List[str]] = None

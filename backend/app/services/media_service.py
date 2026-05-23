@@ -6,6 +6,7 @@ import logging
 import aiohttp
 import os
 import uuid
+import tempfile
 from typing import Optional, Dict, Any
 from pathlib import Path
 
@@ -18,8 +19,8 @@ class MediaService:
     """
     
     def __init__(self):
-        # On Windows, we should use a relative path or a valid temp path
-        self.temp_dir = Path("data/temp/agritelecom_media")
+        # Use system temp directory to avoid permission issues in Docker containers
+        self.temp_dir = Path(tempfile.gettempdir()) / "agritelecom_media"
         self.temp_dir.mkdir(exist_ok=True, parents=True)
     
     async def download_whatsapp_media(self, media_id: str, media_url: str, auth_token: str) -> Optional[bytes]:

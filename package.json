@@ -1,0 +1,15 @@
+{
+  "name": "agric-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "install": "npm install",
+    "build": "npm run build --workspaces",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "format": "prettier --write ."
+  }
+}

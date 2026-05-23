@@ -6,6 +6,6 @@ if [ -z "$1" ]; then
 fi
 
 echo "Restoring database from $1..."
-cat "$1" | docker exec -i agritrust-postgres-1 psql -U postgres -d agri_trust
+cat "$1" | docker exec -i agritrust-postgres-1 psql -U postgres -d zimagritrust
 
 echo "Rollback sequence completed."

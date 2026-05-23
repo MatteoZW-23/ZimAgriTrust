@@ -1,6 +1,6 @@
 -- Populate correct_answer for all classroom_quiz_questions
 -- Matches by question_text (now populated). Run once.
--- docker exec agric-postgres-1 psql -U postgres -d agri_trust -f /tmp/set_correct_answers.sql
+-- docker exec agric-postgres-1 psql -U postgres -d zimagritrust -f /tmp/set_correct_answers.sql
 
 UPDATE classroom_quiz_questions SET correct_answer = 'Sovereign Trust in Trade'
   WHERE question_text ILIKE '%core mission of ZimAgritrust%';

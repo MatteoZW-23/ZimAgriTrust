@@ -30,7 +30,9 @@ RETRY_COUNT=0
 until python -c "
 import psycopg2, os, sys
 try:
-    psycopg2.connect(os.environ['DATABASE_URL'])
+    # Convert SQLAlchemy URL to psycopg2 format
+    db_url = os.environ['DATABASE_URL'].replace('postgresql+psycopg2://', 'postgresql://')
+    psycopg2.connect(db_url)
     sys.exit(0)
 except Exception as e:
     print(f'  DB not ready: {e}')

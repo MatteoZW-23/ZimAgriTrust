@@ -1,5 +1,5 @@
 -- One-time: populate question_text for all blank classroom_quiz_questions
--- Run: docker exec agric-postgres-1 psql -U postgres -d agri_trust -f /tmp/populate_questions.sql
+-- Run: docker exec agric-postgres-1 psql -U postgres -d zimagritrust -f /tmp/populate_questions.sql
 
 UPDATE classroom_quiz_questions SET question_text = 'What is the core mission of ZimAgritrust?'
   WHERE options @> '["Sovereign Trust in Trade"]' AND options @> '["Profit Maximization"]';

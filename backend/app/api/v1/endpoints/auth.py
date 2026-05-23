@@ -82,7 +82,7 @@ async def reset_password(payload: PasswordResetConfirm, db: Session = Depends(ge
     if not user:
         raise HTTPException(status_code=404, detail="User accounts not found.")
     
-    public_pin_roles = {UserRole.FARMER, UserRole.BUYER, UserRole.TRANSPORTER}
+    public_pin_roles = {UserRole.FARMER, UserRole.BUYER, UserRole.DRIVER}
     if user.role in public_pin_roles:
         if not payload.new_password.isdigit() or not 4 <= len(payload.new_password) <= 6:
             raise HTTPException(status_code=400, detail="PIN must be 4-6 numeric digits.")
@@ -616,7 +616,7 @@ async def change_pin(
     if payload.current_pin == payload.new_pin:
         raise HTTPException(status_code=400, detail="New PIN must be different from the current PIN.")
 
-    public_pin_roles = {UserRole.FARMER, UserRole.BUYER, UserRole.TRANSPORTER}
+    public_pin_roles = {UserRole.FARMER, UserRole.BUYER, UserRole.DRIVER}
     if current_user.role in public_pin_roles:
         if not payload.new_pin.isdigit() or not 4 <= len(payload.new_pin) <= 6:
             raise HTTPException(status_code=400, detail="PIN must be 4-6 numeric digits.")

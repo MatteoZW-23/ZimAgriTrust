@@ -5,7 +5,7 @@ Run inside Docker:  docker compose exec backend python _migrate_broadcast.py
 from sqlalchemy import create_engine, text
 import os
 
-url = os.environ.get("DATABASE_URL", "postgresql+psycopg2://postgres:postgres@postgres:5432/agri_trust")
+url = os.environ.get("DATABASE_URL", "postgresql+psycopg2://postgres:postgres@postgres:5432/zimagritrust")
 engine = create_engine(url)
 
 

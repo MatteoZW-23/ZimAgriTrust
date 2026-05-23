@@ -4,7 +4,7 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: agri_trust
+      POSTGRES_DB: zimagritrust
       POSTGRES_USER: ${POSTGRES_USER:-agritrust}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_production}
     expose:
@@ -14,7 +14,7 @@ services:
     networks:
       - backend-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       retries: 5
       timeout: 5s
@@ -57,14 +57,15 @@ services:
       target: production-slim
     ports:
       - "8080:8000"
-    env_file:
-      - .env
     environment:
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-agritrust}:${POSTGRES_PASSWORD:-changeme_in_production}@postgres:5432/agri_trust
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-agritrust}:${POSTGRES_PASSWORD:-changeme_in_production}@postgres:5432/zimagritrust
       REDIS_URL: redis://:${REDIS_PASSWORD:-changeme_in_production}@redis:6379/0
       WHATSAPP_SERVICE_URL: http://whatsapp-service:8000
       WHATSAPP_USE_REDIS: "false"
       APP_ENV: development
+      SECRET_KEY: ${SECRET_KEY:-changeme_in_production_use_strong_random_string}
+      REFRESH_SECRET_KEY: ${REFRESH_SECRET_KEY:-changeme_in_production_use_strong_random_string}
+      ADMIN_BOOTSTRAP_TOKEN: ${ADMIN_BOOTSTRAP_TOKEN:-changeme_in_production_use_strong_random_string}
       CORS_ORIGINS: "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003"
       ALLOWED_HOSTS: "localhost,127.0.0.1"
       # Security Configuration
@@ -102,7 +103,6 @@ services:
       MASTER_TEST_LOGIN_ENABLED: "false"
     volumes:
       - ./data/ml-weights:/app/ml_weights
-      - ./data/training-materials:/app/data/training-materials
       - shared_models:/app/models
     networks:
       - backend-network
@@ -240,6 +240,7 @@ services:
 
   whatsapp-bridge:
     build: ./apps/whatsapp-bridge
+    shm_size: "1gb"
     ports:
       - "3006:3006"
     environment:

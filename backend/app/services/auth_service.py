@@ -16,7 +16,7 @@ def register_user(db: Session, payload: UserRegister) -> User:
     # Roles that self-register and are immediately active
     public_roles = {UserRole.FARMER, UserRole.BUYER}
     # Roles that self-register but need admin approval
-    approval_roles = {UserRole.DRIVER, UserRole.TRANSPORTER, UserRole.SUPPLIER}
+    approval_roles = {UserRole.DRIVER, UserRole.SUPPLIER}
     # Roles that use Email + Password (not PIN)
     password_roles = {
         UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN,

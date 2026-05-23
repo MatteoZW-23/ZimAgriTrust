@@ -21,23 +21,23 @@ interface OrderState {
   raiseDispute: (id: string, data: any) => Promise<void>;
 }
 
-export const useOrderStore = create<OrderState>((set) => ({
+export const useOrderStore = create<OrderState>((set: (partial: Partial<OrderState> | ((state: OrderState) => Partial<OrderState>)) => void) => ({
   orders: [],
   loading: false,
   error: null,
   fetchOrders: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await apiClient.get('/orders');
+      const response = await apiClient.get('/transactions');
       set({ orders: response.data, loading: false });
     } catch (error: any) {
       set({ error: error.message, loading: false });
     }
   },
-  confirmDelivery: async (id) => {
+  confirmDelivery: async (id: string) => {
     set({ loading: true, error: null });
     try {
-      await apiClient.post(`/orders/${id}/confirm-delivery`);
+      await apiClient.post(`/transactions/${id}/confirm-delivery`);
       set((state) => ({
         orders: state.orders.map((o) => (o.id === id ? { ...o, status: 'delivered' } : o)),
         loading: false,
@@ -47,10 +47,10 @@ export const useOrderStore = create<OrderState>((set) => ({
       throw error;
     }
   },
-  raiseDispute: async (id, data) => {
+  raiseDispute: async (id: string, data: any) => {
     set({ loading: true, error: null });
     try {
-      await apiClient.post(`/orders/${id}/dispute`, data);
+      await apiClient.post(`/transactions/${id}/dispute`, data);
       set((state) => ({
         orders: state.orders.map((o) => (o.id === id ? { ...o, status: 'disputed' } : o)),
         loading: false,

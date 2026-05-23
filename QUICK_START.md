@@ -46,7 +46,7 @@ ENVIRONMENT=development
 DEBUG=true
 
 # Database (local PostgreSQL)
-DATABASE_URL=postgresql://postgres:password@localhost:5432/agritrust_dev
+DATABASE_URL=postgresql://postgres:password@localhost:5432/zimagritrust
 
 # Cache (local Redis)
 REDIS_URL=redis://localhost:6379/0
@@ -62,13 +62,13 @@ LOG_LEVEL=INFO
 
 ```bash
 # Create database (if not exists)
-psql -U postgres -c "CREATE DATABASE agritrust_dev;"
+psql -U postgres -c "CREATE DATABASE zimagritrust;"
 
 # Run migrations
 alembic upgrade head
 
 # Check it worked
-psql -U postgres -d agritrust_dev -c "\dt"  # List tables
+psql -U postgres -d zimagritrust -c "\dt"  # List tables
 ```
 
 ## Step 4: Start Development Server (1 minute)
@@ -197,7 +197,7 @@ alembic history  # Show all migrations
 alembic downgrade -1  # Rollback one migration
 
 # Connect to database
-psql -U postgres -d agritrust_dev
+psql -U postgres -d zimagritrust
 ```
 
 ### Cache
@@ -252,16 +252,16 @@ cd backend
 source venv/bin/activate  # or venv\Scripts\activate on Windows
 ```
 
-### "ERROR: Database 'agritrust_dev' does not exist"
+### "ERROR: Database 'zimagritrust' does not exist"
 ```bash
 # Create it
-psql -U postgres -c "CREATE DATABASE agritrust_dev;"
+psql -U postgres -c "CREATE DATABASE zimagritrust;"
 ```
 
 ### Tests fail with "could not translate host name"
 ```bash
 # Check DATABASE_URL in .env
-export DATABASE_URL="postgresql://postgres:password@localhost:5432/agritrust_dev"
+export DATABASE_URL="postgresql://postgres:password@localhost:5432/zimagritrust"
 pytest tests/
 ```
 

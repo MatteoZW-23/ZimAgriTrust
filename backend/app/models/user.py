@@ -15,7 +15,6 @@ class UserRole(str, enum.Enum):
     BUYER = "buyer"
     # Level 20 — Self-registration + admin approval, PIN-based auth
     DRIVER = "driver"
-    TRANSPORTER = "transporter"  # Legacy alias for DRIVER
     # Level 30 — Invitation only, Email + Password
     STAFF = "staff"
     # Level 40 — Invitation + Academy, Agent Code + PIN
@@ -156,8 +155,8 @@ class User(Base):
     buyer_profile = relationship("BuyerProfile", back_populates="user", uselist=False)
     agent_profile = relationship("AgentProfile", back_populates="user", uselist=False)
     agent = relationship("Agent", foreign_keys="Agent.user_id", primaryjoin="User.id == Agent.user_id", uselist=False, lazy="joined")
-    transporter_profile = relationship("TransporterProfile", back_populates="user", uselist=False)
     supplier_profile = relationship("SupplierProfile", back_populates="user", uselist=False)
+    driver_profile = relationship("Driver", back_populates="user", uselist=False)
     
     listings = relationship("Listing", back_populates="seller")
     offers_made = relationship("Offer", back_populates="buyer", foreign_keys="Offer.buyer_id")
@@ -236,12 +235,3 @@ class AgentProfile(Base):
     agent_level: Mapped[int] = mapped_column(Integer, default=1)
 
 
-class TransporterProfile(Base):
-    __tablename__ = "transporter_profiles"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
-    user = relationship("User", back_populates="transporter_profile")
-    
-    vehicle_type: Mapped[Optional[str]] = mapped_column(String(50))
-    carrying_capacity_kg: Mapped[float] = mapped_column(Float, default=0.0)
-    operating_district: Mapped[Optional[str]] = mapped_column(String(50))

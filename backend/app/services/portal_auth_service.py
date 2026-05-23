@@ -29,7 +29,7 @@ OTP_TTL_SECONDS = 300
 
 # ── Role sets for portal gate checks ─────────────────────────────────────────
 PUBLIC_APP_ROLES = {UserRole.FARMER, UserRole.BUYER}
-DRIVER_ROLES = {UserRole.DRIVER, UserRole.TRANSPORTER}
+DRIVER_ROLES = {UserRole.DRIVER}
 SUPPLIER_ROLES = {UserRole.SUPPLIER}
 STAFF_ROLES = {UserRole.STAFF}
 AGENT_PORTAL_ROLES = {UserRole.AGENT}
@@ -45,7 +45,6 @@ ROLE_PORTALS = {
     UserRole.FARMER: ("app", "/app"),
     UserRole.BUYER: ("app", "/app"),
     UserRole.DRIVER: ("driver", "/driver"),
-    UserRole.TRANSPORTER: ("driver", "/driver"),
     UserRole.STAFF: ("admin", "/admin"),
     UserRole.AGENT: ("agent", "/agent"),
     UserRole.SUPPLIER: ("supplier", "/supplier"),
@@ -67,7 +66,7 @@ ACCESS_TOKEN_EXPIRY_BY_ROLE = {
     UserRole.SUPPORT_ADMIN: 60, UserRole.BRANCH_ADMIN: 60,
     UserRole.SUPPLIER: 60, UserRole.STAFF: 60,
     UserRole.AGENT: 480,  # 8 hours
-    UserRole.DRIVER: 60, UserRole.TRANSPORTER: 60,
+    UserRole.DRIVER: 60,
     UserRole.FARMER: 60, UserRole.BUYER: 60,
 }
 
@@ -78,7 +77,7 @@ REFRESH_TOKEN_EXPIRY_DAYS_BY_ROLE = {
     UserRole.SUPPORT_ADMIN: 14, UserRole.BRANCH_ADMIN: 14,
     UserRole.SUPPLIER: 30, UserRole.STAFF: 14,
     UserRole.AGENT: 30,
-    UserRole.DRIVER: 30, UserRole.TRANSPORTER: 30,
+    UserRole.DRIVER: 30,
     UserRole.FARMER: 30, UserRole.BUYER: 30,
 }
 

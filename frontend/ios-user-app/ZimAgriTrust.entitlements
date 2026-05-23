@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- App Groups for sharing data between app and widgets -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.zimagritrust.ios</string>
+	</array>
+	
+	<!-- Keychain Access for secure storage -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)com.zimagritrust.ios</string>
+	</array>
+	
+	<!-- Push Notifications -->
+	<key>aps-environment</key>
+	<string>development</string>
+	
+	<!-- Sign in with Apple -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+	
+	<!-- iCloud (optional) -->
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.com.zimagritrust.ios</string>
+	</array>
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudDocuments</string>
+		<string>CloudKit</string>
+	</array>
+	
+	<!-- In-App Purchase -->
+	<key>com.apple.developer.in-app-payments</key>
+	<array>
+		<string>com.zimagritrust.ios.premium</string>
+	</array>
+	
+	<!-- Associated Domains for Universal Links -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:zimagritrust.com</string>
+		<string>webcredentials:zimagritrust.com</string>
+	</array>
+	
+	<!-- Background Modes -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+		<string>processing</string>
+		<string>location</string>
+	</array>
+	
+	<!-- Location (Always) for background tracking -->
+	<key>com.apple.developer.location.allows-background-location-updates</key>
+	<true/>
+</dict>
+</plist>

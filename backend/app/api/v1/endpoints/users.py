@@ -108,7 +108,7 @@ def change_user_pin(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> User:
-    if current_user.role not in {UserRole.FARMER, UserRole.BUYER, UserRole.TRANSPORTER}:
+    if current_user.role not in {UserRole.FARMER, UserRole.BUYER, UserRole.DRIVER}:
         raise HTTPException(status_code=403, detail="Use the staff password flow.")
     if not payload.new_pin.isdigit():
         raise HTTPException(status_code=400, detail="PIN must contain digits only.")

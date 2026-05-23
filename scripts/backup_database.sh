@@ -5,7 +5,7 @@
 set -e
 
 # Configuration
-DB_NAME=${POSTGRES_DB:-agri_trust}
+DB_NAME=${POSTGRES_DB:-zimagritrust}
 DB_USER=${POSTGRES_USER:-postgres}
 DB_HOST=${DB_HOST:-postgres}
 DB_PORT=${DB_PORT:-5432}

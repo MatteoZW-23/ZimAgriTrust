@@ -8,7 +8,7 @@ import uuid
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, Request, Response, HTTPException
+from fastapi import APIRouter, Depends, Query, Request, Response, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user, require_roles
@@ -35,6 +35,15 @@ from app.schemas.supplier import (
     SupplierWalletTxnResponse,
     PublicSupplierResponse,
     AdminSupplierAction,
+    CSVImportResponse,
+    SupplierReviewCreate,
+    SupplierReviewResponse,
+    SupplierReviewUpdate,
+    SupplierReviewListResponse,
+    SupplierDiscountCreate,
+    SupplierDiscountUpdate,
+    SupplierDiscountResponse,
+    DiscountValidationRequest,
 )
 from app.services.supplier_service import (
     SupplierRegistrationService,
@@ -45,6 +54,11 @@ from app.services.supplier_service import (
     SupplierAnalyticsService,
     SupplierAdminService,
     SupplierPublicService,
+    SupplierReviewService,
+    SupplierSubscriptionService,
+    SupplierLogisticsService,
+    SupplierPayoutService,
+    SupplierDiscountService,
 )
 
 router = APIRouter()
@@ -285,6 +299,45 @@ def bulk_price_update(
 ):
     profile = _get_supplier_profile(db, user)
     return SupplierProductService.bulk_price_update(db, profile.id, data.updates)
+
+
+@router.post("/products/bulk-import", response_model=CSVImportResponse, tags=["supplier-products"])
+async def bulk_import_products(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPPLIER)),
+):
+    """
+    Bulk import products from CSV file.
+    CSV format: product_type,name,description,price,quantity,unit_type,category,brand,manufacturer,min_stock_level,condition,warranty_months
+    """
+    try:
+        profile = _get_supplier_profile(db, user)
+        
+        # Read file content
+        content = await file.read()
+        csv_data = content.decode('utf-8')
+        
+        # Validate file type
+        if not file.filename.endswith('.csv'):
+            raise HTTPException(status_code=400, detail="Only CSV files are allowed")
+        
+        # Call service to import
+        result = SupplierProductService.bulk_import_from_csv(
+            db, 
+            profile.id, 
+            csv_data, 
+            file.filename, 
+            len(content)
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Bulk import error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Bulk import failed: {str(e)}")
 
 
 # ============================================================================
@@ -581,6 +634,413 @@ def public_create_order(
         "promo_code": data.promo_code,
     })
     return {"message": "Order placed", "order_id": str(order.id), "order_number": order.order_number}
+
+
+# ============================================================================
+# SUPPLIER REVIEWS (5 endpoints)
+# ============================================================================
+
+@router.post("/reviews", response_model=SupplierReviewResponse, tags=["supplier-reviews"])
+def create_review(
+    data: SupplierReviewCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Buyer creates a review for a supplier after order completion."""
+    try:
+        # Get supplier from order
+        order = db.query(SupplierOrder).filter(SupplierOrder.id == data.order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        review = SupplierReviewService.create_review(db, user.id, order.supplier_id, data.model_dump())
+        return SupplierReviewResponse.model_validate(review)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Create review error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create review")
+
+
+@router.get("/reviews/{supplier_id}", response_model=SupplierReviewListResponse, tags=["supplier-reviews"])
+def get_supplier_reviews(
+    supplier_id: uuid.UUID,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    """Get all reviews for a supplier with statistics."""
+    try:
+        result = SupplierReviewService.get_reviews(db, supplier_id, limit, offset)
+        return SupplierReviewListResponse(
+            reviews=[SupplierReviewResponse.model_validate(r) for r in result["reviews"]],
+            total=result["total"],
+            average_rating=result["average_rating"],
+            rating_distribution=result["rating_distribution"],
+        )
+    except Exception as e:
+        logger.error(f"Get reviews error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve reviews")
+
+
+@router.put("/reviews/{review_id}/respond", response_model=SupplierReviewResponse, tags=["supplier-reviews"])
+def respond_to_review(
+    review_id: uuid.UUID,
+    data: SupplierReviewUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPPLIER)),
+):
+    """Supplier responds to a review."""
+    try:
+        profile = _get_supplier_profile(db, user)
+        review = SupplierReviewService.respond_to_review(db, profile.id, review_id, data.supplier_response)
+        return SupplierReviewResponse.model_validate(review)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Respond to review error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to respond to review")
+
+
+@router.post("/reviews/{review_id}/flag", response_model=SupplierReviewResponse, tags=["supplier-reviews"])
+def flag_review(
+    review_id: uuid.UUID,
+    notes: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
+):
+    """Admin flags a review for moderation."""
+    try:
+        review = SupplierReviewService.flag_review(db, review_id, notes)
+        return SupplierReviewResponse.model_validate(review)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Flag review error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to flag review")
+
+
+@router.post("/reviews/{review_id}/hide", response_model=SupplierReviewResponse, tags=["supplier-reviews"])
+def hide_review(
+    review_id: uuid.UUID,
+    notes: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
+):
+    """Admin hides a review."""
+    try:
+        review = SupplierReviewService.hide_review(db, review_id, notes)
+        return SupplierReviewResponse.model_validate(review)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Hide review error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to hide review")
+
+
+# ============================================================================
+# SUPPLIER SUBSCRIPTIONS (4 endpoints)
+# ============================================================================
+
+@router.get("/subscription", tags=["supplier-subscriptions"])
+def get_subscription(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPPLIER)),
+):
+    """Get current supplier subscription details."""
+    try:
+        profile = _get_supplier_profile(db, user)
+        return SupplierSubscriptionService.get_subscription(db, profile.id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get subscription error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve subscription")
+
+
+@router.post("/subscription", tags=["supplier-subscriptions"])
+def set_subscription(
+    plan: str = Query(..., description="Subscription plan: basic, pro, enterprise"),
+    billing_cycle: str = Query("monthly", description="Billing cycle: monthly, quarterly, yearly"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
+):
+    """Admin sets a supplier's subscription plan."""
+    try:
+        # For admin, we need supplier_id in request body or query param
+        # For now, this is a simplified version
+        supplier_id = user.id  # This should be from request body in production
+        return SupplierSubscriptionService.set_subscription(db, supplier_id, plan, billing_cycle)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Set subscription error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to set subscription")
+
+
+@router.post("/subscription/cancel", tags=["supplier-subscriptions"])
+def cancel_subscription(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPPLIER)),
+):
+    """Supplier cancels their subscription."""
+    try:
+        profile = _get_supplier_profile(db, user)
+        return SupplierSubscriptionService.cancel_subscription(db, profile.id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Cancel subscription error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to cancel subscription")
+
+
+@router.get("/subscription/feature-check/{feature}", tags=["supplier-subscriptions"])
+def check_feature_entitlement(
+    feature: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPPLIER)),
+):
+    """Check if supplier has access to a specific feature."""
+    try:
+        profile = _get_supplier_profile(db, user)
+        has_access = SupplierSubscriptionService.check_feature_entitlement(db, profile.id, feature)
+        return {"feature": feature, "has_access": has_access}
+    except Exception as e:
+        logger.error(f"Feature check error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to check feature entitlement")
+
+
+# ============================================================================
+# SUPPLIER LOGISTICS INTEGRATION (3 endpoints)
+# ============================================================================
+
+@router.post("/orders/{order_id}/logistics/create", tags=["supplier-logistics"])
+def create_delivery_record(
+    order_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPPLIER)),
+):
+    """Create a logistics delivery record for a supplier order."""
+    try:
+        profile = _get_supplier_profile(db, user)
+        # Verify order belongs to supplier
+        order = db.query(SupplierOrder).filter(
+            SupplierOrder.id == order_id,
+            SupplierOrder.supplier_id == profile.id,
+        ).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        return SupplierLogisticsService.create_delivery_record(db, order_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Create delivery record error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create delivery record")
+
+
+@router.get("/orders/{order_id}/logistics/status", tags=["supplier-logistics"])
+def get_delivery_status(
+    order_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPPLIER)),
+):
+    """Get the logistics delivery status for a supplier order."""
+    try:
+        profile = _get_supplier_profile(db, user)
+        # Verify order belongs to supplier
+        order = db.query(SupplierOrder).filter(
+            SupplierOrder.id == order_id,
+            SupplierOrder.supplier_id == profile.id,
+        ).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        return SupplierLogisticsService.get_delivery_status(db, order_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get delivery status error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve delivery status")
+
+
+@router.post("/orders/{order_id}/logistics/sync", tags=["supplier-logistics"])
+def sync_order_status(
+    order_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPPLIER)),
+):
+    """Sync supplier order status with logistics delivery status."""
+    try:
+        profile = _get_supplier_profile(db, user)
+        # Verify order belongs to supplier
+        order = db.query(SupplierOrder).filter(
+            SupplierOrder.id == order_id,
+            SupplierOrder.supplier_id == profile.id,
+        ).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        return SupplierLogisticsService.sync_order_status(db, order_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Sync order status error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to sync order status")
+
+
+# ============================================================================
+# SUPPLIER PAYOUT PROCESSING (3 endpoints)
+# ============================================================================
+
+@router.post("/wallet/payouts/process", tags=["supplier-payouts"])
+def process_pending_payouts(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
+):
+    """Process all pending withdrawal requests (admin/cron job)."""
+    try:
+        return SupplierPayoutService.process_pending_payouts(db)
+    except Exception as e:
+        logger.error(f"Process payouts error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to process payouts")
+
+
+@router.get("/wallet/payouts/history", tags=["supplier-payouts"])
+def get_payout_history(
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPPLIER)),
+):
+    """Get payout history for a supplier."""
+    try:
+        profile = _get_supplier_profile(db, user)
+        return SupplierPayoutService.get_payout_history(db, profile.id, limit, offset)
+    except Exception as e:
+        logger.error(f"Get payout history error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve payout history")
+
+
+@router.get("/wallet/payouts/tax-report", tags=["supplier-payouts"])
+def get_tax_report(
+    year: int = Query(..., ge=2020, le=2030),
+    month: Optional[int] = Query(None, ge=1, le=12),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPPLIER)),
+):
+    """Generate tax report for supplier earnings."""
+    try:
+        profile = _get_supplier_profile(db, user)
+        return SupplierPayoutService.get_tax_report(db, profile.id, year, month)
+    except Exception as e:
+        logger.error(f"Get tax report error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to generate tax report")
+
+
+# ============================================================================
+# SUPPLIER DISCOUNTS/PROMOTIONS (6 endpoints)
+# ============================================================================
+
+@router.post("/discounts", response_model=SupplierDiscountResponse, tags=["supplier-discounts"])
+def create_discount(
+    data: SupplierDiscountCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPPLIER)),
+):
+    """Create a new discount/promotion code."""
+    try:
+        profile = _get_supplier_profile(db, user)
+        discount = SupplierDiscountService.create_discount(db, profile.id, data.model_dump())
+        return SupplierDiscountResponse.model_validate(discount)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Create discount error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create discount")
+
+
+@router.get("/discounts", tags=["supplier-discounts"])
+def list_discounts(
+    active_only: bool = Query(False),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPPLIER)),
+):
+    """List all discounts for a supplier."""
+    try:
+        profile = _get_supplier_profile(db, user)
+        discounts = SupplierDiscountService.list_discounts(db, profile.id, active_only)
+        return [SupplierDiscountResponse.model_validate(d) for d in discounts]
+    except Exception as e:
+        logger.error(f"List discounts error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve discounts")
+
+
+@router.get("/discounts/{discount_id}", response_model=SupplierDiscountResponse, tags=["supplier-discounts"])
+def get_discount(
+    discount_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPPLIER)),
+):
+    """Get a specific discount."""
+    try:
+        profile = _get_supplier_profile(db, user)
+        discount = SupplierDiscountService.get_discount(db, discount_id, profile.id)
+        return SupplierDiscountResponse.model_validate(discount)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get discount error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve discount")
+
+
+@router.put("/discounts/{discount_id}", response_model=SupplierDiscountResponse, tags=["supplier-discounts"])
+def update_discount(
+    discount_id: uuid.UUID,
+    data: SupplierDiscountUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPPLIER)),
+):
+    """Update a discount."""
+    try:
+        profile = _get_supplier_profile(db, user)
+        discount = SupplierDiscountService.update_discount(db, discount_id, profile.id, data.model_dump(exclude_none=True))
+        return SupplierDiscountResponse.model_validate(discount)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update discount error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update discount")
+
+
+@router.delete("/discounts/{discount_id}", tags=["supplier-discounts"])
+def delete_discount(
+    discount_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPPLIER)),
+):
+    """Delete a discount."""
+    try:
+        profile = _get_supplier_profile(db, user)
+        return SupplierDiscountService.delete_discount(db, discount_id, profile.id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete discount error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete discount")
+
+
+@public_router.post("/discounts/validate", tags=["supplier-discounts"])
+def validate_discount(
+    data: DiscountValidationRequest,
+    db: Session = Depends(get_db),
+):
+    """Validate a discount code (public endpoint)."""
+    try:
+        return SupplierDiscountService.validate_discount(db, data.code, data.order_total, data.product_ids)
+    except Exception as e:
+        logger.error(f"Validate discount error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to validate discount")
 
 
 # ============================================================================

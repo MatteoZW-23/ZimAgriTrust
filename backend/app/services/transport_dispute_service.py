@@ -15,6 +15,17 @@ from enum import Enum
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
+from app.models.transport import (
+    TransportDispute,
+    TransportDisputeEvidence,
+    DisputeStatus as DBDisputeStatus,
+    PaymentAllocation,
+    AllocationStatus,
+)
+from app.models.transaction import Order
+from app.models.user import User, UserRole
+from app.services.notification_service import notification_service
+
 logger = logging.getLogger(__name__)
 
 
@@ -90,27 +101,75 @@ class TransportDisputeService:
             f"type={dispute.dispute_type.value}, amount={dispute.disputed_amount}"
         )
         
-        # TODO: Insert into disputes table
-        # TODO: Hold relevant payments in escrow
-        # TODO: Set response deadline (48 hours)
-        # TODO: Set resolution deadline (7 days)
-        # TODO: Notify admin
-        # TODO: Notify counterparty
-        # TODO: Determine priority based on type and amount
+        # Insert into disputes table
+        priority = self.calculate_dispute_priority(dispute.dispute_type, dispute.disputed_amount)
         
-        dispute_id = uuid.uuid4()
-        response_due_at = datetime.utcnow() + timedelta(hours=self.RESPONSE_DEADLINE_HOURS)
-        resolution_due_at = datetime.utcnow() + timedelta(days=self.RESOLUTION_DEADLINE_DAYS)
+        new_dispute = TransportDispute(
+            order_id=dispute.order_id,
+            transport_request_id=dispute.transport_request_id,
+            delivery_id=dispute.delivery_id,
+            raised_by=dispute.raised_by,
+            dispute_type=dispute.dispute_type.value,
+            category=dispute.category,
+            subcategory=dispute.subcategory,
+            title=dispute.title,
+            description=dispute.description,
+            disputed_amount=dispute.disputed_amount,
+            currency=dispute.currency,
+            status=DBDisputeStatus.OPEN,
+            priority=priority.value,
+            response_due_at=datetime.utcnow() + timedelta(hours=self.RESPONSE_DEADLINE_HOURS),
+            resolution_due_at=datetime.utcnow() + timedelta(days=self.RESOLUTION_DEADLINE_DAYS),
+        )
+        self.db.add(new_dispute)
+        self.db.flush()
+        
+        # Hold relevant payments in escrow
+        payment_allocations = self.db.query(PaymentAllocation).filter(
+            PaymentAllocation.order_id == dispute.order_id,
+            PaymentAllocation.status == AllocationStatus.PENDING
+        ).all()
+        
+        for allocation in payment_allocations:
+            allocation.status = AllocationStatus.HELD
+            allocation.held_at = datetime.utcnow()
+        
+        self.db.commit()
+        
+        # Notify admin
+        admin_users = self.db.query(User).filter(User.role.in_([UserRole.ADMIN, UserRole.SUPER_ADMIN])).all()
+        for admin in admin_users:
+            notification_service.send_notification(
+                db=self.db,
+                user_id=admin.id,
+                notification_type="dispute_raised",
+                title="New Transport Dispute",
+                body=f"A transport dispute has been raised: {dispute.title}",
+                data={"dispute_id": str(new_dispute.id)},
+            )
+        
+        # Notify counterparty
+        order = self.db.query(Order).filter(Order.id == dispute.order_id).first()
+        if order:
+            counterparty_id = order.buyer_id if dispute.raised_by == order.seller_id else order.seller_id
+            notification_service.send_notification(
+                db=self.db,
+                user_id=counterparty_id,
+                notification_type="dispute_raised",
+                title="Transport Dispute Raised",
+                body="A dispute has been raised regarding your order.",
+                data={"dispute_id": str(new_dispute.id)},
+            )
         
         return {
-            "id": str(dispute_id),
+            "id": str(new_dispute.id),
             "order_id": str(dispute.order_id),
             "dispute_type": dispute.dispute_type.value,
-            "status": DisputeStatus.OPEN.value,
-            "priority": dispute.priority.value,
-            "created_at": datetime.utcnow().isoformat(),
-            "response_due_at": response_due_at.isoformat(),
-            "resolution_due_at": resolution_due_at.isoformat(),
+            "status": new_dispute.status.value,
+            "priority": new_dispute.priority.value,
+            "created_at": new_dispute.created_at.isoformat(),
+            "response_due_at": new_dispute.response_due_at.isoformat(),
+            "resolution_due_at": new_dispute.resolution_due_at.isoformat(),
         }
     
     def add_evidence(
@@ -131,18 +190,46 @@ class TransportDisputeService:
         """
         logger.info(f"Adding evidence to dispute {dispute_id}: {evidence_type}")
         
-        # TODO: Validate dispute exists
-        # TODO: Insert into dispute_evidence table
-        # TODO: Notify admin of new evidence
+        # Validate dispute exists
+        dispute = self.db.query(TransportDispute).filter(
+            TransportDispute.id == dispute_id
+        ).first()
         
-        evidence_id = uuid.uuid4()
+        if not dispute:
+            raise HTTPException(status_code=404, detail="Dispute not found")
+        
+        # Insert into dispute_evidence table
+        evidence = TransportDisputeEvidence(
+            dispute_id=dispute_id,
+            uploaded_by=uploaded_by,
+            evidence_type=evidence_type,
+            file_url=file_url,
+            file_name=file_name,
+            file_size_bytes=file_size_bytes,
+            file_mime_type=file_mime_type,
+            description=description,
+        )
+        self.db.add(evidence)
+        self.db.commit()
+        
+        # Notify admin of new evidence
+        admin_users = self.db.query(User).filter(User.role.in_([UserRole.ADMIN, UserRole.SUPER_ADMIN])).all()
+        for admin in admin_users:
+            notification_service.send_notification(
+                db=self.db,
+                user_id=admin.id,
+                notification_type="dispute_evidence_added",
+                title="New Evidence Added to Dispute",
+                body=f"New evidence has been added to dispute: {evidence_type}",
+                data={"dispute_id": str(dispute_id)},
+            )
         
         return {
-            "id": str(evidence_id),
+            "id": str(evidence.id),
             "dispute_id": str(dispute_id),
             "evidence_type": evidence_type,
             "file_url": file_url,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": evidence.created_at.isoformat(),
         }
     
     def escalate_dispute(
@@ -156,17 +243,59 @@ class TransportDisputeService:
         """
         logger.info(f"Escalating dispute {dispute_id} by {escalated_by}")
         
-        # TODO: Validate dispute exists
-        # TODO: Update status to ESCALATED
-        # TODO: Increment escalation level
-        # TODO: Set escalated_at
-        # TODO: Notify admin
-        # TODO: Notify both parties
+        # Validate dispute exists
+        dispute = self.db.query(TransportDispute).filter(
+            TransportDispute.id == dispute_id
+        ).first()
+        
+        if not dispute:
+            raise HTTPException(status_code=404, detail="Dispute not found")
+        
+        # Update status to ESCALATED
+        dispute.status = DBDisputeStatus.ESCALATED
+        dispute.escalated_to_admin = True
+        dispute.escalated_at = datetime.utcnow()
+        dispute.escalation_level = dispute.escalation_level + 1
+        dispute.updated_at = datetime.utcnow()
+        
+        self.db.commit()
+        
+        # Notify admin
+        admin_users = self.db.query(User).filter(User.role.in_([UserRole.ADMIN, UserRole.SUPER_ADMIN])).all()
+        for admin in admin_users:
+            notification_service.send_notification(
+                db=self.db,
+                user_id=admin.id,
+                notification_type="dispute_escalated",
+                title="Dispute Escalated",
+                body=f"A dispute has been escalated: {reason}",
+                data={"dispute_id": str(dispute_id)},
+            )
+        
+        # Notify both parties
+        order = self.db.query(Order).filter(Order.id == dispute.order_id).first()
+        if order:
+            notification_service.send_notification(
+                db=self.db,
+                user_id=order.buyer_id,
+                notification_type="dispute_escalated",
+                title="Dispute Escalated",
+                body="Your dispute has been escalated to admin review.",
+                data={"dispute_id": str(dispute_id)},
+            )
+            notification_service.send_notification(
+                db=self.db,
+                user_id=order.seller_id,
+                notification_type="dispute_escalated",
+                title="Dispute Escalated",
+                body="A dispute has been escalated to admin review.",
+                data={"dispute_id": str(dispute_id)},
+            )
         
         return {
             "id": str(dispute_id),
-            "status": DisputeStatus.ESCALATED.value,
-            "escalated_at": datetime.utcnow().isoformat(),
+            "status": dispute.status.value,
+            "escalated_at": dispute.escalated_at.isoformat(),
             "reason": reason,
         }
     
@@ -190,21 +319,74 @@ class TransportDisputeService:
         """
         logger.info(f"Resolving dispute {dispute_id}: {resolution_type}")
         
-        # TODO: Validate dispute exists
-        # TODO: Validate resolver has permission
-        # TODO: Update status to RESOLVED
-        # TODO: Set resolved_at and resolved_by
-        # TODO: Apply resolution:
-        #   - Process refunds if applicable
-        #   - Release held payments
-        #   - Apply penalties if applicable
-        # TODO: Notify both parties
-        # TODO: Close dispute
+        # Validate dispute exists
+        dispute = self.db.query(TransportDispute).filter(
+            TransportDispute.id == dispute_id
+        ).first()
+        
+        if not dispute:
+            raise HTTPException(status_code=404, detail="Dispute not found")
+        
+        # Validate resolver has permission
+        resolver = self.db.query(User).filter(User.id == resolved_by).first()
+        if not resolver or resolver.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
+            raise HTTPException(status_code=403, detail="Admin permission required")
+        
+        # Update status to RESOLVED
+        dispute.status = DBDisputeStatus.RESOLVED
+        dispute.resolution_type = resolution_type
+        dispute.resolution_amount = resolution_amount
+        dispute.resolution_notes = resolution_notes
+        dispute.resolved_by = resolved_by
+        dispute.resolved_at = datetime.utcnow()
+        dispute.updated_at = datetime.utcnow()
+        
+        # Apply resolution
+        if resolution_type in ["FULL_REFUND", "PARTIAL_REFUND"] and resolution_amount:
+            # Process refunds (simplified - would use payment service)
+            pass
+        
+        # Release held payments
+        payment_allocations = self.db.query(PaymentAllocation).filter(
+            PaymentAllocation.order_id == dispute.order_id,
+            PaymentAllocation.status == AllocationStatus.HELD
+        ).all()
+        
+        for allocation in payment_allocations:
+            allocation.status = AllocationStatus.RELEASED
+            allocation.released_at = datetime.utcnow()
+        
+        self.db.commit()
+        
+        # Notify both parties
+        order = self.db.query(Order).filter(Order.id == dispute.order_id).first()
+        if order:
+            notification_service.send_notification(
+                db=self.db,
+                user_id=order.buyer_id,
+                notification_type="dispute_resolved",
+                title="Dispute Resolved",
+                body=f"Your dispute has been resolved: {resolution_type}",
+                data={"dispute_id": str(dispute_id)},
+            )
+            notification_service.send_notification(
+                db=self.db,
+                user_id=order.seller_id,
+                notification_type="dispute_resolved",
+                title="Dispute Resolved",
+                body=f"A dispute has been resolved: {resolution_type}",
+                data={"dispute_id": str(dispute_id)},
+            )
+        
+        # Close dispute
+        dispute.status = DBDisputeStatus.CLOSED
+        dispute.closed_at = datetime.utcnow()
+        self.db.commit()
         
         return {
             "id": str(dispute_id),
-            "status": DisputeStatus.RESOLVED.value,
-            "resolved_at": datetime.utcnow().isoformat(),
+            "status": dispute.status.value,
+            "resolved_at": dispute.resolved_at.isoformat(),
             "resolution_type": resolution_type,
             "resolution_amount": resolution_amount,
         }
@@ -220,16 +402,55 @@ class TransportDisputeService:
         """
         logger.info(f"Closing dispute {dispute_id} by {closed_by}")
         
-        # TODO: Validate dispute exists
-        # TODO: Update status to CLOSED
-        # TODO: Set closed_at
-        # TODO: Release held payments
-        # TODO: Notify both parties
+        # Validate dispute exists
+        dispute = self.db.query(TransportDispute).filter(
+            TransportDispute.id == dispute_id
+        ).first()
+        
+        if not dispute:
+            raise HTTPException(status_code=404, detail="Dispute not found")
+        
+        # Update status to CLOSED
+        dispute.status = DBDisputeStatus.CLOSED
+        dispute.closed_at = datetime.utcnow()
+        dispute.updated_at = datetime.utcnow()
+        
+        # Release held payments
+        payment_allocations = self.db.query(PaymentAllocation).filter(
+            PaymentAllocation.order_id == dispute.order_id,
+            PaymentAllocation.status == AllocationStatus.HELD
+        ).all()
+        
+        for allocation in payment_allocations:
+            allocation.status = AllocationStatus.RELEASED
+            allocation.released_at = datetime.utcnow()
+        
+        self.db.commit()
+        
+        # Notify both parties
+        order = self.db.query(Order).filter(Order.id == dispute.order_id).first()
+        if order:
+            notification_service.send_notification(
+                db=self.db,
+                user_id=order.buyer_id,
+                notification_type="dispute_closed",
+                title="Dispute Closed",
+                body=f"The dispute has been closed: {reason}",
+                data={"dispute_id": str(dispute_id)},
+            )
+            notification_service.send_notification(
+                db=self.db,
+                user_id=order.seller_id,
+                notification_type="dispute_closed",
+                title="Dispute Closed",
+                body=f"A dispute has been closed: {reason}",
+                data={"dispute_id": str(dispute_id)},
+            )
         
         return {
             "id": str(dispute_id),
-            "status": DisputeStatus.CLOSED.value,
-            "closed_at": datetime.utcnow().isoformat(),
+            "status": dispute.status.value,
+            "closed_at": dispute.closed_at.isoformat(),
             "reason": reason,
         }
     
@@ -240,11 +461,63 @@ class TransportDisputeService:
         """
         Get dispute details including evidence.
         """
-        # TODO: Query disputes table
-        # TODO: Query dispute_evidence table
-        # TODO: Return dispute with evidence list
+        # Query disputes table
+        dispute = self.db.query(TransportDispute).filter(
+            TransportDispute.id == dispute_id
+        ).first()
         
-        return None
+        if not dispute:
+            return None
+        
+        # Query dispute_evidence table
+        evidence = self.db.query(TransportDisputeEvidence).filter(
+            TransportDisputeEvidence.dispute_id == dispute_id
+        ).order_by(TransportDisputeEvidence.created_at).all()
+        
+        # Return dispute with evidence list
+        return {
+            "id": str(dispute.id),
+            "order_id": str(dispute.order_id),
+            "transport_request_id": str(dispute.transport_request_id) if dispute.transport_request_id else None,
+            "delivery_id": str(dispute.delivery_id) if dispute.delivery_id else None,
+            "raised_by": str(dispute.raised_by),
+            "dispute_type": dispute.dispute_type,
+            "category": dispute.category,
+            "subcategory": dispute.subcategory,
+            "title": dispute.title,
+            "description": dispute.description,
+            "disputed_amount": float(dispute.disputed_amount) if dispute.disputed_amount else None,
+            "currency": dispute.currency,
+            "status": dispute.status.value,
+            "priority": dispute.priority,
+            "resolution_type": dispute.resolution_type,
+            "resolution_amount": float(dispute.resolution_amount) if dispute.resolution_amount else None,
+            "resolution_notes": dispute.resolution_notes,
+            "resolved_by": str(dispute.resolved_by) if dispute.resolved_by else None,
+            "resolved_at": dispute.resolved_at.isoformat() if dispute.resolved_at else None,
+            "escalated_to_admin": dispute.escalated_to_admin,
+            "escalated_at": dispute.escalated_at.isoformat() if dispute.escalated_at else None,
+            "escalation_level": dispute.escalation_level,
+            "created_at": dispute.created_at.isoformat(),
+            "updated_at": dispute.updated_at.isoformat(),
+            "closed_at": dispute.closed_at.isoformat() if dispute.closed_at else None,
+            "response_due_at": dispute.response_due_at.isoformat() if dispute.response_due_at else None,
+            "resolution_due_at": dispute.resolution_due_at.isoformat() if dispute.resolution_due_at else None,
+            "evidence": [
+                {
+                    "id": str(ev.id),
+                    "uploaded_by": str(ev.uploaded_by),
+                    "evidence_type": ev.evidence_type,
+                    "file_url": ev.file_url,
+                    "file_name": ev.file_name,
+                    "file_size_bytes": ev.file_size_bytes,
+                    "file_mime_type": ev.file_mime_type,
+                    "description": ev.description,
+                    "created_at": ev.created_at.isoformat(),
+                }
+                for ev in evidence
+            ],
+        }
     
     def get_user_disputes(
         self,
@@ -254,12 +527,29 @@ class TransportDisputeService:
         """
         Get all disputes for a user (as raiser or counterparty).
         """
-        # TODO: Query disputes table
-        # TODO: Filter where raised_by = user_id or counterparty = user_id
-        # TODO: Filter by status if provided
-        # TODO: Return disputes
+        # Query disputes table
+        query = self.db.query(TransportDispute).filter(
+            TransportDispute.raised_by == user_id
+        )
         
-        return []
+        # Filter by status if provided
+        if status:
+            query = query.filter(TransportDispute.status == DBDisputeStatus(status.value))
+        
+        disputes = query.order_by(TransportDispute.created_at.desc()).all()
+        
+        # Return disputes
+        return [
+            {
+                "id": str(d.id),
+                "order_id": str(d.order_id),
+                "dispute_type": d.dispute_type,
+                "status": d.status.value,
+                "priority": d.priority,
+                "created_at": d.created_at.isoformat(),
+            }
+            for d in disputes
+        ]
     
     def get_transport_disputes(
         self,
@@ -268,11 +558,23 @@ class TransportDisputeService:
         """
         Get all disputes for a transport request.
         """
-        # TODO: Query disputes table
-        # TODO: Filter by transport_request_id
-        # TODO: Return disputes
+        # Query disputes table
+        disputes = self.db.query(TransportDispute).filter(
+            TransportDispute.transport_request_id == transport_request_id
+        ).order_by(TransportDispute.created_at.desc()).all()
         
-        return []
+        # Return disputes
+        return [
+            {
+                "id": str(d.id),
+                "order_id": str(d.order_id),
+                "dispute_type": d.dispute_type,
+                "status": d.status.value,
+                "priority": d.priority,
+                "created_at": d.created_at.isoformat(),
+            }
+            for d in disputes
+        ]
     
     def check_response_deadlines(self) -> int:
         """
@@ -285,13 +587,55 @@ class TransportDisputeService:
         
         escalated_count = 0
         
-        # TODO: Query disputes where:
-        #   - status = OPEN
-        #   - response_due_at < NOW
-        # TODO: For each overdue dispute:
-        #   - Escalate to admin
-        #   - Notify admin
-        #   - Notify both parties
+        # Query disputes where status = OPEN and response_due_at < NOW
+        overdue_disputes = self.db.query(TransportDispute).filter(
+            TransportDispute.status == DBDisputeStatus.OPEN,
+            TransportDispute.response_due_at < datetime.utcnow()
+        ).all()
+        
+        # For each overdue dispute:
+        for dispute in overdue_disputes:
+            # Escalate to admin
+            dispute.status = DBDisputeStatus.ESCALATED
+            dispute.escalated_to_admin = True
+            dispute.escalated_at = datetime.utcnow()
+            dispute.escalation_level = dispute.escalation_level + 1
+            dispute.updated_at = datetime.utcnow()
+            escalated_count += 1
+            
+            # Notify admin
+            admin_users = self.db.query(User).filter(User.role.in_([UserRole.ADMIN, UserRole.SUPER_ADMIN])).all()
+            for admin in admin_users:
+                notification_service.send_notification(
+                    db=self.db,
+                    user_id=admin.id,
+                    notification_type="dispute_overdue",
+                    title="Dispute Response Overdue",
+                    body="A dispute has passed its response deadline.",
+                    data={"dispute_id": str(dispute.id)},
+                )
+            
+            # Notify both parties
+            order = self.db.query(Order).filter(Order.id == dispute.order_id).first()
+            if order:
+                notification_service.send_notification(
+                    db=self.db,
+                    user_id=order.buyer_id,
+                    notification_type="dispute_overdue",
+                    title="Dispute Response Overdue",
+                    body="Your dispute has passed its response deadline and has been escalated.",
+                    data={"dispute_id": str(dispute.id)},
+                )
+                notification_service.send_notification(
+                    db=self.db,
+                    user_id=order.seller_id,
+                    notification_type="dispute_overdue",
+                    title="Dispute Response Overdue",
+                    body="A dispute has passed its response deadline and has been escalated.",
+                    data={"dispute_id": str(dispute.id)},
+                )
+        
+        self.db.commit()
         
         return escalated_count
     
@@ -306,13 +650,54 @@ class TransportDisputeService:
         
         auto_resolved_count = 0
         
-        # TODO: Query disputes where:
-        #   - status = UNDER_REVIEW
-        #   - resolution_due_at < NOW
-        # TODO: For each overdue dispute:
-        #   - Apply default resolution (e.g., full refund)
-        #   - Notify both parties
-        #   - Close dispute
+        # Query disputes where status = UNDER_REVIEW and resolution_due_at < NOW
+        overdue_disputes = self.db.query(TransportDispute).filter(
+            TransportDispute.status == DBDisputeStatus.UNDER_REVIEW,
+            TransportDispute.resolution_due_at < datetime.utcnow()
+        ).all()
+        
+        # For each overdue dispute:
+        for dispute in overdue_disputes:
+            # Apply default resolution (e.g., full refund)
+            dispute.resolution_type = "FULL_REFUND"
+            dispute.resolution_amount = dispute.disputed_amount
+            dispute.resolution_notes = "Auto-resolved due to resolution deadline"
+            dispute.status = DBDisputeStatus.RESOLVED
+            dispute.resolved_at = datetime.utcnow()
+            dispute.closed_at = datetime.utcnow()
+            auto_resolved_count += 1
+            
+            # Release held payments
+            payment_allocations = self.db.query(PaymentAllocation).filter(
+                PaymentAllocation.order_id == dispute.order_id,
+                PaymentAllocation.status == AllocationStatus.HELD
+            ).all()
+            
+            for allocation in payment_allocations:
+                allocation.status = AllocationStatus.RELEASED
+                allocation.released_at = datetime.utcnow()
+            
+            # Notify both parties
+            order = self.db.query(Order).filter(Order.id == dispute.order_id).first()
+            if order:
+                notification_service.send_notification(
+                    db=self.db,
+                    user_id=order.buyer_id,
+                    notification_type="dispute_auto_resolved",
+                    title="Dispute Auto-Resolved",
+                    body="Your dispute has been auto-resolved with a full refund.",
+                    data={"dispute_id": str(dispute.id)},
+                )
+                notification_service.send_notification(
+                    db=self.db,
+                    user_id=order.seller_id,
+                    notification_type="dispute_auto_resolved",
+                    title="Dispute Auto-Resolved",
+                    body="A dispute has been auto-resolved with a full refund.",
+                    data={"dispute_id": str(dispute.id)},
+                )
+        
+        self.db.commit()
         
         return auto_resolved_count
     

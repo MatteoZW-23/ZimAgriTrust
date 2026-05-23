@@ -25,6 +25,9 @@ from app.models.supplier import (
     SupplierOrderItem,
     SupplierStockHistory,
     SupplierWalletTransaction,
+    SupplierCSVImport,
+    SupplierReview,
+    SupplierDiscount,
     SupplierBusinessType,
     SupplierVerificationStatus,
     SupplierProductType,
@@ -372,6 +375,160 @@ class SupplierProductService:
                 updated += 1
         db.commit()
         return {"message": f"{updated} product(s) updated"}
+
+    @staticmethod
+    def bulk_import_from_csv(db: Session, supplier_id: uuid.UUID, csv_data: str, file_name: str, file_size: int) -> dict:
+        """
+        Import products from CSV data.
+        CSV format: product_type,name,description,price,quantity,unit_type,category,brand,manufacturer
+        """
+        import csv
+        import io
+        import json
+
+        # Create import record
+        import_record = SupplierCSVImport(
+            supplier_id=supplier_id,
+            file_name=file_name,
+            file_size=file_size,
+            status="processing",
+        )
+        db.add(import_record)
+        db.commit()
+        db.refresh(import_record)
+
+        # Parse CSV
+        f = io.StringIO(csv_data)
+        reader = csv.DictReader(f)
+        rows = list(reader)
+
+        errors = []
+        successful = 0
+        created_products = []
+
+        try:
+            for idx, row in enumerate(rows, start=2):  # Start at 2 (header is row 1)
+                try:
+                    # Validate required fields
+                    if not row.get("name") or not row.get("price") or not row.get("quantity"):
+                        errors.append({
+                            "row_number": idx,
+                            "field": "required",
+                            "error": "Missing required field (name, price, or quantity)",
+                            "value": str(row)
+                        })
+                        continue
+
+                    # Validate product type
+                    product_type = row.get("product_type", "input").lower()
+                    if product_type not in ["input", "machinery"]:
+                        errors.append({
+                            "row_number": idx,
+                            "field": "product_type",
+                            "error": "Invalid product type. Must be 'input' or 'machinery'",
+                            "value": product_type
+                        })
+                        continue
+
+                    # Create product
+                    product = SupplierProduct(
+                        supplier_id=supplier_id,
+                        product_type=SupplierProductType(product_type),
+                        name=row.get("name", "").strip(),
+                        description=row.get("description", "").strip(),
+                        price=float(row.get("price", 0)),
+                        quantity_available=int(row.get("quantity", 0)),
+                        unit_type=row.get("unit_type", "piece").strip(),
+                        min_stock_level=int(row.get("min_stock_level", 5)),
+                        brand=row.get("brand", "").strip(),
+                        manufacturer=row.get("manufacturer", "").strip(),
+                        status=SupplierProductStatus.DRAFT,
+                    )
+
+                    # Set category based on product type
+                    if product_type == "input":
+                        category = row.get("category", "").strip().lower()
+                        if category:
+                            try:
+                                product.input_category = category
+                            except ValueError:
+                                errors.append({
+                                    "row_number": idx,
+                                    "field": "category",
+                                    "error": f"Invalid input category: {category}",
+                                    "value": category
+                                })
+                                continue
+                    else:
+                        category = row.get("category", "").strip().lower()
+                        if category:
+                            try:
+                                product.machinery_category = category
+                            except ValueError:
+                                errors.append({
+                                    "row_number": idx,
+                                    "field": "category",
+                                    "error": f"Invalid machinery category: {category}",
+                                    "value": category
+                                })
+                                continue
+
+                    # Set machinery-specific fields
+                    if product_type == "machinery":
+                        condition = row.get("condition", "new").strip().lower()
+                        if condition in ["new", "used", "refurbished"]:
+                            product.condition = condition
+                        warranty = row.get("warranty_months")
+                        if warranty:
+                            try:
+                                product.warranty_months = int(warranty)
+                            except ValueError:
+                                pass
+
+                    db.add(product)
+                    created_products.append(product)
+                    successful += 1
+
+                except Exception as e:
+                    errors.append({
+                        "row_number": idx,
+                        "field": "general",
+                        "error": str(e),
+                        "value": str(row)
+                    })
+
+            # Commit all products
+            if created_products:
+                db.commit()
+
+            # Update import record
+            import_record.total_rows = len(rows)
+            import_record.successful = successful
+            import_record.failed = len(errors)
+            import_record.errors = json.dumps(errors) if errors else None
+            import_record.status = "completed" if not errors else "partial"
+            import_record.completed_at = datetime.now(timezone.utc)
+            db.commit()
+
+            return {
+                "import_id": str(import_record.id),
+                "status": import_record.status,
+                "total_rows": import_record.total_rows,
+                "successful": import_record.successful,
+                "failed": import_record.failed,
+                "errors": errors,
+                "created_at": import_record.created_at,
+            }
+
+        except Exception as e:
+            # Rollback on error
+            db.rollback()
+            import_record.status = "failed"
+            import_record.errors = json.dumps([{"error": str(e)}])
+            import_record.completed_at = datetime.now(timezone.utc)
+            db.commit()
+
+            raise HTTPException(status_code=500, detail=f"CSV import failed: {str(e)}")
 
 
 # ============================================================================
@@ -954,3 +1111,764 @@ class SupplierPublicService:
                 "logo_url": product.supplier.logo_url,
             },
         }
+
+
+# ============================================================================
+# SUPPLIER REVIEWS
+# ============================================================================
+
+class SupplierReviewService:
+
+    @staticmethod
+    def create_review(db: Session, buyer_id: uuid.UUID, supplier_id: uuid.UUID, data: dict) -> SupplierReview:
+        """Create a review for a supplier after order completion."""
+        # Validate order exists and belongs to buyer
+        order = db.query(SupplierOrder).filter(
+            SupplierOrder.id == uuid.UUID(data["order_id"]),
+            SupplierOrder.buyer_id == buyer_id,
+            SupplierOrder.supplier_id == supplier_id,
+            SupplierOrder.status == SupplierOrderStatus.DELIVERED,
+        ).first()
+        
+        if not order:
+            raise HTTPException(status_code=400, detail="Order not found or not eligible for review")
+        
+        # Check if review already exists for this order
+        existing = db.query(SupplierReview).filter(
+            SupplierReview.order_id == uuid.UUID(data["order_id"]),
+            SupplierReview.buyer_id == buyer_id,
+        ).first()
+        
+        if existing:
+            raise HTTPException(status_code=400, detail="Review already exists for this order")
+        
+        # Create review
+        review = SupplierReview(
+            supplier_id=supplier_id,
+            buyer_id=buyer_id,
+            order_id=uuid.UUID(data["order_id"]),
+            rating=data["rating"],
+            comment=data.get("comment"),
+        )
+        
+        db.add(review)
+        db.commit()
+        db.refresh(review)
+        
+        # Update supplier rating
+        SupplierReviewService._update_supplier_rating(db, supplier_id)
+        
+        return review
+
+    @staticmethod
+    def get_reviews(db: Session, supplier_id: uuid.UUID, limit: int = 50, offset: int = 0) -> dict:
+        """Get all reviews for a supplier with statistics."""
+        reviews = db.query(SupplierReview).filter(
+            SupplierReview.supplier_id == supplier_id,
+            SupplierReview.is_hidden == False,
+        ).order_by(desc(SupplierReview.created_at)).offset(offset).limit(limit).all()
+        
+        # Calculate statistics
+        all_reviews = db.query(SupplierReview).filter(
+            SupplierReview.supplier_id == supplier_id,
+            SupplierReview.is_hidden == False,
+        ).all()
+        
+        total = len(all_reviews)
+        avg_rating = sum(r.rating for r in all_reviews) / total if total > 0 else 0.0
+        
+        # Rating distribution
+        rating_dist = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        for r in all_reviews:
+            rating_dist[r.rating] = rating_dist.get(r.rating, 0) + 1
+        
+        # Load buyer names
+        buyer_ids = [r.buyer_id for r in reviews]
+        buyers = {u.id: u.full_name for u in db.query(User).filter(User.id.in_(buyer_ids)).all()}
+        
+        # Add buyer names to reviews
+        for review in reviews:
+            review.buyer_name = buyers.get(review.buyer_id, "Anonymous")
+        
+        return {
+            "reviews": reviews,
+            "total": total,
+            "average_rating": round(avg_rating, 1),
+            "rating_distribution": rating_dist,
+        }
+
+    @staticmethod
+    def respond_to_review(db: Session, supplier_id: uuid.UUID, review_id: uuid.UUID, response: str) -> SupplierReview:
+        """Supplier responds to a review."""
+        review = db.query(SupplierReview).filter(
+            SupplierReview.id == review_id,
+            SupplierReview.supplier_id == supplier_id,
+        ).first()
+        
+        if not review:
+            raise HTTPException(status_code=404, detail="Review not found")
+        
+        review.supplier_response = response
+        review.supplier_responseed_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(review)
+        
+        return review
+
+    @staticmethod
+    def flag_review(db: Session, review_id: uuid.UUID, notes: Optional[str] = None) -> SupplierReview:
+        """Flag a review for moderation."""
+        review = db.query(SupplierReview).filter(SupplierReview.id == review_id).first()
+        
+        if not review:
+            raise HTTPException(status_code=404, detail="Review not found")
+        
+        review.is_flagged = True
+        review.moderation_notes = notes
+        db.commit()
+        db.refresh(review)
+        
+        return review
+
+    @staticmethod
+    def hide_review(db: Session, review_id: uuid.UUID, notes: Optional[str] = None) -> SupplierReview:
+        """Hide a review (admin action)."""
+        review = db.query(SupplierReview).filter(SupplierReview.id == review_id).first()
+        
+        if not review:
+            raise HTTPException(status_code=404, detail="Review not found")
+        
+        review.is_hidden = True
+        review.moderation_notes = notes
+        db.commit()
+        db.refresh(review)
+        
+        return review
+
+    @staticmethod
+    def _update_supplier_rating(db: Session, supplier_id: uuid.UUID):
+        """Recalculate supplier rating based on all reviews."""
+        reviews = db.query(SupplierReview).filter(
+            SupplierReview.supplier_id == supplier_id,
+            SupplierReview.is_hidden == False,
+        ).all()
+        
+        if reviews:
+            avg_rating = sum(r.rating for r in reviews) / len(reviews)
+            profile = db.query(SupplierProfile).filter(SupplierProfile.id == supplier_id).first()
+            if profile:
+                profile.rating = round(avg_rating, 1)
+                db.commit()
+
+
+# ============================================================================
+# SUPPLIER SUBSCRIPTION INTEGRATION
+# ============================================================================
+
+class SupplierSubscriptionService:
+
+    @staticmethod
+    def set_subscription(db: Session, supplier_id: uuid.UUID, plan: str, billing_cycle: str = "monthly") -> dict:
+        """Set or update a supplier's subscription plan."""
+        from app.services.subscription_service import SubscriptionService, SubscriptionPlan
+        
+        profile = db.query(SupplierProfile).filter(SupplierProfile.id == supplier_id).first()
+        if not profile:
+            raise HTTPException(status_code=404, detail="Supplier not found")
+        
+        # Get plan configuration
+        plan_config = SubscriptionService.get_plan_config(SubscriptionPlan(plan.upper()))
+        
+        # Calculate end date based on billing cycle
+        from datetime import timedelta
+        if billing_cycle == "monthly":
+            end_date = datetime.now(timezone.utc) + timedelta(days=30)
+        elif billing_cycle == "quarterly":
+            end_date = datetime.now(timezone.utc) + timedelta(days=90)
+        elif billing_cycle == "yearly":
+            end_date = datetime.now(timezone.utc) + timedelta(days=365)
+        else:
+            end_date = datetime.now(timezone.utc) + timedelta(days=30)
+        
+        # Update profile
+        profile.subscription_plan = plan
+        profile.subscription_status = "active"
+        profile.subscription_start_date = datetime.now(timezone.utc)
+        profile.subscription_end_date = end_date
+        
+        db.commit()
+        db.refresh(profile)
+        
+        return {
+            "subscription_plan": profile.subscription_plan,
+            "subscription_status": profile.subscription_status,
+            "subscription_start_date": profile.subscription_start_date,
+            "subscription_end_date": profile.subscription_end_date,
+            "features": plan_config.features,
+            "price": plan_config.price,
+        }
+
+    @staticmethod
+    def get_subscription(db: Session, supplier_id: uuid.UUID) -> dict:
+        """Get a supplier's subscription details."""
+        profile = db.query(SupplierProfile).filter(SupplierProfile.id == supplier_id).first()
+        if not profile:
+            raise HTTPException(status_code=404, detail="Supplier not found")
+        
+        from app.services.subscription_service import SubscriptionService, SubscriptionPlan
+        
+        plan_config = None
+        if profile.subscription_plan:
+            try:
+                plan_config = SubscriptionService.get_plan_config(SubscriptionPlan(profile.subscription_plan.upper()))
+            except ValueError:
+                pass
+        
+        # Check if subscription is expired
+        is_expired = False
+        if profile.subscription_end_date and profile.subscription_end_date < datetime.now(timezone.utc):
+            is_expired = True
+            if profile.subscription_status == "active":
+                profile.subscription_status = "past_due"
+                db.commit()
+        
+        return {
+            "subscription_plan": profile.subscription_plan,
+            "subscription_status": profile.subscription_status,
+            "subscription_start_date": profile.subscription_start_date,
+            "subscription_end_date": profile.subscription_end_date,
+            "is_expired": is_expired,
+            "features": plan_config.features if plan_config else [],
+            "price": plan_config.price if plan_config else 0.0,
+        }
+
+    @staticmethod
+    def cancel_subscription(db: Session, supplier_id: uuid.UUID) -> dict:
+        """Cancel a supplier's subscription."""
+        profile = db.query(SupplierProfile).filter(SupplierProfile.id == supplier_id).first()
+        if not profile:
+            raise HTTPException(status_code=404, detail="Supplier not found")
+        
+        profile.subscription_status = "cancelled"
+        profile.subscription_end_date = datetime.now(timezone.utc)
+        
+        db.commit()
+        db.refresh(profile)
+        
+        return {
+            "subscription_plan": profile.subscription_plan,
+            "subscription_status": profile.subscription_status,
+            "subscription_end_date": profile.subscription_end_date,
+        }
+
+    @staticmethod
+    def check_feature_entitlement(db: Session, supplier_id: uuid.UUID, feature: str) -> bool:
+        """Check if a supplier has access to a specific feature based on their subscription."""
+        profile = db.query(SupplierProfile).filter(SupplierProfile.id == supplier_id).first()
+        if not profile:
+            return False
+        
+        # Basic plan is default with basic features
+        if not profile.subscription_plan or profile.subscription_plan == "basic":
+            basic_features = ["basic_marketplace_access"]
+            return feature in basic_features
+        
+        from app.services.subscription_service import SubscriptionService, SubscriptionPlan
+        
+        try:
+            plan_config = SubscriptionService.get_plan_config(SubscriptionPlan(profile.subscription_plan.upper()))
+            return feature in plan_config.features
+        except ValueError:
+            return False
+
+    @staticmethod
+    def check_transaction_limit(db: Session, supplier_id: uuid.UUID) -> dict:
+        """Check if a supplier has reached their transaction limit."""
+        profile = db.query(SupplierProfile).filter(SupplierProfile.id == supplier_id).first()
+        if not profile:
+            return {"has_limit": True, "remaining": 0, "limit": 0}
+        
+        from app.services.subscription_service import SubscriptionService, SubscriptionPlan
+        
+        try:
+            plan_config = SubscriptionService.get_plan_config(SubscriptionPlan(profile.subscription_plan.upper() if profile.subscription_plan else "BASIC"))
+            limit = plan_config.transaction_limit
+            
+            if limit == -1:  # Unlimited
+                return {"has_limit": False, "remaining": -1, "limit": -1}
+            
+            # Count transactions this month
+            from datetime import datetime, timedelta
+            month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            transactions_this_month = db.query(SupplierOrder).filter(
+                SupplierOrder.supplier_id == supplier_id,
+                SupplierOrder.created_at >= month_start,
+            ).count()
+            
+            remaining = limit - transactions_this_month
+            return {
+                "has_limit": True,
+                "remaining": max(0, remaining),
+                "limit": limit,
+                "used": transactions_this_month,
+            }
+        except ValueError:
+            return {"has_limit": True, "remaining": 0, "limit": 0}
+
+
+# ============================================================================
+# SUPPLIER LOGISTICS INTEGRATION
+# ============================================================================
+
+class SupplierLogisticsService:
+
+    @staticmethod
+    def create_delivery_record(db: Session, order_id: uuid.UUID) -> dict:
+        """Create a logistics delivery record for a supplier order."""
+        from app.models.logistics import OrderDelivery, DeliveryMethod, DeliveryStatus
+        
+        order = db.query(SupplierOrder).filter(SupplierOrder.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        # Check if delivery record already exists
+        if order.logistics_delivery_id:
+            raise HTTPException(status_code=400, detail="Delivery record already exists")
+        
+        # Determine delivery method based on shipping method
+        delivery_method = DeliveryMethod.THIRD_PARTY
+        if order.shipping_method:
+            if "buyer" in order.shipping_method.lower():
+                delivery_method = DeliveryMethod.BUYER_COLLECTS
+            elif "farmer" in order.shipping_method.lower() or "supplier" in order.shipping_method.lower():
+                delivery_method = DeliveryMethod.FARMER_DELIVERS
+        
+        # Create delivery record
+        delivery = OrderDelivery(
+            order_id=str(order.id),  # Store as string to match logistics model
+            delivery_method=delivery_method,
+            status=DeliveryStatus.PENDING_PICKUP,
+            pickup_address=None,  # Will be set when assigned
+            delivery_address=order.delivery_address,
+            delivery_phone=order.delivery_phone,
+            recipient_name=None,  # Will be set from buyer profile
+            scheduled_pickup_time=None,
+            scheduled_delivery_time=None,
+            pickup_confirmed_at=None,
+            pickup_completed_at=None,
+            delivery_in_progress_at=None,
+            delivery_confirmed_at=None,
+            agent_id=None,
+            driver_id=None,
+            tracking_number=order.tracking_number,
+            delivery_proof_url=order.delivery_proof_url,
+            gps_coordinates=None,
+            notes=order.supplier_notes,
+        )
+        
+        db.add(delivery)
+        db.commit()
+        db.refresh(delivery)
+        
+        # Link order to delivery
+        order.logistics_delivery_id = delivery.id
+        db.commit()
+        
+        return {
+            "delivery_id": str(delivery.id),
+            "status": delivery.status.value,
+            "delivery_method": delivery.delivery_method.value,
+        }
+
+    @staticmethod
+    def get_delivery_status(db: Session, order_id: uuid.UUID) -> dict:
+        """Get the logistics delivery status for a supplier order."""
+        from app.models.logistics import OrderDelivery
+        
+        order = db.query(SupplierOrder).filter(SupplierOrder.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        if not order.logistics_delivery_id:
+            return {"status": "not_linked", "message": "Order not linked to logistics system"}
+        
+        delivery = db.query(OrderDelivery).filter(OrderDelivery.id == order.logistics_delivery_id).first()
+        if not delivery:
+            return {"status": "not_found", "message": "Delivery record not found"}
+        
+        return {
+            "delivery_id": str(delivery.id),
+            "status": delivery.status.value,
+            "delivery_method": delivery.delivery_method.value,
+            "tracking_number": delivery.tracking_number,
+            "agent_id": str(delivery.agent_id) if delivery.agent_id else None,
+            "driver_id": str(delivery.driver_id) if delivery.driver_id else None,
+            "scheduled_pickup_time": delivery.scheduled_pickup_time,
+            "scheduled_delivery_time": delivery.scheduled_delivery_time,
+            "pickup_confirmed_at": delivery.pickup_confirmed_at,
+            "pickup_completed_at": delivery.pickup_completed_at,
+            "delivery_in_progress_at": delivery.delivery_in_progress_at,
+            "delivery_confirmed_at": delivery.delivery_confirmed_at,
+            "gps_coordinates": delivery.gps_coordinates,
+        }
+
+    @staticmethod
+    def sync_order_status(db: Session, order_id: uuid.UUID) -> dict:
+        """Sync supplier order status with logistics delivery status."""
+        from app.models.logistics import OrderDelivery, DeliveryStatus
+        
+        order = db.query(SupplierOrder).filter(SupplierOrder.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        if not order.logistics_delivery_id:
+            return {"status": "not_linked", "message": "Order not linked to logistics system"}
+        
+        delivery = db.query(OrderDelivery).filter(OrderDelivery.id == order.logistics_delivery_id).first()
+        if not delivery:
+            return {"status": "not_found", "message": "Delivery record not found"}
+        
+        # Map delivery status to order status
+        status_mapping = {
+            DeliveryStatus.PENDING_PICKUP: SupplierOrderStatus.NEW,
+            DeliveryStatus.PICKUP_SCHEDULED: SupplierOrderStatus.CONFIRMED,
+            DeliveryStatus.PICKUP_IN_PROGRESS: SupplierOrderStatus.PROCESSING,
+            DeliveryStatus.PICKUP_COMPLETED: SupplierOrderStatus.PROCESSING,
+            DeliveryStatus.IN_TRANSIT: SupplierOrderStatus.SHIPPED,
+            DeliveryStatus.DELAYED: SupplierOrderStatus.PROCESSING,
+            DeliveryStatus.ARRIVED: SupplierOrderStatus.SHIPPED,
+            DeliveryStatus.DELIVERY_IN_PROGRESS: SupplierOrderStatus.SHIPPED,
+            DeliveryStatus.DELIVERED: SupplierOrderStatus.DELIVERED,
+            DeliveryStatus.CONFIRMED: SupplierOrderStatus.DELIVERED,
+            DeliveryStatus.AUTO_CONFIRMED: SupplierOrderStatus.DELIVERED,
+            DeliveryStatus.DISPUTED: SupplierOrderStatus.REFUNDED,
+        }
+        
+        new_status = status_mapping.get(delivery.status, order.status)
+        
+        if new_status != order.status:
+            order.status = new_status
+            db.commit()
+        
+        return {
+            "order_status": order.status.value,
+            "delivery_status": delivery.status.value,
+            "synced": new_status != order.status,
+        }
+
+
+# ============================================================================
+# SUPPLIER PAYOUT PROCESSING
+# ============================================================================
+
+class SupplierPayoutService:
+
+    @staticmethod
+    def process_pending_payouts(db: Session) -> dict:
+        """Process all pending withdrawal requests (cron job)."""
+        pending_withdrawals = db.query(SupplierWalletTransaction).filter(
+            SupplierWalletTransaction.txn_type == SupplierWalletTxnType.WITHDRAWAL,
+            SupplierWalletTransaction.status == "pending",
+        ).all()
+        
+        processed = 0
+        failed = 0
+        
+        for withdrawal in pending_withdrawals:
+            try:
+                # Simulate payout processing
+                # In production, this would integrate with payment gateways like Stripe, PayPal, etc.
+                SupplierPayoutService._execute_payout(db, withdrawal)
+                processed += 1
+            except Exception as e:
+                withdrawal.status = "failed"
+                withdrawal.description = f"Payout failed: {str(e)}"
+                db.commit()
+                failed += 1
+        
+        return {
+            "processed": processed,
+            "failed": failed,
+            "total": len(pending_withdrawals),
+        }
+
+    @staticmethod
+    def _execute_payout(db: Session, withdrawal: SupplierWalletTransaction):
+        """Execute a single payout (integrates with payment gateway)."""
+        # In production, this would call payment gateway API
+        # For now, we'll simulate successful processing
+        
+        # Simulate payment gateway processing
+        import time
+        time.sleep(0.1)  # Simulate API call
+        
+        # Update withdrawal status
+        withdrawal.status = "completed"
+        withdrawal.description = f"Payout processed via {withdrawal.withdrawal_method}"
+        withdrawal.reference = f"PAYOUT-{withdrawal.id[:8].upper()}"
+        
+        db.commit()
+
+    @staticmethod
+    def get_payout_history(db: Session, supplier_id: uuid.UUID, limit: int = 50, offset: int = 0) -> dict:
+        """Get payout history for a supplier."""
+        payouts = db.query(SupplierWalletTransaction).filter(
+            SupplierWalletTransaction.supplier_id == supplier_id,
+            SupplierWalletTransaction.txn_type == SupplierWalletTxnType.WITHDRAWAL,
+        ).order_by(desc(SupplierWalletTransaction.created_at)).offset(offset).limit(limit).all()
+        
+        total = db.query(SupplierWalletTransaction).filter(
+            SupplierWalletTransaction.supplier_id == supplier_id,
+            SupplierWalletTransaction.txn_type == SupplierWalletTxnType.WITHDRAWAL,
+        ).count()
+        
+        # Calculate totals
+        total_withdrawn = sum(p.amount for p in payouts)
+        total_fees = sum(p.fee for p in payouts)
+        total_net = sum(p.net_amount for p in payouts)
+        
+        return {
+            "payouts": [
+                {
+                    "id": str(p.id),
+                    "amount": p.amount,
+                    "fee": p.fee,
+                    "net_amount": p.net_amount,
+                    "method": p.withdrawal_method,
+                    "status": p.status,
+                    "reference": p.reference,
+                    "description": p.description,
+                    "created_at": p.created_at,
+                }
+                for p in payouts
+            ],
+            "total": total,
+            "total_withdrawn": total_withdrawn,
+            "total_fees": total_fees,
+            "total_net": total_net,
+        }
+
+    @staticmethod
+    def get_tax_report(db: Session, supplier_id: uuid.UUID, year: int, month: Optional[int] = None) -> dict:
+        """Generate tax report for supplier earnings."""
+        from datetime import datetime
+        
+        # Filter transactions by date range
+        start_date = datetime(year, 1, 1) if month is None else datetime(year, month, 1)
+        if month is None:
+            end_date = datetime(year, 12, 31, 23, 59, 59)
+        else:
+            if month == 12:
+                end_date = datetime(year, 12, 31, 23, 59, 59)
+            else:
+                end_date = datetime(year, month + 1, 1, 0, 0, 0) - timedelta(seconds=1)
+        
+        # Get sales transactions
+        sales = db.query(SupplierWalletTransaction).filter(
+            SupplierWalletTransaction.supplier_id == supplier_id,
+            SupplierWalletTransaction.txn_type == SupplierWalletTxnType.SALE,
+            SupplierWalletTransaction.created_at >= start_date,
+            SupplierWalletTransaction.created_at <= end_date,
+        ).all()
+        
+        # Get withdrawal transactions
+        withdrawals = db.query(SupplierWalletTransaction).filter(
+            SupplierWalletTransaction.supplier_id == supplier_id,
+            SupplierWalletTransaction.txn_type == SupplierWalletTxnType.WITHDRAWAL,
+            SupplierWalletTransaction.created_at >= start_date,
+            SupplierWalletTransaction.created_at <= end_date,
+        ).all()
+        
+        # Get platform fees
+        platform_fees = db.query(SupplierWalletTransaction).filter(
+            SupplierWalletTransaction.supplier_id == supplier_id,
+            SupplierWalletTransaction.txn_type == SupplierWalletTxnType.PLATFORM_FEE,
+            SupplierWalletTransaction.created_at >= start_date,
+            SupplierWalletTransaction.created_at <= end_date,
+        ).all()
+        
+        # Calculate totals
+        total_gross = sum(s.amount for s in sales)
+        total_platform_fees = sum(f.amount for f in platform_fees)
+        total_withdrawn = sum(w.net_amount for w in withdrawals if w.status == "completed")
+        
+        return {
+            "period": f"{year}" if month is None else f"{year}-{month:02d}",
+            "total_gross": total_gross,
+            "total_platform_fees": total_platform_fees,
+            "total_net": total_gross - total_platform_fees,
+            "total_withdrawn": total_withdrawn,
+            "taxable_income": total_gross - total_platform_fees,
+            "transaction_count": len(sales),
+            "withdrawal_count": len(withdrawals),
+        }
+
+
+# ============================================================================
+# SUPPLIER DISCOUNT/PROMOTION MANAGEMENT
+# ============================================================================
+
+class SupplierDiscountService:
+
+    @staticmethod
+    def create_discount(db: Session, supplier_id: uuid.UUID, data: dict) -> SupplierDiscount:
+        """Create a new discount/promotion code."""
+        # Check if code already exists
+        existing = db.query(SupplierDiscount).filter(
+            SupplierDiscount.code == data["code"].upper()
+        ).first()
+        
+        if existing:
+            raise HTTPException(status_code=400, detail="Discount code already exists")
+        
+        # Create discount
+        discount = SupplierDiscount(
+            supplier_id=supplier_id,
+            code=data["code"].upper(),
+            discount_type=data["discount_type"],
+            discount_value=data["discount_value"],
+            min_order_value=data.get("min_order_value"),
+            max_discount_amount=data.get("max_discount_amount"),
+            applicable_products=data.get("applicable_products"),
+            applicable_categories=data.get("applicable_categories"),
+            max_uses=data.get("max_uses"),
+            max_uses_per_user=data.get("max_uses_per_user"),
+            start_date=data["start_date"],
+            end_date=data["end_date"],
+            description=data.get("description"),
+        )
+        
+        db.add(discount)
+        db.commit()
+        db.refresh(discount)
+        
+        return discount
+
+    @staticmethod
+    def list_discounts(db: Session, supplier_id: uuid.UUID, active_only: bool = False) -> list[SupplierDiscount]:
+        """List all discounts for a supplier."""
+        q = db.query(SupplierDiscount).filter(SupplierDiscount.supplier_id == supplier_id)
+        
+        if active_only:
+            now = datetime.now(timezone.utc)
+            q = q.filter(
+                SupplierDiscount.is_active == True,
+                SupplierDiscount.start_date <= now,
+                SupplierDiscount.end_date >= now,
+            )
+        
+        return q.order_by(desc(SupplierDiscount.created_at)).all()
+
+    @staticmethod
+    def get_discount(db: Session, discount_id: uuid.UUID, supplier_id: uuid.UUID) -> SupplierDiscount:
+        """Get a specific discount."""
+        discount = db.query(SupplierDiscount).filter(
+            SupplierDiscount.id == discount_id,
+            SupplierDiscount.supplier_id == supplier_id,
+        ).first()
+        
+        if not discount:
+            raise HTTPException(status_code=404, detail="Discount not found")
+        
+        return discount
+
+    @staticmethod
+    def update_discount(db: Session, discount_id: uuid.UUID, supplier_id: uuid.UUID, data: dict) -> SupplierDiscount:
+        """Update a discount."""
+        discount = db.query(SupplierDiscount).filter(
+            SupplierDiscount.id == discount_id,
+            SupplierDiscount.supplier_id == supplier_id,
+        ).first()
+        
+        if not discount:
+            raise HTTPException(status_code=404, detail="Discount not found")
+        
+        for key, val in data.items():
+            if val is not None and hasattr(discount, key):
+                setattr(discount, key, val)
+        
+        db.commit()
+        db.refresh(discount)
+        
+        return discount
+
+    @staticmethod
+    def delete_discount(db: Session, discount_id: uuid.UUID, supplier_id: uuid.UUID) -> dict:
+        """Delete a discount."""
+        discount = db.query(SupplierDiscount).filter(
+            SupplierDiscount.id == discount_id,
+            SupplierDiscount.supplier_id == supplier_id,
+        ).first()
+        
+        if not discount:
+            raise HTTPException(status_code=404, detail="Discount not found")
+        
+        db.delete(discount)
+        db.commit()
+        
+        return {"message": "Discount deleted"}
+
+    @staticmethod
+    def validate_discount(db: Session, code: str, order_total: float, product_ids: Optional[list] = None, user_id: Optional[uuid.UUID] = None) -> dict:
+        """Validate a discount code and calculate discount amount."""
+        discount = db.query(SupplierDiscount).filter(
+            SupplierDiscount.code == code.upper(),
+            SupplierDiscount.is_active == True,
+        ).first()
+        
+        if not discount:
+            return {"valid": False, "error": "Invalid discount code"}
+        
+        # Check validity period
+        now = datetime.now(timezone.utc)
+        if discount.start_date > now or discount.end_date < now:
+            return {"valid": False, "error": "Discount code has expired"}
+        
+        # Check usage limits
+        if discount.max_uses and discount.current_uses >= discount.max_uses:
+            return {"valid": False, "error": "Discount code has reached maximum uses"}
+        
+        # Check minimum order value
+        if discount.min_order_value and order_total < discount.min_order_value:
+            return {"valid": False, "error": f"Minimum order value of ${discount.min_order_value} not met"}
+        
+        # Check product/category applicability
+        if discount.applicable_products and product_ids:
+            if not any(pid in discount.applicable_products for pid in product_ids):
+                return {"valid": False, "error": "Discount not applicable to these products"}
+        
+        # Calculate discount amount
+        discount_amount = 0.0
+        if discount.discount_type == "percentage":
+            discount_amount = order_total * (discount.discount_value / 100)
+        elif discount.discount_type == "fixed_amount":
+            discount_amount = discount.discount_value
+        elif discount.discount_type == "buy_x_get_y":
+            # Simplified: treat as percentage for now
+            discount_amount = order_total * (discount.discount_value / 100)
+        
+        # Apply maximum discount limit
+        if discount.max_discount_amount and discount_amount > discount.max_discount_amount:
+            discount_amount = discount.max_discount_amount
+        
+        return {
+            "valid": True,
+            "discount_id": str(discount.id),
+            "discount_type": discount.discount_type,
+            "discount_amount": round(discount_amount, 2),
+            "final_total": round(order_total - discount_amount, 2),
+        }
+
+    @staticmethod
+    def apply_discount(db: Session, discount_id: uuid.UUID) -> SupplierDiscount:
+        """Apply a discount (increment usage count)."""
+        discount = db.query(SupplierDiscount).filter(SupplierDiscount.id == discount_id).first()
+        
+        if not discount:
+            raise HTTPException(status_code=404, detail="Discount not found")
+        
+        discount.current_uses += 1
+        db.commit()
+        db.refresh(discount)
+        
+        return discount

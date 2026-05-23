@@ -179,7 +179,7 @@ class PrivacyUpdatePayload(BaseModel):
 # ── Helper: resolve Driver from current user ────────────────────────────────
 
 def _get_driver(db: Session, user: User, enforce_active: bool = False) -> Driver:
-    if user.role != UserRole.TRANSPORTER:
+    if user.role != UserRole.DRIVER:
         raise HTTPException(status_code=403, detail="Driver APIs are restricted to driver accounts.")
     driver = db.query(Driver).filter(Driver.user_id == user.id).first()
     if not driver:
@@ -270,7 +270,7 @@ async def self_register_driver(
         full_name=f"{first_name} {last_name}",
         password_hash=get_password_hash(pin),
         ussd_pin_hash=get_password_hash(pin),
-        role=UserRole.TRANSPORTER,
+        role=UserRole.DRIVER,
         status=UserStatus.PENDING_VERIFICATION,
         is_phone_verified=True,
     )
@@ -377,7 +377,7 @@ async def register_submit(payload: dict):
     return {"success": True, "status": "pending", "message": "Please use the one-shot self-register endpoint for final submission"}
 
 
-# ── Driver registration (existing TRANSPORTER user) ───────────────────────────
+# ── Driver registration (existing DRIVER user) ───────────────────────────
 
 @router.options("/register")
 async def register_driver_options(request: Request):
@@ -392,7 +392,7 @@ def register_driver(
     current_user: User = Depends(get_current_user),
 ):
     """Driver accounts can submit vehicle details for admin approval."""
-    if current_user.role != UserRole.TRANSPORTER:
+    if current_user.role != UserRole.DRIVER:
         raise HTTPException(status_code=403, detail="Use the driver mobile app with a driver account.")
     existing = db.query(Driver).filter(Driver.user_id == current_user.id).first()
     if existing:

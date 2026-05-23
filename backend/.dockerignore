@@ -27,4 +27,3 @@ ml_weights/
 htmlcov/
 .tox/
 tests/
-app/api/v1/endpoints/webhooks/

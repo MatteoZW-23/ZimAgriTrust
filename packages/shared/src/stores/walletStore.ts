@@ -29,7 +29,7 @@ export const useWalletStore = create<WalletState>((set) => ({
     try {
       const [balanceRes, transRes] = await Promise.all([
         apiClient.get('/wallet/balance'),
-        apiClient.get('/wallet/transactions'),
+        apiClient.get('/wallet/history'),
       ]);
       set({ balance: balanceRes.data.balance, transactions: transRes.data, loading: false });
     } catch (error: any) {

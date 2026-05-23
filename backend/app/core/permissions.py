@@ -9,7 +9,7 @@ class Role(str, Enum):
     AGENT = "agent"
     FARMER = "farmer"
     BUYER = "buyer"
-    TRANSPORTER = "transporter"
+    DRIVER = "driver"
 
 # Role-Based Access Control (RBAC) mapping
 PERMISSIONS: Dict[Role, List[str]] = {
@@ -51,7 +51,7 @@ PERMISSIONS: Dict[Role, List[str]] = {
         "manage_wallet",
         "rate_sellers"
     ],
-    Role.TRANSPORTER: [
+    Role.DRIVER: [
         "view_delivery_jobs",
         "accept_delivery_jobs",
         "update_delivery_status",

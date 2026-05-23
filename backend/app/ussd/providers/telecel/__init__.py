@@ -1,0 +1,1 @@
+"""Telecel Zimbabwe USSD adapter."""

@@ -45,12 +45,16 @@ class LedgerAccountType(str, enum.Enum):
     PLATFORM_FEE_ZIG = "PLATFORM_FEE_ZIG"
     TRANSPORT_FEE_USD = "TRANSPORT_FEE_USD"
     INSURANCE_FEE_USD = "INSURANCE_FEE_USD"
+    SUBSCRIPTION_REVENUE_USD = "SUBSCRIPTION_REVENUE_USD"
+    SUBSCRIPTION_REVENUE_ZIG = "SUBSCRIPTION_REVENUE_ZIG"
     
     # Expense accounts
     PROVIDER_PAYOUT_USD = "PROVIDER_PAYOUT_USD"
     PROVIDER_PAYOUT_ZIG = "PROVIDER_PAYOUT_ZIG"
     REFUND_USD = "REFUND_USD"
     REFUND_ZIG = "REFUND_ZIG"
+    WITHDRAWAL_PENDING_USD = "WITHDRAWAL_PENDING_USD"
+    WITHDRAWAL_PENDING_ZIG = "WITHDRAWAL_PENDING_ZIG"
 
 
 class LedgerEntry(Base):
@@ -91,7 +95,7 @@ class LedgerEntry(Base):
     idempotency_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, unique=True, index=True)
     
     # Relationships
-    transaction = relationship("Transaction", back_populates="ledger_entries")
+    transaction = relationship("Transaction")
     
     __table_args__ = (
         Index('idx_ledger_account_user', 'account_type', 'user_id'),

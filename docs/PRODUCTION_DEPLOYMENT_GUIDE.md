@@ -379,7 +379,7 @@ S3_BUCKET="zimagritrust-backups"
 DATE=$(date +%Y%m%d_%H%M%S)
 
 # Create backup
-docker compose exec -T postgres pg_dump -U agritrust agri_trust > "$BACKUP_DIR/backup_$DATE.sql"
+docker compose exec -T postgres pg_dump -U agritrust zimagritrust > "$BACKUP_DIR/backup_$DATE.sql"
 
 # Compress
 gzip "$BACKUP_DIR/backup_$DATE.sql"
@@ -420,7 +420,7 @@ redis:
 docker compose stop backend
 
 # 2. Restore from backup
-docker compose exec -T postgres psql -U agritrust agri_trust < backup_file.sql
+docker compose exec -T postgres psql -U agritrust zimagritrust < backup_file.sql
 
 # 3. Restart
 docker compose up -d
@@ -487,7 +487,7 @@ docker compose restart
 docker compose up -d --scale celery-worker=3
 
 # Database access
-docker compose exec postgres psql -U agritrust -d agri_trust
+docker compose exec postgres psql -U agritrust -d zimagritrust
 
 # Redis access
 docker compose exec redis redis-cli -a $REDIS_PASSWORD

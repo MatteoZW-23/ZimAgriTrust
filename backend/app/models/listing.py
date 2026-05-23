@@ -34,7 +34,7 @@ class Sector(str, enum.Enum):
 
 
 class LogisticsType(str, enum.Enum):
-    PLATFORM       = "PLATFORM"        # Third-party transporter (default)
+    PLATFORM       = "PLATFORM"        # Third-party driver (default)
     SELF_COLLECT   = "SELF_COLLECT"    # Buyer picks up from farm
     SELF_DELIVER   = "SELF_DELIVER"    # Farmer delivers to buyer
     PLATFORM_FLEET = "PLATFORM_FLEET"  # ZimAgritrust-managed vehicle (premium)

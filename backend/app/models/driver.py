@@ -1,13 +1,12 @@
 """
-ZimAgritrust Driver Model
-Covers: driver registration, vehicle details, ratings, penalties, suspension.
+Driver models for ZimAgriTrust transport/logistics system.
 """
 import enum
 import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, Enum, Float, ForeignKey, Integer, String, Text, DateTime
+from sqlalchemy import Boolean, Enum, Float, Integer, String, Text, ForeignKey, DateTime, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -15,47 +14,48 @@ from app.db.base import Base
 
 
 class DriverStatus(str, enum.Enum):
-    PENDING_REVIEW  = "PENDING_REVIEW"   # Application submitted
-    ACTIVE          = "ACTIVE"           # Cleared to take jobs
-    SUSPENDED       = "SUSPENDED"        # Temporarily blocked
-    TERMINATED      = "TERMINATED"       # Permanently removed
-    RETRAINING      = "RETRAINING"       # Must complete retraining
-
-
-class TransportScenario(str, enum.Enum):
-    BUYER_COLLECTS   = "BUYER_COLLECTS"
-    FARMER_DELIVERS  = "FARMER_DELIVERS"
-    THIRD_PARTY      = "THIRD_PARTY"
-    PLATFORM_FLEET   = "PLATFORM_FLEET"
-    COOPERATIVE      = "COOPERATIVE"
+    """Driver account status"""
+    PENDING_REVIEW = "pending_review"
+    ACTIVE = "active"
+    SUSPENDED = "suspended"
+    TERMINATED = "terminated"
+    UNDER_INVESTIGATION = "under_investigation"
 
 
 class Driver(Base):
-    """
-    Registered third-party or platform driver.
-    Linked to a User account for auth/wallet.
-    """
+    """Driver profile linked to a User account"""
     __tablename__ = "drivers"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, unique=True, index=True)
-
-    # Vehicle
-    vehicle_reg: Mapped[str] = mapped_column(String(20), nullable=False)
-    vehicle_type: Mapped[Optional[str]] = mapped_column(String(50))   # e.g. "3-Ton Truck", "Pickup"
-    vehicle_model: Mapped[Optional[str]] = mapped_column(String(100))
-    vehicle_year: Mapped[Optional[str]] = mapped_column(String(10))
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
+    
+    # Vehicle information
+    vehicle_reg: Mapped[str] = mapped_column(String(50), nullable=False)
+    vehicle_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    vehicle_model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    vehicle_year: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     vehicle_capacity_kg: Mapped[float] = mapped_column(Float, default=1000.0)
-    is_platform_fleet: Mapped[bool] = mapped_column(Boolean, default=False)
-
-    # Compliance
-    license_number: Mapped[str] = mapped_column(String(30), nullable=False)
+    vehicle_color: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    
+    # License information
+    license_number: Mapped[str] = mapped_column(String(100), nullable=False)
     license_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    # Location/operating area
+    current_district: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    
+    # Status and verification
+    status: Mapped[DriverStatus] = mapped_column(Enum(DriverStatus), default=DriverStatus.PENDING_REVIEW, nullable=False)
     insurance_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     background_cleared: Mapped[bool] = mapped_column(Boolean, default=False)
-    registration_fee_paid: Mapped[bool] = mapped_column(Boolean, default=False)
-
-    # Uploaded documents (file paths on disk)
+    
+    # Performance metrics
+    avg_rating: Mapped[float] = mapped_column(Float, default=0.0)
+    total_deliveries: Mapped[int] = mapped_column(Integer, default=0)
+    successful_deliveries: Mapped[int] = mapped_column(Integer, default=0)
+    warning_count: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Document paths (uploaded files)
     doc_national_id_front: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     doc_national_id_back: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     doc_license_front: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
@@ -64,63 +64,66 @@ class Driver(Base):
     doc_vehicle_photo: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     doc_profile_photo: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     doc_live_selfie: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-
-    # Admin review
-    rejection_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    reviewed_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"), nullable=True)
-    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-
-    # Performance
-    status: Mapped[DriverStatus] = mapped_column(Enum(DriverStatus), default=DriverStatus.PENDING_REVIEW)
-    total_deliveries: Mapped[int] = mapped_column(Integer, default=0)
-    successful_deliveries: Mapped[int] = mapped_column(Integer, default=0)
-    avg_rating: Mapped[float] = mapped_column(Float, default=5.0)
-    warning_count: Mapped[int] = mapped_column(Integer, default=0)
-
-    # Location (for matching)
-    current_district: Mapped[Optional[str]] = mapped_column(String(50))
-    current_lat: Mapped[Optional[float]] = mapped_column(Float)
-    current_lon: Mapped[Optional[float]] = mapped_column(Float)
-
+    
+    # Additional fields (legacy compatibility)
+    name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    
+    # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="driver_profile")
+    jobs = relationship("DriverJob", back_populates="driver", cascade="all, delete-orphan")
 
-    user = relationship("User", foreign_keys=[user_id])
-    jobs = relationship("DriverJob", back_populates="driver")
+
+class DriverJobStatus(str, enum.Enum):
+    """Status of a driver job/assignment"""
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    PICKUP_DONE = "pickup_done"
+    IN_TRANSIT = "in_transit"
+    DELIVERED = "delivered"
+    PAID = "paid"
+    CANCELLED = "cancelled"
+    REJECTED = "rejected"
 
 
 class DriverJob(Base):
-    """
-    A single transport job assigned to a driver.
-    Tracks fee, commission, payout, and rating.
-    """
+    """Driver job/assignment for a specific order"""
     __tablename__ = "driver_jobs"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    driver_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("drivers.id"), nullable=False, index=True)
-    order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id"), nullable=False, index=True)
-
-    # Fees
-    distance_km: Mapped[Optional[float]] = mapped_column(Float)
-    base_fee: Mapped[float] = mapped_column(Float, default=7.0)       # $7 base
-    distance_fee: Mapped[float] = mapped_column(Float, default=0.0)   # km × $0.50
-    waiting_fee: Mapped[float] = mapped_column(Float, default=0.0)    # $2 per 30 min
-    total_transport_fee: Mapped[float] = mapped_column(Float, default=0.0)
-    platform_commission: Mapped[float] = mapped_column(Float, default=0.0)  # 10%
-    driver_payout: Mapped[float] = mapped_column(Float, default=0.0)
-
-    # Status
-    status: Mapped[str] = mapped_column(String(20), default="PENDING")
-    # PENDING → ACCEPTED → PICKUP_DONE → DELIVERED → PAID
-
-    accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-
+    order_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    driver_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("drivers.id", ondelete="SET NULL"), nullable=True)
+    
+    # Job details
+    status: Mapped[DriverJobStatus] = mapped_column(Enum(DriverJobStatus), default=DriverJobStatus.PENDING, nullable=False)
+    distance_km: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    
+    # Pricing
+    total_transport_fee: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    driver_payout: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    
     # Rating
-    buyer_rating: Mapped[Optional[int]] = mapped_column(Integer)       # 1-5
-    buyer_rating_note: Mapped[Optional[str]] = mapped_column(Text)
-
+    buyer_rating: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 1-5 stars
+    
+    # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
+    accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    rejected_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    
+    # Relationships
     driver = relationship("Driver", back_populates="jobs")
-    order  = relationship("Order",  foreign_keys=[order_id])
+    order = relationship("Order", back_populates="driver_jobs")
+
+
+class TransportScenario(str, enum.Enum):
+    """Transport/logistics scenario types"""
+    SELF_PICKUP = "self_pickup"
+    PLATFORM_FLEET = "platform_fleet"
+    FARMER_DELIVERY = "farmer_delivery"
+    THIRD_PARTY = "third_party"
+    AGGREGATED = "aggregated"

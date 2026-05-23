@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 
 from fastapi import HTTPException, status, Depends
-from fastapi.security import HTTPBearer, HTTPAuthCredentials
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.models.user import User, UserRole
 from app.models.rbac import Role, Permission, RolePermission
@@ -21,6 +21,7 @@ from app.models.security_enhanced import (
 from app.models.session import UserSession
 from app.services.security_service import TokenManager
 from app.core.config import settings
+from app.db.session import get_db
 from jose import jwt
 
 
@@ -189,10 +190,6 @@ DEFAULT_ROLE_PERMISSIONS = {
         "transaction:read",
     ],
     
-    "TRANSPORTER": [
-        "transaction:read",
-    ],
-    
     "SUPPLIER": [
         "listing:create", "listing:read", "listing:update", "listing:delete",
         "input:create", "input:read", "input:update", "input:delete",
@@ -250,7 +247,6 @@ class RBACService:
             "FARMER": 10,
             "BUYER": 10,
             "DRIVER": 20,
-            "TRANSPORTER": 20,
             "STAFF": 30,
             "AGENT": 40,
             "SUPPLIER": 60,
@@ -313,7 +309,7 @@ class JWTBearer(HTTPBearer):
     """JWT Bearer token authentication"""
     
     async def __call__(self, request):
-        credentials: HTTPAuthCredentials = await super().__call__(request)
+        credentials: HTTPAuthorizationCredentials = await super().__call__(request)
         
         if not credentials:
             raise HTTPException(
@@ -355,7 +351,7 @@ class JWTBearer(HTTPBearer):
 
 async def get_current_user(
     token: str = Depends(JWTBearer()),
-    db: Session = Depends(get_database),  # Note: get_database needs to be imported
+    db: Session = Depends(get_db),
 ) -> User:
     """Get current authenticated user from JWT token"""
     
@@ -405,7 +401,7 @@ async def check_permission(permission: str):
     
     async def checker(
         user: User = Depends(get_current_user),
-        db: Session = Depends(get_database),
+        db: Session = Depends(get_db),
     ) -> User:
         if not RBACService.user_has_permission(db, user, permission):
             raise HTTPException(

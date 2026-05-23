@@ -41,7 +41,7 @@ async def _process_broadcast_async(broadcast_id: uuid.UUID, db: Session):
     elif broadcast.audience == BroadcastAudience.AGENTS:
         query = query.filter(User.role == UserRole.AGENT)
     elif broadcast.audience == BroadcastAudience.DRIVERS:
-        query = query.filter(User.role == UserRole.TRANSPORTER)
+        query = query.filter(User.role == UserRole.DRIVER)
     elif broadcast.audience == BroadcastAudience.REGIONAL:
         if broadcast.audience_filter and "region" in broadcast.audience_filter:
             query = query.filter(User.province == broadcast.audience_filter["region"])

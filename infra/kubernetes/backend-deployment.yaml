@@ -23,7 +23,7 @@ metadata:
   namespace: agritrust
 type: Opaque
 stringData:
-  DATABASE_URL: "postgresql://user:password@postgres.agritrust.svc.cluster.local:5432/agritrust"
+  DATABASE_URL: "postgresql://user:password@postgres.agritrust.svc.cluster.local:5432/zimagritrust"
   REDIS_URL: "redis://redis.agritrust.svc.cluster.local:6379/0"
   JWT_SECRET: "your-secret-key-change-this-in-production"
   SENTRY_DSN: ""

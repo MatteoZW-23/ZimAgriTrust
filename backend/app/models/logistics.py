@@ -37,7 +37,7 @@ class DeliveryStatus(str, enum.Enum):
 class DeliveryMethod(str, enum.Enum):
     BUYER_COLLECTS   = "BUYER_COLLECTS"    # Buyer comes to farm
     FARMER_DELIVERS  = "FARMER_DELIVERS"   # Farmer brings to buyer
-    THIRD_PARTY      = "THIRD_PARTY"       # External transporter
+    THIRD_PARTY      = "THIRD_PARTY"       # External driver
 
 
 class OrderDelivery(Base):
@@ -99,13 +99,13 @@ class OrderDelivery(Base):
 
 class LogisticsTrip(Base):
     """
-    Trip marketplace for Transporters to list their capacity.
+    Trip marketplace for Drivers to list their capacity.
     Example: '3-Ton truck from Lupane to Bulawayo on April 5th'
     """
     __tablename__ = "logistics_trips"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    transporter_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    driver_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
 
     origin_district: Mapped[str] = mapped_column(String(50))
     destination_city: Mapped[str] = mapped_column(String(50))

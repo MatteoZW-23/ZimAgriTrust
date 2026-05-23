@@ -1,0 +1,17 @@
+{
+  "name": "zimagritrust-whatsapp-bridge",
+  "version": "1.0.0",
+  "description": "WhatsApp Bridge for ZimAgritrust using personal numbers",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "whatsapp-web.js": "^1.34.7",
+    "qrcode-terminal": "^0.12.0",
+    "axios": "^1.6.0",
+    "express": "^4.18.2",
+    "qrcode": "^1.5.3",
+    "dotenv": "^16.3.1"
+  }
+}

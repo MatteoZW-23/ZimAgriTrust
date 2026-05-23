@@ -1,0 +1,97 @@
+export const theme = {
+  colors: {
+    sky: '#29B6F6',
+    gold: '#FFC107',
+    black: '#212121',
+    dark: '#212121',
+    light: '#F6F0DE',
+    white: '#FFFFFF',
+    danger: '#D32F2F',
+    secondary: '#4CAF50',
+    gray: {
+      100: '#F5F5F5',
+      200: '#EEEEEE',
+      300: '#E0E0E0',
+      400: '#BDBDBD',
+      500: '#9E9E9E',
+      600: '#757575',
+      700: '#616161',
+      800: '#424242',
+      900: '#212121',
+    },
+  },
+  typography: {
+    h1: { fontSize: 32, fontWeight: '800', letterSpacing: 0.5, lineHeight: 40 },
+    h2: { fontSize: 28, fontWeight: '800', letterSpacing: 0.5, lineHeight: 36 },
+    h3: { fontSize: 24, fontWeight: '700', letterSpacing: 0.3, lineHeight: 32 },
+    h4: { fontSize: 20, fontWeight: '700', letterSpacing: 0.2, lineHeight: 28 },
+    body: { fontSize: 16, fontWeight: '500', lineHeight: 24 },
+    bodyLarge: { fontSize: 18, fontWeight: '500', lineHeight: 28 },
+    caption: { fontSize: 14, fontWeight: '500', lineHeight: 20 },
+    small: { fontSize: 12, fontWeight: '500', lineHeight: 16 },
+  },
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32,
+    xxl: 48,
+  },
+  borderRadius: {
+    xs: 4,
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 20,
+    xxl: 24,
+    round: 9999,
+  },
+  shadows: {
+    xs: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 1,
+    },
+    sm: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    md: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.12,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    lg: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.16,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    xl: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.2,
+      shadowRadius: 20,
+      elevation: 12,
+    },
+  },
+};
+
+const styles = {
+  text: { color: theme.colors.black },
+  view: { backgroundColor: theme.colors.white },
+  button: { backgroundColor: theme.colors.sky, paddingVertical: 18, paddingHorizontal: 32, borderRadius: theme.borderRadius.md, ...theme.shadows.md },
+  buttonText: { color: theme.colors.white, fontWeight: '700', fontSize: 16, letterSpacing: 1 },
+  input: { borderWidth: 1, borderColor: theme.colors.gray[300], paddingVertical: 16, paddingHorizontal: 18, borderRadius: theme.borderRadius.md, backgroundColor: theme.colors.white, fontSize: 16, fontWeight: '500', ...theme.shadows.xs },
+};
+
+export { styles };

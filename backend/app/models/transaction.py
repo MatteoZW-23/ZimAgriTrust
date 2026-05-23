@@ -83,6 +83,9 @@ class Order(Base):
     buyer = relationship("User", back_populates="orders_as_buyer", foreign_keys=[buyer_id])
     seller = relationship("User", back_populates="orders_as_seller", foreign_keys=[seller_id])
     disputes = relationship("Dispute", back_populates="order")
+    driver_jobs = relationship("DriverJob", back_populates="order", cascade="all, delete-orphan")
+    transport_request = relationship("TransportRequest", back_populates="order", uselist=False, cascade="all, delete-orphan")
+    delivery = relationship("Delivery", back_populates="order", uselist=False, cascade="all, delete-orphan")
     
     @property
     def product(self) -> str:
@@ -129,8 +132,6 @@ class Transaction(Base):
     status: Mapped[str] = mapped_column(String(20), default="completed") # pending, completed, failed
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
-    ledger_entries = relationship("LedgerEntry", back_populates="transaction")
 
 
 class TransportSurvey(Base):

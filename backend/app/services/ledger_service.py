@@ -111,7 +111,7 @@ class LedgerService:
         # Calculate balance: credits - debits
         result = db.execute(
             select(func.coalesce(func.sum(
-                func.case(
+                case(
                     (LedgerEntry.entry_type == LedgerEntryType.CREDIT, LedgerEntry.amount),
                     else_=-LedgerEntry.amount
                 )
@@ -304,7 +304,7 @@ class LedgerService:
     ) -> float:
         """Get current balance for an account"""
         query = select(func.coalesce(func.sum(
-            func.case(
+            case(
                 (LedgerEntry.entry_type == LedgerEntryType.CREDIT, LedgerEntry.amount),
                 else_=-LedgerEntry.amount
             )
@@ -487,13 +487,13 @@ class LedgerService:
         query = select(
             LedgerEntry.account_type,
             func.sum(
-                func.case(
+                case(
                     (LedgerEntry.entry_type == LedgerEntryType.DEBIT, LedgerEntry.amount),
                     else_=0
                 )
             ).label('total_debits'),
             func.sum(
-                func.case(
+                case(
                     (LedgerEntry.entry_type == LedgerEntryType.CREDIT, LedgerEntry.amount),
                     else_=0
                 )

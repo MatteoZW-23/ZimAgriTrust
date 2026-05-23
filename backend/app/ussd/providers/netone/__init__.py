@@ -1,0 +1,1 @@
+"""NetOne Zimbabwe USSD adapter."""

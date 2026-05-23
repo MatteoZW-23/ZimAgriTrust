@@ -63,7 +63,7 @@ class Agent(Base):
     updated_at = mapped_column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships
-    user = relationship("User", foreign_keys=[user_id])
+    user = relationship("User", foreign_keys=[user_id], back_populates="agent")
     assignments = relationship("AgentAssignment", back_populates="agent")
 
 

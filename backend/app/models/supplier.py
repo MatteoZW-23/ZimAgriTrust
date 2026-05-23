@@ -138,6 +138,12 @@ class SupplierProfile(Base):
     pending_balance: Mapped[float] = mapped_column(Float, default=0.0)
     lifetime_earnings: Mapped[float] = mapped_column(Float, default=0.0)
 
+    # Subscription
+    subscription_plan: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # basic, pro, enterprise
+    subscription_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # active, past_due, cancelled, suspended, trial
+    subscription_start_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    subscription_end_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # Policies
     shipping_policy: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     return_policy: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -263,6 +269,9 @@ class SupplierOrder(Base):
     shipping_method: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     tracking_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     delivery_proof_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    
+    # Logistics Integration
+    logistics_delivery_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
 
     # Status
     status: Mapped[SupplierOrderStatus] = mapped_column(Enum(SupplierOrderStatus), default=SupplierOrderStatus.NEW)
@@ -346,3 +355,98 @@ class SupplierWalletTransaction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     supplier = relationship("SupplierProfile", back_populates="wallet_transactions")
+
+
+# ============================================================================
+# SUPPLIER CSV IMPORT HISTORY TABLE
+# ============================================================================
+
+class SupplierCSVImport(Base):
+    __tablename__ = "supplier_csv_imports"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    supplier_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("supplier_profiles.id"), nullable=False, index=True)
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="processing")  # processing, completed, failed, partial
+    total_rows: Mapped[int] = mapped_column(Integer, default=0)
+    successful: Mapped[int] = mapped_column(Integer, default=0)
+    failed: Mapped[int] = mapped_column(Integer, default=0)
+    errors: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON string of errors
+    rollback_performed: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    supplier = relationship("SupplierProfile")
+
+
+# ============================================================================
+# SUPPLIER REVIEWS TABLE
+# ============================================================================
+
+class SupplierReview(Base):
+    __tablename__ = "supplier_reviews"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    supplier_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("supplier_profiles.id"), nullable=False, index=True)
+    buyer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    order_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("supplier_orders.id"), nullable=False, index=True)
+
+    rating: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-5 stars
+    comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Supplier response
+    supplier_response: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    supplier_responseed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    # Moderation
+    is_flagged: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_hidden: Mapped[bool] = mapped_column(Boolean, default=False)
+    moderation_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    supplier = relationship("SupplierProfile")
+    buyer = relationship("User", foreign_keys=[buyer_id])
+    order = relationship("SupplierOrder")
+
+
+# ============================================================================
+# SUPPLIER DISCOUNTS/PROMOTIONS TABLE
+# ============================================================================
+
+class SupplierDiscount(Base):
+    __tablename__ = "supplier_discounts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    supplier_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("supplier_profiles.id"), nullable=False, index=True)
+    
+    # Discount details
+    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)  # Promo code
+    discount_type: Mapped[str] = mapped_column(String(20), nullable=False)  # percentage, fixed_amount, buy_x_get_y
+    discount_value: Mapped[float] = mapped_column(Float, nullable=False)  # Percentage or fixed amount
+    
+    # Applicability
+    min_order_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # Minimum order value to apply discount
+    max_discount_amount: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # Maximum discount amount
+    applicable_products: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)  # List of product IDs
+    applicable_categories: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)  # List of categories
+    
+    # Usage limits
+    max_uses: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # Maximum total uses
+    max_uses_per_user: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # Maximum uses per user
+    current_uses: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Validity
+    start_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    end_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    
+    # Additional info
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    supplier = relationship("SupplierProfile")

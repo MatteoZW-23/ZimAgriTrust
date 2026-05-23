@@ -39,6 +39,14 @@ async def lifespan(app: FastAPI):
     logger.info("SYSLOG | Starting ZimAgriTrust backend...")
 
     init_sentry()
+    
+    # Initialize USSD flow registry
+    try:
+        from app.ussd.engine.flow_registry import register_all_flows
+        register_all_flows()
+        logger.info("SYSLOG | USSD flow registry initialized")
+    except Exception as e:
+        logger.warning(f"SYSLOG | USSD flow registry initialization failed: {e}")
 
     try:
         # Schema is managed EXCLUSIVELY by Alembic migrations.

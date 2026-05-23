@@ -42,13 +42,6 @@ from app.models.listing_extras import (
     ListingReportReason,
     ListingReportStatus,
 )
-from app.models.loan import (
-    Loan,
-    LoanProduct,
-    LoanRepayment,
-    LoanStatus,
-    LoanPurpose,
-)
 from app.models.deposits import (
     PaymentMethod,
     DepositIntent,
@@ -73,6 +66,12 @@ from app.models.input_marketplace import (
     InputReportReason,
     InputReportStatus,
     InputPriceAlert,
+)
+from app.models.ledger import (
+    LedgerEntry,
+    LedgerEntryType,
+    LedgerAccountType,
+    LedgerReconciliation,
 )
 from app.models.security import (
     SuperAdmin,
@@ -123,6 +122,32 @@ from app.models.supplier import (
     SupplierPaymentStatus,
     SupplierWalletTxnType,
 )
+from app.models.transport import (
+    TransportMode,
+    TransportRequestStatus,
+    TransportQuoteStatus,
+    NegotiationStatus,
+    MessageType,
+    AssignmentStatus,
+    DeliveryStatus,
+    TrackingStatus,
+    AllocationType,
+    AllocationStatus,
+    SettlementType,
+    SettlementStatus,
+    DisputeStatus as TransportDisputeStatus,
+    TransportRequest,
+    TransportQuote,
+    TransportNegotiation,
+    NegotiationMessage,
+    DriverAssignment,
+    Delivery,
+    DeliveryTracking,
+    PaymentAllocation,
+    Settlement,
+    TransportDispute,
+    TransportDisputeEvidence,
+)
 
 __all__ = [
     "AdminUser", "AdminRole", "BroadcastMessage", "BroadcastStatus", "BroadcastAudience", "AuditLog",
@@ -151,7 +176,6 @@ __all__ = [
     "NotificationTemplate", "TemplateChannel",
     "ModelVersion", "MLJobLog", "MLPrediction", "MLInsight",
     "SavedListing", "ListingReport", "ListingReportReason", "ListingReportStatus",
-    "Loan", "LoanProduct", "LoanRepayment", "LoanStatus", "LoanPurpose",
     "SuperAdmin", "AdminApproval", "ApprovalStatus", "ApprovalAction", "AdminLevel",
     "AuditChecksum", "FraudAlert", "FraudAlertType", "FraudSeverity",
     "WithdrawalLimit", "UserTier", "AdminActionLog",
@@ -168,6 +192,7 @@ __all__ = [
     "InputCategory", "InputListing", "InputListingStatus",
     "InputOffer", "InputOfferStatus", "InputOrder", "InputOrderStatus",
     "InputReport", "InputReportReason", "InputReportStatus", "InputPriceAlert",
+    "LedgerEntry", "LedgerEntryType", "LedgerAccountType", "LedgerReconciliation",
     "Role", "Permission", "RolePermission", "Invitation", "InvitationStatus",
     "SupplierProfile", "SupplierDocument", "SupplierProduct", "SupplierOrder",
     "SupplierOrderItem", "SupplierStockHistory", "SupplierWalletTransaction",
@@ -175,5 +200,11 @@ __all__ = [
     "SupplierInputCategory", "MachineryCategory", "ProductCondition",
     "SupplierProductStatus", "SupplierOrderStatus", "SupplierPaymentStatus",
     "SupplierWalletTxnType",
+    "TransportMode", "TransportRequestStatus", "TransportQuoteStatus", "NegotiationStatus",
+    "MessageType", "AssignmentStatus", "DeliveryStatus", "TrackingStatus",
+    "AllocationType", "AllocationStatus", "SettlementType", "SettlementStatus",
+    "TransportDisputeStatus", "TransportRequest", "TransportQuote", "TransportNegotiation",
+    "NegotiationMessage", "DriverAssignment", "Delivery", "DeliveryTracking",
+    "PaymentAllocation", "Settlement", "TransportDispute", "TransportDisputeEvidence",
 ]
 

@@ -38,7 +38,6 @@ class RoleLevel(int, enum.Enum):
     FARMER = 10
     BUYER = 10
     DRIVER = 20
-    TRANSPORTER = 20
     STAFF = 30
     AGENT = 40
     SUPPLIER = 60

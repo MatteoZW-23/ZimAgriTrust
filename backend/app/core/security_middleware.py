@@ -132,7 +132,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
     
     def _should_skip(self, request: Request) -> bool:
         path = request.url.path
-        skip = {"/", "/health", "/api/v1/auth/login", "/api/v1/auth/verify-login-2fa", "/api/v1/auth/refresh"}
+        skip = {"/", "/health", "/api/v1/auth/login", "/api/v1/auth/verify-login-2fa", "/api/v1/auth/refresh", "/api/v1/auth/register", "/api/v1/auth/me"}
         if path in skip:
             return True
         for prefix in (

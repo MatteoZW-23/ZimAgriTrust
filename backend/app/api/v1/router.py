@@ -1,6 +1,9 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import admin, audit, auth, disputes, listings, market, payments, transactions, ussd, agents, logistics, whatsapp, trades, recruitment, onboarding, requests, academy, vision, public, drivers, verification, loans, portal_auth, agent_portal, super_admin, admin_approvals, deposits, inputs, browse, wallet, agent_practical, agent_shadowing, ml, users, offers, suppliers, security_auth, agent_classroom
+from app.api.v1.endpoints import admin, audit, auth, disputes, listings, market, payments, transactions, ussd, agents, logistics, whatsapp, trades, recruitment, onboarding, requests, academy, vision, public, drivers, verification, portal_auth, agent_portal, super_admin, admin_approvals, deposits, inputs, browse, wallet, agent_practical, agent_shadowing, ml, users, offers, suppliers, security_auth, agent_classroom, fintech, admin_fintech
+from app.ussd.simulator.api import router as ussd_simulator
+from app.ussd.simulator.debugger import router as ussd_debugger
+from app.ussd.simulator.replay import router as ussd_replay
 from app.api.v1.endpoints.webhooks import vision_webhook
 
 api_router = APIRouter()
@@ -26,6 +29,9 @@ api_router.include_router(drivers.router, prefix="/drivers", tags=["drivers"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(logistics.admin_router, prefix="/admin/transport", tags=["admin-transport"])
 api_router.include_router(ussd.router, prefix="/ussd", tags=["ussd"])
+api_router.include_router(ussd_simulator, prefix="/ussd/simulator", tags=["ussd-simulator"])
+api_router.include_router(ussd_debugger, prefix="/ussd/debug", tags=["ussd-debug"])
+api_router.include_router(ussd_replay, prefix="/ussd/replay", tags=["ussd-replay"])
 api_router.include_router(recruitment.router, prefix="/recruitment", tags=["recruitment"])
 api_router.include_router(onboarding.router, prefix="/onboarding", tags=["onboarding"])
 api_router.include_router(academy.router, prefix="/academy", tags=["academy"])
@@ -38,7 +44,6 @@ api_router.include_router(vision.router)
 api_router.include_router(vision_webhook.router)
 api_router.include_router(public.router, prefix="/public", tags=["public"])
 api_router.include_router(verification.router, prefix="/verification", tags=["verification"])
-api_router.include_router(loans.router, prefix="/loans", tags=["loans"])
 api_router.include_router(admin_approvals.router, prefix="/admin/approvals", tags=["admin-approvals"])
 api_router.include_router(super_admin.router, prefix="/super-admin", tags=["super-admin"])
 api_router.include_router(deposits.router, prefix="/deposits", tags=["deposits"])
@@ -53,3 +58,5 @@ api_router.include_router(security_auth.mfa_router, prefix="/auth/mfa", tags=["m
 api_router.include_router(security_auth.security_router, prefix="/auth/security", tags=["security"])
 api_router.include_router(security_auth.supplier_auth_router, prefix="/auth/supplier", tags=["supplier-auth"])
 api_router.include_router(security_auth.staff_auth_router, prefix="/auth/staff", tags=["staff-auth"])
+api_router.include_router(fintech.router, prefix="/fintech", tags=["fintech"])
+api_router.include_router(admin_fintech.router, prefix="/admin/fintech", tags=["admin-fintech"])

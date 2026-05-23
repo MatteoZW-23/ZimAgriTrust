@@ -1,5 +1,6 @@
 node_modules
 .env
+ngrok.yml
 dist
 build
 *.log

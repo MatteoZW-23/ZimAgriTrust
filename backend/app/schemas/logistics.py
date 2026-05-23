@@ -13,7 +13,7 @@ class LogisticsTripCreate(BaseModel):
 
 class LogisticsTripResponse(BaseModel):
     id: uuid.UUID
-    transporter_id: uuid.UUID
+    driver_id: uuid.UUID
     origin_district: str
     destination_city: str
     available_capacity_kg: float

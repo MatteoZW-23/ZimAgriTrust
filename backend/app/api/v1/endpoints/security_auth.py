@@ -238,7 +238,7 @@ async def change_pin(
     # Only PIN-based roles
     pin_roles = {
         UserRole.FARMER, UserRole.BUYER, UserRole.DRIVER,
-        UserRole.TRANSPORTER, UserRole.AGENT,
+        UserRole.AGENT,
     }
     if current_user.role not in pin_roles:
         raise HTTPException(status_code=403, detail="PIN change not applicable for your role")

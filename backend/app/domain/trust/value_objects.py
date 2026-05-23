@@ -11,7 +11,7 @@ class Role(str, Enum):
     """Domain-local roles relevant to trust scoring.
 
     Mirrors the legacy `UserRole` enum's string values for buyer / farmer /
-    agent. Other roles (admin, transporter) are not trust-scored.
+    agent. Other roles (admin, driver) are not trust-scored.
     """
     BUYER = "buyer"
     FARMER = "farmer"

@@ -18,13 +18,18 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.api.deps import get_db, get_current_user, require_roles
-from app.models.user import User, UserRole
-from app.models.system_audit import SystemAudit
+from app.models import (
+    User, UserRole, SystemAudit,
+    DocumentVerificationRecord, UserVerificationSummary,
+    VerificationStatus, DocumentType
+)
 from app.services.notification_service import NotificationService
-from app.db.base import Base
 from app.core.config import settings
 
 router = APIRouter()
+
+# For backwards compatibility with migration scripts
+IDVerificationRequest = DocumentVerificationRecord
 
 UPLOAD_DIR = settings.SECURE_UPLOAD_DIR if hasattr(settings, "SECURE_UPLOAD_DIR") else "uploads/id_documents"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -54,33 +59,73 @@ def _validate_file_magic(file: UploadFile) -> str:
     return ""
 
 
-# ── Model ────────────────────────────────────────────────────────────────────
-
-class IDVerificationRequest(Base):
-    __tablename__ = "id_verification_requests"
-
-    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-
-    # Uploaded file paths (relative to UPLOAD_DIR)
-    front_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    back_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    selfie_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-
-    national_id_number: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
-
-    # Review state
-    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending | approved | rejected
-    reviewer_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"), nullable=True)
-    reviewer_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-
-    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-
-    user = __import__('sqlalchemy.orm', fromlist=['relationship']).relationship("User", foreign_keys=[user_id])
-
-
 # ── Helpers ──────────────────────────────────────────────────────────────────
+
+def _update_user_verification_summary(db: Session, user_id: uuid.UUID):
+    """Update UserVerificationSummary based on the user's verification records."""
+    # Get all verification records for this user
+    records = db.query(DocumentVerificationRecord).filter(
+        DocumentVerificationRecord.user_id == user_id
+    ).all()
+    
+    if not records:
+        return
+        
+    summary = db.query(UserVerificationSummary).filter(
+        UserVerificationSummary.user_id == user_id
+    ).first()
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return
+        
+    if not summary:
+        summary = UserVerificationSummary(
+            user_id=user_id,
+            role=user.role.value if hasattr(user.role, "value") else str(user.role),
+            overall_status=VerificationStatus.PENDING_ADMIN,
+            verification_level=0,
+        )
+        db.add(summary)
+        
+    # Check if identity is approved (National ID or Passport)
+    identity_approved = any(
+        r.document_type in (DocumentType.NATIONAL_ID, DocumentType.PASSPORT) and r.status == VerificationStatus.APPROVED
+        for r in records
+    )
+    
+    if identity_approved:
+        summary.identity_status = VerificationStatus.APPROVED
+        summary.identity_verified_at = datetime.utcnow()
+        # Find which document was approved
+        approved_doc = next(
+            (r for r in records if r.document_type in (DocumentType.NATIONAL_ID, DocumentType.PASSPORT) and r.status == VerificationStatus.APPROVED),
+            None
+        )
+        if approved_doc:
+            summary.identity_document_type = approved_doc.document_type.value
+            
+    # Set verification level based on count of approved documents
+    approved_count = sum(1 for r in records if r.status == VerificationStatus.APPROVED)
+    summary.verification_level = min(5, approved_count)
+    
+    # Determine overall status
+    if all(r.status == VerificationStatus.APPROVED for r in records):
+        summary.overall_status = VerificationStatus.APPROVED
+    elif any(r.status == VerificationStatus.REJECTED for r in records):
+        summary.overall_status = VerificationStatus.REJECTED
+    else:
+        summary.overall_status = VerificationStatus.PENDING_ADMIN
+        
+    # Update user permissions
+    summary.can_list_products = identity_approved
+    summary.can_make_purchases = identity_approved
+    summary.can_receive_payments = identity_approved
+    summary.can_access_loans = summary.verification_level >= 3
+    summary.can_use_platform_services = identity_approved
+    
+    summary.updated_at = datetime.utcnow()
+
 
 def _save_file(file: UploadFile, user_id: str, slot: str) -> str:
     """Save uploaded file with deep validation (magic bytes, extension, size)."""
@@ -155,9 +200,9 @@ async def submit_id_documents(
     uid = str(current_user.id)
 
     # Cancel any existing pending request so user can resubmit
-    existing = db.query(IDVerificationRequest).filter(
-        IDVerificationRequest.user_id == current_user.id,
-        IDVerificationRequest.status == "pending"
+    existing = db.query(DocumentVerificationRecord).filter(
+        DocumentVerificationRecord.user_id == current_user.id,
+        DocumentVerificationRecord.status == VerificationStatus.PENDING_ADMIN
     ).first()
     if existing:
         db.delete(existing)
@@ -167,13 +212,15 @@ async def submit_id_documents(
     back_path = _save_file(back, uid, "back") if back and back.filename else None
     selfie_path = _save_file(selfie, uid, "selfie") if selfie and selfie.filename else None
 
-    req = IDVerificationRequest(
+    req = DocumentVerificationRecord(
         user_id=current_user.id,
-        front_url=front_path,
-        back_url=back_path,
-        selfie_url=selfie_path,
-        national_id_number=national_id_number,
-        status="pending",
+        document_type=DocumentType.NATIONAL_ID,
+        document_label="National ID",
+        file_url=front_path,
+        back_file_url=back_path,
+        selfie_file_url=selfie_path,
+        document_number=national_id_number,
+        status=VerificationStatus.PENDING_ADMIN,
     )
     db.add(req)
 
@@ -201,24 +248,31 @@ def get_my_verification_status(
 ):
     """User checks the status of their latest verification request."""
     req = (
-        db.query(IDVerificationRequest)
-        .filter(IDVerificationRequest.user_id == current_user.id)
-        .order_by(IDVerificationRequest.submitted_at.desc())
+        db.query(DocumentVerificationRecord)
+        .filter(DocumentVerificationRecord.user_id == current_user.id)
+        .order_by(DocumentVerificationRecord.submitted_at.desc())
         .first()
     )
     if not req:
         return {"status": "not_submitted", "id_verified": current_user.id_verified}
 
+    # Map status to legacy strings for API compatibility
+    status_str = "pending"
+    if req.status == VerificationStatus.APPROVED:
+        status_str = "approved"
+    elif req.status == VerificationStatus.REJECTED:
+        status_str = "rejected"
+
     return {
         "request_id": str(req.id),
-        "status": req.status,
+        "status": status_str,
         "submitted_at": req.submitted_at,
-        "reviewed_at": req.reviewed_at,
-        "reviewer_note": req.reviewer_note,
+        "reviewed_at": req.admin_reviewed_at or req.agent_reviewed_at,
+        "reviewer_note": req.admin_notes or req.agent_notes,
         "id_verified": current_user.id_verified,
-        "has_front": bool(req.front_url),
-        "has_back": bool(req.back_url),
-        "has_selfie": bool(req.selfie_url),
+        "has_front": bool(req.file_url),
+        "has_back": bool(req.back_file_url),
+        "has_selfie": bool(req.selfie_file_url),
     }
 
 
@@ -228,33 +282,53 @@ def get_verification_queue(
     db: Session = Depends(get_db),
 ):
     """Admin/Agent: list all verification requests by status."""
+    # Map incoming status to corresponding new VerificationStatus enums
+    if status == "pending":
+        statuses = [VerificationStatus.PENDING_ADMIN, VerificationStatus.PENDING_AGENT]
+    elif status == "approved":
+        statuses = [VerificationStatus.APPROVED]
+    elif status == "rejected":
+        statuses = [VerificationStatus.REJECTED]
+    else:
+        try:
+            statuses = [VerificationStatus(status)]
+        except ValueError:
+            statuses = []
+
     requests = (
-        db.query(IDVerificationRequest)
-        .filter(IDVerificationRequest.status == status)
-        .order_by(IDVerificationRequest.submitted_at.asc())
+        db.query(DocumentVerificationRecord)
+        .filter(DocumentVerificationRecord.status.in_(statuses))
+        .order_by(DocumentVerificationRecord.submitted_at.asc())
         .all()
     )
 
     result = []
     for r in requests:
         user = db.query(User).filter(User.id == r.user_id).first()
+        
+        status_str = "pending"
+        if r.status == VerificationStatus.APPROVED:
+            status_str = "approved"
+        elif r.status == VerificationStatus.REJECTED:
+            status_str = "rejected"
+
         result.append({
             "request_id": str(r.id),
             "user_id": str(r.user_id),
             "user_name": user.full_name if user else "Unknown",
             "user_phone": user.phone_number if user else "",
             "user_role": user.role.value if user else "",
-            "national_id_number": r.national_id_number,
-            "status": r.status,
+            "national_id_number": r.document_number,
+            "status": status_str,
             "submitted_at": r.submitted_at,
-            "reviewed_at": r.reviewed_at,
-            "reviewer_note": r.reviewer_note,
-            "has_front": bool(r.front_url),
-            "has_back": bool(r.back_url),
-            "has_selfie": bool(r.selfie_url),
-            "front_url": f"/api/v1/verification/document/{r.id}/front" if r.front_url else None,
-            "back_url": f"/api/v1/verification/document/{r.id}/back" if r.back_url else None,
-            "selfie_url": f"/api/v1/verification/document/{r.id}/selfie" if r.selfie_url else None,
+            "reviewed_at": r.admin_reviewed_at or r.agent_reviewed_at,
+            "reviewer_note": r.admin_notes or r.agent_notes,
+            "has_front": bool(r.file_url),
+            "has_back": bool(r.back_file_url),
+            "has_selfie": bool(r.selfie_file_url),
+            "front_url": f"/api/v1/verification/document/{r.id}/front" if r.file_url else None,
+            "back_url": f"/api/v1/verification/document/{r.id}/back" if r.back_file_url else None,
+            "selfie_url": f"/api/v1/verification/document/{r.id}/selfie" if r.selfie_file_url else None,
         })
     return result
 
@@ -269,11 +343,17 @@ def get_document_file(
     if slot not in ("front", "back", "selfie"):
         raise HTTPException(status_code=400, detail="Invalid slot")
 
-    req = db.query(IDVerificationRequest).filter(IDVerificationRequest.id == request_id).first()
+    req = db.query(DocumentVerificationRecord).filter(DocumentVerificationRecord.id == request_id).first()
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
 
-    path = getattr(req, f"{slot}_url")
+    if slot == "front":
+        path = req.file_url
+    elif slot == "back":
+        path = req.back_file_url
+    else:
+        path = req.selfie_file_url
+
     if not path or not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Document not found")
 
@@ -289,22 +369,33 @@ async def approve_verification(
     admin: User = Depends(require_roles(UserRole.ADMIN, UserRole.AGENT)),
 ):
     """Admin/Agent approves an ID verification request."""
-    req = db.query(IDVerificationRequest).filter(IDVerificationRequest.id == request_id).first()
+    req = db.query(DocumentVerificationRecord).filter(DocumentVerificationRecord.id == request_id).first()
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
-    if req.status != "pending":
-        raise HTTPException(status_code=400, detail=f"Request is already {req.status}")
+    if req.status not in (VerificationStatus.PENDING_ADMIN, VerificationStatus.PENDING_AGENT, VerificationStatus.UNDER_REVIEW):
+        raise HTTPException(status_code=400, detail=f"Request is already {req.status.value}")
 
-    req.status = "approved"
-    req.reviewer_id = admin.id
-    req.reviewer_note = note
-    req.reviewed_at = datetime.utcnow()
+    req.status = VerificationStatus.APPROVED
+    
+    # Record reviewer based on role
+    if admin.role == UserRole.AGENT:
+        req.agent_reviewer_id = admin.id
+        req.agent_notes = note
+        req.agent_reviewed_at = datetime.utcnow()
+        req.agent_decision = "approve"
+    else:
+        req.admin_reviewer_id = admin.id
+        req.admin_notes = note
+        req.admin_reviewed_at = datetime.utcnow()
+        req.admin_decision = "approve"
 
     user = db.query(User).filter(User.id == req.user_id).first()
     if user:
         user.id_verified = True
         user.id_verified_at = datetime.utcnow()
         user.trust_score = min(100, user.trust_score + 15)
+
+    _update_user_verification_summary(db, req.user_id)
 
     audit = SystemAudit(
         admin_id=admin.id,
@@ -338,18 +429,29 @@ async def reject_verification(
     admin: User = Depends(require_roles(UserRole.ADMIN, UserRole.AGENT)),
 ):
     """Admin/Agent rejects an ID verification request with a reason."""
-    req = db.query(IDVerificationRequest).filter(IDVerificationRequest.id == request_id).first()
+    req = db.query(DocumentVerificationRecord).filter(DocumentVerificationRecord.id == request_id).first()
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
-    if req.status != "pending":
-        raise HTTPException(status_code=400, detail=f"Request is already {req.status}")
+    if req.status not in (VerificationStatus.PENDING_ADMIN, VerificationStatus.PENDING_AGENT, VerificationStatus.UNDER_REVIEW):
+        raise HTTPException(status_code=400, detail=f"Request is already {req.status.value}")
 
-    req.status = "rejected"
-    req.reviewer_id = admin.id
-    req.reviewer_note = note
-    req.reviewed_at = datetime.utcnow()
+    req.status = VerificationStatus.REJECTED
+    
+    # Record reviewer based on role
+    if admin.role == UserRole.AGENT:
+        req.agent_reviewer_id = admin.id
+        req.agent_notes = note
+        req.agent_reviewed_at = datetime.utcnow()
+        req.agent_decision = "reject"
+    else:
+        req.admin_reviewer_id = admin.id
+        req.admin_notes = note
+        req.admin_reviewed_at = datetime.utcnow()
+        req.admin_decision = "reject"
 
     user = db.query(User).filter(User.id == req.user_id).first()
+
+    _update_user_verification_summary(db, req.user_id)
 
     audit = SystemAudit(
         admin_id=admin.id,
