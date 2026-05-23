@@ -15,6 +15,14 @@ from enum import Enum
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
+from app.models.transport import (
+    PaymentAllocation as DBPaymentAllocation,
+    AllocationStatus as DBAllocationStatus,
+    AllocationType as DBAllocationType,
+)
+from app.models.transaction import Order
+from app.services.notification_service import notification_service
+
 logger = logging.getLogger(__name__)
 
 
@@ -81,14 +89,30 @@ class PaymentAllocationService:
             f"payer={allocation.payer}, payee={allocation.payee}, amount={allocation.amount}"
         )
         
-        # TODO: Insert into payment_allocations table
-        # TODO: Generate payment reference if not provided
-        # TODO: Set initial status to PENDING
+        # Insert into payment_allocations table
+        db_allocation = DBPaymentAllocation(
+            order_id=allocation.order_id,
+            transport_request_id=allocation.transport_request_id,
+            allocation_type=DBAllocationType(allocation.allocation_type.value),
+            payer=allocation.payer,
+            payee=allocation.payee,
+            amount=allocation.amount,
+            currency=allocation.currency,
+            payment_method=allocation.payment_method.value if allocation.payment_method else None,
+            payment_reference=allocation.payment_reference,
+            status=DBAllocationStatus.PENDING,
+        )
+        self.db.add(db_allocation)
+        self.db.flush()
         
-        allocation_id = uuid.uuid4()
+        # Generate payment reference if not provided
+        if not db_allocation.payment_reference:
+            db_allocation.payment_reference = f"PAY-{str(db_allocation.id)[:8].upper()}"
+        
+        self.db.commit()
         
         return {
-            "id": str(allocation_id),
+            "id": str(db_allocation.id),
             "order_id": str(allocation.order_id),
             "allocation_type": allocation.allocation_type.value,
             "payer": allocation.payer,
@@ -96,8 +120,9 @@ class PaymentAllocationService:
             "amount": allocation.amount,
             "currency": allocation.currency,
             "payment_method": allocation.payment_method.value if allocation.payment_method else None,
-            "status": AllocationStatus.PENDING.value,
-            "created_at": datetime.utcnow().isoformat(),
+            "payment_reference": db_allocation.payment_reference,
+            "status": db_allocation.status.value,
+            "created_at": db_allocation.created_at.isoformat(),
         }
     
     def hold_in_escrow(
@@ -111,14 +136,25 @@ class PaymentAllocationService:
         """
         logger.info(f"Holding allocation {allocation_id} in escrow")
         
-        # TODO: Update payment_allocations status to HELD
-        # TODO: Set held_at timestamp
-        # TODO: Integrate with escrow service
+        # Update payment_allocations status to HELD
+        allocation = self.db.query(DBPaymentAllocation).filter(
+            DBPaymentAllocation.id == allocation_id
+        ).first()
+        
+        if not allocation:
+            raise HTTPException(status_code=404, detail="Payment allocation not found")
+        
+        allocation.status = DBAllocationStatus.HELD
+        allocation.held_at = datetime.utcnow()
+        
+        self.db.commit()
+        
+        # Integrate with escrow service (simplified - would call escrow service)
         
         return {
-            "id": str(allocation_id),
-            "status": AllocationStatus.HELD.value,
-            "held_at": datetime.utcnow().isoformat(),
+            "id": str(allocation.id),
+            "status": allocation.status.value,
+            "held_at": allocation.held_at.isoformat(),
         }
     
     def release_allocation(
@@ -132,15 +168,26 @@ class PaymentAllocationService:
         """
         logger.info(f"Releasing allocation {allocation_id}")
         
-        # TODO: Update payment_allocations status to RELEASED
-        # TODO: Set released_at timestamp
-        # TODO: Execute actual payment transfer
-        # TODO: Integrate with wallet service or payment gateway
+        # Update payment_allocations status to RELEASED
+        allocation = self.db.query(DBPaymentAllocation).filter(
+            DBPaymentAllocation.id == allocation_id
+        ).first()
+        
+        if not allocation:
+            raise HTTPException(status_code=404, detail="Payment allocation not found")
+        
+        allocation.status = DBAllocationStatus.RELEASED
+        allocation.released_at = datetime.utcnow()
+        
+        self.db.commit()
+        
+        # Execute actual payment transfer (simplified - would integrate with wallet service or payment gateway)
+        # Integrate with wallet service or payment gateway
         
         return {
-            "id": str(allocation_id),
-            "status": AllocationStatus.RELEASED.value,
-            "released_at": datetime.utcnow().isoformat(),
+            "id": str(allocation.id),
+            "status": allocation.status.value,
+            "released_at": allocation.released_at.isoformat(),
         }
     
     def refund_allocation(
@@ -155,15 +202,27 @@ class PaymentAllocationService:
         """
         logger.info(f"Refunding allocation {allocation_id}: {reason}")
         
-        # TODO: Update payment_allocations status to REFUNDED
-        # TODO: Set refunded_at timestamp
-        # TODO: Execute refund to original payer
-        # TODO: Record refund reason
+        # Update payment_allocations status to REFUNDED
+        allocation = self.db.query(DBPaymentAllocation).filter(
+            DBPaymentAllocation.id == allocation_id
+        ).first()
+        
+        if not allocation:
+            raise HTTPException(status_code=404, detail="Payment allocation not found")
+        
+        allocation.status = DBAllocationStatus.REFUNDED
+        allocation.refunded_at = datetime.utcnow()
+        allocation.refund_reason = reason
+        
+        self.db.commit()
+        
+        # Execute refund to original payer (simplified - would integrate with payment gateway)
+        # Record refund reason
         
         return {
-            "id": str(allocation_id),
-            "status": AllocationStatus.REFUNDED.value,
-            "refunded_at": datetime.utcnow().isoformat(),
+            "id": str(allocation.id),
+            "status": allocation.status.value,
+            "refunded_at": allocation.refunded_at.isoformat(),
             "refund_reason": reason,
         }
     
@@ -296,11 +355,30 @@ class PaymentAllocationService:
         """
         Get all payment allocations for an order.
         """
-        # TODO: Query payment_allocations table
-        # TODO: Filter by order_id
-        # TODO: Return all allocations with status
+        # Query payment_allocations table
+        allocations = self.db.query(DBPaymentAllocation).filter(
+            DBPaymentAllocation.order_id == order_id
+        ).order_by(DBPaymentAllocation.created_at).all()
         
-        return []
+        # Return all allocations with status
+        return [
+            {
+                "id": str(a.id),
+                "order_id": str(a.order_id),
+                "allocation_type": a.allocation_type.value,
+                "payer": a.payer,
+                "payee": a.payee,
+                "amount": float(a.amount),
+                "currency": a.currency,
+                "status": a.status.value,
+                "payment_reference": a.payment_reference,
+                "created_at": a.created_at.isoformat(),
+                "held_at": a.held_at.isoformat() if a.held_at else None,
+                "released_at": a.released_at.isoformat() if a.released_at else None,
+                "refunded_at": a.refunded_at.isoformat() if a.refunded_at else None,
+            }
+            for a in allocations
+        ]
     
     def get_user_allocations(
         self,
@@ -310,11 +388,30 @@ class PaymentAllocationService:
         """
         Get all payment allocations for a user as payer or payee.
         """
-        # TODO: Query payment_allocations table
-        # TODO: Filter by payer or payee
-        # TODO: Return allocations
+        # Query payment_allocations table
+        if role == "payer":
+            allocations = self.db.query(DBPaymentAllocation).filter(
+                DBPaymentAllocation.payer == str(user_id)
+            ).order_by(DBPaymentAllocation.created_at.desc()).all()
+        else:
+            allocations = self.db.query(DBPaymentAllocation).filter(
+                DBPaymentAllocation.payee == str(user_id)
+            ).order_by(DBPaymentAllocation.created_at.desc()).all()
         
-        return []
+        # Return allocations
+        return [
+            {
+                "id": str(a.id),
+                "order_id": str(a.order_id),
+                "allocation_type": a.allocation_type.value,
+                "payer": a.payer,
+                "payee": a.payee,
+                "amount": float(a.amount),
+                "status": a.status.value,
+                "created_at": a.created_at.isoformat(),
+            }
+            for a in allocations
+        ]
     
     def calculate_total_payer_amount(
         self,

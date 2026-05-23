@@ -15,6 +15,8 @@ from enum import Enum
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
+from app.models.logistics import DeliveryStatus as ModelDeliveryStatus
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,17 +28,8 @@ class TrackingStatus(str, Enum):
     IDLE = "IDLE"
 
 
-class DeliveryStatus(str, Enum):
-    PENDING = "PENDING"
-    ASSIGNED = "ASSIGNED"
-    DRIVER_EN_ROUTE = "DRIVER_EN_ROUTE"
-    AT_PICKUP = "AT_PICKUP"
-    PICKED_UP = "PICKED_UP"
-    IN_TRANSIT = "IN_TRANSIT"
-    AT_DELIVERY = "AT_DELIVERY"
-    DELIVERED = "DELIVERED"
-    CANCELLED = "CANCELLED"
-    FAILED = "FAILED"
+# Use DeliveryStatus from models to avoid duplication
+DeliveryStatus = ModelDeliveryStatus
 
 
 # ── Location Data ───────────────────────────────────────────────────────────

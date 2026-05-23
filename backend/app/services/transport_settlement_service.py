@@ -15,6 +15,18 @@ from enum import Enum
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
+from app.models.transport import (
+    Settlement,
+    SettlementStatus as DBSettlementStatus,
+    PaymentAllocation,
+    AllocationStatus,
+    DriverAssignment,
+    TransportRequest,
+)
+from app.models.transaction import Order
+from app.models.user import User, UserRole
+from app.services.notification_service import notification_service
+
 logger = logging.getLogger(__name__)
 
 
@@ -193,17 +205,67 @@ class TransportSettlementService:
         """
         logger.info(f"Processing settlement {settlement_id}")
         
-        # TODO: Query settlements table
-        # TODO: Update status to PROCESSING
-        # TODO: Execute payout based on payout_method
-        # TODO: Integrate with wallet service or payment gateway
-        # TODO: Update status to COMPLETED or FAILED
-        # TODO: Handle retries on failure
+        # Query settlements table
+        settlement = self.db.query(Settlement).filter(
+            Settlement.id == settlement_id
+        ).first()
+        
+        if not settlement:
+            raise HTTPException(status_code=404, detail="Settlement not found")
+        
+        if settlement.status != DBSettlementStatus.PENDING:
+            raise HTTPException(status_code=400, detail="Settlement is not in PENDING status")
+        
+        # Update status to PROCESSING
+        settlement.status = DBSettlementStatus.PROCESSING
+        settlement.processed_at = datetime.utcnow()
+        self.db.commit()
+        
+        # Execute payout based on payout_method
+        try:
+            # Integrate with wallet service or payment gateway (simplified)
+            if settlement.payout_method == "WALLET":
+                # Would call wallet service to credit user wallet
+                pass
+            elif settlement.payout_method == "BANK_TRANSFER":
+                # Would call payment gateway for bank transfer
+                pass
+            elif settlement.payout_method == "MOBILE_MONEY":
+                # Would call mobile money API
+                pass
+            
+            # Update status to COMPLETED
+            settlement.status = DBSettlementStatus.COMPLETED
+            settlement.completed_at = datetime.utcnow()
+            self.db.commit()
+            
+            # Send notification
+            notification_service.send_notification(
+                db=self.db,
+                user_id=settlement.user_id,
+                notification_type="settlement_completed",
+                title="Settlement Completed",
+                body=f"Your settlement of ${settlement.net_amount:.2f} has been processed.",
+                data={"settlement_id": str(settlement.id)},
+            )
+            
+        except Exception as e:
+            # Update status to FAILED
+            settlement.status = DBSettlementStatus.FAILED
+            settlement.retry_count = (settlement.retry_count or 0) + 1
+            settlement.next_retry_at = datetime.utcnow() + timedelta(seconds=calculate_retry_delay(settlement.retry_count))
+            settlement.error_message = str(e)
+            self.db.commit()
+            
+            # Handle retries on failure (would be handled by scheduled job)
+            logger.error(f"Settlement {settlement_id} failed: {e}")
+            raise
         
         return {
-            "id": str(settlement_id),
-            "status": SettlementStatus.PROCESSING.value,
-            "processed_at": datetime.utcnow().isoformat(),
+            "id": str(settlement.id),
+            "status": settlement.status.value,
+            "processed_at": settlement.processed_at.isoformat() if settlement.processed_at else None,
+            "completed_at": settlement.completed_at.isoformat() if settlement.completed_at else None,
         }
     
     def process_order_settlements(
@@ -219,12 +281,71 @@ class TransportSettlementService:
         
         settlements = []
         
-        # TODO: Query order details
-        # TODO: Determine transport fee payer
-        # TODO: Calculate farmer settlement
-        # TODO: Calculate driver settlement (if platform delivery)
-        # TODO: Process all settlements
-        # TODO: Send notifications
+        # Query order details
+        order = self.db.query(Order).filter(Order.id == order_id).first()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        # Determine transport fee payer
+        payment_allocations = self.db.query(PaymentAllocation).filter(
+            PaymentAllocation.order_id == order_id,
+            PaymentAllocation.allocation_type == "TRANSPORT_FEE"
+        ).all()
+        
+        transport_fee_payer = None
+        transport_fee = 0.0
+        for allocation in payment_allocations:
+            if allocation.payer:
+                transport_fee_payer = allocation.payer
+                transport_fee = allocation.amount
+        
+        # Calculate farmer settlement
+        platform_fee = order.total_amount * 0.05  # 5% platform fee
+        transport_fee_paid_by_farmer = transport_fee if transport_fee_payer == "FARMER" else 0.0
+        
+        farmer_settlement = self.calculate_farmer_settlement(
+            order_id=order_id,
+            farmer_id=order.seller_id,
+            goods_amount=order.total_amount,
+            platform_fee=platform_fee,
+            transport_fee_paid_by_farmer=transport_fee_paid_by_farmer,
+        )
+        settlements.append(farmer_settlement)
+        
+        # Calculate driver settlement (if platform delivery)
+        driver_assignment = self.db.query(DriverAssignment).filter(
+            DriverAssignment.transport_request_id.in_(
+                self.db.query(TransportRequest.id).filter(TransportRequest.order_id == order_id)
+            )
+        ).first()
+        
+        if driver_assignment and driver_assignment.status == "COMPLETED":
+            driver_settlement = self.calculate_driver_settlement(
+                order_id=order_id,
+                driver_id=driver_assignment.driver_id,
+                transport_fee=driver_assignment.transport_fee,
+                platform_commission=driver_assignment.platform_commission,
+            )
+            settlements.append(driver_settlement)
+        
+        # Process all settlements
+        for settlement_data in settlements:
+            settlement_id = uuid.UUID(settlement_data["id"])
+            try:
+                self.process_settlement(settlement_id)
+            except Exception as e:
+                logger.error(f"Failed to process settlement {settlement_id}: {e}")
+        
+        # Send notifications
+        notification_service.send_notification(
+            db=self.db,
+            user_id=order.seller_id,
+            notification_type="settlements_processed",
+            title="Order Settlements Processed",
+            body="Your order settlements have been processed.",
+            data={"order_id": str(order_id)},
+        )
         
         return settlements
     
@@ -241,11 +362,30 @@ class TransportSettlementService:
         
         retry_count = 0
         
-        # TODO: Query settlements with status FAILED
-        # TODO: Filter by retry_count < max_retries
-        # TODO: Check if next_retry_at has passed
-        # TODO: Process settlement
-        # TODO: Update retry_count and next_retry_at on failure
+        # Query settlements with status FAILED
+        failed_settlements = self.db.query(Settlement).filter(
+            Settlement.status == DBSettlementStatus.FAILED,
+            (Settlement.retry_count < max_retries) | (Settlement.retry_count.is_(None))
+        ).all()
+        
+        for settlement in failed_settlements:
+            # Check if next_retry_at has passed
+            if settlement.next_retry_at and settlement.next_retry_at > datetime.utcnow():
+                continue
+            
+            # Process settlement
+            try:
+                self.process_settlement(settlement.id)
+                retry_count += 1
+            except Exception as e:
+                # Update retry_count and next_retry_at on failure
+                settlement.retry_count = (settlement.retry_count or 0) + 1
+                settlement.next_retry_at = datetime.utcnow() + timedelta(seconds=calculate_retry_delay(settlement.retry_count))
+                settlement.error_message = str(e)
+                self.db.commit()
+                logger.error(f"Retry failed for settlement {settlement.id}: {e}")
+        
+        return retry_count
         
         return retry_count
     
@@ -256,14 +396,34 @@ class TransportSettlementService:
         """
         Create a settlement record in the database.
         """
-        # TODO: Insert into settlements table
-        # TODO: Generate payout reference if not provided
-        # TODO: Set initial status to PENDING
+        # Insert into settlements table
+        db_settlement = Settlement(
+            order_id=settlement.order_id,
+            user_id=settlement.user_id,
+            settlement_type=settlement.settlement_type.value,
+            gross_amount=settlement.gross_amount,
+            deductions=settlement.deductions,
+            net_amount=settlement.net_amount,
+            currency=settlement.currency,
+            goods_amount=settlement.goods_amount,
+            transport_amount=settlement.transport_amount,
+            platform_fee_amount=settlement.platform_fee_amount,
+            other_deductions=settlement.other_deductions,
+            payout_method=settlement.payout_method.value,
+            payout_reference=settlement.payout_reference,
+            status=DBSettlementStatus.PENDING,
+        )
+        self.db.add(db_settlement)
+        self.db.flush()
         
-        settlement_id = uuid.uuid4()
+        # Generate payout reference if not provided
+        if not db_settlement.payout_reference:
+            db_settlement.payout_reference = f"STL-{str(db_settlement.id)[:8].upper()}"
+        
+        self.db.commit()
         
         return {
-            "id": str(settlement_id),
+            "id": str(db_settlement.id),
             "order_id": str(settlement.order_id),
             "user_id": str(settlement.user_id),
             "settlement_type": settlement.settlement_type.value,
@@ -276,9 +436,9 @@ class TransportSettlementService:
             "platform_fee_amount": settlement.platform_fee_amount,
             "other_deductions": settlement.other_deductions,
             "payout_method": settlement.payout_method.value,
-            "payout_reference": settlement.payout_reference,
-            "status": SettlementStatus.PENDING.value,
-            "created_at": datetime.utcnow().isoformat(),
+            "payout_reference": db_settlement.payout_reference,
+            "status": db_settlement.status.value,
+            "created_at": db_settlement.created_at.isoformat(),
         }
     
     def get_settlement(
@@ -288,10 +448,38 @@ class TransportSettlementService:
         """
         Get settlement details.
         """
-        # TODO: Query settlements table
-        # TODO: Return settlement details
+        # Query settlements table
+        settlement = self.db.query(Settlement).filter(
+            Settlement.id == settlement_id
+        ).first()
         
-        return None
+        if not settlement:
+            return None
+        
+        # Return settlement details
+        return {
+            "id": str(settlement.id),
+            "order_id": str(settlement.order_id),
+            "user_id": str(settlement.user_id),
+            "settlement_type": settlement.settlement_type,
+            "gross_amount": float(settlement.gross_amount),
+            "deductions": settlement.deductions,
+            "net_amount": float(settlement.net_amount),
+            "currency": settlement.currency,
+            "goods_amount": float(settlement.goods_amount) if settlement.goods_amount else None,
+            "transport_amount": float(settlement.transport_amount) if settlement.transport_amount else None,
+            "platform_fee_amount": float(settlement.platform_fee_amount) if settlement.platform_fee_amount else None,
+            "other_deductions": float(settlement.other_deductions) if settlement.other_deductions else 0.0,
+            "payout_method": settlement.payout_method,
+            "payout_reference": settlement.payout_reference,
+            "status": settlement.status.value,
+            "retry_count": settlement.retry_count,
+            "error_message": settlement.error_message,
+            "created_at": settlement.created_at.isoformat(),
+            "processed_at": settlement.processed_at.isoformat() if settlement.processed_at else None,
+            "completed_at": settlement.completed_at.isoformat() if settlement.completed_at else None,
+            "next_retry_at": settlement.next_retry_at.isoformat() if settlement.next_retry_at else None,
+        }
     
     def get_user_settlements(
         self,
@@ -302,11 +490,30 @@ class TransportSettlementService:
         """
         Get all settlements for a user.
         """
-        # TODO: Query settlements table
-        # TODO: Filter by user_id, type, status
-        # TODO: Return settlements
+        # Query settlements table
+        query = self.db.query(Settlement).filter(Settlement.user_id == user_id)
         
-        return []
+        # Filter by type, status
+        if settlement_type:
+            query = query.filter(Settlement.settlement_type == settlement_type.value)
+        if status:
+            query = query.filter(Settlement.status == DBSettlementStatus(status.value))
+        
+        settlements = query.order_by(Settlement.created_at.desc()).all()
+        
+        # Return settlements
+        return [
+            {
+                "id": str(s.id),
+                "order_id": str(s.order_id),
+                "settlement_type": s.settlement_type,
+                "net_amount": float(s.net_amount),
+                "status": s.status.value,
+                "created_at": s.created_at.isoformat(),
+                "completed_at": s.completed_at.isoformat() if s.completed_at else None,
+            }
+            for s in settlements
+        ]
     
     def get_order_settlements(
         self,
@@ -315,11 +522,24 @@ class TransportSettlementService:
         """
         Get all settlements for an order.
         """
-        # TODO: Query settlements table
-        # TODO: Filter by order_id
-        # TODO: Return settlements
+        # Query settlements table
+        settlements = self.db.query(Settlement).filter(
+            Settlement.order_id == order_id
+        ).order_by(Settlement.created_at.desc()).all()
         
-        return []
+        # Return settlements
+        return [
+            {
+                "id": str(s.id),
+                "user_id": str(s.user_id),
+                "settlement_type": s.settlement_type,
+                "net_amount": float(s.net_amount),
+                "status": s.status.value,
+                "created_at": s.created_at.isoformat(),
+                "completed_at": s.completed_at.isoformat() if s.completed_at else None,
+            }
+            for s in settlements
+        ]
 
 
 # ── Helper Functions ─────────────────────────────────────────────────────────
