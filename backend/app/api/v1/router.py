@@ -3,9 +3,6 @@ from fastapi import APIRouter
 from app.core.config import settings
 from app.api.v1.endpoints import admin, audit, auth, disputes, listings, market, payments, transactions, ussd, agents, logistics, whatsapp, trades, recruitment, onboarding, requests, academy, academy_websocket, public, drivers, verification, portal_auth, agent_portal, super_admin, admin_approvals, deposits, inputs, browse, wallet, agent_practical, agent_shadowing, users, offers, suppliers, security_auth, agent_classroom, fintech, admin_fintech
 from app.api.v1.endpoints.admin import certification
-from app.ussd.simulator.api import router as ussd_simulator
-from app.ussd.simulator.debugger import router as ussd_debugger
-from app.ussd.simulator.replay import router as ussd_replay
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -30,10 +27,7 @@ api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(logistics.admin_router, prefix="/admin/transport", tags=["admin-transport"])
 api_router.include_router(certification.router, prefix="/admin/certification", tags=["admin-certification"])
 api_router.include_router(ussd.router, prefix="/ussd", tags=["ussd"])
-if settings.ENABLE_USSD_DEBUG_TOOLS:
-    api_router.include_router(ussd_simulator, prefix="/ussd/simulator", tags=["ussd-simulator"])
-    api_router.include_router(ussd_debugger, prefix="/ussd/debug", tags=["ussd-debug"])
-    api_router.include_router(ussd_replay, prefix="/ussd/replay", tags=["ussd-replay"])
+# REMOVED: USSD simulator/debugger/replay routers - development tools removed for production
 api_router.include_router(recruitment.router, prefix="/recruitment", tags=["recruitment"])
 api_router.include_router(onboarding.router, prefix="/onboarding", tags=["onboarding"])
 api_router.include_router(academy.router, prefix="/academy", tags=["academy"])
