@@ -1,7 +1,8 @@
+import uuid as _uuid
 from collections.abc import Generator
 from types import SimpleNamespace
 
-from fastapi import Depends, HTTPException, status, Request
+from fastapi import Depends, HTTPException, status, Request, WebSocket, Query
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
@@ -58,7 +59,7 @@ async def get_current_user(
             if sa and sa.is_active:
                 from app.models.user import SubscriptionTier, UserStatus
                 virtual = SimpleNamespace(
-                    id=str(sa.id),
+                    id=_uuid.uuid5(_uuid.NAMESPACE_DNS, f"superadmin-{sa.id}"),
                     full_name=sa.username,
                     phone_number=sa.phone_number or "",
                     email=sa.email,
@@ -159,6 +160,35 @@ def get_current_agent(
             detail="ACADEMY_DISMISSAL: Access denied. Your certification candidacy has been terminated."
         )
         
+    return agent
+
+
+async def get_current_agent_ws(
+    websocket: WebSocket,
+    token: str = Query(...),
+    db: Session = Depends(get_db),
+) -> Agent:
+    """WebSocket dependency to authenticate and get agent from query token param"""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id: str | None = payload.get("sub")
+        if user_id is None:
+            await websocket.close(code=4001)
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except JWTError:
+        await websocket.close(code=4001)
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        await websocket.close(code=4001)
+        raise HTTPException(status_code=401, detail="User not found")
+
+    agent = db.query(Agent).filter(Agent.user_id == user.id).first()
+    if not agent:
+        await websocket.close(code=4003)
+        raise HTTPException(status_code=403, detail="Not an agent")
+
     return agent
 
 

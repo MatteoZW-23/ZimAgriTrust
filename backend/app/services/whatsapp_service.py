@@ -11,7 +11,7 @@ import random
 import httpx
 import uuid
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 from app.services.cache_service import cache_service
 
@@ -30,10 +30,6 @@ from app.models.user import User, UserRole
 from app.models.listing import Listing, ListingStatus, Offer, OfferStatus
 from app.models.transaction import Order, OrderStatus
 from app.models.price_history import PriceHistory
-try:
-    from app.ml.vision.vision_service import vision_service
-except ImportError:
-    vision_service = None  # type: ignore[assignment]
 from app.services.media_service import media_service
 from app.core.config import settings
 from sqlalchemy import func
@@ -390,10 +386,6 @@ class WhatsAppService:
         if any(k in body_clean for k in ["sell", "list", "new listing"]):
             await WhatsAppService.set_user_state(phone, "CREATING_LISTING", {"step": "CROP_NAME"})
             return "🌱 *New Listing*\n\nWhat crop would you like to sell? (e.g., 'Maize', 'Mango', 'Tomato')"
-
-        # 10. AI Vision Advisory (Missing Function #102, #103)
-        if has_media and flow == "IDLE":
-            return await WhatsAppService._handle_vision_advisory(db, user, media)
 
         # 4. Search Listings (MVP P2)
         if any(k in body_clean for k in ["buy", "search", "find"]):
@@ -1081,240 +1073,6 @@ class WhatsAppService:
         except ValueError:
             return "⚠️ Please send a valid number for the price (e.g., '0.45')."
 
-    @staticmethod
-    async def _handle_vision_verification(db, user, image_data: bytes, claimed_crop: str) -> Dict[str, Any]:
-        """
-        Verify crop matches claimed type using AI vision
-        This is the core verification function
-        """
-        try:
-            # Process the image
-            validation = await media_service.process_uploaded_image(image_data)
-            if not validation["valid"]:
-                return {
-                    "verified": False,
-                    "message": validation["error"]
-                }
-            
-            # Run AI verification
-            result = await vision_service.verify_crop_match(image_data, claimed_crop)
-            
-            return {
-                "verified": result["is_match"],
-                "detected_crop": result["detected_crop"],
-                "confidence": result["confidence"],
-                "grade": result["grade"],
-                "quality_score": result["quality_score"],
-                "message": result["message"]
-            }
-            
-        except Exception as e:
-            logging.error(f"Vision verification error: {e}")
-            return {
-                "verified": False,
-                "message": "⚠️ AI verification temporarily unavailable. Your listing will be queued for agent review."
-            }
-    
-    @staticmethod
-    async def _handle_listing_flow(db, user, body, has_media, media, state):
-        """
-        Enhanced listing flow with AI vision verification
-        """
-        step = state["data"].get("step")
-        phone = user.phone_number
-        
-        # Step 1: Get crop name from user
-        if step == "CROP_NAME":
-            crop_name = body.strip()
-            
-            # Validate crop is supported
-            try:
-                from app.ml.vision.crop_classifier import crop_classifier
-                supported_crops = list(crop_classifier.CROPS.keys())
-            except ImportError:
-                supported_crops = ["maize", "tomato", "mango", "tobacco", "soybean", "wheat", "groundnut", "cotton"]
-
-            matched_crop = None
-            for crop in supported_crops:
-                if crop in crop_name.lower() or crop_name.lower() in crop:
-                    matched_crop = crop
-                    break
-            
-            if not matched_crop:
-                crop_list = ", ".join([c.title() for c in supported_crops[:5]])
-                return (f"⚠️ We currently support verification for: {crop_list} and more.\n\n"
-                        f"Please reply with the exact crop name (e.g., 'Maize', 'Mango', 'Tomato')")
-            
-            await WhatsAppService.set_user_state(phone, "CREATING_LISTING", {
-                "step": "MEDIA",
-                "claimed_crop": matched_crop,
-                "crop_display": matched_crop.title()
-            })
-            return (f"🌱 *Listing: {matched_crop.title()}*\n\n"
-                    f"Please send a **clear photo** of your {matched_crop.title()} for AI verification.\n\n"
-                    f"📸 Tips:\n"
-                    f"• Use good lighting\n"
-                    f"• Show the crop clearly\n"
-                    f"• Avoid blurry images")
-        
-        # Step 2: User sends photo - AI verifies
-        if step == "MEDIA":
-            if not has_media:
-                return "📸 Please send a photo of your crop to continue."
-            
-            # Use base64 data from bridge if available (simplified for now)
-            image_data = None
-            if media and media.get("data"):
-                import base64
-                image_data = base64.b64decode(media['data'])
-            
-            if not image_data:
-                return "⚠️ Could not process the image. Please try sending again."
-            
-            claimed_crop = state["data"].get("claimed_crop")
-            
-            # Run AI verification
-            verification = await WhatsAppService._handle_vision_verification(
-                db, user, image_data, claimed_crop
-            )
-            
-            if not verification["verified"]:
-                return (f"{verification['message']}\n\n"
-                        f"Please send the correct photo of your **{claimed_crop.title()}** or type 'cancel' to abort.")
-            
-            crop_display = verification["detected_crop"]
-            grade = verification.get("grade", "Standard")
-            confidence = int(verification.get("confidence", 0) * 100)
-            
-            await WhatsAppService.set_user_state(phone, "CREATING_LISTING", {
-                "step": "LOCATION",
-                "claimed_crop": claimed_crop,
-                "crop_display": crop_display,
-                "grade": grade,
-                "confidence": confidence
-            })
-            
-            return (f"✅ *Crop Verified!*\n\n"
-                    f"Detected: **{crop_display}**\n"
-                    f"Grade Estimate: **{grade}**\n"
-                    f"Confidence: {confidence}%\n\n"
-                    f"Now, please share your **farm location** (e.g., 'Mazowe, Mashonaland West')")
-        
-        # Step 3: Get location
-        if step == "LOCATION":
-            location = body.strip()
-            
-            await WhatsAppService.set_user_state(phone, "CREATING_LISTING", {
-                "step": "QUANTITY",
-                "claimed_crop": state["data"].get("claimed_crop"),
-                "crop_display": state["data"].get("crop_display"),
-                "grade": state["data"].get("grade"),
-                "confidence": state["data"].get("confidence"),
-                "location": location
-            })
-            
-            return f"📍 Location saved: {location}\n\nWhat is the total **quantity** (in kg or tonnes) you want to sell?"
-        
-        # Step 4: Get quantity and create listing
-        if step == "QUANTITY":
-            try:
-                quantity = float(body)
-                
-                # Get all the data
-                crop_type = state["data"].get("claimed_crop")
-                crop_display = state["data"].get("crop_display")
-                grade = state["data"].get("grade", "Standard")
-                location = state["data"].get("location")
-                confidence = state["data"].get("confidence", 0)
-                
-                # Create listing in database
-                from app.models.listing import Listing, Sector, ListingStatus
-                
-                new_listing = Listing(
-                    seller_id=user.id,
-                    sector=Sector.CROPS,
-                    product_type=crop_display,
-                    quantity=quantity,
-                    quantity_unit="kg" if quantity < 1000 else "tonnes",
-                    price_per_unit=420.0,
-                    grade=grade,
-                    location_province=location,
-                    status=ListingStatus.PENDING,
-                    verification_status="ai_verified" if confidence > 70 else "pending",
-                    ai_confidence=confidence / 100.0,
-                    ai_verified_at=datetime.utcnow()
-                )
-                db.add(new_listing)
-                db.commit()
-                
-                await WhatsAppService.set_user_state(phone, "IDLE")
-                
-                verification_note = ""
-                if confidence < 70:
-                    verification_note = "\n\n*Note: An agent may verify this listing before it goes public.*"
-                
-                return (f"🚀 *Listing Created Successfully!*\n\n"
-                        f"Product: {crop_display}\n"
-                        f"Grade: {grade}\n"
-                        f"Quantity: {quantity} kg\n"
-                        f"Location: {location}\n"
-                        f"Status: Pending Review{verification_note}\n\n"
-                        f"Listing ID: `{new_listing.id}`\n\n"
-                        f"Type 'my listings' to manage your crops.")
-                        
-            except ValueError:
-                return "⚠️ Please enter a valid number for quantity (e.g., '500' for 500 kg)"
-        
-        return "Listing flow error. Please type 'sell' to start over."
-
-    @staticmethod
-    async def _handle_vision_advisory(db, user, media):
-        """
-        AI Vision Advisory: Pest/Disease detection and Grading
-        """
-        if not media or not media.get("data"):
-            return "⚠️ Please send a clear photo of the crop for analysis."
-        
-        import base64
-        image_data = base64.b64decode(media['data'])
-        
-        # Validate image
-        validation = await media_service.process_uploaded_image(image_data)
-        if not validation["valid"]:
-            return validation["error"]
-        
-        # Run full analysis
-        analysis = await vision_service.analyze_crop(image_data)
-        
-        if not analysis.get("success"):
-            return (f"⚠️ {analysis.get('error', 'Could not analyze image')}\n\n"
-                    f"Please ensure the photo is clear, well-lit, and focused on the crop.")
-        
-        crop_name = analysis["crop"]["name"]
-        confidence_pct = int(analysis["crop"]["confidence"] * 100)
-        grade = analysis["grade"]["grade"]
-        health = analysis["health"]["status"]
-        
-        response = (f"🔬 *ZimAgritrust AI Vision Analysis*\n\n"
-                    f"🌿 **Detected Crop:** {crop_name}\n"
-                    f"📊 **Confidence:** {confidence_pct}%\n"
-                    f"⭐ **Estimated Grade:** {grade}\n"
-                    f"🩺 **Health Status:** {health}\n\n")
-        
-        if analysis["health"]["issues"]:
-            response += f"⚠️ **Issues Detected:**\n"
-            for issue in analysis["health"]["issues"]:
-                response += f"• {issue}\n"
-            response += "\n"
-        
-        if analysis["recommendations"]:
-            response += f"💡 **Recommendations:**\n"
-            for rec in analysis["recommendations"][:2]:
-                response += f"• {rec}\n"
-        
-        response += f"\nType 'sell' to list this {crop_name} on the marketplace."
-        
-        return response
 
     @staticmethod
     async def _handle_dispute_flow(db, user, body, has_media, media, state):
@@ -1333,67 +1091,6 @@ class WhatsAppService:
 
         return "Dispute flow error."
 
-    @staticmethod
-    async def _handle_vision_advisory(db, user, media):
-        """
-        AI Vision Advisory: Handles Pest/Disease detection and Grading via chat.
-        """
-        try:
-            from app.ml.vision.vision_service import vision_service
-        except ImportError as e:
-            # Vision service not available in production-slim environment
-            return (f"⚠️ *Vision Service Unavailable*\n\n"
-                    f"The AI vision analysis feature is currently unavailable in this environment.\n\n"
-                    f"Please contact support or use the web portal for crop analysis.")
-        
-        # In production, we'd download the media from WhatsApp's API here.
-        # For now, we simulate the analysis result using the production vision_service engine.
-        import base64
-        import tempfile
-        import os
-        
-        # Use base64 data from bridge
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
-            tmp.write(base64.b64decode(media['data']))
-            image_path = tmp.name
-        
-        try:
-            with open(image_path, 'rb') as f:
-                image_data = f.read()
-            
-            # Use the actual vision_service API
-            analysis = await vision_service.full_analysis(image_data)
-            
-            # Cleanup
-            try: os.remove(image_path)
-            except: pass
-            
-            if not analysis.get("success", True):
-                return (f"⚠️ *Visual Validation Failed*\n\n"
-                        f"The image provided does not appear to be a recognized agricultural commodity.\n\n"
-                        f"Please ensure the photo is clear, well-lit, and focused on the crop or leaf you wish to analyze.")
-
-            crop_info = analysis.get("crop", {})
-            health_info = analysis.get("health", {})
-            grade_info = analysis.get("grade", {})
-            disease_info = analysis.get("disease", {})
-
-            return (f"🔬 *Sovereign AI Vision Analysis*\n\n"
-                    f"Crop Detected: *{crop_info.get('name', 'Unknown')}*\n"
-                    f"Health Status: *{health_info.get('status', 'Unknown')}*\n"
-                    f"Quality Grade: *{grade_info.get('grade', 'Standard')}*\n"
-                    f"Confidence: {crop_info.get('confidence', 0) * 100:.1f}%\n\n"
-                    f"🌿 *Recommended Action:* \n"
-                    f"{health_info.get('issues', ['No issues detected'])[0] if health_info.get('issues') else 'Maintain current moisture levels.'}\n\n"
-                    f"Type 'sell' if you want to list this crop.")
-        except Exception as e:
-            # Cleanup on error
-            try: os.remove(image_path)
-            except: pass
-            
-            return (f"⚠️ *Analysis Error*\n\n"
-                    f"Unable to analyze the image: {str(e)}\n\n"
-                    f"Please try again with a clearer photo.")
 
     @staticmethod
     async def _handle_loan_application_flow(db, user, body, state):
@@ -2224,7 +1921,7 @@ class WhatsAppService:
     @staticmethod
     async def send_payment_reminder(db: Session, user_phone: str, amount: float, due_date: datetime, loan_id: str):
         """Send loan repayment reminders"""
-        days_until_due = (due_date - datetime.utcnow()).days
+        days_until_due = (due_date - datetime.now(timezone.utc)).days
         
         if days_until_due < 0:
             status = "⚠️ OVERDUE"
@@ -2322,7 +2019,7 @@ class WhatsAppService:
         """Process shared GPS location"""
         user.latitude = latitude
         user.longitude = longitude
-        user.location_last_updated = datetime.utcnow()
+        user.location_last_updated = datetime.now(timezone.utc)
         db.commit()
         
         return (
@@ -2434,7 +2131,7 @@ class WhatsAppService:
         recent_listings = db.query(func.count(Listing.id)).filter(
             Listing.product_type.ilike(f"%{crop_type}%"),
             Listing.location_province == province,
-            Listing.created_at >= datetime.utcnow() - timedelta(days=30)
+            Listing.created_at >= datetime.now(timezone.utc) - timedelta(days=30)
         ).scalar()
         
         demand_level = "HIGH" if recent_listings < 10 else "MEDIUM" if recent_listings < 20 else "LOW"

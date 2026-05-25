@@ -55,12 +55,15 @@ export default function AgentApplicationWizard({ onCancel, onSuccess }) {
   const [submitted, setSubmitted] = useState(null); // application response
 
   // Step 1
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [nationalId, setNationalId] = useState("");
   const [province, setProvince] = useState("Harare");
   const [district, setDistrict] = useState("");
+  const [address, setAddress] = useState("");
+  const [nextOfKin, setNextOfKin] = useState("");
   const [experienceYears, setExperienceYears] = useState(1);
 
   // Step 2 — documents (stored locally as filenames + base64 manifest)
@@ -83,10 +86,13 @@ export default function AgentApplicationWizard({ onCancel, onSuccess }) {
 
   function validateStep() {
     if (step === 1) {
-      if (!fullName.trim()) return "Full name required";
+      if (!firstName.trim()) return "First name required";
+      if (!lastName.trim()) return "Last name required";
       if (!phone.trim()) return "Phone required";
       if (!nationalId.trim()) return "National ID required";
       if (!district.trim()) return "District required";
+      if (!address.trim()) return "Address required";
+      if (!nextOfKin.trim()) return "Next of kin required";
       return null;
     }
     if (step === 2) {
@@ -131,11 +137,14 @@ export default function AgentApplicationWizard({ onCancel, onSuccess }) {
         fileToDocument(cv),
       ]);
       const payload = {
-        full_name: fullName.trim(),
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
         phone_number: fmtPhone(phone.trim()),
         national_id: nationalId.trim(),
         province,
         district: district.trim(),
+        address: address.trim(),
+        next_of_kin: nextOfKin.trim(),
         has_smartphone: hasSmartphone,
         has_transport: hasTransport,
         transport_type: hasTransport ? transportType || null : null,
@@ -213,7 +222,8 @@ export default function AgentApplicationWizard({ onCancel, onSuccess }) {
 
         {step === 1 && (
           <>
-            <Field label="Full Name" value={fullName} onChange={setFullName} placeholder="Tendai Ncube" />
+            <Field label="First Name" value={firstName} onChange={setFirstName} placeholder="Tendai" />
+            <Field label="Last Name" value={lastName} onChange={setLastName} placeholder="Ncube" />
             <Field label="Phone (+263 prefixed automatically)" value={phone} onChange={setPhone} placeholder="771234567" />
             <Field label="Email (optional)" value={email} onChange={setEmail} type="email" />
             <Field label="National ID" value={nationalId} onChange={setNationalId} placeholder="63-1234567X12" />
@@ -224,6 +234,8 @@ export default function AgentApplicationWizard({ onCancel, onSuccess }) {
               </select>
             </div>
             <Field label="District" value={district} onChange={setDistrict} placeholder="Harare East" />
+            <Field label="Residential Address" value={address} onChange={setAddress} placeholder="123 Main Street, Harare" />
+            <Field label="Next of Kin (Name & Phone)" value={nextOfKin} onChange={setNextOfKin} placeholder="John Ncube - +263771234567" />
             <Field label="Years of Agriculture Experience" value={experienceYears} onChange={setExperienceYears} type="number" />
           </>
         )}

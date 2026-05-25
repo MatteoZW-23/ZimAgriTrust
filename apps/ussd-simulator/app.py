@@ -378,4 +378,5 @@ def index():
 
 
 if __name__ == "__main__":
-    app.run(port=5000, debug=True)
+    debug_enabled = os.getenv("FLASK_DEBUG", "false").lower() == "true"
+    app.run(host=os.getenv("FLASK_HOST", "127.0.0.1"), port=int(os.getenv("PORT", "5000")), debug=debug_enabled)

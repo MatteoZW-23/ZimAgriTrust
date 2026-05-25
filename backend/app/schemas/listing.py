@@ -27,8 +27,6 @@ class ListingCreate(BaseModel):
 
 
 class OfferCreate(BaseModel):
-    quantity: float = Field(gt=0)
-    offered_price: float = Field(gt=0)
     currency: str = Field(default="USD")
     logistics_type: LogisticsType = Field(default=LogisticsType.PLATFORM)
     buyer_message: Optional[str] = Field(default=None, max_length=500)
@@ -120,8 +118,6 @@ class OfferResponse(BaseModel):
     listing_id: uuid.UUID
     buyer_id: uuid.UUID
     seller_id: uuid.UUID
-    quantity: float
-    offered_price: float
     currency: str
     logistics_type: LogisticsType
     status: OfferStatus

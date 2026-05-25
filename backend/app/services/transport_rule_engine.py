@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
 from enum import Enum
@@ -328,7 +328,7 @@ class TransportRuleEngine:
         quote = await self._calculate_transport_quote(transport_data)
         
         # Set negotiation expiry (72 hours)
-        expires_at = datetime.utcnow() + timedelta(hours=72)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=72)
         
         # Create notifications
         notifications = [
@@ -379,7 +379,7 @@ class TransportRuleEngine:
         logger.info(f"Applying Rule 6: Deferred Decision for order {order_id}")
         
         # Set decision deadline (48 hours)
-        decision_deadline = datetime.utcnow() + timedelta(hours=48)
+        decision_deadline = datetime.now(timezone.utc) + timedelta(hours=48)
         
         # Determine counterparty
         counterparty = "FARMER" if requested_by == "BUYER" else "BUYER"

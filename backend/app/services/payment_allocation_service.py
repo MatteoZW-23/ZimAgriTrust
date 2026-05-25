@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from enum import Enum
@@ -145,7 +145,7 @@ class PaymentAllocationService:
             raise HTTPException(status_code=404, detail="Payment allocation not found")
         
         allocation.status = DBAllocationStatus.HELD
-        allocation.held_at = datetime.utcnow()
+        allocation.held_at = datetime.now(timezone.utc)
         
         self.db.commit()
         
@@ -177,7 +177,7 @@ class PaymentAllocationService:
             raise HTTPException(status_code=404, detail="Payment allocation not found")
         
         allocation.status = DBAllocationStatus.RELEASED
-        allocation.released_at = datetime.utcnow()
+        allocation.released_at = datetime.now(timezone.utc)
         
         self.db.commit()
         
@@ -211,7 +211,7 @@ class PaymentAllocationService:
             raise HTTPException(status_code=404, detail="Payment allocation not found")
         
         allocation.status = DBAllocationStatus.REFUNDED
-        allocation.refunded_at = datetime.utcnow()
+        allocation.refunded_at = datetime.now(timezone.utc)
         allocation.refund_reason = reason
         
         self.db.commit()

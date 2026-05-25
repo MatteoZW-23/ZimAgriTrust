@@ -15,7 +15,7 @@ class FieldTrainingUpdate(BaseModel):
     shadowing_tasks: Optional[int] = None
     supervised_tasks: Optional[int] = None
     field_score: Optional[float] = None
-    certification_level: Optional[CertificationLevel] = None
+    certification_level: Optional[str] = None
 
 @router.get("/progress")
 def list_all_agent_progress(
@@ -29,7 +29,7 @@ def list_all_agent_progress(
         {
             "agent_id": str(p.agent_id),
             "agent_name": p.agent.user.full_name if p.agent.user else "Unknown",
-            "certification_level": p.certification_level,
+            "certification_level": p.certification_level.value if p.certification_level else CertificationLevel.TRAINEE.value,
             "modules_completed": sum([
                 1 for i in range(1, 11) if getattr(p, f"module_{i}_status") == ModuleStatus.COMPLETED
             ]),
@@ -64,7 +64,7 @@ def update_field_training(
     training = db.query(AgentTraining).filter(AgentTraining.agent_id == agent_id).first()
     if not training:
         raise HTTPException(status_code=404, detail="Training record not found")
-        
+
     if update.shadowing_tasks is not None:
         training.shadowing_tasks_completed = update.shadowing_tasks
     if update.supervised_tasks is not None:
@@ -72,8 +72,11 @@ def update_field_training(
     if update.field_score is not None:
         training.field_evaluation_score = update.field_score
     if update.certification_level is not None:
-        training.certification_level = update.certification_level
-        
+        try:
+            training.certification_level = CertificationLevel(update.certification_level)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid certification_level: {update.certification_level}")
+
     db.commit()
     return {"message": "Field training progress updated"}
 

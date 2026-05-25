@@ -73,3 +73,33 @@ export const getSalesAnalytics = () => request("/suppliers/analytics/sales");
 export const getBestsellers = () => request("/suppliers/analytics/bestsellers");
 export const getInventoryAnalytics = () => request("/suppliers/analytics/inventory");
 export const getReports = () => request("/suppliers/reports");
+
+// ── Reviews ──────────────────────────────────────────────────────────────────
+export const getReviews = (limit = 50, offset = 0) => request(`/suppliers/reviews?limit=${limit}&offset=${offset}`);
+export const getReviewStats = () => request("/suppliers/reviews/stats");
+export const respondToReview = (review_id, response) => request(`/suppliers/reviews/${review_id}/respond`, { method: "PUT", body: JSON.stringify({ supplier_response: response }) });
+export const flagReview = (review_id) => request(`/suppliers/reviews/${review_id}/flag`, { method: "POST" });
+
+// ── Subscriptions ─────────────────────────────────────────────────────────────
+export const getSubscription = () => request("/suppliers/subscription");
+export const setSubscription = (plan, billing_cycle) => request(`/suppliers/subscription?plan=${plan}&billing_cycle=${billing_cycle}`, { method: "POST" });
+export const cancelSubscription = () => request("/suppliers/subscription/cancel", { method: "POST" });
+export const checkFeatureEntitlement = (feature) => request(`/suppliers/subscription/feature-check/${feature}`);
+
+// ── Logistics ────────────────────────────────────────────────────────────────
+export const createDeliveryRecord = (order_id) => request(`/suppliers/orders/${order_id}/logistics/create`, { method: "POST" });
+export const getDeliveryStatus = (order_id) => request(`/suppliers/orders/${order_id}/logistics/status`);
+export const syncOrderStatus = (order_id) => request(`/suppliers/orders/${order_id}/logistics/sync`, { method: "POST" });
+
+// ── Payouts ───────────────────────────────────────────────────────────────────
+export const processPendingPayouts = () => request("/suppliers/wallet/payouts/process", { method: "POST" });
+export const getPayoutHistory = (limit = 50, offset = 0) => request(`/suppliers/wallet/payouts/history?limit=${limit}&offset=${offset}`);
+export const getTaxReport = (year, month) => request(`/suppliers/wallet/payouts/tax-report?year=${year}${month ? `&month=${month}` : ""}`);
+
+// ── Discounts ─────────────────────────────────────────────────────────────────
+export const createDiscount = (data) => request("/suppliers/discounts", { method: "POST", body: JSON.stringify(data) });
+export const listDiscounts = (active_only = false) => request(`/suppliers/discounts?active_only=${active_only}`);
+export const getDiscount = (discount_id) => request(`/suppliers/discounts/${discount_id}`);
+export const updateDiscount = (discount_id, data) => request(`/suppliers/discounts/${discount_id}`, { method: "PUT", body: JSON.stringify(data) });
+export const deleteDiscount = (discount_id) => request(`/suppliers/discounts/${discount_id}`, { method: "DELETE" });
+export const validateDiscount = (code, order_total, product_ids) => request("/public/suppliers/discounts/validate", { method: "POST", body: JSON.stringify({ code, order_total, product_ids }) });

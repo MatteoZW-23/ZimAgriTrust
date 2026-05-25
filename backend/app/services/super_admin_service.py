@@ -86,7 +86,7 @@ def login_step_1(
 
     enforce_ip(request, account)
 
-    if account.locked_until and account.locked_until > datetime.utcnow():
+    if account.locked_until and account.locked_until > datetime.now(timezone.utc):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Account locked until {account.locked_until.isoformat()}",
@@ -95,7 +95,7 @@ def login_step_1(
     if not verify_password(password, account.password_hash):
         account.failed_login_count = (account.failed_login_count or 0) + 1
         if account.failed_login_count >= MAX_FAILED_LOGINS:
-            account.locked_until = datetime.utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+            account.locked_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)
         db.commit()
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -142,13 +142,13 @@ def verify_mfa(
     if not ok:
         account.failed_login_count = (account.failed_login_count or 0) + 1
         if account.failed_login_count >= MAX_FAILED_LOGINS:
-            account.locked_until = datetime.utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+            account.locked_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)
         db.commit()
         raise HTTPException(status_code=401, detail="MFA verification failed")
 
     account.failed_login_count = 0
     account.locked_until = None
-    account.last_login_at = datetime.utcnow()
+    account.last_login_at = datetime.now(timezone.utc)
     account.last_login_ip = client_ip
     db.commit()
 
@@ -218,7 +218,7 @@ def seed_super_admin(
         ip_whitelist=ip_whitelist or [],
         is_active=True,
         created_by=created_by,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     db.add(account)
     db.commit()

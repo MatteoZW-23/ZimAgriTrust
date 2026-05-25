@@ -41,7 +41,7 @@ class ListingFlowHandler:
         if step == "CROP_NAME":
             return await self._handle_crop_name(phone, body)
         elif step == "MEDIA":
-            return await self._handle_media(phone, has_media, media, data)
+            return await self._handle_media(phone, body, has_media, media, data)
         elif step == "LOCATION":
             return await self._handle_location(phone, body, data)
         elif step == "QUANTITY":
@@ -97,6 +97,7 @@ class ListingFlowHandler:
     async def _handle_media(
         self,
         phone: str,
+        body: str,
         has_media: bool,
         media: Optional[Dict[str, Any]],
         data: Dict[str, Any],

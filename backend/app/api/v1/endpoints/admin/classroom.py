@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session, joinedload
@@ -531,7 +531,7 @@ def grade_essay(
     essay.grade = grade_data.grade
     essay.feedback = grade_data.feedback
     essay.graded_by = current_user.id
-    essay.graded_at = datetime.utcnow()
+    essay.graded_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(essay)

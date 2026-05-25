@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from enum import Enum
@@ -218,7 +218,7 @@ class TransportSettlementService:
         
         # Update status to PROCESSING
         settlement.status = DBSettlementStatus.PROCESSING
-        settlement.processed_at = datetime.utcnow()
+        settlement.processed_at = datetime.now(timezone.utc)
         self.db.commit()
         
         # Execute payout based on payout_method
@@ -236,7 +236,7 @@ class TransportSettlementService:
             
             # Update status to COMPLETED
             settlement.status = DBSettlementStatus.COMPLETED
-            settlement.completed_at = datetime.utcnow()
+            settlement.completed_at = datetime.now(timezone.utc)
             self.db.commit()
             
             # Send notification
@@ -253,7 +253,7 @@ class TransportSettlementService:
             # Update status to FAILED
             settlement.status = DBSettlementStatus.FAILED
             settlement.retry_count = (settlement.retry_count or 0) + 1
-            settlement.next_retry_at = datetime.utcnow() + timedelta(seconds=calculate_retry_delay(settlement.retry_count))
+            settlement.next_retry_at = datetime.now(timezone.utc) + timedelta(seconds=calculate_retry_delay(settlement.retry_count))
             settlement.error_message = str(e)
             self.db.commit()
             
@@ -370,7 +370,7 @@ class TransportSettlementService:
         
         for settlement in failed_settlements:
             # Check if next_retry_at has passed
-            if settlement.next_retry_at and settlement.next_retry_at > datetime.utcnow():
+            if settlement.next_retry_at and settlement.next_retry_at > datetime.now(timezone.utc):
                 continue
             
             # Process settlement
@@ -380,7 +380,7 @@ class TransportSettlementService:
             except Exception as e:
                 # Update retry_count and next_retry_at on failure
                 settlement.retry_count = (settlement.retry_count or 0) + 1
-                settlement.next_retry_at = datetime.utcnow() + timedelta(seconds=calculate_retry_delay(settlement.retry_count))
+                settlement.next_retry_at = datetime.now(timezone.utc) + timedelta(seconds=calculate_retry_delay(settlement.retry_count))
                 settlement.error_message = str(e)
                 self.db.commit()
                 logger.error(f"Retry failed for settlement {settlement.id}: {e}")

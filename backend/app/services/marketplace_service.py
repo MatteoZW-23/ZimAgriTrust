@@ -2,11 +2,12 @@ import math
 import uuid
 import secrets
 import string
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.policy import calculate_seller_settlement, calculate_transport_insurance_fee
 from app.models.listing import Listing, ListingStatus, Offer, OfferStatus, Sector, BuyerRequest, FarmerResponse
 from app.models.transaction import Order, OrderStatus, Transaction, TransactionType
 from app.models.user import User, UserRole
@@ -21,20 +22,6 @@ def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
-
-def calculate_seller_settlement(amount: float, trust_score: float, currency: str = "USD"):
-    """
-    ZimAgritrust Fee Structure:
-    - Standardfee: 1.0% (0.01)
-    - High Trust Discount: 0.5% if trust_score > 90
-    """
-    fee_rate = 0.01
-    if trust_score > 90:
-        fee_rate = 0.005
-        
-    fee = amount * fee_rate
-    payout = amount - fee
-    return fee, payout
 
 def create_listing(db: Session, seller: User, payload: ListingCreate) -> Listing:
     listing = Listing(
@@ -89,12 +76,12 @@ def accept_offer(
     fee, payout = calculate_seller_settlement(
         total_amount,
         listing.seller.trust_score,
+        False,
         offer.currency,
         using_platform_transport=using_platform_transport,
     )
 
     # Transport insurance fee (optional, buyer-elected)
-    from app.core.policy import calculate_transport_insurance_fee
     insurance_fee = calculate_transport_insurance_fee(
         total_amount, offer.currency, transport_insurance_elected
     )
@@ -204,7 +191,7 @@ def accept_farmer_response(db: Session, response: FarmerResponse) -> Order:
     db.flush()
 
     total_amount = response.supply_quantity * response.bid_price
-    fee, payout = calculate_seller_settlement(total_amount, response.farmer.trust_score, response.currency)
+    fee, payout = calculate_seller_settlement(total_amount, response.farmer.trust_score, False, response.currency)
 
     order = Order(
         listing_id=virtual_listing.id,
@@ -239,7 +226,7 @@ def expire_old_listings(db: Session, days: int = 30) -> int:
     Auto-expires listings older than the specified duration.
     """
     from datetime import timedelta
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     expired_count = db.query(Listing).filter(
         Listing.status == ListingStatus.ACTIVE,
         Listing.created_at < cutoff
@@ -251,7 +238,7 @@ def bump_listing(db: Session, listing: Listing) -> Listing:
     """
     Bumps a listing to the top of search results by updating its created_at timestamp.
     """
-    listing.created_at = datetime.utcnow()
+    listing.created_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(listing)
     return listing

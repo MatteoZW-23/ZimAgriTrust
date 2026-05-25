@@ -62,7 +62,7 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:-changeme_in_production}@redis:6379/0
       WHATSAPP_SERVICE_URL: http://whatsapp-service:8000
       WHATSAPP_USE_REDIS: "false"
-      APP_ENV: development
+      APP_ENV: ${APP_ENV:-production}
       SECRET_KEY: ${SECRET_KEY:-changeme_in_production_use_strong_random_string}
       REFRESH_SECRET_KEY: ${REFRESH_SECRET_KEY:-changeme_in_production_use_strong_random_string}
       ADMIN_BOOTSTRAP_TOKEN: ${ADMIN_BOOTSTRAP_TOKEN:-changeme_in_production_use_strong_random_string}
@@ -101,9 +101,6 @@ services:
       DB_STATEMENT_TIMEOUT_MS: "30000"
       AUTO_CONFIRM_PAYMENTS: "false"
       MASTER_TEST_LOGIN_ENABLED: "false"
-    volumes:
-      - ./data/ml-weights:/app/ml_weights
-      - shared_models:/app/models
     networks:
       - backend-network
     restart: unless-stopped
@@ -255,35 +252,11 @@ services:
       - backend
     restart: always
 
-  # ── Jupyter Research Environment (DEVELOPMENT ONLY — large, ~3-5GB) ────────
-  # Contains PyTorch, YOLOv8, TensorFlow — NEVER used in production
-  # Access: http://localhost:8888  token: zimagritrust
-  jupyter:
-    build:
-      context: ./jupyter
-      dockerfile: Dockerfile
-    ports:
-      - "8888:8888"
-    volumes:
-      - ./jupyter/notebooks:/workspace/notebooks
-      - ./jupyter/scripts:/workspace/scripts
-      - ./jupyter/data:/workspace/data
-      - shared_models:/workspace/exports/models
-    environment:
-      - JUPYTER_ENABLE_LAB=yes
-    depends_on:
-      - postgres
-    profiles:
-      - dev
-    restart: unless-stopped
-
 
 volumes:
   postgres_data:
   wwebjs_auth:
   wwebjs_cache:
-  shared_models:
-    driver: local
   redis_data:
 
 networks:

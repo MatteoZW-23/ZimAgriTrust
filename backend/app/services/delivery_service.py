@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import HTTPException, status
@@ -40,7 +40,7 @@ def _get_order(db: Session, order_id: uuid.UUID) -> Order:
 
 def _transition(delivery: OrderDelivery, new_status: DeliveryStatus, db: Session) -> None:
     delivery.status = new_status
-    delivery.updated_at = datetime.utcnow()
+    delivery.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(delivery)
 
@@ -176,8 +176,8 @@ def confirm_delivery(
 
     delivery.delivery_photos = photos or []
     delivery.delivery_gps_verified = gps_verified
-    delivery.delivered_at = datetime.utcnow()
-    delivery.inspection_deadline = datetime.utcnow() + timedelta(hours=INSPECTION_WINDOW_HOURS)
+    delivery.delivered_at = datetime.now(timezone.utc)
+    delivery.inspection_deadline = datetime.now(timezone.utc) + timedelta(hours=INSPECTION_WINDOW_HOURS)
 
     # Update order status to DELIVERED
     order = _get_order(db, order_id)
@@ -202,7 +202,7 @@ def buyer_confirm_receipt(db: Session, order_id: uuid.UUID, buyer_id: uuid.UUID)
     if delivery.status != DeliveryStatus.DELIVERED:
         raise HTTPException(status_code=400, detail="Delivery not yet completed")
 
-    delivery.confirmed_at = datetime.utcnow()
+    delivery.confirmed_at = datetime.now(timezone.utc)
     _transition(delivery, DeliveryStatus.CONFIRMED, db)
 
     # Release escrow
@@ -218,7 +218,7 @@ def auto_confirm_expired(db: Session) -> int:
     Scheduler job — auto-confirm all deliveries past their inspection deadline.
     Returns count of orders auto-confirmed.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     expired = (
         db.query(OrderDelivery)
         .filter(

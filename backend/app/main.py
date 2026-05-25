@@ -9,19 +9,13 @@ from starlette.middleware.base import BaseHTTPMiddleware
 import time
 import logging
 import traceback
+import os
 
 from app.api.v1.router import api_router
 from app.core.config import settings
-from app.db.base import Base
-from app.db.session import engine, SessionLocal
+from app.db.session import SessionLocal
 import app.models # noqa: F401
 
-from app.services.settlement_service import settlement_worker
-from app.services.auth_service import build_phone_lookup_candidates, normalize_phone_identifier
-from app.models.user import User, UserRole, UserStatus, FarmerProfile, BuyerProfile, AgentProfile
-from app.core.security import get_password_hash
-from app.services.startup_scraper import run_startup_scrape, start_scheduler
-from app.db.schema_patch import apply_schema_patches
 from app.core.security_middleware import SecurityMiddleware, AuditLoggingMiddleware
 from app.core.logging_config import configure_logging
 from app.core.tracing_middleware import RequestTracingMiddleware
@@ -30,7 +24,6 @@ from app.core.health import router as health_router
 from app.core.error_tracking import init_sentry
 from app.core.metrics import router as metrics_router, MetricsMiddleware
 from app.models.system_config import SystemConfig
-from app.ml.model_loader import model_loader
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -48,6 +41,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"SYSLOG | USSD flow registry initialization failed: {e}")
 
+    testing_mode = os.getenv("APP_ENV", "").lower() in {"test", "testing"} or bool(os.getenv("PYTEST_CURRENT_TEST"))
     try:
         # Schema is managed EXCLUSIVELY by Alembic migrations.
         # create_all() is intentionally removed — it bypasses migration history
@@ -59,9 +53,6 @@ async def lifespan(app: FastAPI):
             from app.services.rbac_service import RBACService
             RBACService.create_default_roles(db)
 
-        # Load ONNX and sklearn inference models (non-fatal if weights missing)
-        model_loader.load_all()
-        logger.info("SYSLOG | ML model loader initialized.")
 
     except Exception as exc:
         logger.error("BOOT_ERROR | Startup failure: %s", exc, exc_info=True)
@@ -70,34 +61,35 @@ async def lifespan(app: FastAPI):
 
     # Distributed scheduler: only one pod should run the scheduler.
     # Uses Redis SET NX to elect a leader for the lifetime of this process.
-    from app.services.cache_service import cache_service as _cs
-    import asyncio as _asyncio
-    import os as _os
-    _pod_id = _os.environ.get("HOSTNAME", str(id(app)))
-    _scheduler_lock_key = "scheduler:leader"
-    _scheduler_lock_ttl = 120  # seconds; worker must renew before expiry
-    _is_scheduler = False
-    try:
-        _is_scheduler = bool(
-            await _cs.set(_scheduler_lock_key, _pod_id, expire=_scheduler_lock_ttl, nx=True)
-        )
-    except Exception:
-        pass
+    if not testing_mode:
+        from app.services.cache_service import cache_service as _cs
+        import asyncio as _asyncio
+        _pod_id = os.environ.get("HOSTNAME", str(id(app)))
+        _scheduler_lock_key = "scheduler:leader"
+        _scheduler_lock_ttl = 120  # seconds; worker must renew before expiry
+        _is_scheduler = False
+        try:
+            _is_scheduler = bool(
+                await _cs.set(_scheduler_lock_key, _pod_id, expire=_scheduler_lock_ttl, nx=True)
+            )
+        except Exception:
+            pass
 
-    if _is_scheduler:
-        start_scheduler()
-        logger.info("SYSLOG | This pod is the scheduler leader (%s). Scheduler started.", _pod_id)
+        if _is_scheduler:
+            logger.info("SYSLOG | This pod is the scheduler leader (%s).", _pod_id)
 
-        async def _renew_scheduler_lock():
-            while True:
-                await _asyncio.sleep(_scheduler_lock_ttl // 2)
-                try:
-                    await _cs.set(_scheduler_lock_key, _pod_id, expire=_scheduler_lock_ttl)
-                except Exception:
-                    pass
-        _asyncio.create_task(_renew_scheduler_lock())
+            async def _renew_scheduler_lock():
+                while True:
+                    await _asyncio.sleep(_scheduler_lock_ttl // 2)
+                    try:
+                        await _cs.set(_scheduler_lock_key, _pod_id, expire=_scheduler_lock_ttl)
+                    except Exception:
+                        pass
+            _asyncio.create_task(_renew_scheduler_lock())
+        else:
+            logger.info("SYSLOG | Scheduler leader already elected. This pod is a follower.")
     else:
-        logger.info("SYSLOG | Scheduler leader already elected. This pod is a follower.")
+        logger.info("SYSLOG | Testing mode detected; skipping distributed scheduler startup.")
 
     logger.info("SYSLOG | Platform Live and Ready for Market Deployment.")
     yield

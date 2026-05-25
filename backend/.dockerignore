@@ -21,7 +21,6 @@ logs/
 *.sqlite
 *.sqlite3
 data/
-ml_weights/
 .pytest_cache/
 .coverage
 htmlcov/

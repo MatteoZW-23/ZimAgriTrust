@@ -359,8 +359,8 @@ def confirm_intent(
 
     intent.status = DepositIntentStatus.COMPLETED
     intent.transaction_id = txn.id if txn else None
-    intent.completed_at = datetime.utcnow()
-    intent.refundable_until = datetime.utcnow() + timedelta(days=REFUND_WINDOW_DAYS)
+    intent.completed_at = datetime.now(timezone.utc)
+    intent.refundable_until = datetime.now(timezone.utc) + timedelta(days=REFUND_WINDOW_DAYS)
     intent.receipt_url = f"/api/v1/deposits/{intent.id}/receipt"
 
     append_audit(
@@ -437,7 +437,7 @@ def agent_collect_cash(
         raise HTTPException(status_code=400, detail=f"Intent is {intent.status.value}")
 
     intent.agent_id = agent.id
-    intent.agent_collected_at = datetime.utcnow()
+    intent.agent_collected_at = datetime.now(timezone.utc)
     intent.agent_receipt_no = receipt_no
     intent.status = DepositIntentStatus.AGENT_HELD
     append_audit(
@@ -471,7 +471,7 @@ def agent_reconcile_cash(
         raise HTTPException(status_code=404, detail="Cash-agent intent not found")
     if intent.status != DepositIntentStatus.AGENT_HELD:
         raise HTTPException(status_code=400, detail="Cash not yet collected")
-    intent.agent_reconciled_at = datetime.utcnow()
+    intent.agent_reconciled_at = datetime.now(timezone.utc)
     return confirm_intent(db, intent_id=intent.id, actor=agent)
 
 

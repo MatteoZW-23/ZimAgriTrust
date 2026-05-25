@@ -11,6 +11,11 @@ export function getSAToken() {
   return localStorage.getItem(SA_TOKEN_KEY) || null;
 }
 
+function getCsrfCookie(): string | null {
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 export async function request(path, options = {}) {
   const saToken = getSAToken();
   const optionHeaders = options.headers || {};
@@ -19,10 +24,12 @@ export async function request(path, options = {}) {
     explicitAuth === "Bearer null" ||
     explicitAuth === "Bearer undefined" ||
     explicitAuth === "Bearer active_session";
+  const csrfToken = getCsrfCookie();
   const headers = {
     ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
     ...(optionHeaders || {}),
     ...(saToken && invalidAuth ? { "Authorization": `Bearer ${saToken}` } : {}),
+    ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
   };
 
   // Strip Authorization if the token is still null/undefined/placeholder
@@ -505,12 +512,6 @@ export function fetchGeoDistribution(token) {
   });
 }
 
-export function fetchNationalPulse(token) {
-  return request("/market/pulse", {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-}
-
 export function fetchMarketNews(token) {
   return request("/market/news", {
     headers: { Authorization: `Bearer ${token}` },
@@ -741,23 +742,6 @@ export function updatePlatformConfig(token, key, value, isActive = true) {
   });
 }
 
-// AI & DATA SCIENCE
-export function analyzeCrop(token, file) {
-  const formData = new FormData();
-  formData.append('file', file);
-  
-  return request("/ai/vision/analyze-crop", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData
-  });
-}
-
-export function fetchAIProof(token) {
-  return request("/ai/research/proof-of-concept", {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-}
 // RECRUITMENT & ONBOARDING
 export function listApplications(token) {
   return request("/recruitment/applications", {
@@ -1014,85 +998,6 @@ export function getAgentSupervisedAsAdmin(token, agentId) {
   return request(`/admin/agents/${agentId}/supervised`, {
     headers: { Authorization: `Bearer ${token}` },
   }).catch(() => ({ reviews: [], approved_count: 0, required: 20 }));
-}
-
-// DISEASE DETECTION
-export function detectDisease(token, file) {
-  const formData = new FormData();
-  formData.append('file', file);
-  return request('/ai/vision/detect-disease', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
-  });
-}
-
-export function fullCropAnalysis(token, file, expectedCrop = null) {
-  const formData = new FormData();
-  formData.append('file', file);
-  const qs = expectedCrop ? `?expected_crop=${encodeURIComponent(expectedCrop)}` : '';
-  return request(`/ai/vision/full-analysis${qs}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
-  });
-}
-
-export function trainDiseaseModel(token) {
-  return request('/ai/train/disease', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-}
-
-// AI MODEL MANAGEMENT
-export function fetchModelStatuses(token) {
-  return request('/ai/models/status', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-}
-
-export function triggerModelTraining(token, modelId) {
-  return request(`/ai/train/${modelId}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-}
-
-// SCRAPING & DATA PIPELINE
-export function fetchScraperStatus(token) {
-  return request('/admin/scraping/status', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-}
-
-export function runScraper(token, target) {
-  // target: 'prices' | 'news' | 'weather' | 'all'
-  return request(`/admin/scraping/run/${target}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-}
-
-export function runCleaningPipeline(token, target) {
-  // target: 'prices' | 'listings' | 'transactions' | 'all'
-  return request(`/admin/scraping/clean/${target}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-}
-
-export function clearScraperCaches(token) {
-  return request('/admin/scraping/cache', {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-}
-
-export function fetchDataSnapshots(token) {
-  return request('/admin/scraping/snapshots', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
 }
 
 

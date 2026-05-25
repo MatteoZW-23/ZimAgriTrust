@@ -1,9 +1,12 @@
 from typing import List, Dict, Optional
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 import json
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 from app.db.session import SessionLocal
 from app.models.academy import AcademyModule, AgentTraining, ModuleStatus, ExamAttempt
@@ -68,7 +71,7 @@ class TrainingService:
         """
         ledger_path = "sovereign_ledger.json"
         entry = {
-            "timestamp": str(datetime.utcnow()),
+            "timestamp": str(datetime.now(timezone.utc)),
             "action": action,
             "data": data,
             "hash": None  # Replace with real ledger hash when blockchain integration is active
@@ -86,7 +89,7 @@ class TrainingService:
         with open(ledger_path, "w") as f:
             json.dump(ledger, f, indent=4)
         
-        print(f"🔒 [LEDGER] Recorded: {action}")
+        logger.info("LEDGER | Recorded: %s", action)
 
 training_service = TrainingService()
 

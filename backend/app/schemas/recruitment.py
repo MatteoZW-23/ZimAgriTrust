@@ -5,9 +5,16 @@ from datetime import datetime
 from app.models.recruitment import ApplicationStatus
 
 class AgentApplicationCreate(BaseModel):
-    full_name: str
-    phone_number: str
+    first_name: str
+    last_name: str
     national_id: str
+    phone_number: str
+    email: str
+    address: str
+    next_of_kin: str
+    profile_photo: Optional[str] = None
+    uploaded_documents: Optional[dict] = None
+    background_details: Optional[str] = None
     province: str
     district: str
     has_smartphone: bool

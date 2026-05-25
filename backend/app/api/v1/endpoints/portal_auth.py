@@ -21,8 +21,8 @@ from app.services.portal_auth_service import (
     login_with_pin,
 )
 
-# ── In-memory OTP store (replace with Redis in production) ───────────────────
-_driver_otp_store: dict[str, dict] = {}
+_DRIVER_OTP_PREFIX = "driver_otp:"
+_DRIVER_OTP_TTL = 600  # 10 minutes
 
 
 class DriverOtpRequest(BaseModel):
@@ -77,27 +77,28 @@ async def driver_request_otp(
     db: Session = Depends(get_db),
 ) -> dict:
     """Send a 6-digit OTP to the driver's phone for registration verification."""
-    otp = f"{secrets.randbelow(1_000_000):06d}"
-    _driver_otp_store[payload.phone_number] = {
-        "otp": otp,
-        "expires_at": datetime.now(timezone.utc) + timedelta(minutes=10),
-    }
+    from app.services.cache_service import cache_service
+    import logging
+    _log = logging.getLogger(__name__)
 
-    # Send via WhatsApp
+    otp = f"{secrets.randbelow(1_000_000):06d}"
+    await cache_service.set(f"{_DRIVER_OTP_PREFIX}{payload.phone_number}", otp, expire=_DRIVER_OTP_TTL)
+
     from app.services.whatsapp_service import WhatsAppService
     message = f"🚚 *ZimAgriTrust Driver Verification*\n\nYour OTP code is: {otp}\n\nValid for 10 minutes. Do not share this code with anyone."
     try:
         await WhatsAppService.send_whatsapp_message(payload.phone_number, message)
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"Failed to send WhatsApp OTP: {e}")
+        _log.warning("Failed to send WhatsApp OTP: %s", e)
 
-    # TODO: dispatch via Africa's Talking SMS in production
-    # sms_service.send(payload.phone_number, f"Your ZimAgriTrust driver OTP: {otp}")
-    import logging
-    logging.getLogger(__name__).info("DRIVER OTP for %s: %s", payload.phone_number, otp)
-    # Return OTP in response for development (remove in production)
-    return {"status": "sent", "message": "OTP sent to your phone number", "otp": otp, "dev_note": "OTP returned for development only - remove in production"}
+    from app.services.sms_service import send_otp as sms_send_otp
+    try:
+        sms_send_otp(payload.phone_number, otp)
+    except Exception as e:
+        _log.warning("Failed to send SMS OTP: %s", e)
+
+    _log.info("Driver OTP dispatched for %s", payload.phone_number)
+    return {"status": "sent", "message": "OTP sent to your phone number"}
 
 
 @driver_auth_router.post("/verify-otp", summary="Verify OTP and get temp registration token")
@@ -106,15 +107,14 @@ async def driver_verify_otp(
     db: Session = Depends(get_db),
 ) -> dict:
     """Verify OTP; returns a short-lived temp_token for the registration form submission."""
-    record = _driver_otp_store.get(payload.phone_number)
-    if not record:
+    from app.services.cache_service import cache_service
+    otp_key = f"{_DRIVER_OTP_PREFIX}{payload.phone_number}"
+    stored_otp = await cache_service.get(otp_key)
+    if not stored_otp:
         raise HTTPException(status_code=400, detail="No OTP found for this number. Request a new one.")
-    if datetime.now(timezone.utc) > record["expires_at"]:
-        _driver_otp_store.pop(payload.phone_number, None)
-        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
-    if record["otp"] != payload.otp.strip():
+    if stored_otp != payload.otp.strip():
         raise HTTPException(status_code=400, detail="Incorrect OTP.")
-    _driver_otp_store.pop(payload.phone_number, None)
+    await cache_service.delete(otp_key)
     # Issue a short-lived temp token (15 min) scoped to registration only
     now = datetime.now(timezone.utc)
     temp_token = jwt.encode(

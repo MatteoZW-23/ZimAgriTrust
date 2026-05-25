@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Optional
 
@@ -136,7 +136,7 @@ def create_listing(
         )
     if cat.requires_expiry and not expiry_date:
         raise HTTPException(status_code=400, detail=f"Category '{cat.name}' requires expiry date")
-    if expiry_date and expiry_date <= datetime.utcnow():
+    if expiry_date and expiry_date <= datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Expiry date must be in the future")
     if quantity <= 0 or price_per_unit <= 0:
         raise HTTPException(status_code=400, detail="Quantity and price must be positive")
@@ -214,7 +214,7 @@ def update_listing(
         listing.verified_at = None
         listing.verified_by = None
 
-    listing.updated_at = datetime.utcnow()
+    listing.updated_at = datetime.now(timezone.utc)
     db.flush()
     if price_dropped and listing.status == InputListingStatus.ACTIVE:
         try:
@@ -227,7 +227,7 @@ def update_listing(
 def delete_listing(db: Session, *, seller: User, listing_id: uuid.UUID) -> None:
     listing = _get_owned_listing(db, listing_id, seller)
     listing.status = InputListingStatus.REMOVED
-    listing.updated_at = datetime.utcnow()
+    listing.updated_at = datetime.now(timezone.utc)
 
 
 def boost_listing(db: Session, *, seller: User, listing_id: uuid.UUID) -> InputListing:
@@ -238,7 +238,7 @@ def boost_listing(db: Session, *, seller: User, listing_id: uuid.UUID) -> InputL
     if not wallet_service.withdraw(db, seller.id, settings.INPUT_BOOST_FEE_USD, "USD"):
         raise HTTPException(status_code=400, detail="Insufficient balance for boost fee")
     listing.is_boosted = True
-    listing.boost_paid_until = datetime.utcnow() + timedelta(days=7)
+    listing.boost_paid_until = datetime.now(timezone.utc) + timedelta(days=7)
     return listing
 
 
@@ -277,7 +277,7 @@ def search_listings(
         query = query.filter(InputListing.status == InputListingStatus.ACTIVE)
     if not include_expired:
         query = query.filter(
-            or_(InputListing.expiry_date.is_(None), InputListing.expiry_date > datetime.utcnow())
+            or_(InputListing.expiry_date.is_(None), InputListing.expiry_date > datetime.now(timezone.utc))
         )
     if q:
         like = f"%{q}%"
@@ -332,7 +332,7 @@ def verify_listing(
             raise HTTPException(status_code=400, detail="Cannot approve: registration number missing")
 
     listing.verified_by = agent.id
-    listing.verified_at = datetime.utcnow()
+    listing.verified_at = datetime.now(timezone.utc)
     listing.verification_notes = notes
     if approve:
         listing.status = InputListingStatus.ACTIVE
@@ -404,7 +404,7 @@ def create_offer(
         total_amount=Decimal(str(total)),
         currency=listing.currency,
         note=note,
-        expires_at=datetime.utcnow() + timedelta(hours=OFFER_EXPIRY_HOURS),
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=OFFER_EXPIRY_HOURS),
     )
     db.add(offer)
     db.flush()
@@ -424,7 +424,7 @@ def withdraw_offer(db: Session, *, buyer: User, offer_id: uuid.UUID) -> InputOff
     if offer.status != InputOfferStatus.PENDING:
         raise HTTPException(status_code=400, detail=f"Offer is {offer.status.value}")
     offer.status = InputOfferStatus.WITHDRAWN
-    offer.decided_at = datetime.utcnow()
+    offer.decided_at = datetime.now(timezone.utc)
     return offer
 
 
@@ -445,7 +445,7 @@ def accept_offer(
         raise HTTPException(status_code=403, detail="Not your listing")
     if offer.status != InputOfferStatus.PENDING:
         raise HTTPException(status_code=400, detail=f"Offer is {offer.status.value}")
-    if offer.expires_at and datetime.utcnow() > offer.expires_at:
+    if offer.expires_at and datetime.now(timezone.utc) > offer.expires_at:
         offer.status = InputOfferStatus.EXPIRED
         db.flush()
         raise HTTPException(status_code=400, detail="Offer has expired")
@@ -495,7 +495,7 @@ def accept_offer(
     db.add(order)
 
     offer.status = InputOfferStatus.ACCEPTED
-    offer.decided_at = datetime.utcnow()
+    offer.decided_at = datetime.now(timezone.utc)
     listing.quantity -= offer.quantity
     if listing.quantity <= 0:
         listing.status = InputListingStatus.SOLD_OUT
@@ -539,7 +539,7 @@ def reject_offer(
         raise HTTPException(status_code=400, detail=f"Offer is {offer.status.value}")
     offer.status = InputOfferStatus.REJECTED
     offer.decision_notes = reason
-    offer.decided_at = datetime.utcnow()
+    offer.decided_at = datetime.now(timezone.utc)
     buyer = db.query(User).filter(User.id == offer.buyer_id).first()
     if buyer:
         notification_triggers.input_offer_rejected(
@@ -562,7 +562,7 @@ def mark_shipped(
         raise HTTPException(status_code=400, detail=f"Order is {order.status.value}")
     order.status = InputOrderStatus.SHIPPED
     order.tracking_number = tracking_number
-    order.shipped_at = datetime.utcnow()
+    order.shipped_at = datetime.now(timezone.utc)
     buyer = db.query(User).filter(User.id == order.buyer_id).first()
     if buyer:
         notification_triggers.input_order_shipped(
@@ -585,8 +585,8 @@ def confirm_delivery(
         raise HTTPException(status_code=500, detail="Seller credit failed")
 
     order.status = InputOrderStatus.COMPLETED
-    order.delivered_at = order.delivered_at or datetime.utcnow()
-    order.confirmed_at = datetime.utcnow()
+    order.delivered_at = order.delivered_at or datetime.now(timezone.utc)
+    order.confirmed_at = datetime.now(timezone.utc)
     if rating is not None:
         if not 1 <= rating <= 5:
             raise HTTPException(status_code=400, detail="Rating must be 1..5")
@@ -660,7 +660,7 @@ def resolve_report(
         raise HTTPException(status_code=400, detail=f"Report is {rep.status.value}")
     rep.status = InputReportStatus.UPHELD if uphold else InputReportStatus.DISMISSED
     rep.resolved_by = actor.id
-    rep.resolved_at = datetime.utcnow()
+    rep.resolved_at = datetime.now(timezone.utc)
     rep.resolution_notes = notes
     if uphold and remove_listing:
         listing = db.query(InputListing).filter(InputListing.id == rep.listing_id).first()
@@ -714,7 +714,7 @@ def upsert_price_alert(
 # ---------------------------------------------------------------------------
 
 def price_trends(db: Session, *, category_id: int, days: int = 30) -> dict:
-    since = datetime.utcnow() - timedelta(days=days)
+    since = datetime.now(timezone.utc) - timedelta(days=days)
     rows = (
         db.query(
             func.avg(InputListing.price_per_unit).label("avg_price"),
@@ -744,7 +744,7 @@ def price_trends(db: Session, *, category_id: int, days: int = 30) -> dict:
 # ---------------------------------------------------------------------------
 
 def sweep_expired(db: Session, *, now: Optional[datetime] = None) -> int:
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     expiring = (
         db.query(InputListing)
         .filter(
@@ -767,7 +767,7 @@ def sweep_expired(db: Session, *, now: Optional[datetime] = None) -> int:
 
 def warn_expiring(db: Session, *, days_ahead: int = 7, now: Optional[datetime] = None) -> int:
     """Notify sellers whose listings expire within `days_ahead` days. Idempotent per day."""
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     horizon = now + timedelta(days=days_ahead)
     rows = (
         db.query(InputListing)
@@ -810,7 +810,7 @@ def evaluate_price_alerts(db: Session, *, listing: InputListing) -> int:
                 getattr(user, "phone_number", None), listing.product_name,
                 float(listing.price_per_unit), float(alert.target_price),
             )
-            alert.last_triggered_at = datetime.utcnow()
+            alert.last_triggered_at = datetime.now(timezone.utc)
             fired += 1
     db.flush()
     return fired

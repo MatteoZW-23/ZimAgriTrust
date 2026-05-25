@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text
 from typing import Dict, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.db.session import get_db
 from app.models.user import User, UserRole, UserStatus
@@ -51,12 +51,12 @@ def get_system_health(
     # Order metrics
     total_orders = db.query(func.count(Order.id)).scalar() or 0
     pending_orders = db.query(func.count(Order.id)).filter(
-        Order.status.in_([OrderStatus.PENDING, OrderStatus.PROCESSING])
+        Order.status.in_([OrderStatus.PENDING, OrderStatus.ESCROW_HELD])
     ).scalar() or 0
     
     # Financial metrics
     escrow_value = db.query(func.sum(Order.total_amount)).filter(
-        Order.status.in_([OrderStatus.PENDING, OrderStatus.PROCESSING, OrderStatus.IN_TRANSIT])
+        Order.status.in_([OrderStatus.PENDING, OrderStatus.ESCROW_HELD, OrderStatus.DELIVERED])
     ).scalar() or 0.0
     
     # Agent metrics
@@ -66,7 +66,7 @@ def get_system_health(
     ).scalar() or 0
     
     # Recent activity (last 24 hours)
-    yesterday = datetime.utcnow() - timedelta(days=1)
+    yesterday = datetime.now(timezone.utc) - timedelta(days=1)
     new_users_24h = db.query(func.count(User.id)).filter(
         User.created_at >= yesterday
     ).scalar() or 0
@@ -76,7 +76,7 @@ def get_system_health(
     
     return {
         "status": "operational",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "database": {
             "status": db_status,
             "connection": "active"
@@ -108,9 +108,7 @@ def get_system_health(
         "services": {
             "api": "online",
             "database": db_status,
-            "whatsapp": "connected",  # Would check actual service
-            "ai_models": "loaded",
-            "scraper": "idle"
+            "whatsapp": "connected"  # Would check actual service
         }
     }
 
@@ -124,7 +122,7 @@ def get_system_diagnostics(
     Detailed system diagnostics for troubleshooting
     """
     diagnostics = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "checks": []
     }
     
@@ -163,9 +161,9 @@ def get_system_diagnostics(
     
     # Check for stuck orders
     try:
-        stuck_threshold = datetime.utcnow() - timedelta(days=7)
+        stuck_threshold = datetime.now(timezone.utc) - timedelta(days=7)
         stuck_orders = db.query(func.count(Order.id)).filter(
-            Order.status == OrderStatus.PROCESSING,
+            Order.status == OrderStatus.ESCROW_HELD,
             Order.created_at < stuck_threshold
         ).scalar() or 0
         
@@ -184,7 +182,7 @@ def get_system_diagnostics(
     # Check escrow balance consistency
     try:
         total_escrow = db.query(func.sum(Order.total_amount)).filter(
-            Order.status.in_([OrderStatus.PENDING, OrderStatus.PROCESSING, OrderStatus.IN_TRANSIT])
+            Order.status.in_([OrderStatus.PENDING, OrderStatus.ESCROW_HELD, OrderStatus.DELIVERED])
         ).scalar() or 0.0
         
         diagnostics["checks"].append({
@@ -214,7 +212,7 @@ def run_maintenance(
     """
     result = {
         "operation": operation,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "status": "unknown"
     }
     
@@ -270,7 +268,7 @@ def get_realtime_stats(
     """
     Real-time platform statistics for monitoring dashboard
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     hour_ago = now - timedelta(hours=1)
     day_ago = now - timedelta(days=1)
     
@@ -307,7 +305,7 @@ def get_realtime_stats(
                 User.status == UserStatus.ACTIVE
             ).scalar() or 0,
             "pending_orders": db.query(func.count(Order.id)).filter(
-                Order.status.in_([OrderStatus.PENDING, OrderStatus.PROCESSING])
+                Order.status.in_([OrderStatus.PENDING, OrderStatus.ESCROW_HELD])
             ).scalar() or 0,
             "active_listings": db.query(func.count(Listing.id)).filter(
                 Listing.status == ListingStatus.ACTIVE
@@ -334,7 +332,7 @@ def toggle_emergency_lockdown(
         "lockdown_enabled": enable,
         "reason": reason,
         "activated_by": current_user.full_name,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "message": f"Emergency lockdown {'enabled' if enable else 'disabled'}"
     }
 
@@ -353,7 +351,7 @@ def get_recent_logs(
     # For now, return a placeholder
     return [
         {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": "info",
             "message": "System operational",
             "source": "command_center"

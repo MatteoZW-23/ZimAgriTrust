@@ -9,27 +9,27 @@ const AGENT_URL = import.meta.env.VITE_AGENT_URL || "http://localhost:3002";
 const APP_PORTAL = import.meta.env.VITE_APP_PORTAL_URL || "http://localhost:3003";
 
 export function getAuthRedirect(user) {
-  if (!user) return '/login';
+ if (!user) return '/login';
 
-  // Drivers (transporter) must use mobile app - redirect to download page
-  if (user.role === 'transporter') {
-    return '/download-mobile-app';
-  }
+ // Drivers (transporter) must use mobile app - redirect to download page
+ if (user.role === 'transporter') {
+ return '/download-mobile-app';
+ }
 
-  const roleRedirects = {
-    admin: ADMIN_URL,
-    agent: AGENT_URL,
-    farmer: '/dashboard',
-    buyer: '/dashboard',
-  };
+ const roleRedirects = {
+ admin: ADMIN_URL,
+ agent: AGENT_URL,
+ farmer: '/dashboard',
+ buyer: '/dashboard',
+ };
 
-  return roleRedirects[user.role] || '/dashboard';
+ return roleRedirects[user.role] || '/dashboard';
 }
 
 export function handleLoginSuccess(userData) {
-  localStorage.setItem('user', JSON.stringify(userData));
-  localStorage.setItem('token', userData.access_token);
-  
-  const redirectUrl = getAuthRedirect(userData);
-  window.location.href = redirectUrl;
+ localStorage.setItem('user', JSON.stringify(userData));
+ localStorage.setItem('token', userData.access_token);
+ 
+ const redirectUrl = getAuthRedirect(userData);
+ window.location.href = redirectUrl;
 }

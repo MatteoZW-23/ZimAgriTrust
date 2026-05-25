@@ -6,6 +6,8 @@ transactions via the port.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from app.application.trust.dto import RecomputeTrustCommand
 from app.application.ports.notifications import NotificationPort
 from app.application.ports.trust import (

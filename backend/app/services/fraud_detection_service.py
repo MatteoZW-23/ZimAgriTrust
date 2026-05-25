@@ -228,7 +228,7 @@ def _record_alert(
         related_resource_id=related_resource_id,
         resolved=False,
         notified_super_admin=False,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     db.add(alert)
     return alert
@@ -273,7 +273,7 @@ def resolve_alert(
         raise ValueError("alert not found")
     alert.resolved = True
     alert.resolved_by = super_admin_id
-    alert.resolved_at = datetime.utcnow()
+    alert.resolved_at = datetime.now(timezone.utc)
     alert.resolution_notes = notes
     db.flush()
     return alert

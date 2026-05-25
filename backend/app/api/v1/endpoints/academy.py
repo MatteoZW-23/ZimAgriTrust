@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import random
 import json
 import os
@@ -10,7 +10,7 @@ from app.api.deps import get_db, get_current_agent
 from app.core.security import decode_token, create_access_token, verify_password
 from app.models.agent import Agent, AgentStatus
 from app.models.user import User
-from app.models.academy import AgentTraining, AcademyModule, ExamAttempt, ModuleStatus
+from app.models.academy import AgentTraining, AcademyModule, ExamAttempt, ModuleStatus, CertificationLevel
 from app.schemas.academy import (
     ModuleProgressUpdate, ExamSubmission, CertificationRequest, TraineeLogin, TraineeToken
 )
@@ -29,7 +29,7 @@ async def academy_login(
     response: Response,
     db: Session = Depends(get_db),
 ):
-    """Authenticate a Trainee or Agent using their official Code and PIN"""
+    """Authenticate a Trainee or Agent using their official Code and PIN - TRAINEE ONLY ACCESS"""
     agent = db.query(Agent).filter(Agent.agent_code == payload.agent_code).first()
     if not agent or not agent.user:
         raise HTTPException(
@@ -43,9 +43,17 @@ async def academy_login(
             detail="ACADEMY_DISMISSAL: This profile has been terminated due to failure to meet certification standards."
         )
     
-    # Verify PIN (which is the user's password)
-    if not verify_password(payload.pin, agent.user.password_hash):
-         raise HTTPException(
+    # RBAC: Only TRAINEE status allowed for Academy login
+    if agent.status not in [AgentStatus.TRAINEE, AgentStatus.ACTIVE]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="ACCESS_DENIED: Academy login is restricted to trainees and certified agents only."
+        )
+    
+    # Verify PIN: prefer agent.pin_hash (dedicated PIN), fall back to user password hash
+    pin_hash = agent.pin_hash or agent.user.password_hash
+    if not pin_hash or not verify_password(payload.pin, pin_hash):
+        raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="INVALID_PIN: The security PIN provided does not match our records."
         )
@@ -56,10 +64,26 @@ async def academy_login(
         request=request,
         response=response,
     )
+    
+    # Check certification expiry for ACTIVE agents
+    training = db.query(AgentTraining).filter(AgentTraining.agent_id == agent.id).first()
+    if training and training.certification_expires_at:
+        days_until_expiry = (training.certification_expires_at - datetime.now(timezone.utc)).days
+        if days_until_expiry <= 0:
+            agent.status = AgentStatus.SUSPENDED
+            training.certification_level = CertificationLevel.TRAINEE
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="CERTIFICATION_EXPIRED: Your certification has expired. Please contact administration for renewal."
+            )
+    
     return {
         "access_token": session_token.access_token,
         "token_type": "bearer",
-        "agent_code": agent.agent_code
+        "agent_code": agent.agent_code,
+        "agent_status": agent.status.value,
+        "certification_level": training.certification_level.value if training else CertificationLevel.TRAINEE.value
     }
 
 
@@ -80,6 +104,21 @@ def get_my_progress(
         db.commit()
         db.refresh(training)
     
+    # Check certification expiry
+    days_until_expiry = None
+    if training.certification_expires_at:
+        days_until_expiry = (training.certification_expires_at - datetime.now(timezone.utc)).days
+        if days_until_expiry <= 0:
+            # Certification expired, restrict access
+            if current_agent.status == AgentStatus.ACTIVE:
+                current_agent.status = AgentStatus.SUSPENDED
+                training.certification_level = CertificationLevel.TRAINEE
+                db.commit()
+                raise HTTPException(
+                    status_code=403,
+                    detail="CERTIFICATION_EXPIRED: Your certification has expired. Please contact administration for renewal."
+                )
+    
     # Fetch all curriculum modules
     academy_content = db.query(AcademyModule).order_by(AcademyModule.module_number).all()
     
@@ -88,10 +127,10 @@ def get_my_progress(
     for mod in academy_content:
         num = mod.module_number
         status = getattr(training, f"module_{num}_status")
-        
+
         # (Assuming topics are tracked in training.topics_progress which is a dict of {topic_id: bool})
         topics_progress = training.topics_progress or {}
-        
+
         topics_data = []
         if mod.topics:
             for topic in mod.topics:
@@ -107,13 +146,13 @@ def get_my_progress(
             "module_number": num,
             "title": mod.title,
             "description": mod.description,
-            "status": status,
+            "status": status.value if status else ModuleStatus.NOT_STARTED.value,
             "score": getattr(training, f"module_{num}_score"),
             "is_locked": num > 1 and getattr(training, f"module_{num-1}_status") != ModuleStatus.COMPLETED,
             "topics": topics_data
         })
 
-    modules_completed = sum([1 for m in modules_list if m["status"] == ModuleStatus.COMPLETED])
+    modules_completed = sum([1 for m in modules_list if m["status"] == ModuleStatus.COMPLETED.value])
     overall_progress = (modules_completed / len(academy_content)) * 100 if academy_content else 0
     
     agent_name = "Agent Name"
@@ -123,10 +162,12 @@ def get_my_progress(
     return {
         "agent_id": current_agent.id,
         "agent_name": agent_name,
-        "certification_level": training.certification_level,
+        "certification_level": training.certification_level.value if training else CertificationLevel.TRAINEE.value,
         "overall_progress": overall_progress,
         "modules_completed": modules_completed,
-        "modules": modules_list
+        "modules": modules_list,
+        "certification_expires_at": training.certification_expires_at,
+        "days_until_expiry": days_until_expiry
     }
 
 @router.get("/modules/{module_number}/content")
@@ -298,42 +339,6 @@ def submit_module_quiz(
     }
 
 
-@router.post("/exam/mid/submit")
-def submit_mid_exam(
-    submission: ExamSubmission,
-    current_agent: Agent = Depends(get_current_agent),
-    db: Session = Depends(get_db)
-):
-    """Submit mid-academy exam (100 questions, after Module 5)"""
-    
-    training = db.query(AgentTraining).filter(AgentTraining.agent_id == current_agent.id).first()
-    if not training or training.module_5_status != ModuleStatus.COMPLETED:
-        raise HTTPException(status_code=403, detail="Complete first 5 modules before taking the Mid Exam")
-    
-    if training.mid_exam_attempts >= 2 and (not training.mid_exam_score or training.mid_exam_score < 75):
-        raise HTTPException(status_code=403, detail="Maximum attempts reached for Mid Exam")
-    
-    score = (submission.correct_answers / 100) * 100
-    
-    attempt = ExamAttempt(
-        agent_id=current_agent.id,
-        exam_type="mid",
-        score=score,
-        answers=submission.answers,
-        passed=score >= 75
-    )
-    db.add(attempt)
-    
-    training.mid_exam_score = score
-    training.mid_exam_attempts += 1
-    db.commit()
-    
-    if score >= 75:
-        return {"passed": True, "score": score, "message": "✅ MID-ACADEMY EXAM PASSED! You may proceed to Module 6."}
-    else:
-        return {"passed": False, "score": score, "message": f"❌ Failed Mid Exam. {2 - training.mid_exam_attempts} attempts remaining."}
-
-
 @router.get("/exam/final/questions")
 def get_final_exam_questions(
     current_agent: Agent = Depends(get_current_agent),
@@ -366,7 +371,7 @@ def get_final_exam_questions(
     selected_questions = random.sample(all_questions, 200)
     
     # Store session state in DB
-    training.last_exam_started_at = datetime.utcnow()
+    training.last_exam_started_at = datetime.now(timezone.utc)
     training.active_exam_question_ids = [str(q["id"]) for q in selected_questions]
     db.commit()
 
@@ -404,7 +409,10 @@ def submit_final_exam(
     if not training.last_exam_started_at:
         raise HTTPException(status_code=400, detail="Exam session not started. Call GET /questions first.")
     
-    elapsed = datetime.utcnow() - training.last_exam_started_at
+    started = training.last_exam_started_at
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    elapsed = datetime.now(timezone.utc) - started
     if elapsed > timedelta(minutes=65):
         training.final_exam_attempts += 1
         db.commit()
@@ -461,9 +469,9 @@ def submit_final_exam(
     training.final_exam_attempts += 1
     
     if passed:
-        training.certification_level = "certified"
-        training.certified_at = datetime.utcnow()
-        training.certification_expires_at = datetime.utcnow() + timedelta(days=365)
+        training.certification_level = CertificationLevel.CERTIFIED
+        training.certified_at = datetime.now(timezone.utc)
+        training.certification_expires_at = datetime.now(timezone.utc) + timedelta(days=365)
         
         agent = db.query(Agent).filter(Agent.id == current_agent.id).first()
         agent.status = AgentStatus.ACTIVE
@@ -518,7 +526,7 @@ def download_certificate(
 ):
     """Generate and download certification PDF with QR verification"""
     training = db.query(AgentTraining).filter(AgentTraining.agent_id == current_agent.id).first()
-    if not training or training.certification_level == "trainee":
+    if not training or training.certification_level == CertificationLevel.TRAINEE:
         raise HTTPException(status_code=403, detail="Not certified yet")
     
     from app.services.certificate_service import certificate_service
@@ -527,7 +535,7 @@ def download_certificate(
         agent_name=current_agent.user.full_name,
         agent_id=current_agent.id,
         agent_code=current_agent.agent_code,
-        issue_date=training.certified_at or datetime.utcnow(),
+        issue_date=training.certified_at or datetime.now(timezone.utc),
         expiry_date=training.certification_expires_at
     )
     

@@ -6,6 +6,7 @@ Requires admin role and creates full audit trail.
 """
 import uuid
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -204,7 +205,7 @@ def get_reconciliation_report(
         "total_credits": round(total_credits, 2),
         "difference": round(difference, 2),
         "is_balanced": is_balanced,
-        "timestamp": str(uuid.uuid4())  # Will be actual timestamp in production
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 

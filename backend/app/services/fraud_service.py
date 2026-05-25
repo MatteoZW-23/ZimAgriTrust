@@ -17,7 +17,7 @@ def apply_listing_controls(_: Session, user: User) -> User:
     return user
 
 
-def fake_seller_detected(user: User) -> bool:
+def is_high_risk_seller(user: User) -> bool:
     return user.risk_score >= 80 or user.trust_score <= 20
 
 

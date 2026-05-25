@@ -122,7 +122,7 @@ def _persist_system_audit(db: Session, report: dict) -> None:
         db.add(SystemAudit(
             event_type="DAILY_RECONCILIATION",
             details=report,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         ))
         db.commit()
     except Exception as exc:  # noqa: BLE001

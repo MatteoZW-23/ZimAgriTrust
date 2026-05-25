@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from enum import Enum
@@ -293,7 +293,7 @@ class DriverAssignmentService:
             platform_commission=assignment.platform_commission,
             driver_payout=assignment.driver_earnings,
             status=DriverJobStatus.PENDING,
-            assigned_at=datetime.utcnow(),
+            assigned_at=datetime.now(timezone.utc),
         )
         self.db.add(job)
         self.db.commit()
@@ -345,7 +345,7 @@ class DriverAssignmentService:
             "estimated_distance_km": assignment.estimated_distance_km,
             "estimated_duration_minutes": assignment.estimated_duration_minutes,
             "status": AssignmentStatus.ASSIGNED.value,
-            "assigned_at": job.assigned_at.isoformat() if job.assigned_at else datetime.utcnow().isoformat(),
+            "assigned_at": job.assigned_at.isoformat() if job.assigned_at else datetime.now(timezone.utc).isoformat(),
             "assigned_by": assignment.assigned_by.value,
         }
     
@@ -378,13 +378,13 @@ class DriverAssignmentService:
         
         # Check if within timeout window
         if job.assigned_at:
-            time_elapsed = datetime.utcnow() - job.assigned_at
+            time_elapsed = datetime.now(timezone.utc) - job.assigned_at
             if time_elapsed.total_seconds() > self.RESPONSE_TIMEOUT_MINUTES * 60:
                 raise HTTPException(status_code=400, detail="Assignment timed out")
         
         # Update status to ACCEPTED
         job.status = DriverJobStatus.ACCEPTED
-        job.accepted_at = datetime.utcnow()
+        job.accepted_at = datetime.now(timezone.utc)
         self.db.commit()
         self.db.refresh(job)
         
@@ -413,7 +413,7 @@ class DriverAssignmentService:
                 order_id=job.order_id,
                 driver_id=driver_id,
                 status="ASSIGNED",
-                assigned_at=datetime.utcnow(),
+                assigned_at=datetime.now(timezone.utc),
             )
             self.db.add(delivery)
             self.db.commit()
@@ -423,7 +423,7 @@ class DriverAssignmentService:
         return {
             "id": str(assignment_id),
             "status": AssignmentStatus.ACCEPTED.value,
-            "accepted_at": job.accepted_at.isoformat() if job.accepted_at else datetime.utcnow().isoformat(),
+            "accepted_at": job.accepted_at.isoformat() if job.accepted_at else datetime.now(timezone.utc).isoformat(),
         }
     
     def reject_assignment(
@@ -455,7 +455,7 @@ class DriverAssignmentService:
         # Update status to REJECTED
         job.status = DriverJobStatus.REJECTED
         job.driver_rejection_reason = reason
-        job.rejected_at = datetime.utcnow()
+        job.rejected_at = datetime.now(timezone.utc)
         job.reassignment_attempts = (job.reassignment_attempts or 0) + 1
         self.db.commit()
         
@@ -481,7 +481,7 @@ class DriverAssignmentService:
                         return {
                             "id": str(assignment_id),
                             "status": AssignmentStatus.REJECTED.value,
-                            "rejected_at": job.rejected_at.isoformat() if job.rejected_at else datetime.utcnow().isoformat(),
+                            "rejected_at": job.rejected_at.isoformat() if job.rejected_at else datetime.now(timezone.utc).isoformat(),
                             "reason": reason,
                             "reassigned_to": new_job.get("driver_id"),
                         }
@@ -496,7 +496,7 @@ class DriverAssignmentService:
         return {
             "id": str(assignment_id),
             "status": AssignmentStatus.REJECTED.value,
-            "rejected_at": job.rejected_at.isoformat() if job.rejected_at else datetime.utcnow().isoformat(),
+            "rejected_at": job.rejected_at.isoformat() if job.rejected_at else datetime.now(timezone.utc).isoformat(),
             "reason": reason,
         }
     
@@ -521,7 +521,7 @@ class DriverAssignmentService:
         
         # Update status to CANCELLED
         job.status = DriverJobStatus.CANCELLED
-        job.cancelled_at = datetime.utcnow()
+        job.cancelled_at = datetime.now(timezone.utc)
         job.cancelled_by = cancelled_by_user_id
         job.cancellation_reason = reason
         self.db.commit()
@@ -579,7 +579,7 @@ class DriverAssignmentService:
         return {
             "id": str(assignment_id),
             "status": AssignmentStatus.CANCELLED.value,
-            "cancelled_at": job.cancelled_at.isoformat() if job.cancelled_at else datetime.utcnow().isoformat(),
+            "cancelled_at": job.cancelled_at.isoformat() if job.cancelled_at else datetime.now(timezone.utc).isoformat(),
             "reason": reason,
         }
     
@@ -605,8 +605,8 @@ class DriverAssignmentService:
         
         # Update status to COMPLETED
         job.status = DriverJobStatus.PAID
-        job.completed_at = datetime.utcnow()
-        job.paid_at = datetime.utcnow()
+        job.completed_at = datetime.now(timezone.utc)
+        job.paid_at = datetime.now(timezone.utc)
         self.db.commit()
         
         # Trigger driver payout via settlement service
@@ -646,7 +646,7 @@ class DriverAssignmentService:
         return {
             "id": str(assignment_id),
             "status": AssignmentStatus.COMPLETED.value,
-            "completed_at": job.completed_at.isoformat() if job.completed_at else datetime.utcnow().isoformat(),
+            "completed_at": job.completed_at.isoformat() if job.completed_at else datetime.now(timezone.utc).isoformat(),
         }
     
     def check_response_timeouts(self) -> int:
@@ -663,7 +663,7 @@ class DriverAssignmentService:
         from app.models.logistics import OrderDelivery
         
         timeout_count = 0
-        timeout_threshold = datetime.utcnow() - timedelta(minutes=self.RESPONSE_TIMEOUT_MINUTES)
+        timeout_threshold = datetime.now(timezone.utc) - timedelta(minutes=self.RESPONSE_TIMEOUT_MINUTES)
         
         # Query assignments where status = ASSIGNED and assigned_at < timeout threshold
         timed_out_jobs = self.db.query(DriverJob).filter(
@@ -852,7 +852,7 @@ class DriverAssignmentService:
         
         driver.current_latitude = latitude
         driver.current_longitude = longitude
-        driver.last_location_update_at = datetime.utcnow()
+        driver.last_location_update_at = datetime.now(timezone.utc)
         self.db.commit()
         
         # Store in delivery_tracking if on active delivery
@@ -872,7 +872,7 @@ class DriverAssignmentService:
                     latitude=latitude,
                     longitude=longitude,
                     accuracy_meters=accuracy_meters,
-                    recorded_at=datetime.utcnow(),
+                    recorded_at=datetime.now(timezone.utc),
                 )
                 self.db.add(tracking)
                 self.db.commit()
@@ -883,7 +883,7 @@ class DriverAssignmentService:
             "driver_id": str(driver_id),
             "latitude": latitude,
             "longitude": longitude,
-            "updated_at": driver.last_location_update_at.isoformat() if driver.last_location_update_at else datetime.utcnow().isoformat(),
+            "updated_at": driver.last_location_update_at.isoformat() if driver.last_location_update_at else datetime.now(timezone.utc).isoformat(),
         }
 
 

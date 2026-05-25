@@ -77,8 +77,6 @@ services:
       AUTO_CONFIRM_PAYMENTS: "false"
     volumes:
       - ./backend:/app
-      - ./data/ml-weights:/app/ml_weights
-      - pgrok_shared_models:/app/models
     networks:
       - ngrok-net
     depends_on:
@@ -175,7 +173,6 @@ services:
 volumes:
   pgrok_postgres_data:
   pgrok_redis_data:
-  pgrok_shared_models:
 
 networks:
   ngrok-net:

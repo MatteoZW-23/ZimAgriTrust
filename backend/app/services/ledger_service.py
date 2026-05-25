@@ -10,7 +10,7 @@ Implements double-entry accounting with:
 """
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, and_
@@ -289,7 +289,7 @@ class LedgerService:
             description=description,
             idempotency_key=idempotency_key,
             entry_metadata=entry_metadata,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         
         db.add(entry)
@@ -448,7 +448,7 @@ class LedgerService:
                 "actual": actual_balance,
                 "difference": difference
             },
-            reconciled_at=datetime.utcnow(),
+            reconciled_at=datetime.now(timezone.utc),
             reconciled_by=reconciled_by,
         )
         

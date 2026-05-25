@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
@@ -29,7 +29,7 @@ def system_health_check(
         "ecocash": "CONNECTED",
         "ussd_bridge": "ACTIVE",
         "hostname": socket.gethostname(),
-        "timestamp": str(datetime.utcnow())
+        "timestamp": str(datetime.now(timezone.utc))
     }
 
 @router.get("/logs")
@@ -143,7 +143,7 @@ def trigger_manual_backup(
     Function 240: Create manual database backup.
     """
     # In a real system, this would trigger a pg_dump or similar.
-    backup_id = f"backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+    backup_id = f"backup_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
     
     audit = SystemAudit(
         admin_id=admin.id,
@@ -170,19 +170,6 @@ def update_retention_policy(
         config.value = str(days)
         db.commit()
     return {"status": "UPDATED", "retention_days": days}
-
-from app.services.sync_service import sync_system_data
-
-@router.post("/sync-platform")
-def sync_platform(
-    db: Session = Depends(get_db),
-    _: User = Depends(require_roles(UserRole.ADMIN)),
-):
-    """
-    Synchronizes the platform with fresh demo data.
-    """
-    result = sync_system_data(db)
-    return result
 
 
 @router.post("/reconcile")

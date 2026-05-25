@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 import uuid
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
 from app.models.onboarding import AgentContract, TrainingModule, AgentTrainingProgress, ShadowingLog, OnboardingPhase
@@ -18,7 +18,7 @@ class OnboardingService:
             raise HTTPException(status_code=404, detail="Application not found")
 
         # Generate integrity hash
-        content_source = f"{application_id}-{signee_name}-{datetime.utcnow().isoformat()}"
+        content_source = f"{application_id}-{signee_name}-{datetime.now(timezone.utc).isoformat()}"
         integrity_hash = hashlib.sha256(content_source.encode()).hexdigest()
 
         contract = AgentContract(
@@ -76,7 +76,7 @@ class OnboardingService:
         progress.attempts += 1
         if score >= module.min_pass_score:
             progress.status = "completed"
-            progress.completed_at = datetime.utcnow()
+            progress.completed_at = datetime.now(timezone.utc)
             
         db.commit()
         return {"score": score, "passed": score >= module.min_pass_score}

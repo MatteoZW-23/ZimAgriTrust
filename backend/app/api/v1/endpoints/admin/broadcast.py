@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
@@ -65,7 +65,7 @@ async def _process_broadcast_async(broadcast_id: uuid.UUID, db: Session):
             broadcast.failed_count += 1
     
     broadcast.status = BroadcastStatus.SENT
-    broadcast.sent_at = datetime.utcnow()
+    broadcast.sent_at = datetime.now(timezone.utc)
     db.commit()
 
 
@@ -103,7 +103,7 @@ async def create_broadcast(
     db.commit()
     db.refresh(broadcast)
 
-    if not payload.scheduled_for or payload.scheduled_for <= datetime.utcnow():
+    if not payload.scheduled_for or payload.scheduled_for <= datetime.now(timezone.utc):
         background.add_task(_process_broadcast_async, broadcast.id, db)
     else:
         broadcast.status = BroadcastStatus.SCHEDULED

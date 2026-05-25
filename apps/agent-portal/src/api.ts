@@ -4,6 +4,11 @@
  */
 const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 
+function getCsrfToken(): string | null {
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 export async function request(path, options = {}) {
   let storedAuth = null;
   // Read token from whichever session is active (academy takes priority if present)
@@ -12,10 +17,12 @@ export async function request(path, options = {}) {
     try { storedAuth = JSON.parse(localStorage.getItem("zimagritrust_agent_auth")); } catch {}
   }
   const token = storedAuth?.access_token;
+  const csrfToken = getCsrfToken();
   const headers = {
     ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers || {}),
+    ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
   };
   const res = await fetch(`${API}${path}`, { ...options, headers, credentials: "include" });
   const ct = res.headers.get("content-type") || "";
@@ -144,17 +151,17 @@ export const getApplicationStatusByPhone = (phone_number) =>
   request(`/recruitment/my-status/${encodeURIComponent(phone_number)}`);
 
 // ── Academy / Classroom ───────────────────────────────────────────────────────
-export const getAcademyCourses = () => request("/agent/classroom/courses");
-export const getAcademyCourseDetail = (courseId) => request(`/agent/classroom/courses/${courseId}`);
-export const enrollInAcademyCourse = (courseId) =>
-  request(`/agent/classroom/courses/${courseId}/enroll`, { method: "POST" });
-export const completeAcademyTopic = (topicId) =>
-  request(`/agent/classroom/topics/${topicId}/complete`, { method: "POST" });
-export const startAcademyQuiz = (resourceId) =>
-  request(`/agent/classroom/quizzes/${resourceId}/start`, { method: "POST" });
-export const submitAcademyQuiz = (resourceId, answers) =>
-  request(`/agent/classroom/quizzes/${resourceId}/submit`, { method: "POST", body: JSON.stringify({ answers }) });
-export const getAcademyProgress = () => request("/agent/classroom/progress");
+export const getAcademyCourses = () => request("/academy/my-progress");
+export const getAcademyCourseDetail = (moduleNumber) => request(`/academy/modules/${moduleNumber}/content`);
+export const enrollInAcademyCourse = (moduleNumber) =>
+  request(`/academy/modules/${moduleNumber}/topics/complete`, { method: "POST" });
+export const completeAcademyTopic = (moduleNumber, topicId) =>
+  request(`/academy/modules/${moduleNumber}/topics/${topicId}/complete`, { method: "POST" });
+export const startAcademyQuiz = (moduleNumber) =>
+  request(`/academy/modules/${moduleNumber}/quiz/start`, { method: "POST" });
+export const submitAcademyQuiz = (moduleNumber, answers) =>
+  request(`/academy/modules/${moduleNumber}/quiz/submit`, { method: "POST", body: JSON.stringify({ answers }) });
+export const getAcademyProgress = () => request("/academy/my-progress");
 
 // ── Academy Certification ──────────────────────────────────────────────────────
 export const getAcademyMyProgress = () => request("/academy/my-progress");
@@ -169,7 +176,7 @@ export async function getCertificate() {
   }
   const token = storedAuth?.access_token;
   const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
-  const res = await fetch(`${API}/agent/classroom/certificate`, {
+  const res = await fetch(`${API}/academy/certificate`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     credentials: "include",
   });
@@ -177,9 +184,6 @@ export async function getCertificate() {
     const data = await res.json().catch(() => ({}));
     throw new Error(data?.detail || "Certificate not available yet");
   }
-  const html = await res.text();
-  // Open the HTML certificate in a new tab
-  const blob = new Blob([html], { type: "text/html" });
-  const url = URL.createObjectURL(blob);
-  return { certificate_url: url };
+  const data = await res.json();
+  return data;
 }

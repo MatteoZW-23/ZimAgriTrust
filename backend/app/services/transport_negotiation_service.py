@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from enum import Enum
@@ -101,7 +101,7 @@ class TransportNegotiationService:
         )
         
         negotiation_id = uuid.uuid4()
-        expires_at = datetime.utcnow() + timedelta(hours=self.NEGOTIATION_TIMEOUT_HOURS)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=self.NEGOTIATION_TIMEOUT_HOURS)
         
         # Insert into transport_negotiations table
         negotiation = TransportNegotiation(
@@ -178,7 +178,7 @@ class TransportNegotiationService:
         if negotiation.status not in [DBNegotiationStatus.INITIATED, DBNegotiationStatus.COUNTER_OFFER]:
             raise HTTPException(status_code=400, detail="Negotiation is not active")
         
-        if negotiation.expires_at < datetime.utcnow():
+        if negotiation.expires_at < datetime.now(timezone.utc):
             negotiation.status = DBNegotiationStatus.EXPIRED
             self.db.commit()
             raise HTTPException(status_code=400, detail="Negotiation has expired")
@@ -205,7 +205,7 @@ class TransportNegotiationService:
         elif message_type == MessageType.REJECTION:
             negotiation.status = DBNegotiationStatus.COUNTER_OFFER
         
-        negotiation.updated_at = datetime.utcnow()
+        negotiation.updated_at = datetime.now(timezone.utc)
         self.db.commit()
         
         # Notify counterparty via WebSocket
@@ -229,7 +229,7 @@ class TransportNegotiationService:
             
             if acceptance_count >= 2:
                 negotiation.status = DBNegotiationStatus.ACCEPTED
-                negotiation.completed_at = datetime.utcnow()
+                negotiation.completed_at = datetime.now(timezone.utc)
                 self.db.commit()
         
         return {
@@ -331,7 +331,7 @@ class TransportNegotiationService:
         # If both accepted, resolve negotiation
         if acceptance_count >= 2:
             negotiation.status = DBNegotiationStatus.ACCEPTED
-            negotiation.completed_at = datetime.utcnow()
+            negotiation.completed_at = datetime.now(timezone.utc)
             
             if latest_offer and latest_offer.structured_offer:
                 negotiation.final_payer = latest_offer.structured_offer.get("payer")
@@ -366,7 +366,7 @@ class TransportNegotiationService:
         return {
             "negotiation_id": str(negotiation_id),
             "status": NegotiationStatus.ACCEPTED.value,
-            "accepted_at": datetime.utcnow().isoformat(),
+            "accepted_at": datetime.now(timezone.utc).isoformat(),
         }
     
     def reject_offer(
@@ -404,7 +404,7 @@ class TransportNegotiationService:
         
         # Update negotiation status
         negotiation.status = DBNegotiationStatus.COUNTER_OFFER
-        negotiation.updated_at = datetime.utcnow()
+        negotiation.updated_at = datetime.now(timezone.utc)
         
         self.db.commit()
         
@@ -422,7 +422,7 @@ class TransportNegotiationService:
         return {
             "negotiation_id": str(negotiation_id),
             "status": NegotiationStatus.COUNTER_OFFER.value,
-            "rejected_at": datetime.utcnow().isoformat(),
+            "rejected_at": datetime.now(timezone.utc).isoformat(),
             "reason": reason,
         }
     
@@ -453,7 +453,7 @@ class TransportNegotiationService:
         
         # Update negotiation status to CANCELLED
         negotiation.status = DBNegotiationStatus.CANCELLED
-        negotiation.updated_at = datetime.utcnow()
+        negotiation.updated_at = datetime.now(timezone.utc)
         
         # Send system message
         system_message = NegotiationMessage(
@@ -481,7 +481,7 @@ class TransportNegotiationService:
         return {
             "negotiation_id": str(negotiation_id),
             "status": NegotiationStatus.CANCELLED.value,
-            "cancelled_at": datetime.utcnow().isoformat(),
+            "cancelled_at": datetime.now(timezone.utc).isoformat(),
             "reason": reason,
         }
     
@@ -577,19 +577,19 @@ class TransportNegotiationService:
         
         # Query negotiations where expires_at < NOW and status = INITIATED/COUNTER_OFFER
         expired_negotiations = self.db.query(TransportNegotiation).filter(
-            TransportNegotiation.expires_at < datetime.utcnow(),
+            TransportNegotiation.expires_at < datetime.now(timezone.utc),
             TransportNegotiation.status.in_([DBNegotiationStatus.INITIATED, DBNegotiationStatus.COUNTER_OFFER])
         ).all()
         
         # Update status to EXPIRED
         for negotiation in expired_negotiations:
             negotiation.status = DBNegotiationStatus.EXPIRED
-            negotiation.updated_at = datetime.utcnow()
+            negotiation.updated_at = datetime.now(timezone.utc)
             expired_count += 1
             
             # Escalate to admin
             negotiation.escalated_to_admin = True
-            negotiation.escalated_at = datetime.utcnow()
+            negotiation.escalated_at = datetime.now(timezone.utc)
             
             # Send notifications
             notification_service.send_notification(
@@ -636,9 +636,9 @@ class TransportNegotiationService:
         
         negotiation.status = DBNegotiationStatus.ADMIN_REVIEW
         negotiation.escalated_to_admin = True
-        negotiation.escalated_at = datetime.utcnow()
+        negotiation.escalated_at = datetime.now(timezone.utc)
         negotiation.escalated_by = escalated_by
-        negotiation.updated_at = datetime.utcnow()
+        negotiation.updated_at = datetime.now(timezone.utc)
         
         # Send system message
         system_message = NegotiationMessage(
@@ -666,7 +666,7 @@ class TransportNegotiationService:
         return {
             "negotiation_id": str(negotiation_id),
             "status": NegotiationStatus.ADMIN_REVIEW.value,
-            "escalated_at": datetime.utcnow().isoformat(),
+            "escalated_at": datetime.now(timezone.utc).isoformat(),
         }
     
     def resolve_negotiation(
@@ -694,9 +694,9 @@ class TransportNegotiationService:
         
         # Update negotiation status to RESOLVED
         negotiation.status = DBNegotiationStatus.RESOLVED
-        negotiation.completed_at = datetime.utcnow()
+        negotiation.completed_at = datetime.now(timezone.utc)
         negotiation.admin_resolution = resolution.get("notes", "")
-        negotiation.updated_at = datetime.utcnow()
+        negotiation.updated_at = datetime.now(timezone.utc)
         
         # Apply resolution (payer, amount, split)
         negotiation.final_payer = resolution.get("payer")
@@ -739,7 +739,7 @@ class TransportNegotiationService:
         return {
             "negotiation_id": str(negotiation_id),
             "status": NegotiationStatus.RESOLVED.value,
-            "resolved_at": datetime.utcnow().isoformat(),
+            "resolved_at": datetime.now(timezone.utc).isoformat(),
             "resolution": resolution,
         }
     
@@ -803,7 +803,7 @@ def validate_split_ratio(split_ratio: Dict[str, float]) -> bool:
 
 def calculate_time_remaining(expires_at: datetime) -> Dict[str, Any]:
     """Calculate time remaining until expiry"""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     remaining = expires_at - now
     
     if remaining.total_seconds() <= 0:

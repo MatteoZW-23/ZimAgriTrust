@@ -6,7 +6,7 @@ automatic suspension, plan upgrades, downgrades, proration, and feature entitlem
 """
 import uuid
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from enum import Enum
 from sqlalchemy.orm import Session
@@ -151,11 +151,11 @@ class SubscriptionService:
         
         # Calculate billing period
         if trial_days > 0:
-            start_date = datetime.utcnow()
+            start_date = datetime.now(timezone.utc)
             end_date = start_date + timedelta(days=trial_days)
             status = SubscriptionStatus.TRIAL
         else:
-            start_date = datetime.utcnow()
+            start_date = datetime.now(timezone.utc)
             if billing_cycle == BillingCycle.MONTHLY:
                 end_date = start_date + timedelta(days=30)
             elif billing_cycle == BillingCycle.QUARTERLY:
@@ -263,7 +263,7 @@ class SubscriptionService:
         return {
             "subscription_id": subscription_id,
             "status": "billed",
-            "next_billing_date": (datetime.utcnow() + timedelta(days=30)).isoformat(),
+            "next_billing_date": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(),
         }
 
     @staticmethod
@@ -283,7 +283,7 @@ class SubscriptionService:
         else:
             # Set to past due
             status = SubscriptionStatus.PAST_DUE
-            next_retry = datetime.utcnow() + timedelta(days=SubscriptionConfig.RETRY_INTERVAL_DAYS)
+            next_retry = datetime.now(timezone.utc) + timedelta(days=SubscriptionConfig.RETRY_INTERVAL_DAYS)
             logger.info(
                 f"Subscription {subscription_id} past due, "
                 f"retry attempt {attempt_number + 1} on {next_retry}"

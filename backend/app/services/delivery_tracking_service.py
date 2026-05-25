@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from enum import Enum
@@ -100,7 +100,7 @@ class DeliveryTrackingService:
             delivery_latitude=delivery_latitude,
             delivery_longitude=delivery_longitude,
             status=DeliveryStatus.PENDING.value,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         self.db.add(delivery)
         self.db.commit()
@@ -110,7 +110,7 @@ class DeliveryTrackingService:
         if pickup_latitude and pickup_longitude and delivery_latitude and delivery_longitude:
             distance_km = calculate_distance(pickup_latitude, pickup_longitude, delivery_latitude, delivery_longitude) / 1000
             eta_minutes = estimate_eta(distance_km, 40)  # Assume 40 km/h average speed
-            delivery.estimated_arrival_time = datetime.utcnow() + timedelta(minutes=eta_minutes)
+            delivery.estimated_arrival_time = datetime.now(timezone.utc) + timedelta(minutes=eta_minutes)
             delivery.estimated_distance_km = distance_km
             self.db.commit()
         
@@ -123,7 +123,7 @@ class DeliveryTrackingService:
             "delivery_address": delivery_address,
             "estimated_distance_km": delivery.estimated_distance_km,
             "estimated_arrival_time": delivery.estimated_arrival_time.isoformat() if delivery.estimated_arrival_time else None,
-            "created_at": delivery.created_at.isoformat() if delivery.created_at else datetime.utcnow().isoformat(),
+            "created_at": delivery.created_at.isoformat() if delivery.created_at else datetime.now(timezone.utc).isoformat(),
         }
     
     def update_location(
@@ -153,7 +153,7 @@ class DeliveryTrackingService:
             status=location.status.value,
             device_id=location.device_id,
             battery_level=location.battery_level,
-            recorded_at=datetime.utcnow(),
+            recorded_at=datetime.now(timezone.utc),
         )
         self.db.add(tracking)
         self.db.commit()
@@ -164,7 +164,7 @@ class DeliveryTrackingService:
         if delivery:
             delivery.current_latitude = location.latitude
             delivery.current_longitude = location.longitude
-            delivery.last_location_update_at = datetime.utcnow()
+            delivery.last_location_update_at = datetime.now(timezone.utc)
             self.db.commit()
         
         # Check geofences (pickup, delivery)
@@ -178,7 +178,7 @@ class DeliveryTrackingService:
         
         # Recalculate ETA if needed
         if delivery and delivery.estimated_arrival_time:
-            time_since_eta = datetime.utcnow() - delivery.estimated_arrival_time.replace(tzinfo=None)
+            time_since_eta = datetime.now(timezone.utc) - delivery.estimated_arrival_time.replace(tzinfo=None)
             if abs(time_since_eta.total_seconds()) > self.ETA_UPDATE_THRESHOLD_MINUTES * 60:
                 self.calculate_eta(location.delivery_id)
         
@@ -193,7 +193,7 @@ class DeliveryTrackingService:
             "latitude": location.latitude,
             "longitude": location.longitude,
             "status": location.status.value,
-            "recorded_at": tracking.recorded_at.isoformat() if tracking.recorded_at else datetime.utcnow().isoformat(),
+            "recorded_at": tracking.recorded_at.isoformat() if tracking.recorded_at else datetime.now(timezone.utc).isoformat(),
         }
     
     def check_geofences(
@@ -289,9 +289,9 @@ class DeliveryTrackingService:
         
         # Set appropriate timestamp
         if new_status == DeliveryStatus.PICKED_UP:
-            delivery.pickup_confirmed_at = datetime.utcnow()
+            delivery.pickup_confirmed_at = datetime.now(timezone.utc)
         elif new_status == DeliveryStatus.DELIVERED:
-            delivery.delivery_confirmed_at = datetime.utcnow()
+            delivery.delivery_confirmed_at = datetime.now(timezone.utc)
         
         # Update linked DriverJob status
         job = self.db.query(DriverJob).filter(DriverJob.order_id == delivery.order_id).first()
@@ -335,7 +335,7 @@ class DeliveryTrackingService:
         return {
             "id": str(delivery_id),
             "status": new_status.value,
-            "updated_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
     
     def confirm_pickup(
@@ -373,7 +373,7 @@ class DeliveryTrackingService:
         
         # Update delivery status to PICKED_UP
         delivery.status = DeliveryStatus.PICKED_UP.value
-        delivery.pickup_confirmed_at = datetime.utcnow()
+        delivery.pickup_confirmed_at = datetime.now(timezone.utc)
         delivery.pickup_confirmed_by = driver_id
         delivery.pickup_photo_url = photo_url
         delivery.pickup_signature_url = signature_url
@@ -404,7 +404,7 @@ class DeliveryTrackingService:
         return {
             "id": str(delivery_id),
             "status": DeliveryStatus.PICKED_UP.value,
-            "pickup_confirmed_at": delivery.pickup_confirmed_at.isoformat() if delivery.pickup_confirmed_at else datetime.utcnow().isoformat(),
+            "pickup_confirmed_at": delivery.pickup_confirmed_at.isoformat() if delivery.pickup_confirmed_at else datetime.now(timezone.utc).isoformat(),
             "delivery_code": delivery.delivery_code,
         }
     
@@ -444,7 +444,7 @@ class DeliveryTrackingService:
         
         # Update delivery status to DELIVERED
         delivery.status = DeliveryStatus.DELIVERED.value
-        delivery.delivery_confirmed_at = datetime.utcnow()
+        delivery.delivery_confirmed_at = datetime.now(timezone.utc)
         delivery.delivery_confirmed_by = driver_id
         delivery.delivery_photo_url = photo_url
         delivery.delivery_signature_url = signature_url
@@ -482,7 +482,7 @@ class DeliveryTrackingService:
         return {
             "id": str(delivery_id),
             "status": DeliveryStatus.DELIVERED.value,
-            "delivery_confirmed_at": delivery.delivery_confirmed_at.isoformat() if delivery.delivery_confirmed_at else datetime.utcnow().isoformat(),
+            "delivery_confirmed_at": delivery.delivery_confirmed_at.isoformat() if delivery.delivery_confirmed_at else datetime.now(timezone.utc).isoformat(),
         }
     
     def calculate_eta(
@@ -528,7 +528,7 @@ class DeliveryTrackingService:
         
         # Calculate ETA
         eta_minutes = estimate_eta(remaining_distance_km, average_speed_kmh)
-        estimated_arrival_time = datetime.utcnow() + timedelta(minutes=eta_minutes)
+        estimated_arrival_time = datetime.now(timezone.utc) + timedelta(minutes=eta_minutes)
         
         # Update delivery estimated_arrival_time
         delivery.estimated_arrival_time = estimated_arrival_time
@@ -765,7 +765,7 @@ class DeliveryTrackingService:
         
         from app.models.logistics import DeliveryTracking
         
-        cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_to_keep)
         
         # Delete from delivery_tracking where recorded_at < cutoff_date
         deleted = self.db.query(DeliveryTracking).filter(

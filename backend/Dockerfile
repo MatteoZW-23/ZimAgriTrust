@@ -140,8 +140,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PATH=/home/appuser/.local/bin:$PATH \
-    MODELS_PATH=/app/models
+    PATH=/home/appuser/.local/bin:$PATH
 
 EXPOSE 8000
 

@@ -1,6 +1,4 @@
 # Production backend — MUST stay under 500MB total image size
-# NO PyTorch, NO TensorFlow, NO Ultralytics, NO Jupyter
-# Inference only: ONNX Runtime + scikit-learn for pre-exported models
 
 fastapi==0.115.6
 uvicorn[standard]==0.34.0

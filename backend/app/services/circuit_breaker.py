@@ -9,7 +9,7 @@ import logging
 from enum import Enum
 from typing import Optional, Callable, Any, TypeVar
 from functools import wraps
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.core.config import settings
 from app.services.cache_service import cache_service
@@ -71,7 +71,7 @@ class CircuitBreaker:
             last_failure_str = await cache_service.get(self._get_last_failure_time_key())
             if last_failure_str:
                 last_failure = datetime.fromisoformat(last_failure_str)
-                if datetime.utcnow() - last_failure > timedelta(seconds=self.timeout):
+                if datetime.now(timezone.utc) - last_failure > timedelta(seconds=self.timeout):
                     await self.set_state(CircuitState.HALF_OPEN)
                     logger.info(f"Circuit breaker {self.name} transitioned to HALF_OPEN")
                     return CircuitState.HALF_OPEN
@@ -101,7 +101,7 @@ class CircuitBreaker:
         count = await self.increment_failure_count()
         await cache_service.set(
             self._get_last_failure_time_key(),
-            datetime.utcnow().isoformat(),
+            datetime.now(timezone.utc).isoformat(),
             expire=3600
         )
         

@@ -118,14 +118,11 @@ class EcoCashProvider(PaymentProvider):
 
     async def initiate_payment(self, request: PaymentRequest) -> PaymentResponse:
         """Initiate EcoCash payment via USSD push"""
-        # Implementation would call EcoCash API
-        # For now, return mock response
         return PaymentResponse(
-            success=True,
-            transaction_id=str(uuid.uuid4()),
-            provider_reference=f"ECO{uuid.uuid4().hex[:12].upper()}",
-            status="PENDING",
-            message="Payment initiated via EcoCash USSD",
+            success=False,
+            transaction_id=request.reference,
+            status="PROVIDER_NOT_CONFIGURED",
+            message="EcoCash API credentials and live integration are not configured",
         )
 
     async def verify_webhook(self, payload: WebhookPayload) -> bool:
@@ -148,22 +145,20 @@ class EcoCashProvider(PaymentProvider):
 
     async def check_status(self, transaction_id: str) -> PaymentResponse:
         """Check EcoCash transaction status"""
-        # Implementation would query EcoCash API
         return PaymentResponse(
-            success=True,
+            success=False,
             transaction_id=transaction_id,
-            status="SUCCESS",
-            message="Transaction completed",
+            status="PROVIDER_NOT_CONFIGURED",
+            message="EcoCash API status lookup is not configured",
         )
 
     async def refund(self, transaction_id: str, amount: float) -> PaymentResponse:
         """Process EcoCash refund"""
-        # Implementation would call EcoCash refund API
         return PaymentResponse(
-            success=True,
+            success=False,
             transaction_id=transaction_id,
-            status="REFUNDED",
-            message="Refund processed",
+            status="PROVIDER_NOT_CONFIGURED",
+            message="EcoCash API refund is not configured",
         )
 
     def is_healthy(self) -> bool:
@@ -184,11 +179,10 @@ class OneMoneyProvider(PaymentProvider):
     async def initiate_payment(self, request: PaymentRequest) -> PaymentResponse:
         """Initiate OneMoney payment"""
         return PaymentResponse(
-            success=True,
-            transaction_id=str(uuid.uuid4()),
-            provider_reference=f"OM{uuid.uuid4().hex[:12].upper()}",
-            status="PENDING",
-            message="Payment initiated via OneMoney",
+            success=False,
+            transaction_id=request.reference,
+            status="PROVIDER_NOT_CONFIGURED",
+            message="OneMoney API credentials and live integration are not configured",
         )
 
     async def verify_webhook(self, payload: WebhookPayload) -> bool:
@@ -199,19 +193,19 @@ class OneMoneyProvider(PaymentProvider):
     async def check_status(self, transaction_id: str) -> PaymentResponse:
         """Check OneMoney transaction status"""
         return PaymentResponse(
-            success=True,
+            success=False,
             transaction_id=transaction_id,
-            status="SUCCESS",
-            message="Transaction completed",
+            status="PROVIDER_NOT_CONFIGURED",
+            message="OneMoney API status lookup is not configured",
         )
 
     async def refund(self, transaction_id: str, amount: float) -> PaymentResponse:
         """Process OneMoney refund"""
         return PaymentResponse(
-            success=True,
+            success=False,
             transaction_id=transaction_id,
-            status="REFUNDED",
-            message="Refund processed",
+            status="PROVIDER_NOT_CONFIGURED",
+            message="OneMoney API refund is not configured",
         )
 
     def is_healthy(self) -> bool:

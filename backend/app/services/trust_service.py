@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models.dispute import Dispute
@@ -200,7 +200,7 @@ def check_and_apply_inactivity(db: Session, user: User) -> bool:
     if not user.last_activity_at:
         return False
     
-    days_inactive = (datetime.utcnow() - user.last_activity_at).days
+    days_inactive = (datetime.now(timezone.utc) - user.last_activity_at).days
     
     if days_inactive >= 60 and user.role == UserRole.FARMER:
         _record_trust_event(db, user, -10, "Inactivity penalty (60 days)", triggered_by="system")

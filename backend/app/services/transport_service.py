@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException
@@ -207,7 +207,7 @@ def driver_accept_job(db: Session, job_id: uuid.UUID, driver_user_id: uuid.UUID)
         raise HTTPException(status_code=400, detail=f"Job already {job.status}")
 
     job.status = "ACCEPTED"
-    job.accepted_at = datetime.utcnow()
+    job.accepted_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(job)
 
@@ -263,7 +263,7 @@ def settle_driver_payout(db: Session, job: DriverJob) -> bool:
     ))
 
     job.status = "PAID"
-    job.paid_at = datetime.utcnow()
+    job.paid_at = datetime.now(timezone.utc)
     driver.total_deliveries += 1
     driver.successful_deliveries += 1
     db.commit()

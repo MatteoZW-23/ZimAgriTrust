@@ -1,6 +1,6 @@
 import uuid
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
@@ -262,7 +262,7 @@ def update_listing(
     data = payload.model_dump(exclude_unset=True)
     for field, value in data.items():
         setattr(listing, field, value)
-    listing.updated_at = datetime.utcnow()
+    listing.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(listing)
     return listing
@@ -288,7 +288,7 @@ def delete_listing(
             detail="Cannot delete listing with accepted offers; cancel orders first.",
         )
     listing.status = ListingStatus.DELETED
-    listing.updated_at = datetime.utcnow()
+    listing.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(listing)
     return listing
@@ -304,8 +304,8 @@ def expire_listing(
     """F#58 — mark listing as expired."""
     listing = _get_owned_listing(db, listing_id, current_user)
     listing.status = ListingStatus.EXPIRED
-    listing.expires_at = datetime.utcnow()
-    listing.updated_at = datetime.utcnow()
+    listing.expires_at = datetime.now(timezone.utc)
+    listing.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(listing)
     return listing
@@ -327,7 +327,7 @@ def add_listing_photos(
         if url and url not in existing:
             existing.append(url)
     listing.photo_urls = existing
-    listing.updated_at = datetime.utcnow()
+    listing.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(listing)
     return ListingPhotosResponse(listing_id=listing.id, photo_urls=existing)
@@ -344,7 +344,7 @@ def remove_listing_photo(
     listing = _get_owned_listing(db, listing_id, current_user)
     existing = [u for u in (listing.photo_urls or []) if u != url]
     listing.photo_urls = existing
-    listing.updated_at = datetime.utcnow()
+    listing.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(listing)
     return ListingPhotosResponse(listing_id=listing.id, photo_urls=existing)
@@ -369,14 +369,23 @@ def boost_listing(
         raise HTTPException(status_code=400, detail="Only active listings can be boosted")
 
     fee = round(BOOST_FEE_PER_DAY_USD * payload.duration_days, 2)
-    if (current_user.balance_usd or 0) < fee:
+
+    from app.services.wallet_service import wallet_service
+    idempotency_key = f"boost:{listing.id}:{payload.duration_days}"
+    success = wallet_service.withdraw(
+        db,
+        user_id=current_user.id,
+        amount=fee,
+        currency="USD",
+        idempotency_key=idempotency_key,
+    )
+    if not success:
         raise HTTPException(
             status_code=402,
             detail=f"Insufficient wallet balance. Boost requires ${fee:.2f}.",
         )
 
-    current_user.balance_usd = round((current_user.balance_usd or 0) - fee, 2)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     base = listing.boosted_until if (listing.boosted_until and listing.boosted_until > now) else now
     listing.is_boosted = True
     listing.boost_fee = (listing.boost_fee or 0) + fee
@@ -384,14 +393,14 @@ def boost_listing(
     listing.updated_at = now
     db.commit()
     db.refresh(listing)
-    db.refresh(current_user)
 
+    balance_data = wallet_service.get_balance_detail(db, current_user.id)
     return ListingBoostResponse(
         listing_id=listing.id,
         is_boosted=listing.is_boosted,
         boosted_until=listing.boosted_until,
         boost_fee=listing.boost_fee,
-        wallet_balance=current_user.balance_usd or 0.0,
+        wallet_balance=balance_data.get("available", 0.0),
     )
 
 
@@ -409,7 +418,8 @@ def get_listing_stats(
         .filter(Offer.listing_id == listing.id, Offer.status == OfferStatus.ACCEPTED)
         .scalar()
     ) or 0
-    days_active = (datetime.utcnow() - listing.created_at).days
+    created_at_aware = listing.created_at.replace(tzinfo=timezone.utc) if listing.created_at.tzinfo is None else listing.created_at
+    days_active = (datetime.now(timezone.utc) - created_at_aware).days
     return ListingStatsResponse(
         listing_id=listing.id,
         view_count=listing.view_count or 0,

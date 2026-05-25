@@ -95,7 +95,7 @@ def maybe_trigger_auto_topup(db: Session, *, user: User) -> Optional[DepositInte
         return None
 
     # Daily cap on auto top-ups
-    since = datetime.utcnow() - timedelta(days=1)
+    since = datetime.now(timezone.utc) - timedelta(days=1)
     today_count = (
         db.query(func.count(DepositIntent.id))
         .filter(
@@ -132,7 +132,7 @@ def maybe_trigger_auto_topup(db: Session, *, user: User) -> Optional[DepositInte
     intent = db.query(DepositIntent).filter(DepositIntent.id == uuid.UUID(result["intent_id"])).first()
     if intent is not None:
         intent.metadata_json = {**(intent.metadata_json or {}), "auto": "1"}
-    rule.last_triggered_at = datetime.utcnow()
+    rule.last_triggered_at = datetime.now(timezone.utc)
     db.flush()
     return intent
 
@@ -143,7 +143,7 @@ def maybe_trigger_auto_topup(db: Session, *, user: User) -> Optional[DepositInte
 
 def _next_run(cadence: RecurrenceCadence, *, day_of_week: Optional[int],
               day_of_month: Optional[int], from_dt: Optional[datetime] = None) -> datetime:
-    base = from_dt or datetime.utcnow()
+    base = from_dt or datetime.now(timezone.utc)
     if cadence == RecurrenceCadence.WEEKLY:
         days = (day_of_week if day_of_week is not None else base.weekday()) - base.weekday()
         if days <= 0:
@@ -206,7 +206,7 @@ def cancel_schedule(db: Session, *, user: User, schedule_id: uuid.UUID) -> None:
 
 def run_due_schedules(db: Session, *, now: Optional[datetime] = None) -> int:
     """Scheduler entrypoint. Returns number of intents created."""
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     due = (
         db.query(RecurringDepositSchedule)
         .filter(
@@ -277,7 +277,7 @@ def request_refund(
         raise HTTPException(status_code=404, detail="Deposit not found")
     if intent.status != DepositIntentStatus.COMPLETED:
         raise HTTPException(status_code=400, detail="Only completed deposits are refundable")
-    if not intent.refundable_until or datetime.utcnow() > intent.refundable_until:
+    if not intent.refundable_until or datetime.now(timezone.utc) > intent.refundable_until:
         raise HTTPException(status_code=400, detail="7-day refund window has expired")
 
     # Available balance must cover the refund (no funds were spent)
@@ -326,7 +326,7 @@ def decide_refund(
         raise HTTPException(status_code=400, detail=f"Request already {req.status.value}")
 
     req.decided_by = actor.id
-    req.decided_at = datetime.utcnow()
+    req.decided_at = datetime.now(timezone.utc)
     req.decision_notes = notes
     intent = db.query(DepositIntent).filter(DepositIntent.id == req.deposit_intent_id).first()
 
@@ -351,7 +351,7 @@ def decide_refund(
         return req
 
     req.status = RefundStatus.PROCESSED
-    req.processed_at = datetime.utcnow()
+    req.processed_at = datetime.now(timezone.utc)
     if intent:
         intent.status = DepositIntentStatus.REFUNDED
 

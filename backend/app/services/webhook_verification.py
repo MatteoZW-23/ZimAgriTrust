@@ -10,7 +10,7 @@ import hmac
 import hashlib
 import logging
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import Request, HTTPException, status
 
@@ -120,7 +120,7 @@ class WebhookVerifier:
             sig_value = signature.split(',')[1].split('=')[1]
 
             # Check timestamp is within tolerance (5 minutes)
-            current_time = int(datetime.utcnow().timestamp())
+            current_time = int(datetime.now(timezone.utc).timestamp())
             if abs(current_time - timestamp) > 300:
                 return False
 
@@ -260,7 +260,7 @@ async def verify_webhook_request(
         
         if request_id:
             timestamp_str = payload_dict.get('timestamp')
-            timestamp = datetime.fromisoformat(timestamp_str) if timestamp_str else datetime.utcnow()
+            timestamp = datetime.fromisoformat(timestamp_str) if timestamp_str else datetime.now(timezone.utc)
             
             if WebhookVerifier.check_replay_attack(request_id, timestamp):
                 raise HTTPException(

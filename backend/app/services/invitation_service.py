@@ -5,7 +5,7 @@ Handles invitation creation, verification, and role provisioning
 import secrets
 import hashlib
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 
 from sqlalchemy.orm import Session
@@ -94,7 +94,7 @@ class InvitationService:
             email=email,
             role_id=role.id,
             token_hash=token_hash,
-            expires_at=datetime.utcnow() + timedelta(hours=expires_hours),
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=expires_hours),
             created_by=invited_by.id,
             status=InvitationStatus.PENDING,
         )
@@ -145,7 +145,7 @@ class InvitationService:
         if not invitation:
             return False, "Invalid or expired invitation", None
         
-        if invitation.expires_at < datetime.utcnow():
+        if invitation.expires_at < datetime.now(timezone.utc):
             invitation.status = InvitationStatus.EXPIRED
             db.commit()
             return False, "Invitation has expired", None
@@ -171,7 +171,7 @@ class InvitationService:
         
         # Update invitation
         invitation.status = InvitationStatus.ACCEPTED
-        invitation.used_at = datetime.utcnow()
+        invitation.used_at = datetime.now(timezone.utc)
         
         # Assign role to user
         user.role_id = invitation.role_id

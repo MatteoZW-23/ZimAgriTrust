@@ -6,7 +6,7 @@ Includes: Core messaging, webhooks, enhanced features, bulk operations
 from fastapi import APIRouter, Depends, HTTPException, Body, Request
 from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel
 import requests
 import os
@@ -17,6 +17,7 @@ from app.models.user import User, UserRole
 from app.services.whatsapp_service import whatsapp_service
 from app.services.auth_service import build_phone_lookup_candidates
 from app.api.deps import get_current_user, require_roles
+from app.core.config import settings
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -145,7 +146,11 @@ async def verify_webhook(request: Request):
     token = params.get("hub.verify_token")
     challenge = params.get("hub.challenge")
     
-    if mode == "subscribe" and token == "ZimAgritrust_SOVEREIGN_TOKEN":
+    if not settings.WHATSAPP_VERIFY_TOKEN:
+        logger.error("WHATSAPP_VERIFY_TOKEN is not configured")
+        raise HTTPException(status_code=500, detail="Webhook verification is not configured")
+
+    if mode == "subscribe" and token == settings.WHATSAPP_VERIFY_TOKEN:
         return int(challenge)
     raise HTTPException(status_code=403, detail="Verification Failed")
 
@@ -157,8 +162,14 @@ async def get_whatsapp_status():
 
 
 @router.post("/test-alert")
-async def test_alert(phone: str, message: str):
-    """Manually triggers a proactive alert for testing purposes"""
+async def test_alert(
+    phone: str,
+    message: str,
+    current_user: User = Depends(require_roles(UserRole.ADMIN)),
+):
+    """Development-only WhatsApp alert sender, disabled by default."""
+    if not settings.ENABLE_WHATSAPP_TEST_ENDPOINTS:
+        raise HTTPException(status_code=404, detail="Not found")
     send_notification(phone, message)
     return {"status": "Alert sent"}
 
@@ -250,7 +261,7 @@ async def initiate_mobile_payment(request: MobilePaymentRequest, db: Session = D
 @router.post("/payment/receipt")
 async def send_payment_receipt(transaction_id: str, amount: float, recipient: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Send payment receipt to user"""
-    await whatsapp_service.send_payment_receipt(db, current_user.phone_number, transaction_id, amount, recipient, datetime.utcnow())
+    await whatsapp_service.send_payment_receipt(db, current_user.phone_number, transaction_id, amount, recipient, datetime.now(timezone.utc))
     return {"success": True, "message": "Receipt sent"}
 
 

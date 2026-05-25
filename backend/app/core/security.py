@@ -178,7 +178,7 @@ def sign_request(payload: dict, secret: str = None) -> str:
     """
     Generate HMAC-SHA256 signature for webhook/request integrity.
     """
-    key = secret or settings.HMAC_SECRET or settings.SECRET_KEY
+    key = secret or settings.effective_transaction_signing_key
     body = json.dumps(payload, sort_keys=True, separators=(',', ':'))
     return hmac.new(key.encode(), body.encode(), hashlib.sha256).hexdigest()
 

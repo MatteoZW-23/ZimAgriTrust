@@ -6,7 +6,7 @@ import secrets
 import hashlib
 import hmac
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple, Dict, List
 import uuid
 
@@ -215,7 +215,7 @@ class SessionManager:
             device_fingerprint=device_fingerprint,
             user_agent=user_agent,
             platform=platform,
-            expires_at=datetime.utcnow() + timedelta(minutes=timeout_minutes),
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=timeout_minutes),
         )
         
         db.add(session)
@@ -239,7 +239,7 @@ class SessionManager:
             and_(
                 UserSession.user_id == user.id,
                 UserSession.is_active == True,
-                UserSession.expires_at > datetime.utcnow(),
+                UserSession.expires_at > datetime.now(timezone.utc),
             )
         ).count()
         
@@ -254,7 +254,7 @@ class SessionManager:
             
             if oldest_session:
                 oldest_session.is_active = False
-                oldest_session.revoked_at = datetime.utcnow()
+                oldest_session.revoked_at = datetime.now(timezone.utc)
                 oldest_session.revoke_reason = 'max_sessions_exceeded'
                 db.commit()
             
@@ -268,7 +268,7 @@ class SessionManager:
         session = db.query(UserSession).filter(UserSession.id == session_id).first()
         if session:
             session.is_active = False
-            session.revoked_at = datetime.utcnow()
+            session.revoked_at = datetime.now(timezone.utc)
             session.revoke_reason = reason
             db.commit()
     
@@ -279,7 +279,7 @@ class SessionManager:
             and_(
                 UserSession.user_id == user_id,
                 UserSession.is_active == True,
-                UserSession.expires_at > datetime.utcnow(),
+                UserSession.expires_at > datetime.now(timezone.utc),
             )
         ).all()
     
@@ -340,8 +340,8 @@ class TokenManager:
             'email': user.email,
             'role': role,
             'type': TokenType.ACCESS.value,
-            'iat': datetime.utcnow(),
-            'exp': datetime.utcnow() + timedelta(minutes=expires_in),
+            'iat': datetime.now(timezone.utc),
+            'exp': datetime.now(timezone.utc) + timedelta(minutes=expires_in),
         }
         
         if session_id:
@@ -365,8 +365,8 @@ class TokenManager:
             'sub': str(user.id),
             'role': role,
             'type': TokenType.REFRESH.value,
-            'iat': datetime.utcnow(),
-            'exp': datetime.utcnow() + timedelta(minutes=expires_in),
+            'iat': datetime.now(timezone.utc),
+            'exp': datetime.now(timezone.utc) + timedelta(minutes=expires_in),
         }
         
         if session_id:
@@ -388,8 +388,8 @@ class TokenManager:
         payload = {
             'sub': str(user.id),
             'type': TokenType.RESET.value,
-            'iat': datetime.utcnow(),
-            'exp': datetime.utcnow() + timedelta(minutes=expires_in),
+            'iat': datetime.now(timezone.utc),
+            'exp': datetime.now(timezone.utc) + timedelta(minutes=expires_in),
         }
         
         token = jwt.encode(
@@ -482,7 +482,7 @@ class PINManager:
             user_id=user.id,
             pin_hash=pin_hash,
             change_reason=change_reason,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         
         # Check for reuse (last 3 PINs)
@@ -519,7 +519,7 @@ class PINManager:
         # Check if account is locked
         lockout = db.query(PINLockout).filter(PINLockout.user_id == user.id).first()
         
-        if lockout and lockout.locked_until and lockout.locked_until > datetime.utcnow():
+        if lockout and lockout.locked_until and lockout.locked_until > datetime.now(timezone.utc):
             return False, f"Account locked until {lockout.locked_until}. Contact support."
         
         # Check if user has PIN set
@@ -553,11 +553,11 @@ class PINManager:
                 db.add(lockout)
             
             lockout.failed_attempts += 1
-            lockout.last_attempt_at = datetime.utcnow()
+            lockout.last_attempt_at = datetime.now(timezone.utc)
             
             # Lock after 3 failed attempts
             if lockout.failed_attempts >= 3:
-                lockout.locked_until = datetime.utcnow() + timedelta(minutes=15)
+                lockout.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
                 lockout.lockout_count += 1
                 db.commit()
                 
@@ -764,7 +764,7 @@ class RateLimiter:
         if limit is None:
             limit = RateLimiter.DEFAULT_LIMITS.get(key, 100)
         
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         window_start = now - timedelta(minutes=window_minutes)
         
         # Count requests in window
@@ -793,8 +793,8 @@ class RateLimiter:
         rate_limit = RateLimit(
             identifier=identifier,
             key=key.value,
-            window_start=datetime.utcnow(),
-            expires_at=datetime.utcnow() + timedelta(minutes=window_minutes),
+            window_start=datetime.now(timezone.utc),
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=window_minutes),
         )
         
         db.add(rate_limit)

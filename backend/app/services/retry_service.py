@@ -7,7 +7,7 @@ Failed operations are retried with exponential backoff before moving to DLQ.
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Callable, TypeVar, Any
 from enum import Enum
 
@@ -125,7 +125,7 @@ class RetryService:
         )
         await cache_service.set(
             f"{retry_key}:scheduled_at",
-            datetime.utcnow().isoformat(),
+            datetime.now(timezone.utc).isoformat(),
             expire=86400
         )
         
@@ -174,7 +174,7 @@ class RetryService:
             "operation_id": operation_id,
             "error_message": error_message,
             "attempt_count": attempt_count,
-            "failed_at": datetime.utcnow().isoformat(),
+            "failed_at": datetime.now(timezone.utc).isoformat(),
             "status": RetryStatus.DEAD_LETTER.value
         }
         

@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
 from app.models.agent import Agent, AgentAssignment, AgentStatus
@@ -185,7 +185,7 @@ class AgentService:
 
         Returns a dict describing the action taken.
         """
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timezone, timezone, timedelta
         from app.models.agent import Agent
         from app.models.academy import AgentTraining, CertificationLevel
 

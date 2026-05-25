@@ -17,8 +17,11 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('agent_applications', sa.Column('district', sa.String(50), nullable=True))
+    conn = op.get_bind()
+    conn.execute(sa.text(
+        "ALTER TABLE agent_applications ADD COLUMN IF NOT EXISTS district VARCHAR(50)"
+    ))
 
 
 def downgrade():
-    op.drop_column('agent_applications', 'district')
+    pass

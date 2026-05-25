@@ -170,20 +170,25 @@ def agent_stats(
             } for u in basic_agents
         ]
 
-    return [
-        {
+    result = []
+    for a in agents:
+        try:
+            assignments = a.assignments or []
+            resolved = len([x for x in assignments if x.status == "completed"])
+        except Exception:
+            resolved = 0
+        result.append({
             "id": str(a.user_id),
             "full_name": a.user.full_name if a.user else "Anonymous Agent",
             "region": a.user.province if a.user else "Verified Zone",
-            "resolved": len([x for x in (a.assignments or []) if x.status == "completed"]),
-            "resolution_count": len([x for x in (a.assignments or []) if x.status == "completed"]),
+            "resolved": resolved,
+            "resolution_count": resolved,
             "rating": round(a.rating, 1) if a.rating else 0.0,
             "average_rating": round(a.rating, 1) if a.rating else 0.0,
             "wallet_balance": round(a.wallet_balance or 0.0, 2),
             "pending_earnings": round(a.pending_earnings or 0.0, 2),
-        }
-        for a in agents
-    ]
+        })
+    return result
 
 @router.get("/{agent_id}", response_model=AgentDetailResponse)
 def get_agent_detail(

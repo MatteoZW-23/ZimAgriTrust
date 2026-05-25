@@ -9,11 +9,9 @@ from . import (
     system,
     disputes,
     config,
-    ai,
     notifications,
     permissions,
     academy,
-    scraping,
     command_center,
     invitations,
     broadcast,
@@ -33,10 +31,8 @@ router.include_router(analytics.router, prefix="/analytics", tags=["admin-analyt
 router.include_router(system.router, prefix="/system", tags=["admin-system"])
 router.include_router(disputes.router, prefix="/disputes", tags=["admin-disputes"])
 router.include_router(config.router, prefix="/config", tags=["admin-config"])
-router.include_router(ai.router, prefix="/ai", tags=["admin-ai"])
 router.include_router(notifications.router, prefix="/notifications", tags=["admin-notifications"])
 router.include_router(permissions.router, prefix="/permissions", tags=["admin-permissions"])
-router.include_router(scraping.router, prefix="/scraping", tags=["admin-scraping"])
 router.include_router(command_center.router, prefix="/command-center", tags=["admin-command-center"])
 router.include_router(invitations.router, prefix="/invitations", tags=["admin-invitations"])
 router.include_router(broadcast.router, prefix="/broadcast", tags=["admin-broadcast"])

@@ -1,6 +1,6 @@
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, List
 
 from sqlalchemy.orm import Session
@@ -141,7 +141,7 @@ class VerificationService:
             return {"success": True, "message": "Phone already verified.", "delta": 0}
         
         user.is_phone_verified = True
-        user.phone_verified_at = datetime.utcnow()
+        user.phone_verified_at = datetime.now(timezone.utc)
         
         delta = cls.TRUST_SCORES.get(user.role, {}).get("phone_verified", 5)
         cls._record_trust_event(db, user, delta, "Phone verified via OTP", triggered_by="system")
@@ -156,7 +156,7 @@ class VerificationService:
                 return {"success": True, "message": "ID already verified.", "delta": 0}
             
             user.id_verified = True
-            user.id_verified_at = datetime.utcnow()
+            user.id_verified_at = datetime.now(timezone.utc)
             user.id_verification_notes = notes
             
             delta = cls.TRUST_SCORES.get(user.role, {}).get("id_verified", 15)
@@ -178,7 +178,7 @@ class VerificationService:
                 return {"success": True, "message": "Location already verified.", "delta": 0}
             
             user.is_location_verified = True
-            user.location_verified_at = datetime.utcnow()
+            user.location_verified_at = datetime.now(timezone.utc)
             
             delta = cls.TRUST_SCORES.get(user.role, {}).get("location_verified", 20)
             cls._record_trust_event(db, user, delta, "Farm/location verified by agent", triggered_by="agent")
@@ -198,7 +198,7 @@ class VerificationService:
                 return {"success": True, "message": "Business already verified.", "delta": 0}
             
             user.business_verified = True
-            user.business_verified_at = datetime.utcnow()
+            user.business_verified_at = datetime.now(timezone.utc)
             
             delta = cls.TRUST_SCORES.get(UserRole.BUYER, {}).get("business_verified", 25)
             cls._record_trust_event(db, user, delta, "Business account verified by admin", triggered_by="admin")
@@ -215,7 +215,7 @@ class VerificationService:
         
         if approved:
             user.background_verified = True
-            user.background_verified_at = datetime.utcnow()
+            user.background_verified_at = datetime.now(timezone.utc)
             delta = cls.TRUST_SCORES.get(UserRole.AGENT, {}).get("background_cleared", 10)
             cls._record_trust_event(db, user, delta, "Background check cleared by admin", triggered_by="admin")
             return {"success": True, "message": f"Background check passed! Trust Score +{delta}", "delta": delta}
@@ -231,7 +231,7 @@ class VerificationService:
             return {"success": True, "message": "Training already completed.", "delta": 0}
         
         user.training_completed = True
-        user.training_completed_at = datetime.utcnow()
+        user.training_completed_at = datetime.now(timezone.utc)
         delta = cls.TRUST_SCORES.get(UserRole.AGENT, {}).get("final_exam_passed", 20)
         cls._record_trust_event(db, user, delta, "Agent training completed and exam passed", triggered_by="admin")
         return {"success": True, "message": f"Training completed! Trust Score +{delta}", "delta": delta}
@@ -245,7 +245,7 @@ class VerificationService:
             return {"success": True, "message": "Practical already passed.", "delta": 0}
         
         user.practical_passed = True
-        user.practical_passed_at = datetime.utcnow()
+        user.practical_passed_at = datetime.now(timezone.utc)
         delta = cls.TRUST_SCORES.get(UserRole.AGENT, {}).get("practical_passed", 15)
         cls._record_trust_event(db, user, delta, "Practical assessment passed by senior agent", triggered_by="senior_agent")
         return {"success": True, "message": f"Practical passed! Trust Score +{delta}", "delta": delta}
@@ -259,7 +259,7 @@ class VerificationService:
             return {"success": True, "message": "Shadowing already complete.", "delta": 0}
         
         user.shadowing_complete = True
-        user.shadowing_complete_at = datetime.utcnow()
+        user.shadowing_complete_at = datetime.now(timezone.utc)
         delta = cls.TRUST_SCORES.get(UserRole.AGENT, {}).get("shadowing_complete", 10)
         cls._record_trust_event(db, user, delta, "Shadowing period completed by senior agent", triggered_by="senior_agent")
         return {"success": True, "message": f"Shadowing complete! Trust Score +{delta}", "delta": delta}
@@ -430,7 +430,7 @@ class VerificationService:
     @classmethod
     def update_last_activity(cls, db: Session, user: User) -> None:
         """Update user's last activity timestamp."""
-        user.last_activity_at = datetime.utcnow()
+        user.last_activity_at = datetime.now(timezone.utc)
         db.commit()
 
 

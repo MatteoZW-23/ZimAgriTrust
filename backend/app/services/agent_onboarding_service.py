@@ -16,7 +16,7 @@ import uuid
 import hashlib
 import random
 import string
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict
 
 from app.models.recruitment import AgentApplication, ApplicationStatus
@@ -50,6 +50,7 @@ class AgentOnboardingService:
 
         application = AgentApplication(**payload.model_dump())
         application.status = ApplicationStatus.APPLIED
+        application.full_name = f"{payload.first_name} {payload.last_name}"
         
         db.add(application)
         db.commit()
@@ -107,7 +108,7 @@ class AgentOnboardingService:
 
         # Create trainee agent record
         agent = await AgentOnboardingService._create_trainee_agent(
-            db, user, application
+            db, user, application, temp_pin
         )
 
         # Initialize academy progress
@@ -131,7 +132,7 @@ class AgentOnboardingService:
         ip: str
     ) -> AgentContract:
         """Internal method to handle contract signing."""
-        content_source = f"{application.id}-{signee_name}-{datetime.utcnow().isoformat()}"
+        content_source = f"{application.id}-{signee_name}-{datetime.now(timezone.utc).isoformat()}"
         integrity_hash = hashlib.sha256(content_source.encode()).hexdigest()
 
         contract = AgentContract(
@@ -189,14 +190,18 @@ class AgentOnboardingService:
     async def _create_trainee_agent(
         db: Session,
         user: User,
-        application: AgentApplication
+        application: AgentApplication,
+        temp_pin: str
     ) -> Agent:
         """Create trainee agent record."""
+        from app.core.security import get_password_hash
+        
         agent = db.query(Agent).filter(Agent.user_id == user.id).first()
         if not agent:
             agent = Agent(
                 user_id=user.id,
                 agent_code=f"TRN{str(uuid.uuid4())[:5]}".upper(),
+                pin_hash=get_password_hash(temp_pin),
                 specialization=AgentSpecialization.FIELD_SUPPORT,
                 province=application.province,
                 district=application.district,
@@ -345,7 +350,7 @@ class AgentOnboardingService:
         passed = False
         if score >= (module.min_pass_score or 70):
             progress.status = "completed"
-            progress.completed_at = datetime.utcnow()
+            progress.completed_at = datetime.now(timezone.utc)
             passed = True
             
             # Also update legacy tracking

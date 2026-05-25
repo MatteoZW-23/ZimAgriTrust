@@ -6,7 +6,7 @@ Automatically freezes high-risk transactions and creates investigation records.
 """
 import uuid
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 from enum import Enum
 from sqlalchemy.orm import Session
@@ -134,7 +134,7 @@ class FraudEngine:
         flags = []
         
         # Check transaction count in window
-        window_start = datetime.utcnow() - timedelta(seconds=FraudConfig.VELOCITY_WINDOW_SECONDS)
+        window_start = datetime.now(timezone.utc) - timedelta(seconds=FraudConfig.VELOCITY_WINDOW_SECONDS)
         
         txn_count = db.execute(
             select(func.count(Transaction.id))
@@ -178,7 +178,7 @@ class FraudEngine:
         flags = []
         
         # Get recent transactions
-        window_start = datetime.utcnow() - timedelta(seconds=FraudConfig.VELOCITY_WINDOW_SECONDS)
+        window_start = datetime.now(timezone.utc) - timedelta(seconds=FraudConfig.VELOCITY_WINDOW_SECONDS)
         
         recent_txns = db.execute(
             select(Transaction.amount)
@@ -228,7 +228,7 @@ class FraudEngine:
             return flags
         
         # Check if user is new
-        account_age = (datetime.utcnow() - user.created_at).days
+        account_age = (datetime.now(timezone.utc) - user.created_at).days
         
         if account_age <= FraudConfig.NEW_USER_DAYS:
             if amount > FraudConfig.NEW_USER_MAX_WITHDRAWAL:
@@ -275,7 +275,7 @@ class FraudEngine:
             return flags
         
         # Get recent transactions from different IPs
-        window_start = datetime.utcnow() - timedelta(days=7)
+        window_start = datetime.now(timezone.utc) - timedelta(days=7)
         
         recent_ips = db.execute(
             select(func.distinct(Transaction.id))  # This would need to be updated to track IP

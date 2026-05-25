@@ -27,9 +27,8 @@ class AcademyProgressResponse(BaseModel):
     overall_progress: float
     modules_completed: int
     modules: List[dict]
-    mid_exam: dict
-    final_exam: dict
-    field_training: dict
+    certification_expires_at: Optional[datetime] = None
+    days_until_expiry: Optional[int] = None
 
 class TraineeLogin(BaseModel):
     agent_code: str
@@ -39,5 +38,7 @@ class TraineeToken(BaseModel):
     access_token: str
     token_type: str = "bearer"
     agent_code: str
+    agent_status: Optional[str] = None
+    certification_level: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)

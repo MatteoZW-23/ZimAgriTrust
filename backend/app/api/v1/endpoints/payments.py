@@ -19,6 +19,16 @@ from app.core.policy import calculate_platform_fees, calculate_seller_settlement
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
+def _required_env(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"{name} is not configured",
+        )
+    return value
+
 class EcoCashCallbackPayload(BaseModel):
     request_id: str
     status: str # SUCCESS, PENDING, FAILED
@@ -168,6 +178,36 @@ def fee_preview(
     )
 
 
+@router.get("/fees/quote")
+def fee_quote(
+    grossMinor: int,
+    currency: str = "USD",
+    plan: str = "BASIC",
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Compatibility endpoint for TypeScript finance clients.
+    Financial calculations remain backend-owned and are returned in minor units.
+    """
+    gross_amount = grossMinor / 100
+    breakdown = calculate_full_order_breakdown(
+        goods_amount=gross_amount,
+        user_trust_score=current_user.trust_score,
+        currency=currency,
+    )
+    fee_amount = float(breakdown.get("platform_fee", 0.0))
+    seller_payout = float(breakdown.get("seller_payout", gross_amount - fee_amount))
+    return {
+        "grossMinor": str(grossMinor),
+        "feeMinor": str(round(fee_amount * 100)),
+        "taxMinor": "0",
+        "netMinor": str(round(seller_payout * 100)),
+        "currency": currency.upper(),
+        "plan": plan.upper(),
+        "breakdown": breakdown,
+    }
+
+
 @router.post("/initiate")
 def initiate_payment(
     payload: PaymentInitiateRequest,
@@ -199,14 +239,14 @@ def initiate_payment(
         instructions = {
             "method": "ecocash",
             "ussd_code": "*151#",
-            "merchant_code": os.getenv("ECOCASH_MERCHANT_CODE", "123456"),
+            "merchant_code": _required_env("ECOCASH_MERCHANT_CODE"),
             "amount": order.total_amount,
             "currency": order.currency,
             "reference": payment_ref,
             "steps": [
                 f"Dial *151# on {phone or 'your phone'}",
                 "Select 'Send Money' → 'Pay Merchant'",
-                f"Enter merchant code: {os.getenv('ECOCASH_MERCHANT_CODE', '123456')}",
+                f"Enter merchant code: {_required_env('ECOCASH_MERCHANT_CODE')}",
                 f"Enter amount: {order.currency} {order.total_amount:.2f}",
                 "Enter your EcoCash PIN to confirm",
             ],
@@ -216,14 +256,14 @@ def initiate_payment(
         instructions = {
             "method": "onemoney",
             "ussd_code": "*111#",
-            "merchant_code": os.getenv("ONEMONEY_MERCHANT_CODE", "654321"),
+            "merchant_code": _required_env("ONEMONEY_MERCHANT_CODE"),
             "amount": order.total_amount,
             "currency": order.currency,
             "reference": payment_ref,
             "steps": [
                 f"Dial *111# on {phone or 'your phone'}",
                 "Select 'Payments' → 'Pay Bill'",
-                f"Enter biller code: {os.getenv('ONEMONEY_MERCHANT_CODE', '654321')}",
+                f"Enter biller code: {_required_env('ONEMONEY_MERCHANT_CODE')}",
                 f"Enter amount: {order.currency} {order.total_amount:.2f}",
                 "Confirm with your OneMoney PIN",
             ],
@@ -232,16 +272,16 @@ def initiate_payment(
     elif method == "bank":
         instructions = {
             "method": "bank",
-            "bank_name": "ZimAgritrust Trust Account — CBZ Bank",
-            "account_number": os.getenv("BANK_ACCOUNT_NUMBER", "1234567890"),
-            "branch_code": os.getenv("BANK_BRANCH_CODE", "001"),
+            "bank_name": os.getenv("BANK_ACCOUNT_NAME", "ZimAgriTrust Trust Account"),
+            "account_number": _required_env("BANK_ACCOUNT_NUMBER"),
+            "branch_code": _required_env("BANK_BRANCH_CODE"),
             "reference": merchant_ref,
             "amount": order.total_amount,
             "currency": order.currency,
             "steps": [
                 "Log in to your internet banking",
                 "Select 'Transfer' → 'Pay Beneficiary'",
-                f"Account: {os.getenv('BANK_ACCOUNT_NUMBER', '1234567890')}",
+                f"Account: {_required_env('BANK_ACCOUNT_NUMBER')}",
                 f"Reference: {merchant_ref}",
                 f"Amount: {order.currency} {order.total_amount:.2f}",
                 "Allow 1-2 business days for processing",
@@ -263,8 +303,7 @@ def initiate_payment(
             "expires_minutes": 1440,
         }
 
-    # For demo/dev: auto-confirm small payments immediately
-    auto_confirm = os.getenv("AUTO_CONFIRM_PAYMENTS", "true").lower() == "true"
+    auto_confirm = os.getenv("AUTO_CONFIRM_PAYMENTS", "false").lower() == "true"
     if auto_confirm and order.total_amount <= 500:
         process_ecocash_callback(db, payment_ref, "PAID", merchant_ref)
         return {
@@ -434,8 +473,7 @@ def initiate_deposit(
     db.commit()
     db.refresh(txn)
 
-    # Auto-confirm small deposits in dev mode
-    auto_confirm = os.getenv("AUTO_CONFIRM_PAYMENTS", "true").lower() == "true"
+    auto_confirm = os.getenv("AUTO_CONFIRM_PAYMENTS", "false").lower() == "true"
     if auto_confirm and payload.amount <= 1000:
         wallet_service.deposit(db, current_user.id, payload.amount, payload.currency, str(txn.id))
         txn.status = "completed"

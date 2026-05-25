@@ -12,7 +12,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy.orm import Session
@@ -74,7 +74,7 @@ def append_audit(
         actor_id=str(actor_id) if actor_id is not None else None,
         actor_role=actor_role,
         payload_snapshot=payload,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     db.add(row)
     db.flush()

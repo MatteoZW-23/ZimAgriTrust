@@ -1,7 +1,8 @@
 import React from 'react';
 import { useAuthStore } from '../store.ts';
 import { 
-  LayoutDashboard, Package, ShoppingCart, Box, Wallet, BarChart3, User, LogOut 
+  LayoutDashboard, Package, ShoppingCart, Box, Wallet, BarChart3, User, LogOut,
+  Star, Tag, DollarSign, CreditCard
 } from 'lucide-react';
 
 export function DashboardLayout({ currentView, onViewChange, children }) {
@@ -14,6 +15,10 @@ export function DashboardLayout({ currentView, onViewChange, children }) {
     { id: 'inventory', label: 'Inventory', icon: Box },
     { id: 'wallet', label: 'Wallet', icon: Wallet },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'reviews', label: 'Reviews', icon: Star },
+    { id: 'discounts', label: 'Discounts', icon: Tag },
+    { id: 'payouts', label: 'Payouts', icon: DollarSign },
+    { id: 'subscription', label: 'Subscription', icon: CreditCard },
     { id: 'profile', label: 'Profile', icon: User },
   ];
 

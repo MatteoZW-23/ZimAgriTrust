@@ -6,7 +6,7 @@ import uuid
 import os
 import shutil
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
@@ -809,7 +809,7 @@ def update_delivery_status(
 
     job.status = new_status
     if new_status == "DELIVERED":
-        job.completed_at = datetime.utcnow()
+        job.completed_at = datetime.now(timezone.utc)
 
     delivery = db.query(OrderDelivery).filter(OrderDelivery.order_id == job.order_id).first()
     if delivery:
@@ -821,7 +821,7 @@ def update_delivery_status(
         if new_status in delivery_status_map:
             delivery.status = delivery_status_map[new_status]
             if new_status == "DELIVERED":
-                delivery.delivered_at = datetime.utcnow()
+                delivery.delivered_at = datetime.now(timezone.utc)
 
     db.commit()
     return {"status": job.status, "updated": True}
@@ -840,7 +840,7 @@ def get_driver_earnings(
     total = sum(j.driver_payout or 0 for j in all_jobs if j.status in ("DELIVERED", "PAID"))
     pending = sum(j.driver_payout or 0 for j in all_jobs if j.status in ("ACCEPTED", "PICKUP_DONE", "IN_TRANSIT"))
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     this_week = sum(
         j.driver_payout or 0 for j in all_jobs
         if j.status in ("DELIVERED", "PAID") and j.completed_at and (now - j.completed_at).days <= 7
@@ -975,7 +975,7 @@ def approve_driver(
         driver.reviewed_by = uuid.UUID(str(admin.id))
     except ValueError:
         driver.reviewed_by = None
-    driver.reviewed_at = datetime.utcnow()
+    driver.reviewed_at = datetime.now(timezone.utc)
     db.commit()
 
     # Notify driver
@@ -1035,7 +1035,7 @@ def reject_driver(
         driver.reviewed_by = uuid.UUID(str(admin.id))
     except ValueError:
         driver.reviewed_by = None
-    driver.reviewed_at = datetime.utcnow()
+    driver.reviewed_at = datetime.now(timezone.utc)
     db.commit()
 
     # Notify driver
@@ -1154,7 +1154,7 @@ def update_driver_location(
     driver.current_lat = payload.latitude
     driver.current_lon = payload.longitude
     db.commit()
-    return {"success": True, "timestamp": payload.timestamp or datetime.utcnow().isoformat()}
+    return {"success": True, "timestamp": payload.timestamp or datetime.now(timezone.utc).isoformat()}
 
 
 @router.post("/availability")
@@ -1261,13 +1261,13 @@ def confirm_pickup(
         raise HTTPException(status_code=400, detail="Job cannot be picked up in current status")
     
     job.status = "PICKUP_DONE"
-    job.accepted_at = job.accepted_at or datetime.utcnow()
+    job.accepted_at = job.accepted_at or datetime.now(timezone.utc)
     
     # Update delivery status
     delivery = db.query(OrderDelivery).filter(OrderDelivery.order_id == job.order_id).first()
     if delivery:
         delivery.status = DeliveryStatus.PICKUP_COMPLETED
-        delivery.pickup_at = datetime.utcnow()
+        delivery.pickup_at = datetime.now(timezone.utc)
     
     db.commit()
     return {"success": True, "status": job.status}
@@ -1295,13 +1295,13 @@ def confirm_delivery(
         raise HTTPException(status_code=400, detail="Job must be picked up before delivery")
     
     job.status = "DELIVERED"
-    job.completed_at = datetime.utcnow()
+    job.completed_at = datetime.now(timezone.utc)
     
     # Update delivery status
     delivery = db.query(OrderDelivery).filter(OrderDelivery.order_id == job.order_id).first()
     if delivery:
         delivery.status = DeliveryStatus.DELIVERED
-        delivery.delivered_at = datetime.utcnow()
+        delivery.delivered_at = datetime.now(timezone.utc)
     
     # Update driver stats
     driver.total_deliveries += 1

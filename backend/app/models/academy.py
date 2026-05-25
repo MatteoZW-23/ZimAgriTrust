@@ -52,8 +52,6 @@ class AgentTraining(Base):
     module_10_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     
     # Exams
-    mid_exam_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    mid_exam_attempts: Mapped[int] = mapped_column(Integer, default=0)
     final_exam_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     final_exam_attempts: Mapped[int] = mapped_column(Integer, default=0)
     

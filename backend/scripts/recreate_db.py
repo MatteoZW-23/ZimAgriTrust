@@ -1,13 +1,14 @@
-import uuid
+import os
 from sqlalchemy import create_engine, text
 from app.db.base import Base
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.user import User, UserRole
-from app.models.listing import Listing, Sector, ListingStatus
-from app.core.security import get_password_hash
 
 def recreate():
+    if os.getenv("ALLOW_DB_RECREATE", "false").lower() != "true":
+        raise RuntimeError("Refusing to recreate the database unless ALLOW_DB_RECREATE=true")
+
     engine = create_engine(settings.DATABASE_URL)
     print("Force-dropping all tables (CASCADE)...")
     with engine.connect() as conn:
@@ -23,27 +24,30 @@ def recreate():
 def bootstrap_admin():
     from app.services.auth_service import register_user
     from app.schemas.auth import UserRegister
-    import os
 
     db = SessionLocal()
     try:
         # Check if admin already exists
-        admin_phone = "0888888888"
+        admin_phone = os.getenv("BOOTSTRAP_ADMIN_PHONE")
+        admin_password = os.getenv("BOOTSTRAP_ADMIN_PASSWORD")
+        if not admin_phone or not admin_password:
+            raise RuntimeError("BOOTSTRAP_ADMIN_PHONE and BOOTSTRAP_ADMIN_PASSWORD are required")
+
         existing = db.query(User).filter(User.phone_number == admin_phone).first()
         if existing:
             print(f"Admin {admin_phone} already exists. Skipping bootstrap.")
             return
 
-        print(f"Bootstrapping first admin user ({admin_phone})...")
+        print("Bootstrapping first admin user...")
         payload = UserRegister(
             full_name="System Administrator",
             phone_number=admin_phone,
-            password="admin-secure-pin-2026",
+            password=admin_password,
             role=UserRole.ADMIN,
             admin_secret=settings.ADMIN_BOOTSTRAP_TOKEN
         )
         register_user(db, payload)
-        print("Admin user created successfully. Use phone '0888888888' and password 'admin-secure-pin-2026' for first login.")
+        print("Admin user created successfully.")
     except Exception as e:
         print(f"Bootstrap failed: {e}")
     finally:

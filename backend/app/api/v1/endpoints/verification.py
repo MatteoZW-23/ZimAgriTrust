@@ -8,7 +8,7 @@ ID Verification Upload & Review System
 import uuid
 import os
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import FileResponse
@@ -96,7 +96,7 @@ def _update_user_verification_summary(db: Session, user_id: uuid.UUID):
     
     if identity_approved:
         summary.identity_status = VerificationStatus.APPROVED
-        summary.identity_verified_at = datetime.utcnow()
+        summary.identity_verified_at = datetime.now(timezone.utc)
         # Find which document was approved
         approved_doc = next(
             (r for r in records if r.document_type in (DocumentType.NATIONAL_ID, DocumentType.PASSPORT) and r.status == VerificationStatus.APPROVED),
@@ -124,7 +124,7 @@ def _update_user_verification_summary(db: Session, user_id: uuid.UUID):
     summary.can_access_loans = summary.verification_level >= 3
     summary.can_use_platform_services = identity_approved
     
-    summary.updated_at = datetime.utcnow()
+    summary.updated_at = datetime.now(timezone.utc)
 
 
 def _save_file(file: UploadFile, user_id: str, slot: str) -> str:
@@ -381,18 +381,18 @@ async def approve_verification(
     if admin.role == UserRole.AGENT:
         req.agent_reviewer_id = admin.id
         req.agent_notes = note
-        req.agent_reviewed_at = datetime.utcnow()
+        req.agent_reviewed_at = datetime.now(timezone.utc)
         req.agent_decision = "approve"
     else:
         req.admin_reviewer_id = admin.id
         req.admin_notes = note
-        req.admin_reviewed_at = datetime.utcnow()
+        req.admin_reviewed_at = datetime.now(timezone.utc)
         req.admin_decision = "approve"
 
     user = db.query(User).filter(User.id == req.user_id).first()
     if user:
         user.id_verified = True
-        user.id_verified_at = datetime.utcnow()
+        user.id_verified_at = datetime.now(timezone.utc)
         user.trust_score = min(100, user.trust_score + 15)
 
     _update_user_verification_summary(db, req.user_id)
@@ -441,12 +441,12 @@ async def reject_verification(
     if admin.role == UserRole.AGENT:
         req.agent_reviewer_id = admin.id
         req.agent_notes = note
-        req.agent_reviewed_at = datetime.utcnow()
+        req.agent_reviewed_at = datetime.now(timezone.utc)
         req.agent_decision = "reject"
     else:
         req.admin_reviewer_id = admin.id
         req.admin_notes = note
-        req.admin_reviewed_at = datetime.utcnow()
+        req.admin_reviewed_at = datetime.now(timezone.utc)
         req.admin_decision = "reject"
 
     user = db.query(User).filter(User.id == req.user_id).first()

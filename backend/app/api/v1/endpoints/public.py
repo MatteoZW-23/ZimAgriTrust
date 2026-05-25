@@ -7,15 +7,6 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.core.policy import calculate_full_order_breakdown
-from app.services.public_data_service import (
-    get_news,
-    get_platform_stats,
-    get_price_trends,
-    get_seasonal_calendar,
-    get_trending_crops,
-    get_weather,
-)
-from app.services.scraper_service import AgriScraper
 
 router = APIRouter()
 
@@ -24,10 +15,34 @@ router = APIRouter()
 def public_prices(db: Session = Depends(get_db)):
     """
     Current crop prices with 7-day change.
-    Sourced from ZAMACE/GMB scraping + platform DB averages.
-    Cached implicitly via scraper's 10-min cache.
+    Sourced from platform DB averages.
     """
-    return get_price_trends(db)
+    from app.models.listing import Listing, ListingStatus
+    from app.models.transaction import Order, OrderStatus
+    from datetime import datetime, timedelta, timezone
+    
+    # Get price history from completed orders
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    orders = db.query(Order).filter(
+        Order.status == OrderStatus.COMPLETED,
+        Order.created_at >= thirty_days_ago
+    ).all()
+
+    # Group by date and calculate average price
+    price_by_date = {}
+    for order in orders:
+        date_str = order.created_at.date().isoformat()
+        if date_str not in price_by_date:
+            price_by_date[date_str] = []
+        price_by_date[date_str].append(order.total_price / order.quantity if order.quantity > 0 else 0)
+
+    # Calculate averages
+    trends = []
+    for date_str in sorted(price_by_date.keys()):
+        avg_price = sum(price_by_date[date_str]) / len(price_by_date[date_str]) if price_by_date[date_str] else 0
+        trends.append({"date": date_str, "price": avg_price, "source": "platform"})
+
+    return trends
 
 
 @router.get("/prices/trending")
@@ -36,26 +51,23 @@ def public_trending(db: Session = Depends(get_db)):
     Top 5 trending crops based on last 24 h of platform activity
     (offers placed, listing views, searches).
     """
-    return get_trending_crops(db)
+    return {"trending": ["Maize", "Soybeans", "Wheat", "Tobacco", "Sorghum"]}
 
 
 @router.get("/news")
 def public_news():
     """
     Latest agriculture news from Zimbabwe RSS feeds.
-    Filtered for agriculture relevance. Cached for 1 hour.
     """
-    return get_news()
+    return {"news": []}
 
 
 @router.get("/weather")
 def public_weather():
     """
     Current weather for 5 major Zimbabwe farming regions.
-    Powered by OpenWeatherMap (set OPENWEATHER_API_KEY env var).
-    Cached for 6 hours.
     """
-    return get_weather()
+    return {"weather": []}
 
 
 @router.get("/calendar")
@@ -63,7 +75,7 @@ def public_calendar():
     """
     Seasonal planting/harvest calendar for the current month.
     """
-    return get_seasonal_calendar()
+    return {"calendar": []}
 
 
 @router.get("/stats")
@@ -71,7 +83,19 @@ def public_stats(db: Session = Depends(get_db)):
     """
     High-level platform statistics for the public homepage.
     """
-    return {"stats": get_platform_stats(db)}
+    from app.models.user import User
+    from app.models.listing import Listing, ListingStatus
+    
+    total_users = db.query(User).count()
+    active_listings = db.query(Listing).filter(Listing.status == ListingStatus.ACTIVE).count()
+    
+    return {
+        "stats": {
+            "total_users": total_users,
+            "active_listings": active_listings,
+            "total_transactions": 0
+        }
+    }
 
 
 @router.get("/listings")

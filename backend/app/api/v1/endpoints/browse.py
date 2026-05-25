@@ -4,7 +4,7 @@ frontend can render a single grid with the toggle "Crops / Inputs / All".
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -76,7 +76,7 @@ def unified_search(
     if kind in ("all", "inputs"):
         iq = db.query(InputListing).filter(InputListing.status == InputListingStatus.ACTIVE)
         iq = iq.filter(
-            (InputListing.expiry_date.is_(None)) | (InputListing.expiry_date > datetime.utcnow())
+            (InputListing.expiry_date.is_(None)) | (InputListing.expiry_date > datetime.now(timezone.utc))
         )
         if q:
             like = f"%{q}%"

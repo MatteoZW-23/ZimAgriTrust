@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from enum import Enum
@@ -118,8 +118,8 @@ class TransportDisputeService:
             currency=dispute.currency,
             status=DBDisputeStatus.OPEN,
             priority=priority.value,
-            response_due_at=datetime.utcnow() + timedelta(hours=self.RESPONSE_DEADLINE_HOURS),
-            resolution_due_at=datetime.utcnow() + timedelta(days=self.RESOLUTION_DEADLINE_DAYS),
+            response_due_at=datetime.now(timezone.utc) + timedelta(hours=self.RESPONSE_DEADLINE_HOURS),
+            resolution_due_at=datetime.now(timezone.utc) + timedelta(days=self.RESOLUTION_DEADLINE_DAYS),
         )
         self.db.add(new_dispute)
         self.db.flush()
@@ -132,7 +132,7 @@ class TransportDisputeService:
         
         for allocation in payment_allocations:
             allocation.status = AllocationStatus.HELD
-            allocation.held_at = datetime.utcnow()
+            allocation.held_at = datetime.now(timezone.utc)
         
         self.db.commit()
         
@@ -254,9 +254,9 @@ class TransportDisputeService:
         # Update status to ESCALATED
         dispute.status = DBDisputeStatus.ESCALATED
         dispute.escalated_to_admin = True
-        dispute.escalated_at = datetime.utcnow()
+        dispute.escalated_at = datetime.now(timezone.utc)
         dispute.escalation_level = dispute.escalation_level + 1
-        dispute.updated_at = datetime.utcnow()
+        dispute.updated_at = datetime.now(timezone.utc)
         
         self.db.commit()
         
@@ -338,8 +338,8 @@ class TransportDisputeService:
         dispute.resolution_amount = resolution_amount
         dispute.resolution_notes = resolution_notes
         dispute.resolved_by = resolved_by
-        dispute.resolved_at = datetime.utcnow()
-        dispute.updated_at = datetime.utcnow()
+        dispute.resolved_at = datetime.now(timezone.utc)
+        dispute.updated_at = datetime.now(timezone.utc)
         
         # Apply resolution
         if resolution_type in ["FULL_REFUND", "PARTIAL_REFUND"] and resolution_amount:
@@ -354,7 +354,7 @@ class TransportDisputeService:
         
         for allocation in payment_allocations:
             allocation.status = AllocationStatus.RELEASED
-            allocation.released_at = datetime.utcnow()
+            allocation.released_at = datetime.now(timezone.utc)
         
         self.db.commit()
         
@@ -380,7 +380,7 @@ class TransportDisputeService:
         
         # Close dispute
         dispute.status = DBDisputeStatus.CLOSED
-        dispute.closed_at = datetime.utcnow()
+        dispute.closed_at = datetime.now(timezone.utc)
         self.db.commit()
         
         return {
@@ -412,8 +412,8 @@ class TransportDisputeService:
         
         # Update status to CLOSED
         dispute.status = DBDisputeStatus.CLOSED
-        dispute.closed_at = datetime.utcnow()
-        dispute.updated_at = datetime.utcnow()
+        dispute.closed_at = datetime.now(timezone.utc)
+        dispute.updated_at = datetime.now(timezone.utc)
         
         # Release held payments
         payment_allocations = self.db.query(PaymentAllocation).filter(
@@ -423,7 +423,7 @@ class TransportDisputeService:
         
         for allocation in payment_allocations:
             allocation.status = AllocationStatus.RELEASED
-            allocation.released_at = datetime.utcnow()
+            allocation.released_at = datetime.now(timezone.utc)
         
         self.db.commit()
         
@@ -590,7 +590,7 @@ class TransportDisputeService:
         # Query disputes where status = OPEN and response_due_at < NOW
         overdue_disputes = self.db.query(TransportDispute).filter(
             TransportDispute.status == DBDisputeStatus.OPEN,
-            TransportDispute.response_due_at < datetime.utcnow()
+            TransportDispute.response_due_at < datetime.now(timezone.utc)
         ).all()
         
         # For each overdue dispute:
@@ -598,9 +598,9 @@ class TransportDisputeService:
             # Escalate to admin
             dispute.status = DBDisputeStatus.ESCALATED
             dispute.escalated_to_admin = True
-            dispute.escalated_at = datetime.utcnow()
+            dispute.escalated_at = datetime.now(timezone.utc)
             dispute.escalation_level = dispute.escalation_level + 1
-            dispute.updated_at = datetime.utcnow()
+            dispute.updated_at = datetime.now(timezone.utc)
             escalated_count += 1
             
             # Notify admin
@@ -653,7 +653,7 @@ class TransportDisputeService:
         # Query disputes where status = UNDER_REVIEW and resolution_due_at < NOW
         overdue_disputes = self.db.query(TransportDispute).filter(
             TransportDispute.status == DBDisputeStatus.UNDER_REVIEW,
-            TransportDispute.resolution_due_at < datetime.utcnow()
+            TransportDispute.resolution_due_at < datetime.now(timezone.utc)
         ).all()
         
         # For each overdue dispute:
@@ -663,8 +663,8 @@ class TransportDisputeService:
             dispute.resolution_amount = dispute.disputed_amount
             dispute.resolution_notes = "Auto-resolved due to resolution deadline"
             dispute.status = DBDisputeStatus.RESOLVED
-            dispute.resolved_at = datetime.utcnow()
-            dispute.closed_at = datetime.utcnow()
+            dispute.resolved_at = datetime.now(timezone.utc)
+            dispute.closed_at = datetime.now(timezone.utc)
             auto_resolved_count += 1
             
             # Release held payments
@@ -675,7 +675,7 @@ class TransportDisputeService:
             
             for allocation in payment_allocations:
                 allocation.status = AllocationStatus.RELEASED
-                allocation.released_at = datetime.utcnow()
+                allocation.released_at = datetime.now(timezone.utc)
             
             # Notify both parties
             order = self.db.query(Order).filter(Order.id == dispute.order_id).first()

@@ -9,7 +9,7 @@ Handles all authentication flows:
 - Invitation acceptance
 """
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends, Request, status
@@ -241,10 +241,10 @@ async def login_with_pin(
     await NotificationService.send_notification(
         db, user, 'new_login_detected',
         LOCATION='Your device',
-        TIME=datetime.utcnow().isoformat(),
+        TIME=datetime.now(timezone.utc).isoformat(),
     )
     
-    access_expiry = (access_exp - datetime.utcnow()).total_seconds() if isinstance(access_exp, datetime) else 3600
+    access_expiry = (access_exp - datetime.now(timezone.utc)).total_seconds() if isinstance(access_exp, datetime) else 3600
     
     return PINLoginResponse(
         access_token=access_token,
@@ -347,7 +347,7 @@ async def login_with_password(
         details={'method': 'password'},
     )
     
-    access_expiry = (access_exp - datetime.utcnow()).total_seconds()
+    access_expiry = (access_exp - datetime.now(timezone.utc)).total_seconds()
     
     return PasswordLoginResponse(
         access_token=access_token,
@@ -461,7 +461,7 @@ async def verify_mfa(
     if MFAManager.verify_mfa(db, current_user, request.code):
         config = db.query(MFAConfiguration).filter(MFAConfiguration.user_id == current_user.id).first()
         config.status = 'active'
-        config.enabled_at = datetime.utcnow()
+        config.enabled_at = datetime.now(timezone.utc)
         db.commit()
         
         # Send notification
@@ -543,7 +543,7 @@ async def refresh_token(
     # Create new access token
     access_token, access_exp = TokenManager.create_access_token(user)
     
-    access_expiry = (access_exp - datetime.utcnow()).total_seconds()
+    access_expiry = (access_exp - datetime.now(timezone.utc)).total_seconds()
     
     return PINLoginResponse(
         access_token=access_token,

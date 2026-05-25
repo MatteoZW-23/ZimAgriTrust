@@ -9,6 +9,10 @@ import { InventoryManagement } from './components/InventoryManagement.tsx';
 import { WalletManagement } from './components/WalletManagement.tsx';
 import { ProfileManagement } from './components/ProfileManagement.tsx';
 import { Analytics } from './components/Analytics.tsx';
+import { DiscountsManagement } from './components/DiscountsManagement.tsx';
+import { PayoutsManagement } from './components/PayoutsManagement.tsx';
+import { ReviewsManagement } from './components/ReviewsManagement.tsx';
+import { SubscriptionManagement } from './components/SubscriptionManagement.tsx';
 
 const PlaceholderPanel = ({ title, icon }) => (
   <div className="flex flex-col items-center justify-center h-full py-20 text-center">
@@ -27,7 +31,7 @@ function App() {
 
   useEffect(() => {
     if (isAuthenticated && user?.role === 'supplier') {
-      import('./api.js').then(api => api.getApplicationStatus())
+      import('./api.ts').then(api => api.getApplicationStatus())
         .then(data => setApplicationStatus(data))
         .catch(() => setApplicationStatus(null));
     }
@@ -65,6 +69,14 @@ function App() {
         return <Analytics />;
       case 'profile':
         return <ProfileManagement />;
+      case 'discounts':
+        return <DiscountsManagement />;
+      case 'payouts':
+        return <PayoutsManagement />;
+      case 'reviews':
+        return <ReviewsManagement />;
+      case 'subscription':
+        return <SubscriptionManagement />;
       default:
         return <SupplierDashboard applicationStatus={applicationStatus} />;
     }

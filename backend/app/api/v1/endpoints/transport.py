@@ -4,7 +4,7 @@ Implements the transport request, pricing, and payment responsibility endpoints.
 Core Business Rule: WHOEVER REQUESTS TRANSPORT = WHO PAYS FOR TRANSPORT
 """
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -330,12 +330,12 @@ async def accept_transport(
         if not quote:
             raise HTTPException(status_code=404, detail="Quote not found or expired")
         
-        if quote.valid_until < datetime.utcnow():
+        if quote.valid_until < datetime.now(timezone.utc):
             raise HTTPException(status_code=400, detail="Quote has expired")
     
     # Update transport_request status to ACCEPTED
     transport_request.status = TransportRequestStatus.ACCEPTED
-    transport_request.decision_made_at = datetime.utcnow()
+    transport_request.decision_made_at = datetime.now(timezone.utc)
     transport_request.decision_made_by = current_user.role.value
     
     # Create payment allocations
@@ -411,7 +411,7 @@ async def defer_transport(
     
     # Update transport_request mode to DEFERRED
     transport_request.mode = DBTransportMode.DEFERRED
-    transport_request.decision_deadline = datetime.utcnow() + timedelta(hours=48)
+    transport_request.decision_deadline = datetime.now(timezone.utc) + timedelta(hours=48)
     transport_request.status = TransportRequestStatus.PENDING
     
     db.commit()
@@ -434,7 +434,7 @@ async def defer_transport(
     return {
         "success": True,
         "message": "Transport decision deferred",
-        "decision_deadline": (datetime.utcnow() + timedelta(hours=48)).isoformat(),
+        "decision_deadline": (datetime.now(timezone.utc) + timedelta(hours=48)).isoformat(),
     }
 
 
@@ -539,7 +539,7 @@ async def start_negotiation(
         initiator_id=current_user.id,
         counterparty_id=counterparty_id,
         status=DBNegotiationStatus.INITIATED,
-        expires_at=datetime.utcnow() + timedelta(hours=72),
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=72),
     )
     
     if initial_offer:
@@ -599,7 +599,7 @@ async def submit_negotiation_offer(
     if negotiation.status not in [DBNegotiationStatus.INITIATED, DBNegotiationStatus.COUNTER_OFFER]:
         raise HTTPException(status_code=400, detail="Negotiation is not active")
     
-    if negotiation.expires_at < datetime.utcnow():
+    if negotiation.expires_at < datetime.now(timezone.utc):
         negotiation.status = DBNegotiationStatus.EXPIRED
         db.commit()
         raise HTTPException(status_code=400, detail="Negotiation has expired")
@@ -620,7 +620,7 @@ async def submit_negotiation_offer(
     
     # Update negotiation status
     negotiation.status = DBNegotiationStatus.COUNTER_OFFER
-    negotiation.updated_at = datetime.utcnow()
+    negotiation.updated_at = datetime.now(timezone.utc)
     
     db.commit()
     
@@ -672,7 +672,7 @@ async def accept_negotiation(
     # Check if both parties have accepted (simplified - in production would track acceptances per party)
     # For now, mark as accepted and process
     negotiation.status = DBNegotiationStatus.ACCEPTED
-    negotiation.completed_at = datetime.utcnow()
+    negotiation.completed_at = datetime.now(timezone.utc)
     
     # If both accepted, process agreement
     if negotiation.final_amount and negotiation.final_payer:
@@ -928,7 +928,7 @@ async def confirm_pickup(
     
     # Update delivery status to PICKED_UP
     delivery.status = DeliveryStatus.PICKED_UP
-    delivery.pickup_confirmed_at = datetime.utcnow()
+    delivery.pickup_confirmed_at = datetime.now(timezone.utc)
     delivery.pickup_confirmed_by = current_user.id
     delivery.pickup_photo_url = photo_url
     
@@ -986,17 +986,17 @@ async def confirm_delivery(
     
     # Update delivery status to DELIVERED
     delivery.status = DeliveryStatus.DELIVERED
-    delivery.delivery_confirmed_at = datetime.utcnow()
+    delivery.delivery_confirmed_at = datetime.now(timezone.utc)
     delivery.delivery_confirmed_by = current_user.id
     delivery.delivery_photo_url = photo_url
     delivery.delivery_signature_url = signature_url
     delivery.proof_of_delivery_url = photo_url
-    delivery.actual_arrival_time = datetime.utcnow()
+    delivery.actual_arrival_time = datetime.now(timezone.utc)
     
     # Complete driver assignment
     if delivery.driver_assignment:
         delivery.driver_assignment.status = AssignmentStatus.COMPLETED
-        delivery.driver_assignment.completed_at = datetime.utcnow()
+        delivery.driver_assignment.completed_at = datetime.now(timezone.utc)
     
     db.commit()
     
@@ -1071,7 +1071,7 @@ async def raise_delivery_dispute(
         description=description,
         disputed_amount=disputed_amount,
         status=TransportDisputeStatus.OPEN,
-        response_due_at=datetime.utcnow() + timedelta(hours=48),
+        response_due_at=datetime.now(timezone.utc) + timedelta(hours=48),
     )
     db.add(dispute)
     db.flush()
@@ -1159,7 +1159,7 @@ async def update_driver_location(
     # Update delivery current location
     delivery.current_latitude = latitude
     delivery.current_longitude = longitude
-    delivery.last_location_update_at = datetime.utcnow()
+    delivery.last_location_update_at = datetime.now(timezone.utc)
     
     db.commit()
     
@@ -1217,7 +1217,3 @@ def get_tracking_history(
             for point in tracking_points
         ],
     }
-    
-    return {
-        "delivery_id": str(delivery_id),
-        "tracking_points": [],

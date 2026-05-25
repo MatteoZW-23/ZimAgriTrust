@@ -13,7 +13,6 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 10080
     DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@db:5432/zimagritrust"
-    REDIS_URL: str = "redis://redis:6379/0"
     ADMIN_BOOTSTRAP_TOKEN: str = "secret-bootstrap-token"
     
     # --- AUTHENTICATION CONFIG ---
@@ -75,18 +74,7 @@ class Settings(BaseSettings):
             raise ValueError("ADMIN_BOOTSTRAP_TOKEN must be changed from default value")
         return v
 
-    # --- SMS CONFIG (AfricasTalking) ---
-    SMS_API_KEY: str = ""
-    SMS_USERNAME: str = "sandbox"
-    SMS_SENDER_ID: str = "ZimAgritrust"
-
-    # --- EMAIL CONFIG (dual provider: SendGrid + AWS SES, console fallback) ---
-    EMAIL_PROVIDER: str = "console"  # one of: console, sendgrid, ses, smtp
-    EMAIL_FROM_ADDRESS: str = "no-reply@zimagritrust.co.zw"
-    EMAIL_FROM_NAME: str = "ZimAgriTrust"
-    EMAIL_REPLY_TO: str = "support@zimagritrust.co.zw"
-
-    SENDGRID_API_KEY: str = ""
+    # --- AWS SES CONFIG ---
     AWS_SES_REGION: str = "us-east-1"
     AWS_SES_ACCESS_KEY_ID: str = ""
     AWS_SES_SECRET_ACCESS_KEY: str = ""
@@ -221,6 +209,7 @@ class Settings(BaseSettings):
     WHATSAPP_API_KEY: str = ""
     WHATSAPP_PHONE_NUMBER_ID: str = ""
     WHATSAPP_BUSINESS_ACCOUNT_ID: str = ""
+    WHATSAPP_VERIFY_TOKEN: str = ""
     WHATSAPP_ENABLE: bool = True
     
     # Email Configuration
@@ -374,6 +363,11 @@ class Settings(BaseSettings):
     # --- PAYMENT SAFETY ---
     # CRITICAL: Must be False in production. True only for local dev/test.
     AUTO_CONFIRM_PAYMENTS: bool = False
+
+    # --- DEVELOPMENT TOOLING ---
+    # Debug/simulator endpoints must stay off unless explicitly enabled.
+    ENABLE_USSD_DEBUG_TOOLS: bool = False
+    ENABLE_WHATSAPP_TEST_ENDPOINTS: bool = False
 
     # --- MASTER TEST ACCOUNT (MUST be False in production) ---
     MASTER_TEST_LOGIN_ENABLED: bool = False

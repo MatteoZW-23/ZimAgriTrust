@@ -70,8 +70,8 @@ def get_user_growth(
     Function 156: View active user growth.
     Aggregates user registrations over the last 30 days.
     """
-    from datetime import datetime, timedelta
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    from datetime import datetime, timedelta, timezone
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     
     results = db.query(
         func.date(User.created_at).label("date"),

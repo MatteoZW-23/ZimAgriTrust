@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends
@@ -27,7 +27,7 @@ def get_security_audit_logs(
     In a production app, this would query a dedicated AuditLog table.
     """
     # Mock some dynamic timestamps
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     return [
         {
             "id": 1,

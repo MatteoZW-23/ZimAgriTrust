@@ -1,8 +1,6 @@
 # Production Docker Compose Configuration
 # Enterprise-grade deployment with monitoring, SSL, and security
 
-version: '3.8'
-
 services:
   # Nginx Reverse Proxy with SSL
   nginx:
@@ -31,8 +29,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-zimagritrust}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - "5432:5432"
+    expose:
+      - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backups:/backups
@@ -49,12 +47,12 @@ services:
   redis:
     image: redis:7-alpine
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
-    ports:
-      - "6379:6379"
+    expose:
+      - "6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -94,11 +92,11 @@ services:
       PASSWORD_REQUIRE_DIGIT: "true"
       PASSWORD_REQUIRE_SPECIAL: "true"
       # Monitoring
+      APP_ENV: production
       SENTRY_DSN: ${SENTRY_DSN}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      MODELS_PATH: /app/models
-    volumes:
-      - shared_models:/app/models:ro
+      MASTER_TEST_LOGIN_ENABLED: "false"
+      AUTO_CONFIRM_PAYMENTS: "false"
     depends_on:
       postgres:
         condition: service_healthy
@@ -231,6 +229,4 @@ volumes:
   grafana_data:
     driver: local
   nginx_logs:
-    driver: local
-  shared_models:
     driver: local

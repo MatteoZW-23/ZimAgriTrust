@@ -269,9 +269,6 @@ _EMAIL: List[NotificationTemplate] = [
 
 _ALL = _SMS + _WHATSAPP + _EMAIL
 
-TEMPLATES: Dict[str, NotificationTemplate] = {tpl.key: tpl for tpl in _ALL}
-TEMPLATES_BY_SPEC_ID: Dict[int, NotificationTemplate] = {tpl.spec_id: tpl for tpl in _ALL}
-
 
 def get_template(key_or_spec_id: str | int) -> NotificationTemplate:
     """Lookup by string key or integer spec ID."""
@@ -285,7 +282,7 @@ def get_template(key_or_spec_id: str | int) -> NotificationTemplate:
 
 
 def get_templates_by_channel(channel: NotificationChannel) -> List[NotificationTemplate]:
-    return [t for t in _ALL for _ in [0] if t.channel == channel]
+    return [t for t in _ALL if t.channel == channel]
 
 
 # ---------------------------------------------------------------------------
@@ -397,6 +394,9 @@ _SUPPLIER_EMAIL: List[NotificationTemplate] = [
 ]
 
 _ALL = _SMS + _WHATSAPP + _EMAIL + _SUPPLIER_SMS + _SUPPLIER_WHATSAPP + _SUPPLIER_EMAIL
+
+TEMPLATES: Dict[str, NotificationTemplate] = {tpl.key: tpl for tpl in _ALL}
+TEMPLATES_BY_SPEC_ID: Dict[int, NotificationTemplate] = {tpl.spec_id: tpl for tpl in _ALL}
 
 # Sanity check on import: spec mandates 18+15+10 = 43 templates + 21 supplier templates = 64 total
 assert len(_SMS) == 18, f"SMS templates: expected 18 (spec 245-262), got {len(_SMS)}"

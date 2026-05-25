@@ -5,7 +5,7 @@ import json
 import uuid
 import logging
 from typing import Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
 from sqlalchemy.orm import Session
@@ -42,7 +42,7 @@ class ConnectionManager:
             "type": "connected",
             "delivery_id": delivery_id,
             "connection_id": connection_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         })
     
     def disconnect(self, delivery_id: str, connection_id: str):
@@ -77,7 +77,7 @@ class ConnectionManager:
             "type": "location_update",
             "delivery_id": delivery_id,
             "data": location_data,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         await self.broadcast_to_delivery(delivery_id, message)
     
@@ -88,7 +88,7 @@ class ConnectionManager:
             "delivery_id": delivery_id,
             "status": status,
             "metadata": metadata or {},
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         await self.broadcast_to_delivery(delivery_id, message)
 
@@ -134,7 +134,7 @@ async def delivery_tracking_websocket(
                 "type": "initial_state",
                 "delivery_id": delivery_id,
                 "data": current_location,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             })
         
         # Keep connection alive and handle incoming messages
@@ -148,7 +148,7 @@ async def delivery_tracking_websocket(
                 # Respond to ping with pong
                 await websocket.send_json({
                     "type": "pong",
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                 })
             
             elif message_type == "request_location":
@@ -159,7 +159,7 @@ async def delivery_tracking_websocket(
                         "type": "location_update",
                         "delivery_id": delivery_id,
                         "data": location,
-                        "timestamp": datetime.utcnow().isoformat(),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
                     })
             
             elif message_type == "request_eta":
@@ -169,7 +169,7 @@ async def delivery_tracking_websocket(
                     "type": "eta_update",
                     "delivery_id": delivery_id,
                     "data": eta,
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                 })
             
             else:

@@ -6,7 +6,7 @@ import type {
 } from '@agritrust/shared';
 
 const FINTECH_API_URL =
-  import.meta.env.VITE_FINTECH_API_URL || 'http://localhost:8090/api/v1';
+  import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
 async function request<T>(path: string, init?: RequestInit & { accessToken?: string; idempotencyKey?: string }): Promise<T> {
   const { accessToken, idempotencyKey, ...fetchInit } = init || {};
@@ -50,7 +50,7 @@ export const enterpriseFinanceApi = {
   },
 
   getWalletBalance(accessToken?: string) {
-    return request<WalletBalanceDto>('/wallets/balance', { accessToken });
+    return request<WalletBalanceDto>('/wallet/balance', { accessToken });
   },
 
   quotePlatformFee(grossMinor: number | string, currency = 'USD', plan = 'BASIC') {

@@ -15,7 +15,6 @@ from app.models.recruitment import AgentApplication, ApplicationStatus
 from app.models.onboarding import OnboardingPhase, TrainingModule, AgentTrainingProgress, AgentContract, ShadowingLog
 from app.models.system_config import SystemConfig, ConfigGroup
 from app.models.notification_template import NotificationTemplate, TemplateChannel
-from app.models.ml_metadata import ModelVersion, MLJobLog, MLPrediction, MLInsight
 from app.models.academy import AgentTraining, AcademyModule, ExamAttempt
 from app.models.classroom import (
     Course, CourseTopic, Resource, QuizQuestion, Enrollment,
@@ -174,7 +173,6 @@ __all__ = [
     "EnhancedNotificationPreference", "NotificationChannel", "NotificationCategory",
     "SystemConfig", "ConfigGroup",
     "NotificationTemplate", "TemplateChannel",
-    "ModelVersion", "MLJobLog", "MLPrediction", "MLInsight",
     "SavedListing", "ListingReport", "ListingReportReason", "ListingReportStatus",
     "SuperAdmin", "AdminApproval", "ApprovalStatus", "ApprovalAction", "AdminLevel",
     "AuditChecksum", "FraudAlert", "FraudAlertType", "FraudSeverity",

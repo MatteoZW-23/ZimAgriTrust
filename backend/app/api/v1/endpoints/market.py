@@ -1,19 +1,18 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 from app.api.deps import get_db, get_current_user
 
 router = APIRouter()
 
 from app.models.user import SubscriptionTier, UserRole
-from app.services.scraper_service import AgriScraper
 
 @router.get("/news")
 def get_market_news(user = Depends(get_current_user)):
     """
-    Returns live-scraped agricultural news from the National Network.
+    Returns agricultural news.
     """
-    return AgriScraper.scrape_latest_news()
+    return {"news": []}
 
 
 @router.get("/summary")
@@ -23,12 +22,18 @@ def get_market_summary(
 ):
     """
     Unified market summary. Open to all registered users.
-    NOW POWERED BY LIVE MARKET SCRAPING.
     """
-    scraped_prices = AgriScraper.scrape_market_prices()
+    from app.models.listing import Listing, ListingStatus
+    from app.models.transaction import Order, OrderStatus
+    
+    # Get active listings and recent orders
+    active_listings = db.query(Listing).filter(Listing.status == ListingStatus.ACTIVE).all()
+    recent_orders = db.query(Order).filter(Order.status == OrderStatus.COMPLETED).order_by(Order.created_at.desc()).limit(100).all()
+    
     market_data = {}
-    for item in scraped_prices:
-        market_data[item["commodity"]] = {"price": item["price"], "unit": item["unit"], "origin": item.get("source", "")}
+    for listing in active_listings:
+        if listing.product_type not in market_data:
+            market_data[listing.product_type] = {"price": listing.price_per_unit, "unit": listing.quantity_unit, "origin": "platform"}
         
     return market_data
 
@@ -67,27 +72,34 @@ def get_price_trends(
 ):
     """
     Historical price trends from completed platform orders (last 30 days).
-    Falls back to scraper spot prices when no order history exists.
     """
-    from app.ml.price_predictor import deep_engine as price_engine
+    from app.models.listing import Listing, ListingStatus
+    from app.models.transaction import Order, OrderStatus
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import func
 
-    # Try live DB history first
-    history = price_engine.get_price_history(crop, db=db, days=30)
-    if history:
-        return history
+    # Get price history from completed orders
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    orders = db.query(Order).filter(
+        Order.status == OrderStatus.COMPLETED,
+        Order.created_at >= thirty_days_ago
+    ).all()
 
-    # Fallback: scraper spot price as a single data point
-    try:
-        from app.services.scraper_service import AgriScraper
-        prices = AgriScraper.scrape_market_prices()
-        for item in prices:
-            if crop.lower() in item.get("commodity", "").lower():
-                today = datetime.utcnow().date().isoformat()
-                return [{"date": today, "price": item["price"], "source": item.get("source", "scraper")}]
-    except Exception:
-        pass
+    # Group by date and calculate average price
+    price_by_date = {}
+    for order in orders:
+        date_str = order.created_at.date().isoformat()
+        if date_str not in price_by_date:
+            price_by_date[date_str] = []
+        price_by_date[date_str].append(order.total_price / order.quantity if order.quantity > 0 else 0)
 
-    return []
+    # Calculate averages
+    trends = []
+    for date_str in sorted(price_by_date.keys()):
+        avg_price = sum(price_by_date[date_str]) / len(price_by_date[date_str]) if price_by_date[date_str] else 0
+        trends.append({"date": date_str, "price": avg_price, "source": "platform"})
+
+    return trends
 
 
 @router.get("/demand/{crop}")
@@ -193,6 +205,6 @@ def get_agri_catalog(
     """
     Returns the National Agricultural Database/Catalog.
     """
-    from app.services.national_commodity_service import NationalCommodityService
-    return NationalCommodityService.SECTOR_GRADING_REGISTRY
+    return {"catalog": []}
+
 

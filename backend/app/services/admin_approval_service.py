@@ -141,9 +141,9 @@ def request_approval(
         currency=currency,
         reason=reason,
         requested_by=requested_by.id,
-        requested_at=datetime.utcnow(),
+        requested_at=datetime.now(timezone.utc),
         status=ApprovalStatus.PENDING,
-        expires_at=datetime.utcnow() + timedelta(hours=APPROVAL_TTL_HOURS),
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=APPROVAL_TTL_HOURS),
         rules_snapshot=rules,
     )
     db.add(approval)
@@ -170,7 +170,7 @@ def approve(
         raise HTTPException(status_code=404, detail="Approval not found")
     if approval.status not in (ApprovalStatus.PENDING, ApprovalStatus.PARTIAL_APPROVED):
         raise HTTPException(status_code=400, detail=f"Approval is {approval.status.value}")
-    if approval.expires_at and datetime.utcnow() > approval.expires_at:
+    if approval.expires_at and datetime.now(timezone.utc) > approval.expires_at:
         approval.status = ApprovalStatus.EXPIRED
         db.flush()
         raise HTTPException(status_code=400, detail="Approval has expired")
@@ -205,11 +205,11 @@ def approve(
 
     if approval.approved_by_1 is None:
         approval.approved_by_1 = actor.id
-        approval.approved_at_1 = datetime.utcnow()
+        approval.approved_at_1 = datetime.now(timezone.utc)
         approval.signature_1 = sig
     else:
         approval.approved_by_2 = actor.id
-        approval.approved_at_2 = datetime.utcnow()
+        approval.approved_at_2 = datetime.now(timezone.utc)
         approval.signature_2 = sig
 
     needs_dual = requires_dual_approval(action=approval.action, amount=float(approval.amount))
@@ -223,12 +223,12 @@ def approve(
                         detail="At least one approver must be SENIOR or SUPER admin",
                     )
             approval.status = ApprovalStatus.FULLY_APPROVED
-            approval.fully_approved_at = datetime.utcnow()
+            approval.fully_approved_at = datetime.now(timezone.utc)
         else:
             approval.status = ApprovalStatus.PARTIAL_APPROVED
     else:
         approval.status = ApprovalStatus.FULLY_APPROVED
-        approval.fully_approved_at = datetime.utcnow()
+        approval.fully_approved_at = datetime.now(timezone.utc)
 
     db.flush()
     return approval
