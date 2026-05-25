@@ -203,29 +203,8 @@ def upgrade() -> None:
     op.create_index("ix_input_price_alerts_user_id", "input_price_alerts", ["user_id"])
     op.create_index("ix_input_price_alerts_listing_id", "input_price_alerts", ["listing_id"])
 
-    # Seed 7 default categories
-    op.execute(
-        """
-        INSERT INTO input_categories
-            (slug, name, description, requires_registration, requires_expiry,
-             requires_agent_verification, is_regulated, is_active)
-        VALUES
-            ('seeds', 'Seeds', 'Maize, soybeans, wheat, vegetable seeds',
-             FALSE, TRUE, TRUE, FALSE, TRUE),
-            ('fertilizers', 'Fertilizers', 'Compound, nitrogen, organic',
-             TRUE, FALSE, TRUE, TRUE, TRUE),
-            ('pesticides', 'Pesticides', 'Insecticides, fungicides, herbicides',
-             TRUE, TRUE, TRUE, TRUE, TRUE),
-            ('equipment', 'Equipment', 'Sprayers, irrigation, tillers',
-             FALSE, FALSE, TRUE, FALSE, TRUE),
-            ('tools', 'Tools', 'Hoes, shovels, pruning shears',
-             FALSE, FALSE, FALSE, FALSE, TRUE),
-            ('animal_feed', 'Animal feed', 'Layers, broilers, cattle, goats, pigs',
-             FALSE, TRUE, TRUE, FALSE, TRUE),
-            ('other', 'Other agricultural supplies', 'Other supplies',
-             FALSE, FALSE, TRUE, FALSE, TRUE)
-        """
-    )
+    # Seed 7 default categories - REMOVED FOR PRODUCTION
+    # Categories should be created via admin panel or separate seed script
 
 
 def downgrade() -> None:

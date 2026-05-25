@@ -191,17 +191,8 @@ def upgrade() -> None:
     op.create_index("ix_admin_action_logs_resource_id", "admin_action_logs", ["resource_id"])
     op.create_index("ix_admin_action_logs_created_at", "admin_action_logs", ["created_at"])
 
-    # Seed default withdrawal limits
-    op.execute(
-        """
-        INSERT INTO withdrawal_limits
-            (user_tier, daily_limit, weekly_limit, monthly_limit, per_transaction_limit, min_trust_score)
-        VALUES
-            ('unverified', 50.00,  200.00,  500.00,  50.00,  NULL),
-            ('verified',   500.00, 2000.00, 5000.00, 500.00, NULL),
-            ('trusted',    1000.00, 5000.00, 15000.00, 1000.00, 80)
-        """
-    )
+    # Seed default withdrawal limits - REMOVED FOR PRODUCTION
+    # Withdrawal limits should be configured via admin panel or separate seed script
 
 
 def downgrade() -> None:

@@ -156,17 +156,8 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
     )
 
-    # Seed default deposit limits
-    op.execute(
-        """
-        INSERT INTO deposit_limits
-            (user_tier, daily_limit, weekly_limit, monthly_limit, per_transaction_limit, id_verification_required_above)
-        VALUES
-            ('unverified', 200.00,  500.00,  1000.00, 200.00,  500.00),
-            ('verified',   2000.00, 8000.00, 20000.00, 2000.00, 1000.00),
-            ('trusted',    10000.00,30000.00,100000.00,10000.00,1000.00)
-        """
-    )
+    # Seed default deposit limits - REMOVED FOR PRODUCTION
+    # Deposit limits should be configured via admin panel or separate seed script
 
 
 def downgrade() -> None:
