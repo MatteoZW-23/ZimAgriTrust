@@ -2,6 +2,9 @@
 USSD Integration Tests
 ======================
 End-to-end tests for USSD flows with database.
+
+Uses a TestClient with base_url="http://localhost" so that TrustedHostMiddleware
+(configured with ALLOWED_HOSTS=localhost,127.0.0.1) does not reject requests.
 """
 from __future__ import annotations
 
@@ -12,9 +15,9 @@ from sqlalchemy.orm import Session
 
 @pytest.fixture
 def client(db: Session):
-    """Test client with database."""
+    """Test client with database, using allowed host."""
     from app.main import app
-    return TestClient(app)
+    return TestClient(app, base_url="http://localhost")
 
 
 def test_econet_webhook_new_session(client: TestClient, db: Session):

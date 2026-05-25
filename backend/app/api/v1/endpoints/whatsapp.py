@@ -161,17 +161,7 @@ async def get_whatsapp_status():
     return await whatsapp_service.get_status()
 
 
-@router.post("/test-alert")
-async def test_alert(
-    phone: str,
-    message: str,
-    current_user: User = Depends(require_roles(UserRole.ADMIN)),
-):
-    """Development-only WhatsApp alert sender, disabled by default."""
-    if not settings.ENABLE_WHATSAPP_TEST_ENDPOINTS:
-        raise HTTPException(status_code=404, detail="Not found")
-    send_notification(phone, message)
-    return {"status": "Alert sent"}
+# REMOVED: /test-alert endpoint - Development-only, not for production
 
 
 def send_notification(to_phone: str, message: str):

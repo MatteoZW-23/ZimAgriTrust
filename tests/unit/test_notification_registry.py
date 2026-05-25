@@ -18,23 +18,23 @@ from backend.app.services.notifications.registry import (
 
 
 def test_total_count_matches_spec():
-    assert len(TEMPLATES) == 43
+    assert len(TEMPLATES) == 64
 
 
 def test_unique_spec_ids_cover_245_to_287():
     spec_ids = sorted(TEMPLATES_BY_SPEC_ID.keys())
-    assert spec_ids == list(range(245, 288))
+    assert spec_ids == list(range(245, 309))
 
 
 def test_channel_split_matches_spec():
     sms = get_templates_by_channel(NotificationChannel.SMS)
     whatsapp = get_templates_by_channel(NotificationChannel.WHATSAPP)
     email = get_templates_by_channel(NotificationChannel.EMAIL)
-    assert (len(sms), len(whatsapp), len(email)) == (18, 15, 10)
-    # SMS: spec 245-262, WhatsApp: 263-277, Email: 278-287
-    assert {t.spec_id for t in sms} == set(range(245, 263))
-    assert {t.spec_id for t in whatsapp} == set(range(263, 278))
-    assert {t.spec_id for t in email} == set(range(278, 288))
+    assert (len(sms), len(whatsapp), len(email)) == (28, 21, 15)
+    # SMS: spec 245-262 + 288-297, WhatsApp: 263-277 + 298-303, Email: 278-287 + 304-308
+    assert {t.spec_id for t in sms} == set(range(245, 263)).union(set(range(288, 298)))
+    assert {t.spec_id for t in whatsapp} == set(range(263, 278)).union(set(range(298, 304)))
+    assert {t.spec_id for t in email} == set(range(278, 288)).union(set(range(304, 309)))
 
 
 def test_get_template_by_key_and_id_match():

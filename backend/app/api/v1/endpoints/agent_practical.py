@@ -131,37 +131,8 @@ def _result(row: PracticalAssessment) -> PracticalResult:
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@router.post("/grading-test", response_model=PracticalResult)
-def submit_grading_test(
-    payload: PracticalSubmission,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_roles(UserRole.AGENT)),
-):
-    agent = _get_agent_for_user(db, user)
-    _ensure_final_exam_passed(db, agent.id)
-    return _result(_upsert_practical(db, agent.id, PracticalTestType.GRADING, payload))
-
-
-@router.post("/app-test", response_model=PracticalResult)
-def submit_app_navigation_test(
-    payload: PracticalSubmission,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_roles(UserRole.AGENT)),
-):
-    agent = _get_agent_for_user(db, user)
-    _ensure_final_exam_passed(db, agent.id)
-    return _result(_upsert_practical(db, agent.id, PracticalTestType.APP_NAVIGATION, payload))
-
-
-@router.post("/photo-test", response_model=PracticalResult)
-def submit_photo_evidence_test(
-    payload: PracticalSubmission,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_roles(UserRole.AGENT)),
-):
-    agent = _get_agent_for_user(db, user)
-    _ensure_final_exam_passed(db, agent.id)
-    return _result(_upsert_practical(db, agent.id, PracticalTestType.PHOTO_EVIDENCE, payload))
+# REMOVED: /grading-test, /app-test, /photo-test endpoints - Development-only, not for production
+# Agent practical tests should be managed through the Academy system
 
 
 @router.post("/dispute-roleplay", response_model=PracticalResult)

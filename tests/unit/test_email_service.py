@@ -10,9 +10,16 @@ from backend.app.services.email_service import EmailService, _ConsoleProvider
 
 def _force_console(monkeypatch):
     """Ensure tests run against the console provider regardless of env."""
-    from backend.app.core import config as cfg
-
-    monkeypatch.setattr(cfg.settings, "EMAIL_PROVIDER", "console", raising=False)
+    try:
+        from app.core import config as cfg_app
+        monkeypatch.setattr(cfg_app.settings, "EMAIL_PROVIDER", "console", raising=False)
+    except ImportError:
+        pass
+    try:
+        from backend.app.core import config as cfg_back
+        monkeypatch.setattr(cfg_back.settings, "EMAIL_PROVIDER", "console", raising=False)
+    except ImportError:
+        pass
 
 
 def test_send_template_console_ok(monkeypatch, caplog):
@@ -56,6 +63,6 @@ def test_list_email_templates_returns_ten(monkeypatch):
     _force_console(monkeypatch)
     svc = EmailService()
     templates = svc.list_templates()
-    assert len(templates) == 10
+    assert len(templates) == 15
     spec_ids = [t[0] for t in templates]
-    assert sorted(spec_ids) == list(range(278, 288))
+    assert sorted(spec_ids) == list(range(278, 288)) + list(range(304, 309))

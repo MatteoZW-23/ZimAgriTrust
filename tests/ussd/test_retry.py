@@ -15,15 +15,13 @@ from app.ussd.providers.econet.retry_logic import econet_retry
 async def test_duplicate_callback_detection():
     """Test that duplicate callbacks are detected."""
     session_id = "test_session_123"
-    phone = "+263712345678"
-    text = "1"
-    
+
     # First request should process
-    should_process_1 = await econet_retry.should_process(session_id, text)
+    should_process_1 = await econet_retry.should_process(session_id, "1")
     assert should_process_1 is True
-    
+
     # Duplicate should be rejected
-    should_process_2 = await econet_retry.should_process(session_id, text)
+    should_process_2 = await econet_retry.should_process(session_id, "1")
     assert should_process_2 is False
 
 
@@ -31,23 +29,28 @@ async def test_duplicate_callback_detection():
 async def test_retry_limit():
     """Test that retry limit is enforced."""
     session_id = "test_retry_limit"
-    
+
     # Exceed max retries
     for i in range(10):
         await econet_retry.increment_retry(session_id)
-    
+
     count = await econet_retry.get_retry_count(session_id)
     assert count >= 3
 
 
 @pytest.mark.asyncio
 async def test_rate_limiting():
-    """Test per-phone rate limiting."""
-    phone = "+263712345678"
+    """Test per-phone rate limiting.
     
-    for _ in range(15):
-        await retry_handler.evaluate_request("session_1", phone, "1")
-    
+    Uses unique session IDs per call so the per-session retry cap (5) does not
+    prevent all 15 calls from being evaluated. The per-minute rate cap (10) kicks
+    in after 10 requests, making the counter exactly 10.
+    """
+    phone = "+263799999999"  # Unique phone to avoid cross-test pollution
+
+    for i in range(15):
+        await retry_handler.evaluate_request(f"rate_test_session_{i}", phone, "1")
+
     rate_info = await retry_handler.get_phone_rate_info(phone)
     assert rate_info["requests_this_minute"] >= 10
 

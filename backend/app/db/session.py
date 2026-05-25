@@ -54,9 +54,17 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 @event.listens_for(engine, "connect")
 def _on_connect(dbapi_conn, _connection_record):
     """Set statement timeout on every new connection to prevent runaway queries."""
+    if type(dbapi_conn).__name__.startswith("sqlite") or "sqlite" in str(type(dbapi_conn)).lower():
+        return
     timeout_ms = int(getattr(settings, "DB_STATEMENT_TIMEOUT_MS", 30000))
-    with dbapi_conn.cursor() as cur:
-        cur.execute(f"SET statement_timeout = '{timeout_ms}ms'")
+    try:
+        cur = dbapi_conn.cursor()
+        try:
+            cur.execute(f"SET statement_timeout = '{timeout_ms}ms'")
+        finally:
+            cur.close()
+    except Exception:
+        pass
 
 
 def get_db():

@@ -7,10 +7,28 @@ import uuid
 from datetime import datetime
 from typing import Optional, List
 
-from sqlalchemy import Enum, Float, ForeignKey, String, Text, DateTime, Boolean, JSON, Integer, Numeric, BigInteger, ARRAY
+from sqlalchemy import Enum, Float, ForeignKey, String, Text, DateTime, Boolean, JSON, Integer, Numeric, BigInteger
+from sqlalchemy.types import TypeDecorator
 from sqlalchemy.dialects.postgresql import UUID, INET
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
+
+class SqliteCompatibleARRAY(TypeDecorator):
+    """Allows PostgreSQL ARRAY type on postgres, fallback to JSON/Text on SQLite."""
+    impl = JSON
+    cache_ok = True
+
+    def __init__(self, item_type, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.item_type = item_type
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            from sqlalchemy.dialects.postgresql import ARRAY
+            return dialect.type_descriptor(ARRAY(self.item_type))
+        else:
+            return dialect.type_descriptor(JSON)
+
 
 
 # ── Enums ────────────────────────────────────────────────────────────────────────
@@ -159,7 +177,7 @@ class TransportRequest(Base):
     cargo_weight: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     cargo_volume: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
     cargo_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    special_handling: Mapped[Optional[List[str]]] = mapped_column(ARRAY(String), nullable=True)
+    special_handling: Mapped[Optional[List[str]]] = mapped_column(SqliteCompatibleARRAY(String), nullable=True)
     
     # Timing
     preferred_pickup_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -168,7 +186,7 @@ class TransportRequest(Base):
     
     # Vehicle preferences
     preferred_vehicle_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    vehicle_requirements: Mapped[Optional[List[str]]] = mapped_column(ARRAY(String), nullable=True)
+    vehicle_requirements: Mapped[Optional[List[str]]] = mapped_column(SqliteCompatibleARRAY(String), nullable=True)
     
     # Status
     status: Mapped[TransportRequestStatus] = mapped_column(Enum(TransportRequestStatus), default=TransportRequestStatus.PENDING, nullable=False)

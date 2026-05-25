@@ -21,9 +21,9 @@ async def test_concurrent_session_creation():
             provider="econet",
         )
         tasks.append(task)
-    
+
     await asyncio.gather(*tasks)
-    
+
     # Verify all sessions exist
     for i in range(10):
         session = await session_store.get_session(f"concurrent_{i}")
@@ -39,20 +39,24 @@ async def test_concurrent_updates():
         phone_number="+263712345678",
         provider="econet",
     )
-    
-    tasks = []
-    for i in range(5):
-        async def update():
-            session = await session_store.get_session(session_id)
-            session.current_screen = f"screen_{i}"
-            await session_store.update_session(session)
-        tasks.append(update())
-    
-    await asyncio.gather(*tasks)
-    
-    # Final session should have one of the updates
+
+    results = []
+
+    async def update(screen_name: str):
+        session = await session_store.get_session(session_id)
+        if session is None:
+            return
+        session.current_screen = screen_name
+        success = await session_store.update_session(session)
+        results.append(success)
+
+    await asyncio.gather(*[update(f"screen_{i}") for i in range(5)])
+
+    # Final session should still exist
     session = await session_store.get_session(session_id)
     assert session is not None
+    # At least one update succeeded
+    assert any(results)
 
 
 @pytest.mark.asyncio
@@ -64,7 +68,7 @@ async def test_session_recovery():
         phone_number=phone,
         provider="econet",
     )
-    
+
     recovered = await session_store.get_session_by_phone(phone)
     assert recovered is not None
     assert recovered.session_id == "recovery_123"

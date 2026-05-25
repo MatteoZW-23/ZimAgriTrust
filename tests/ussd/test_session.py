@@ -5,8 +5,8 @@ Tests Redis session store, TTL, and session lifecycle.
 """
 from __future__ import annotations
 
+import asyncio
 import pytest
-import time
 from app.ussd.engine.redis_session_store import session_store, USSDSession
 
 
@@ -19,7 +19,7 @@ async def test_create_session():
         provider="econet",
     )
     assert session.session_id == "test_create_123"
-    assert session.phone_number == "+263712378"
+    assert session.phone_number == "+263712345678"
     assert session.current_screen == "welcome"
 
 
@@ -66,7 +66,7 @@ async def test_destroy_session():
 @pytest.mark.asyncio
 async def test_session_ttl():
     """Test session TTL expiration."""
-    session = await session_store.create_session(
+    await session_store.create_session(
         session_id="test_ttl_123",
         phone_number="+263712345678",
         provider="econet",
