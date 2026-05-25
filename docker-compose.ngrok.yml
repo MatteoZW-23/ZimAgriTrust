@@ -73,7 +73,7 @@ services:
       RATE_LIMIT_ENABLED: "false"
       ADMIN_AUDIT_LOGGING: "false"
       ADMIN_MFA_ENABLED: "false"
-      MASTER_TEST_LOGIN_ENABLED: "true"
+      MASTER_TEST_LOGIN_ENABLED: "false"
       AUTO_CONFIRM_PAYMENTS: "false"
     volumes:
       - ./backend:/app

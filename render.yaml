@@ -1,4 +1,4 @@
-# Render.com Blueprint for ZimAgriTrust Demo
+# Render.com Blueprint for ZimAgriTrust Production
 # Deploy at: https://render.com/blueprints
 
 services:
@@ -27,7 +27,7 @@ services:
       - key: PIN_PEPPER
         generateValue: true
       - key: ADMIN_BOOTSTRAP_TOKEN
-        value: demo-bootstrap-token-32-chars-long
+        generateValue: true
       - key: APP_ENV
         value: production
       - key: ENVIRONMENT
@@ -75,5 +75,5 @@ databases:
   # PostgreSQL Database
   - name: agritrust-db
     plan: free
-    databaseName: agritrust_demo
+    databaseName: agritrust
     user: agritrust
