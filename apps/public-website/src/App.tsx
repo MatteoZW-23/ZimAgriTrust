@@ -375,26 +375,9 @@ function TrustSection() {
 }
 
 function TestimonialsSection() {
- const testimonials = [
- {
- quote: "ZimAgritrust helped me sell my maize at fair market price. The escrow payment gave me peace of mind.",
- author: "John Moyo",
- role: "Farmer, Mashonaland",
- rating: 5,
- },
- {
- quote: "As a buyer, I get quality crops delivered on time. The GPS tracking is a game changer.",
- author: "Sarah Ndlovu",
- role: "Agro-dealer, Bulawayo",
- rating: 5,
- },
- {
- quote: "The USSD feature means I can trade even without a smartphone. Brilliant for rural farmers!",
- author: "Tendai Mutasa",
- role: "Small-scale Farmer, Manicaland",
- rating: 5,
- },
- ];
+ // REMOVED: Hardcoded testimonials data for production
+ // Testimonials should be loaded from backend API or CMS
+ const testimonials = [];
 
  return (
  <section className="section-padding bg-white"><div className="container-custom"><div className="text-center max-w-2xl mx-auto mb-16"><span className="badge badge-primary mb-4">Testimonials</span><h2 className="text-3xl sm:text-4xl font-bold text-earth-900 mb-4">What Our Users Say

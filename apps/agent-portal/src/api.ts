@@ -115,16 +115,8 @@ export const getTransactions = () => request("/transactions");
 export const getAgentEarnings = () => request("/agent/earnings").catch(() => request("/payments/balance"));
 export const getAgentEarningsBreakdown = () => request("/agent/earnings");
 
-// ── Practical Assessment (post-final-exam) ────────────────────────────────────
-export const submitGradingTest = (payload) =>
-  request("/agents/practical/grading-test", { method: "POST", body: JSON.stringify(payload) });
-export const submitAppNavTest = (payload) =>
-  request("/agents/practical/app-test", { method: "POST", body: JSON.stringify(payload) });
-export const submitPhotoTest = (payload) =>
-  request("/agents/practical/photo-test", { method: "POST", body: JSON.stringify(payload) });
-export const submitDisputeRoleplay = (payload) =>
-  request("/agents/practical/dispute-roleplay", { method: "POST", body: JSON.stringify(payload) });
-export const getPracticalResults = () => request("/agents/practical/results");
+// REMOVED: Practical Assessment test endpoints - Development-only, not for production
+// Agent practical tests should be managed through the Academy system
 
 // ── Shadowing (10 tasks with senior agent) ────────────────────────────────────
 export const getShadowingTasks = () => request("/agents/shadowing/tasks");

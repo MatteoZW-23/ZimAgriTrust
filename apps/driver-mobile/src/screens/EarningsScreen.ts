@@ -16,9 +16,9 @@ import { theme } from '../styles';
 import { getEarnings, withdrawEarnings } from '../api';
 
 const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const DEMO_WEEK = [45, 0, 90, 65, 120, 80, 50];
+// REMOVED: DEMO_WEEK - Demo data removed for production
 
-function WeeklyChart({ data = DEMO_WEEK }) {
+function WeeklyChart({ data = [] }) {
   const max = Math.max(...data, 1);
   const today = new Date().getDay(); // 0=Sun, 1=Mon...
   const todayIdx = today === 0 ? 6 : today - 1;
@@ -43,13 +43,7 @@ function WeeklyChart({ data = DEMO_WEEK }) {
   );
 }
 
-const DEMO_TRANSACTIONS = [
-  { id: '1', route: 'Harare → Bulawayo', amount: 150, status: 'paid',    date: 'Today, 2:30 PM',  type: 'delivery' },
-  { id: '2', route: 'Mutare → Harare',   amount: 90,  status: 'paid',    date: 'Yesterday',       type: 'delivery' },
-  { id: '3', route: 'EcoCash Withdrawal',amount: -200, status: 'done',   date: 'May 1',           type: 'withdrawal' },
-  { id: '4', route: 'Gweru → Masvingo',  amount: 65,  status: 'pending', date: 'Apr 30',          type: 'delivery' },
-  { id: '5', route: 'Chinhoyi → Kariba', amount: 75,  status: 'paid',    date: 'Apr 29',          type: 'delivery' },
-];
+// REMOVED: DEMO_TRANSACTIONS - Demo data removed for production
 
 export default function EarningsScreen({ route, navigation }) {
   const { token } = route.params || {};
