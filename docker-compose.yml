@@ -216,7 +216,13 @@ services:
     depends_on:
       - backend
 
-  # REMOVED: node-gateway - IoT gateway service removed
+  node-gateway:
+    build: ./apps/iot-gateway
+    ports:
+      - "3005:3005"
+    depends_on:
+      - backend
+
   # REMOVED: ussd-simulator - USSD simulator removed (development-only)
 
   whatsapp-bridge:

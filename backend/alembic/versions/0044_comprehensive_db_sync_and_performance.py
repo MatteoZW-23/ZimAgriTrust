@@ -319,7 +319,11 @@ def upgrade() -> None:
     _create_index_if_not_exists(conn, "ix_transactions_status", "transactions", "status")
     _create_index_if_not_exists(conn, "ix_transactions_created_at", "transactions", "created_at")
 
-    # Supplier profiles table
+    # Supplier profiles table - Add missing subscription columns first
+    _add_column_if_not_exists(conn, "supplier_profiles", "subscription_status", "VARCHAR(20)")
+    _add_column_if_not_exists(conn, "supplier_profiles", "subscription_start_date", "TIMESTAMP WITH TIME ZONE")
+    _add_column_if_not_exists(conn, "supplier_profiles", "subscription_end_date", "TIMESTAMP WITH TIME ZONE")
+    
     _create_index_if_not_exists(conn, "ix_supplier_profiles_verification_status", "supplier_profiles", "verification_status")
     _create_index_if_not_exists(conn, "ix_supplier_profiles_subscription_status", "supplier_profiles", "subscription_status")
     _create_index_if_not_exists(conn, "ix_supplier_profiles_business_type", "supplier_profiles", "business_type")
