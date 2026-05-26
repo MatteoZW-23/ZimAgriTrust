@@ -216,24 +216,8 @@ services:
     depends_on:
       - backend
 
-  node-gateway:
-    build: ./apps/iot-gateway
-    ports:
-      - "3005:3005"
-    depends_on:
-      - backend
-
-  ussd-simulator:
-    build: ./apps/ussd-simulator
-    ports:
-      - "5000:5000"
-    environment:
-      - BACKEND_URL=http://backend:8000
-      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-default-dev-secret-key-change-in-production}
-    volumes:
-      - ./apps/ussd-simulator:/app
-    depends_on:
-      - backend
+  # REMOVED: node-gateway - IoT gateway service removed
+  # REMOVED: ussd-simulator - USSD simulator removed (development-only)
 
   whatsapp-bridge:
     build: ./apps/whatsapp-bridge
