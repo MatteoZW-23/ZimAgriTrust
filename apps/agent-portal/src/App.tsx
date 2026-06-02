@@ -14,8 +14,6 @@ import PerformancePanel from "./components/PerformancePanel";
 import PracticalAssessmentPanel from "./components/PracticalAssessmentPanel";
 import ShadowingPanel from "./components/ShadowingPanel";
 import SupervisedPanel from "./components/SupervisedPanel";
-import Academy from "./components/Academy";
-import AcademyApp from "./components/AcademyApp";
 
 const AUTH_KEY = "zimagritrust_agent_auth";
 const USER_KEY = "zimagritrust_agent_user";
@@ -29,7 +27,6 @@ const NAV = [
   { id: "listings", icon: "fa-list", label: "Listing Review" },
   { id: "disputes", icon: "fa-flag", label: "Disputes" },
   { id: "delivery", icon: "fa-truck", label: "Delivery" },
-  { id: "academy", icon: "fa-graduation-cap", label: "Academy" },
   { id: "practical", icon: "fa-clipboard-check", label: "Practical Assessment" },
   { id: "shadowing", icon: "fa-eye", label: "Shadowing" },
   { id: "supervised", icon: "fa-user-graduate", label: "Supervised" },
@@ -42,9 +39,7 @@ export default function App() {
   const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem(USER_KEY)); } catch { return null; } });
   const [view, setView] = useState("dashboard");
   // Show standalone Academy for unauthenticated trainees or trainees who land here
-  const [showAcademy, setShowAcademy] = useState(() => {
-    return localStorage.getItem("zimagritrust_academy_auth") !== null;
-  });
+  const [showAcademy, setShowAcademy] = useState(false);
 
   const handleLogin = d => {
     const u = d?.user || d;
@@ -56,14 +51,6 @@ export default function App() {
   };
 
   // Called when a trainee graduates from AcademyApp — they now log in to the full portal
-  const handleGraduate = () => {
-    localStorage.setItem(NEEDS_ACADEMY_KEY, "graduated");
-    localStorage.removeItem("zimagritrust_academy_auth");
-    localStorage.removeItem("zimagritrust_academy_user");
-    setAuth(null); setUser(null); setShowAcademy(false);
-    localStorage.removeItem(AUTH_KEY); localStorage.removeItem(USER_KEY);
-  };
-
   const handleLogout = () => {
     logout(); setAuth(null); setUser(null);
     localStorage.removeItem(AUTH_KEY); localStorage.removeItem(USER_KEY);
@@ -82,16 +69,12 @@ export default function App() {
   }
 
   // If Academy session is active (or user chose Academy), show standalone Academy
-  if (showAcademy) {
-    return <AcademyApp onGraduate={handleGraduate} />;
-  }
-
   if (!auth) return (
     <>
       <AuthScreen onLogin={handleLogin} />
       <div style={{ position: "fixed", bottom: 16, left: 0, right: 0, textAlign: "center", fontSize: 13, color: "#94a3b8" }}>
         <span
-          onClick={() => setShowAcademy(true)}
+          onClick={() => { window.location.href = "https://academy.zimagritrust.com"; }}
           style={{ color: "#10b981", fontWeight: 700, cursor: "pointer", marginRight: 16 }}
         >
           <i className="fas fa-graduation-cap" style={{ marginRight: 4 }}></i> Enter Academy (Trainees)
@@ -105,7 +88,8 @@ export default function App() {
   // Trainees (status === "trainee") must complete the Academy before accessing the portal
   const agentStatus = (user?.agent_status || user?.status || "").toLowerCase();
   if (auth && agentStatus === "trainee") {
-    return <AcademyApp onGraduate={handleGraduate} />;
+    window.location.href = "https://academy.zimagritrust.com";
+    return null;
   }
 
   // Graduated trainees: show a portal login prompt (their status is now "active")
@@ -138,7 +122,6 @@ export default function App() {
       case "listings": return <ListingReviewPanel />;
       case "disputes": return <DisputesPanel />;
       case "delivery": return <DeliveryPanel />;
-      case "academy": return <Academy token={auth?.access_token || auth} agent={user} onCertified={() => {}} />;
       case "practical": return <PracticalAssessmentPanel />;
       case "shadowing": return <ShadowingPanel user={user} />;
       case "supervised": return <SupervisedPanel />;

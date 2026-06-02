@@ -4,6 +4,7 @@
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
+    "build": "npx expo export --platform web",
     "start": "npx expo start --no-dev --minify",
     "android": "npx expo run:android",
     "ios": "npx expo run:ios",

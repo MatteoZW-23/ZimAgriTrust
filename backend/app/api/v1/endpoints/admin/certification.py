@@ -8,11 +8,26 @@ from app.services.certification_service import certification_service
 
 router = APIRouter()
 
+@router.get("/programs")
+def list_certification_programs(
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_roles(UserRole.ADMIN, UserRole.ACADEMY_ADMIN))
+):
+    """
+    Admin compatibility endpoint for certification programs.
+    """
+    return {
+        "programs": [
+            {"code": "agent_foundation", "name": "Agent Foundation Certification", "active": True},
+            {"code": "agent_advanced", "name": "Agent Advanced Certification", "active": True},
+        ]
+    }
+
 
 @router.post("/check-expiry")
 def check_certification_expiry(
     db: Session = Depends(get_db),
-    _: dict = Depends(require_roles(UserRole.ADMIN))
+    _: dict = Depends(require_roles(UserRole.ADMIN, UserRole.ACADEMY_ADMIN))
 ):
     """Admin endpoint to check all certifications for expiry and send notifications"""
     return certification_service.check_certification_expiry(db)
@@ -23,7 +38,7 @@ def renew_agent_certification(
     agent_id: str,
     renewal_days: Optional[int] = 365,
     db: Session = Depends(get_db),
-    _: dict = Depends(require_roles(UserRole.ADMIN))
+    _: dict = Depends(require_roles(UserRole.ADMIN, UserRole.ACADEMY_ADMIN))
 ):
     """Admin endpoint to renew an agent's certification"""
     try:

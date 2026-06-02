@@ -13,7 +13,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional, List, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, case, or_
 
 from app.models.ledger import (
     LedgerEntry, LedgerEntryType, LedgerAccountType,
@@ -140,7 +140,12 @@ class LedgerService:
         )
         
         result = db.execute(
-            select(func.coalesce(func.sum(LedgerEntry.amount), 0.0))
+            select(func.coalesce(func.sum(
+                case(
+                    (LedgerEntry.entry_type == LedgerEntryType.CREDIT, LedgerEntry.amount),
+                    else_=-LedgerEntry.amount
+                )
+            ), 0.0))
             .where(
                 and_(
                     LedgerEntry.user_id == user_id,
@@ -341,6 +346,9 @@ class LedgerService:
         Create a double-entry transaction.
         Debit one account, credit another. Total debits = total credits.
         """
+        debit_idempotency_key = f"{idempotency_key}:debit" if idempotency_key else None
+        credit_idempotency_key = f"{idempotency_key}:credit" if idempotency_key else None
+
         debit_entry = LedgerService.create_entry(
             db=db,
             transaction_id=transaction_id,
@@ -352,7 +360,7 @@ class LedgerService:
             order_id=order_id,
             reference=reference,
             description=f"{description} (DEBIT)" if description else None,
-            idempotency_key=idempotency_key,
+            idempotency_key=debit_idempotency_key,
             entry_metadata=entry_metadata,
         )
         
@@ -367,7 +375,7 @@ class LedgerService:
             order_id=order_id,
             reference=reference,
             description=f"{description} (CREDIT)" if description else None,
-            idempotency_key=idempotency_key,
+            idempotency_key=credit_idempotency_key,
             entry_metadata=entry_metadata,
         )
         
@@ -384,7 +392,13 @@ class LedgerService:
         """
         return db.execute(
             select(LedgerEntry)
-            .where(LedgerEntry.idempotency_key == idempotency_key)
+            .where(
+                or_(
+                    LedgerEntry.idempotency_key == idempotency_key,
+                    LedgerEntry.idempotency_key == f"{idempotency_key}:debit",
+                    LedgerEntry.idempotency_key == f"{idempotency_key}:credit",
+                )
+            )
         ).scalar_one_or_none()
 
     @staticmethod

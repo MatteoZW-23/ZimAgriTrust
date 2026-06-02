@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
+from math import asin, cos, radians, sin, sqrt
 import numpy as np
 from app.models.agent import Agent, AgentAssignment, AgentStatus, AgentSpecialization
 from app.models.listing import Listing
@@ -166,7 +167,7 @@ class AgentAssignmentService:
     
     def _requires_verification(self, listing: Listing) -> bool:
         """
-        AI-Driven Risk Engine: Decides if an agent is mandatory based on:
+        Risk Engine: Decides if an agent is mandatory based on:
         - Transaction Amount (>$500)
         - Farmer Trust Score (<40)
         - Crop Type (Premium risk)
@@ -252,16 +253,47 @@ class AgentAssignmentService:
             "route_optimization": self._get_optimized_route(agent_id, listing_id)
         }
 
-    def _get_optimized_route(self, agent_id: int, target_listing_id: int) -> Dict:
-        """
-        Route optimization placeholder — integrate with a mapping API for real data.
-        """
+    def _get_optimized_route(self, agent_id, target_listing_id) -> Dict:
+        agent = self.db.query(Agent).filter(Agent.id == agent_id).first()
+        listing = self.db.query(Listing).filter(Listing.id == target_listing_id).first()
+        agent_user = getattr(agent, "user", None)
+        if (
+            not agent_user
+            or agent_user.latitude is None
+            or agent_user.longitude is None
+            or not listing
+            or listing.latitude is None
+            or listing.longitude is None
+        ):
+            return {
+                "estimated_distance_km": None,
+                "estimated_travel_time_mins": None,
+                "fuel_cost_estimate_usd": None,
+                "suggested_route": []
+            }
+
+        distance_km = self._distance_km(
+            float(agent_user.latitude),
+            float(agent_user.longitude),
+            float(listing.latitude),
+            float(listing.longitude),
+        )
         return {
-            "estimated_distance_km": None,
-            "estimated_travel_time_mins": None,
-            "fuel_cost_estimate_usd": None,
-            "suggested_route": []
+            "estimated_distance_km": round(distance_km, 2),
+            "estimated_travel_time_mins": round((distance_km / 45) * 60),
+            "fuel_cost_estimate_usd": round(distance_km * 0.16, 2),
+            "suggested_route": [
+                {"latitude": float(agent_user.latitude), "longitude": float(agent_user.longitude), "label": "agent"},
+                {"latitude": float(listing.latitude), "longitude": float(listing.longitude), "label": "listing"},
+            ]
         }
+
+    @staticmethod
+    def _distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        dlat = radians(lat2 - lat1)
+        dlon = radians(lon2 - lon1)
+        a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+        return 6371.0 * 2 * asin(sqrt(a))
     
     def _calculate_deadline(self, priority: int, urgent: bool = False) -> datetime:
         now = datetime.now()
@@ -296,15 +328,15 @@ class AgentAssignmentService:
         return False
 
     def _notify_agent(self, agent: Agent, assignment: AgentAssignment):
-        """Send simulated SMS/Push to agent"""
+        """Send assignment notification to agent."""
         from app.services.notification_service import NotificationService
         
         task_type = "verification" if assignment.listing_id else "dispute"
         location = f"{agent.district}, {agent.province}"
         
         NotificationService.notify_agent_assignment(
-            agent.user.name, 
-            agent.user.phone, 
+            agent.user.full_name,
+            agent.user.phone_number,
             task_type, 
             location
         )

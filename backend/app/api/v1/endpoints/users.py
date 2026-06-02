@@ -31,6 +31,7 @@ class UserSettingsUpdate(BaseModel):
     language: Optional[str] = Field(default=None, pattern="^(en|sn|nd)$")
     data_sharing_consent: Optional[bool] = None
     phone_visibility: Optional[bool] = None
+    marketplace_discovery: Optional[bool] = None
 
 
 class PinChangePayload(BaseModel):
@@ -47,6 +48,7 @@ def _settings_for(user: User) -> dict:
         "language": user.preferred_language or "en",
         "data_sharing_consent": prefs.get("data_sharing_consent", True),
         "phone_visibility": prefs.get("phone_visibility", False),
+        "marketplace_discovery": prefs.get("marketplace_discovery", True),
     }
 
 

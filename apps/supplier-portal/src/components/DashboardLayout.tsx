@@ -2,8 +2,9 @@ import React from 'react';
 import { useAuthStore } from '../store.ts';
 import { 
   LayoutDashboard, Package, ShoppingCart, Box, Wallet, BarChart3, User, LogOut,
-  Star, Tag, DollarSign, CreditCard
+  Star, Tag, DollarSign, CreditCard, ShieldCheck
 } from 'lucide-react';
+import logo from '../assets/logo.png';
 
 export function DashboardLayout({ currentView, onViewChange, children }) {
   const { user, logout } = useAuthStore();
@@ -31,32 +32,41 @@ export function DashboardLayout({ currentView, onViewChange, children }) {
   };
 
   return (
-    <div className="min-h-screen bg-earth-50 flex">
+    <div className="flex min-h-screen bg-earth-50">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-earth-200 fixed h-full">
-        <div className="p-6 border-b border-earth-200">
+      <aside className="fixed h-full w-72 border-r border-earth-200/80 bg-white/92 shadow-soft backdrop-blur-xl">
+        <div className="border-b border-earth-200/80 p-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary-500 rounded-xl flex items-center justify-center">
-              <i className="fas fa-store text-white"></i>
+            <div className="supplier-logo-surface">
+              <img src={logo} alt="ZimAgriTrust Market" className="supplier-logo" />
             </div>
             <div>
-              <h1 className="font-black text-earth-800 text-sm">ZimAgriTrust</h1>
-              <p className="text-xs text-earth-500 font-bold">Supplier Portal</p>
+              <h1 className="font-display text-lg font-black leading-tight text-earth-900">Zim<span className="text-primary-700">Agri</span>Trust</h1>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-earth-500">Supplier Portal</p>
             </div>
+          </div>
+          <div className="mt-5 rounded-3xl border border-primary-100 bg-primary-50 p-4">
+            <div className="flex items-center gap-2 text-primary-800">
+              <ShieldCheck className="h-4 w-4" />
+              <span className="text-xs font-black uppercase tracking-[0.14em]">Verified trade tools</span>
+            </div>
+            <p className="mt-2 text-sm font-semibold leading-relaxed text-earth-700">
+              Manage products, escrow-backed orders, stock, payouts, and supplier growth from one portal.
+            </p>
           </div>
         </div>
         
-        <nav className="p-4 space-y-1">
+        <nav className="space-y-1 p-4">
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
               <button
                 key={item.id}
                 onClick={() => onViewChange(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-colors ${
+                className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-black transition-colors ${
                   currentView === item.id
-                    ? 'bg-primary-50 text-primary-700'
-                    : 'text-earth-600 hover:bg-earth-100'
+                    ? 'bg-primary-700 text-white shadow-glow'
+                    : 'text-earth-700 hover:bg-primary-50 hover:text-primary-700'
                 }`}
               >
                 <Icon className="w-5 h-5" />
@@ -66,10 +76,10 @@ export function DashboardLayout({ currentView, onViewChange, children }) {
           })}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-earth-200">
+        <div className="absolute bottom-0 left-0 right-0 border-t border-earth-200 bg-white p-4">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm text-red-600 hover:bg-red-50 transition-colors"
+            className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-black text-red-600 transition-colors hover:bg-red-50"
           >
             <LogOut className="w-5 h-5" />
             Logout
@@ -78,17 +88,20 @@ export function DashboardLayout({ currentView, onViewChange, children }) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 ml-64">
-        <header className="bg-white border-b border-earth-200 px-8 py-4">
+      <main className="ml-72 flex-1">
+        <header className="sticky top-0 z-20 border-b border-earth-200/80 bg-white/88 px-8 py-4 backdrop-blur-xl">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-black text-earth-800 capitalize">{currentView.replace('-', ' ')}</h2>
+            <div>
+              <h2 className="font-display text-2xl font-black capitalize text-earth-900">{currentView.replace('-', ' ')}</h2>
+              <p className="text-sm font-semibold text-earth-500">Real supplier operations connected to ZimAgriTrust APIs</p>
+            </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
                 <p className="font-bold text-earth-800 text-sm">{user?.full_name || 'Supplier'}</p>
                 <p className="text-xs text-earth-500">{user?.phone_number || ''}</p>
               </div>
-              <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                <User className="w-5 h-5 text-primary-600" />
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
+                <User className="h-5 w-5" />
               </div>
             </div>
           </div>

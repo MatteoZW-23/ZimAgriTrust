@@ -47,10 +47,10 @@ class WhatsAppService:
 
         # Legacy direct bridge communication
         # Sanitize phone number (ensure @c.us suffix)
-        if not to_phone.endswith('@c.us'):
+        if not (to_phone.endswith('@c.us') or to_phone.endswith('@g.us')):
             # Convert +263... to 263...
             clean_phone = to_phone.replace('+', '')
-            if not clean_phone.endswith('@c.us'):
+            if not (clean_phone.endswith('@c.us') or clean_phone.endswith('@g.us')):
                 clean_phone += '@c.us'
         else:
             clean_phone = to_phone
@@ -601,20 +601,20 @@ class WhatsAppService:
                         f"*Reply with any command above* 👆")
 
             if user.role == UserRole.BUYER:
-                return (f"� *ZimAgritrust Buyer Menu*\n\n"
-                        f"� *Procurement*\n"
-                        f"• `buy` - Search for crops\n"
-                        f"• `my orders` - Track purchases\n"
-                        f"• `offers` - View your offers\n"
-                        f"• `prices` - Check current rates\n"
-                        f"• `forecast` - Price predictions\n\n"
-                        f"💰 *Financial*\n"
-                        f"• `wallet` - Check balance\n"
-                        f"• `history` - Transaction history\n"
-                        f"• `payment methods` - Manage cards\n\n"
-                        f"⚙️ *Account*\n"
-                        f"• `profile` - Your information\n"
-                        f"• `verify` - Complete verification\n"
+                return (f"*ZimAgritrust Buyer Menu*\n\n"
+                        f"*Procurement*\n"
+                        f"- `buy` - Search for crops\n"
+                        f"- `my orders` - Track purchases\n"
+                        f"- `offers` - View your offers\n"
+                        f"- `prices` - Check current rates\n"
+                        f"- `forecast` - Price predictions\n\n"
+                        f"*Financial*\n"
+                        f"- `wallet` - Check balance\n"
+                        f"- `history` - Transaction history\n"
+                        f"- `payment methods` - Manage cards\n\n"
+                        f"*Account*\n"
+                        f"- `profile` - Your information\n"
+                        f"- `verify` - Complete verification\n"
                         f"• `settings` - Notification preferences\n\n"
                         f"🆘 *Support*\n"
                         f"• `help` - All commands\n"
@@ -1066,8 +1066,25 @@ class WhatsAppService:
         
         try:
             new_price = float(body)
-            # In a real app, we would update the Offer record or send a TradeMessage
-            # For this P0 implementation, we simulate notifying the buyer
+            offer = db.query(Offer).filter(Offer.id == offer_id).first()
+            if not offer:
+                await WhatsAppService.set_user_state(phone, "IDLE")
+                return "⚠️ Offer not found. Reply `offers` to see your current offers."
+            if offer.seller_id != user.id:
+                await WhatsAppService.set_user_state(phone, "IDLE")
+                return "⚠️ You are not allowed to counter this offer."
+            if offer.status not in {OfferStatus.PENDING, OfferStatus.COUNTERED}:
+                await WhatsAppService.set_user_state(phone, "IDLE")
+                return f"⚠️ This offer is already {offer.status.value}."
+            offer.offered_price = new_price
+            offer.status = OfferStatus.COUNTERED
+            db.commit()
+            buyer = db.query(User).filter(User.id == offer.buyer_id).first()
+            if buyer and buyer.phone_number:
+                await WhatsAppService.send_whatsapp_message(
+                    buyer.phone_number,
+                    f"Counter offer received: ${new_price:.2f}/unit. Reply `offers` to review.",
+                )
             await WhatsAppService.set_user_state(phone, "IDLE")
             return f"✅ *Counter Offer Sent*\n\nYour proposed price of ${new_price}/unit has been sent to the buyer. You will be notified of their decision."
         except ValueError:
@@ -1692,9 +1709,9 @@ class WhatsAppService:
             f"• `maintenance on` - Enable maintenance mode\n\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"*Emergency Contacts:*\n"
-            f"CTO: +263 77 XXX XXXX\n"
-            f"DevOps: +263 77 XXX XXXX\n"
-            f"Support Lead: +263 77 XXX XXXX"
+            f"CTO: +263 787021397\n"
+            f"DevOps: +263788272020\n"
+            f"Support Lead: +263 717358956"
         )
 
 
@@ -1760,7 +1777,7 @@ class WhatsAppService:
     async def _handle_agent_performance(db, user):
         completed = db.query(func.count(Listing.id)).filter(
             Listing.status == ListingStatus.ACTIVE,
-            Listing.verification_status == "ai_verified"
+            Listing.verification_status == "verified"
         ).scalar() or 0
         return (
             f"📊 *Agent Performance*\n\n"
@@ -2084,8 +2101,28 @@ class WhatsAppService:
     @staticmethod
     async def translate_message(message: str, target_language: str = "sn") -> str:
         """Translate message to local language (Shona, Ndebele)"""
-        # TODO: Integrate with translation service
-        return message
+        dictionaries = {
+            "sn": {
+                "prices": "mitengo",
+                "wallet": "homwe",
+                "help": "rubatsiro",
+                "sell": "tengesa",
+                "orders": "maodha",
+                "thank you": "mazvita",
+            },
+            "nd": {
+                "prices": "amanani",
+                "wallet": "isikhwama",
+                "help": "usizo",
+                "sell": "thengisa",
+                "orders": "ama-oda",
+                "thank you": "siyabonga",
+            },
+        }
+        translated = message
+        for source, target in dictionaries.get(target_language, {}).items():
+            translated = translated.replace(source, target).replace(source.title(), target.title())
+        return translated
     
     @staticmethod
     async def detect_language(message: str) -> str:
@@ -2118,8 +2155,10 @@ class WhatsAppService:
     @staticmethod
     async def send_group_message(db: Session, group_id: str, message: str):
         """Send message to WhatsApp group"""
-        # TODO: Implement group messaging
-        pass
+        if not group_id.endswith("@g.us"):
+            raise ValueError("Invalid WhatsApp group id")
+        await WhatsAppService.send_whatsapp_message(group_id, message)
+        return {"success": True, "group_id": group_id}
     
     # ═══════════════════════════════════════════════════════════════════════════
     # MARKET INTELLIGENCE

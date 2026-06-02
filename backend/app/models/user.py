@@ -35,6 +35,7 @@ class UserRole(str, enum.Enum):
     # Level 100 — DB seed only, Email + Password + Hardware MFA
     ADMIN = "admin"  # Legacy alias for SUPER_ADMIN
     SUPER_ADMIN = "super_admin"
+    ACADEMY_ADMIN = "academy_admin"
 
 
 class UserStatus(str, enum.Enum):
@@ -163,6 +164,7 @@ class User(Base):
     offers_received = relationship("Offer", back_populates="seller", foreign_keys="Offer.seller_id")
     orders_as_buyer = relationship("Order", back_populates="buyer", foreign_keys="Order.buyer_id")
     orders_as_seller = relationship("Order", back_populates="seller", foreign_keys="Order.seller_id")
+    payments = relationship("Payment", back_populates="user", lazy="dynamic")
 
     dynamic_role = relationship("Role", back_populates="users")
     sessions = relationship("UserSession", back_populates="user", lazy="dynamic")

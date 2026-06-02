@@ -742,8 +742,8 @@ def get_certificate(
         if current_agent.status.value in ("trainee", "TRAINEE", "pending"):
             current_agent.status = AgentStatus.ACTIVE
             db.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"Failed to update agent status to ACTIVE after certification: {e}")
 
     issued_str = certified_at.strftime("%d %B %Y")
     expiry_str = expiry.strftime("%d %B %Y")

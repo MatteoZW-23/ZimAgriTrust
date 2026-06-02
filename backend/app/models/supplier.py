@@ -14,6 +14,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 
+def _enum_values(enum_cls: type[enum.Enum]) -> list[str]:
+    return [member.value for member in enum_cls]
+
+
 # ============================================================================
 # ENUMS
 # ============================================================================
@@ -80,6 +84,23 @@ class SupplierOrderStatus(str, enum.Enum):
     REFUNDED = "refunded"
 
 
+SUPPLIER_ORDER_STATUS_TRANSITIONS: dict[SupplierOrderStatus, set[SupplierOrderStatus]] = {
+    SupplierOrderStatus.NEW: {SupplierOrderStatus.CONFIRMED, SupplierOrderStatus.CANCELLED},
+    SupplierOrderStatus.CONFIRMED: {SupplierOrderStatus.PROCESSING, SupplierOrderStatus.SHIPPED, SupplierOrderStatus.CANCELLED},
+    SupplierOrderStatus.PROCESSING: {SupplierOrderStatus.SHIPPED, SupplierOrderStatus.CANCELLED},
+    SupplierOrderStatus.SHIPPED: {SupplierOrderStatus.DELIVERED, SupplierOrderStatus.CANCELLED},
+    SupplierOrderStatus.DELIVERED: set(),
+    SupplierOrderStatus.CANCELLED: {SupplierOrderStatus.REFUNDED},
+    SupplierOrderStatus.REFUNDED: set(),
+}
+
+
+def can_transition_supplier_order_status(
+    current: SupplierOrderStatus, next_status: SupplierOrderStatus
+) -> bool:
+    return next_status in SUPPLIER_ORDER_STATUS_TRANSITIONS.get(current, set())
+
+
 class SupplierPaymentStatus(str, enum.Enum):
     PENDING = "pending"
     ESCROW = "escrow"
@@ -110,7 +131,10 @@ class SupplierProfile(Base):
     business_name: Mapped[str] = mapped_column(String(200), nullable=False)
     registration_number: Mapped[Optional[str]] = mapped_column(String(100), unique=True, nullable=True)
     tax_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    business_type: Mapped[Optional[SupplierBusinessType]] = mapped_column(Enum(SupplierBusinessType), nullable=True)
+    business_type: Mapped[Optional[SupplierBusinessType]] = mapped_column(
+        Enum(SupplierBusinessType, values_callable=_enum_values, name="supplierbusinesstype"),
+        nullable=True
+    )
     years_in_operation: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     physical_address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     contact_person: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -121,7 +145,8 @@ class SupplierProfile(Base):
 
     # Verification
     verification_status: Mapped[SupplierVerificationStatus] = mapped_column(
-        Enum(SupplierVerificationStatus), default=SupplierVerificationStatus.PENDING
+        Enum(SupplierVerificationStatus, values_callable=_enum_values, name="supplierverificationstatus"),
+        default=SupplierVerificationStatus.PENDING
     )
     verification_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     verified_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
@@ -192,9 +217,18 @@ class SupplierProduct(Base):
     sku: Mapped[Optional[str]] = mapped_column(String(50), unique=True, nullable=True)
 
     # Type & Category
-    product_type: Mapped[SupplierProductType] = mapped_column(Enum(SupplierProductType), nullable=False)
-    input_category: Mapped[Optional[InputCategory]] = mapped_column(Enum(InputCategory), nullable=True)
-    machinery_category: Mapped[Optional[MachineryCategory]] = mapped_column(Enum(MachineryCategory), nullable=True)
+    product_type: Mapped[SupplierProductType] = mapped_column(
+        Enum(SupplierProductType, values_callable=_enum_values, name="supplierproducttype"),
+        nullable=False
+    )
+    input_category: Mapped[Optional[InputCategory]] = mapped_column(
+        Enum(InputCategory, values_callable=_enum_values, name="supplierinputcategory"),
+        nullable=True
+    )
+    machinery_category: Mapped[Optional[MachineryCategory]] = mapped_column(
+        Enum(MachineryCategory, values_callable=_enum_values, name="suppliermachinerycategory"),
+        nullable=True
+    )
 
     # Core details
     name: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -212,7 +246,10 @@ class SupplierProduct(Base):
     safety_data_sheet_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     # Machinery-specific fields
-    condition: Mapped[Optional[ProductCondition]] = mapped_column(Enum(ProductCondition), nullable=True)
+    condition: Mapped[Optional[ProductCondition]] = mapped_column(
+        Enum(ProductCondition, values_callable=_enum_values, name="supplierproductcondition"),
+        nullable=True
+    )
     warranty_months: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     delivery_included: Mapped[bool] = mapped_column(Boolean, default=False)
     manual_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
@@ -221,7 +258,10 @@ class SupplierProduct(Base):
     photo_urls: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)  # Up to 5 images
 
     # Status
-    status: Mapped[SupplierProductStatus] = mapped_column(Enum(SupplierProductStatus), default=SupplierProductStatus.DRAFT)
+    status: Mapped[SupplierProductStatus] = mapped_column(
+        Enum(SupplierProductStatus, values_callable=_enum_values, name="supplierproductstatus"),
+        default=SupplierProductStatus.DRAFT
+    )
 
     # Boost & Promotion
     is_boosted: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -271,11 +311,19 @@ class SupplierOrder(Base):
     delivery_proof_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     
     # Logistics Integration
-    logistics_delivery_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    logistics_delivery_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True, deferred=True
+    )
 
     # Status
-    status: Mapped[SupplierOrderStatus] = mapped_column(Enum(SupplierOrderStatus), default=SupplierOrderStatus.NEW)
-    payment_status: Mapped[SupplierPaymentStatus] = mapped_column(Enum(SupplierPaymentStatus), default=SupplierPaymentStatus.PENDING)
+    status: Mapped[SupplierOrderStatus] = mapped_column(
+        Enum(SupplierOrderStatus, values_callable=_enum_values, name="supplierorderstatus"),
+        default=SupplierOrderStatus.NEW
+    )
+    payment_status: Mapped[SupplierPaymentStatus] = mapped_column(
+        Enum(SupplierPaymentStatus, values_callable=_enum_values, name="supplierpaymentstatus"),
+        default=SupplierPaymentStatus.PENDING
+    )
 
     # Promo
     promo_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
@@ -343,7 +391,10 @@ class SupplierWalletTransaction(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     supplier_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("supplier_profiles.id"), nullable=False, index=True)
     order_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("supplier_orders.id"), nullable=True)
-    txn_type: Mapped[SupplierWalletTxnType] = mapped_column(Enum(SupplierWalletTxnType), nullable=False)
+    txn_type: Mapped[SupplierWalletTxnType] = mapped_column(
+        Enum(SupplierWalletTxnType, values_callable=_enum_values, name="supplierwallettxntype"),
+        nullable=False
+    )
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     fee: Mapped[float] = mapped_column(Float, default=0.0)
     net_amount: Mapped[float] = mapped_column(Float, nullable=False)

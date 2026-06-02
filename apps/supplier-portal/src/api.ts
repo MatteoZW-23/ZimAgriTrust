@@ -4,8 +4,10 @@
 const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 
 export async function request(path, options = {}) {
+  const token = localStorage.getItem("zimagritrust_token");
   const headers = {
     ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers || {}),
   };
   const res = await fetch(`${API}${path}`, {
@@ -60,6 +62,7 @@ export const cancelOrder = (id, reason) => request(`/suppliers/orders/${id}/canc
 export const addTracking = (id, tracking_number, shipping_method) => request(`/suppliers/orders/${id}/tracking`, { method: "POST", body: JSON.stringify({ tracking_number, shipping_method }) });
 export const exportOrders = () => request("/suppliers/orders/export");
 export const generateInvoice = (id) => request(`/suppliers/orders/${id}/invoice`, { method: "POST" });
+export const requestSupplierTransport = (orderId, transportData) => request(`/suppliers/orders/${orderId}/transport`, { method: "POST", body: JSON.stringify(transportData) });
 
 // ── Wallet ────────────────────────────────────────────────────────────────────
 export const getWallet = () => request("/suppliers/wallet");
@@ -82,9 +85,20 @@ export const flagReview = (review_id) => request(`/suppliers/reviews/${review_id
 
 // ── Subscriptions ─────────────────────────────────────────────────────────────
 export const getSubscription = () => request("/suppliers/subscription");
-export const setSubscription = (plan, billing_cycle) => request(`/suppliers/subscription?plan=${plan}&billing_cycle=${billing_cycle}`, { method: "POST" });
+export const getSubscriptionPlans = () => request("/subscriptions/plans?role=supplier");
+export const setSubscription = (plan, billing_cycle) => request("/suppliers/subscription/upgrade", { method: "POST", body: JSON.stringify({ plan, billing_cycle }) });
 export const cancelSubscription = () => request("/suppliers/subscription/cancel", { method: "POST" });
 export const checkFeatureEntitlement = (feature) => request(`/suppliers/subscription/feature-check/${feature}`);
+export const getEnterpriseFeatureAccess = async () => {
+  const [teamAccounts, analytics] = await Promise.all([
+    checkFeatureEntitlement("team_accounts"),
+    checkFeatureEntitlement("advanced_analytics"),
+  ]);
+  return {
+    team_accounts: !!teamAccounts?.has_access,
+    advanced_analytics: !!analytics?.has_access,
+  };
+};
 
 // ── Logistics ────────────────────────────────────────────────────────────────
 export const createDeliveryRecord = (order_id) => request(`/suppliers/orders/${order_id}/logistics/create`, { method: "POST" });

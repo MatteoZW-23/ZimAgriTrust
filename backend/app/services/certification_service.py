@@ -1,12 +1,21 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from datetime import datetime, timedelta, timezone
 from typing import List
 import logging
+import enum
 
 from app.models.agent import Agent, AgentStatus
-from app.models.academy import AgentTraining, CertificationLevel
+from app.models.onboarding import AgentTrainingProgress
 from app.services.whatsapp_service import WhatsAppService
 from app.services.email_service import email_service
+from app.services.notification_service import notification_service
+
+
+class CertificationLevel(str, enum.Enum):
+    NOT_CERTIFIED = "not_certified"
+    CERTIFIED = "certified"
+    EXPIRED = "expired"
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +32,12 @@ class CertificationService:
         """
         now = datetime.now(timezone.utc)
         
-        # Get all active agents with certifications
-        trainings = db.query(AgentTraining).filter(
-            AgentTraining.certification_level == CertificationLevel.CERTIFIED,
-            AgentTraining.certification_expires_at.isnot(None)
+        trainings = db.query(AgentTrainingProgress).filter(
+            AgentTrainingProgress.certification_expires_at.isnot(None),
+            or_(
+                AgentTrainingProgress.certification_status == "certified",
+                AgentTrainingProgress.certification_status == "active"
+            )
         ).all()
         
         summary = {
@@ -42,7 +53,7 @@ class CertificationService:
         }
         
         for training in trainings:
-            agent = db.query(Agent).filter(Agent.id == training.agent_id).first()
+            agent = db.query(Agent).filter(Agent.id == training.application_id).first()
             if not agent or not agent.user:
                 continue
             
@@ -79,73 +90,36 @@ class CertificationService:
         return summary
     
     @staticmethod
-    def _handle_expired_certification(db: Session, agent: Agent, training: AgentTraining):
+    def _handle_expired_certification(db: Session, agent: Agent, training: AgentTrainingProgress):
         """Handle expired certification by suspending agent"""
+        training.certification_status = "expired"
+        training.review_required = True
         agent.status = AgentStatus.SUSPENDED
-        training.certification_level = CertificationLevel.TRAINEE
-        
-        # Send notification
-        msg = (
-            f"⚠️ *CERTIFICATION EXPIRED*\n\n"
-            f"Dear {agent.user.full_name},\n\n"
-            f"Your ZimAgritrust Field Agent certification has expired.\n\n"
-            f"Your account has been suspended until renewal.\n"
-            f"Please contact administration to begin the recertification process."
-        )
-        
-        try:
-            WhatsAppService.send_whatsapp_message(agent.user.phone_number, msg)
-        except Exception as e:
-            logger.error(f"Failed to send expiry notification to {agent.user.phone_number}: {e}")
-        
-        # Send email if available
-        if agent.user.email:
-            try:
-                email_service.send_template(
-                    "email.certification_expired",
-                    to=agent.user.email,
-                    context={
-                        "name": agent.user.full_name,
-                        "agent_code": agent.agent_code,
-                        "expired_date": training.certification_expires_at.strftime("%Y-%m-%d")
-                    }
-                )
-            except Exception as e:
-                logger.error(f"Failed to send expiry email to {agent.user.email}: {e}")
     
     @staticmethod
-    def _send_expiry_reminder(agent: Agent, training: AgentTraining, days_remaining: int):
+    def _send_expiry_reminder(agent: Agent, training: AgentTrainingProgress, days_remaining: int):
         """Send certification expiry reminder"""
-        expiry_date = training.certification_expires_at.strftime("%Y-%m-%d")
-        
-        msg = (
-            f"⏰ *CERTIFICATION EXPIRY REMINDER*\n\n"
-            f"Dear {agent.user.full_name},\n\n"
-            f"Your ZimAgritrust Field Agent certification expires in {days_remaining} day(s).\n\n"
-            f"📅 Expiry Date: {expiry_date}\n\n"
-            f"Please contact administration to renew your certification before expiry to avoid account suspension."
-        )
-        
         try:
-            WhatsAppService.send_whatsapp_message(agent.user.phone_number, msg)
-        except Exception as e:
-            logger.error(f"Failed to send reminder to {agent.user.phone_number}: {e}")
-        
-        # Send email if available
-        if agent.user.email:
-            try:
-                email_service.send_template(
-                    "email.certification_reminder",
-                    to=agent.user.email,
-                    context={
-                        "name": agent.user.full_name,
-                        "agent_code": agent.agent_code,
-                        "days_remaining": days_remaining,
-                        "expiry_date": expiry_date
-                    }
+            if agent.user and agent.user.phone_number:
+                WhatsAppService.send_message(
+                    agent.user.phone_number,
+                    f"Certification expires in {days_remaining} day(s). Complete renewal in academy."
                 )
-            except Exception as e:
-                logger.error(f"Failed to send reminder email to {agent.user.email}: {e}")
+            if agent.user and agent.user.email:
+                email_service.send_email(
+                    to_email=agent.user.email,
+                    subject="Certification Renewal Required",
+                    html_content=f"Your certification expires in {days_remaining} day(s). Please renew immediately."
+                )
+            notification_service.create_notification(
+                db=None,
+                user_id=agent.user_id,
+                title="Certification Renewal Required",
+                message=f"Your certification expires in {days_remaining} day(s).",
+                notification_type="certification_expiry"
+            )
+        except Exception:
+            logger.exception("Failed to send one or more certification reminders")
     
     @staticmethod
     def renew_certification(db: Session, agent_id: str, renewal_days: int = 365) -> dict:
@@ -164,45 +138,23 @@ class CertificationService:
         if not agent:
             raise ValueError("Agent not found")
         
-        training = db.query(AgentTraining).filter(AgentTraining.agent_id == agent.id).first()
+        training = db.query(AgentTrainingProgress).filter(
+            AgentTrainingProgress.application_id == agent.id
+        ).order_by(AgentTrainingProgress.updated_at.desc() if hasattr(AgentTrainingProgress, "updated_at") else AgentTrainingProgress.id.desc()).first()
         if not training:
             raise ValueError("Training record not found")
-        
-        # Calculate new expiry date
-        if training.certification_expires_at and training.certification_expires_at > datetime.now(timezone.utc):
-            # Extend from current expiry
-            new_expiry = training.certification_expires_at + timedelta(days=renewal_days)
-        else:
-            # Set from now
-            new_expiry = datetime.now(timezone.utc) + timedelta(days=renewal_days)
-        
-        training.certification_expires_at = new_expiry
-        training.certification_level = CertificationLevel.CERTIFIED
+        now = datetime.now(timezone.utc)
+        training.certification_status = "certified"
+        training.review_required = False
+        training.certification_issued_at = now
+        training.certification_expires_at = now + timedelta(days=renewal_days)
         agent.status = AgentStatus.ACTIVE
-        
         db.commit()
-        
-        # Send renewal confirmation
-        msg = (
-            f"✅ *CERTIFICATION RENEWED*\n\n"
-            f"Dear {agent.user.full_name},\n\n"
-            f"Your ZimAgritrust Field Agent certification has been successfully renewed.\n\n"
-            f"📅 New Expiry Date: {new_expiry.strftime('%Y-%m-%d')}\n\n"
-            f"Your account is now active with full portal access."
-        )
-        
-        try:
-            WhatsAppService.send_whatsapp_message(agent.user.phone_number, msg)
-        except Exception as e:
-            logger.error(f"Failed to send renewal notification: {e}")
-        
         return {
             "agent_id": str(agent.id),
-            "agent_code": agent.agent_code,
-            "certification_level": training.certification_level.value,
-            "certified_at": training.certified_at,
-            "certification_expires_at": training.certification_expires_at,
-            "agent_status": agent.status.value
+            "status": training.certification_status,
+            "issued_at": training.certification_issued_at,
+            "expires_at": training.certification_expires_at
         }
 
 

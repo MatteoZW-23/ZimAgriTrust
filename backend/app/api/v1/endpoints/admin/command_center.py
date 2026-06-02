@@ -14,6 +14,7 @@ from app.models.listing import Listing, ListingStatus
 from app.models.transaction import Order, OrderStatus
 from app.models.transaction import Transaction
 from app.models.agent import Agent
+from app.models.audit_log import AuditLog
 from app.api.deps import get_current_user, require_roles
 from app.models.user import UserRole
 
@@ -347,13 +348,19 @@ def get_recent_logs(
     """
     Retrieve recent system logs
     """
-    # This would integrate with your logging system
-    # For now, return a placeholder
+    query = db.query(AuditLog)
+    if level != "all":
+        query = query.filter(AuditLog.status == level)
+
+    logs = query.order_by(AuditLog.created_at.desc()).limit(max(1, min(limit, 500))).all()
     return [
         {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "level": "info",
-            "message": "System operational",
-            "source": "command_center"
+            "timestamp": log.created_at.isoformat() if log.created_at else None,
+            "level": log.status,
+            "message": log.action,
+            "source": log.entity_type or "audit",
+            "entity_id": log.entity_id,
+            "request_id": log.request_id,
         }
+        for log in logs
     ]

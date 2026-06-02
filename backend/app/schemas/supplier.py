@@ -180,6 +180,9 @@ class SupplierProductResponse(BaseModel):
     supplier_name: Optional[str] = None
     supplier_rating: Optional[float] = None
     supplier_verification: Optional[str] = None
+    supplier_subscription_plan: Optional[str] = None
+    supplier_badges: List[str] = []
+    visibility_weight: int = 100
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -350,6 +353,9 @@ class PublicSupplierResponse(BaseModel):
     total_sales: int
     trust_score: int
     verification_status: str
+    subscription_plan: Optional[str] = None
+    badges: List[str] = []
+    visibility_weight: int = 100
     product_categories: Optional[List[str]] = None
     physical_address: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)

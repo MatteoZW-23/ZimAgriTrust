@@ -23,6 +23,8 @@ def create_dispute(db: Session, payload: DisputeCreate, actor: User) -> Dispute:
     dispute = Dispute(**payload.model_dump())
     db.add(dispute)
     order.status = OrderStatus.DISPUTED
+    from app.services.escrow_account_service import EscrowAccountService
+    EscrowAccountService.freeze_for_order(db, order, reason=payload.description)
     db.commit()
     db.refresh(dispute)
 
@@ -61,10 +63,11 @@ def _ai_triage_dispute(db: Session, dispute: Dispute, reporter: User):
         dispute.resolution = "AI AUTO-SETTLEMENT: Low value / High-trust fast-track."
         
         # Action: Refund if buyer reported, Complete if seller reported (simple favor)
+        from app.services.escrow_service import refund_payment, release_payment
         if reporter.id == order.buyer_id:
-            order.status = OrderStatus.REFUNDED
+            refund_payment(db, order)
         else:
-            order.status = OrderStatus.COMPLETED
+            release_payment(db, order)
             
         db.commit()
         return

@@ -65,6 +65,7 @@ class SuperAdmin(Base):
     phone_number: Mapped[Optional[str]] = mapped_column(String(32))
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_root: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     last_login_ip: Mapped[Optional[str]] = mapped_column(String(45))
     failed_login_count: Mapped[int] = mapped_column(Integer, default=0)

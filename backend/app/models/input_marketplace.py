@@ -249,3 +249,21 @@ class InputPriceAlert(Base):
         UniqueConstraint("user_id", "listing_id", "category_id", "brand",
                          name="uq_input_price_alert_target"),
     )
+
+
+class InputSavedSearch(Base):
+    __tablename__ = "input_saved_searches"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    query_text: Mapped[Optional[str]] = mapped_column(String(200))
+    category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("input_categories.id"))
+    brand: Mapped[Optional[str]] = mapped_column(String(100))
+    province: Mapped[Optional[str]] = mapped_column(String(50))
+    min_price: Mapped[Optional[float]] = mapped_column(Numeric(12, 2))
+    max_price: Mapped[Optional[float]] = mapped_column(Numeric(12, 2))
+    notify_on_match: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_matched_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

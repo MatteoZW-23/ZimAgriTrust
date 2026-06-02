@@ -13,6 +13,7 @@ from app.models.transaction import Order
 from app.models.user import User, UserRole
 from app.schemas.dispute import DisputeCreate, DisputeResolve, DisputeResponse, SettlementProposal
 from app.services.dispute_service import create_dispute, resolve_dispute, propose_settlement, accept_settlement
+from app.services.notification_service import NotificationService
 
 router = APIRouter()
 
@@ -36,7 +37,18 @@ def raise_dispute(
         dispute = create_dispute_uc(cmd)
         # Convert domain entity to ORM for response
         return db.query(Dispute).filter(Dispute.id == dispute.id.value).first()
-    return create_dispute(db, payload, current_user)
+    created = create_dispute(db, payload, current_user)
+    if created and created.order:
+        for party in (created.order.buyer, created.order.seller):
+            if party:
+                import asyncio
+                try:
+                    asyncio.run(NotificationService.dispatch_event(db, party, "ticket_created", priority="important", TICKET_REF=str(created.id)))
+                    asyncio.run(NotificationService.dispatch_event(db, party, "ticket_assigned", priority="informational", TICKET_REF=str(created.id)))
+                except RuntimeError:
+                    loop = asyncio.get_event_loop()
+                    loop.create_task(NotificationService.dispatch_event(db, party, "ticket_created", priority="important", TICKET_REF=str(created.id)))
+    return created
 
 
 @router.get("", response_model=list[DisputeResponse])
@@ -91,6 +103,14 @@ async def upload_evidence(
         f"{memo}\nEvidence uploaded by {current_user.id}: {', '.join(uploaded)}"
     ).strip()
     db.commit()
+    if dispute.order:
+        for party in (dispute.order.buyer, dispute.order.seller):
+            if party:
+                import asyncio
+                try:
+                    asyncio.run(NotificationService.dispatch_event(db, party, "ticket_replied", priority="informational", TICKET_REF=str(dispute.id)))
+                except RuntimeError:
+                    asyncio.get_event_loop().create_task(NotificationService.dispatch_event(db, party, "ticket_replied", priority="informational", TICKET_REF=str(dispute.id)))
 
     return {"uploaded": uploaded, "count": len(uploaded)}
 
@@ -116,7 +136,19 @@ def resolve_case(
         resolve_dispute_uc(cmd)
         db.refresh(dispute)
         return dispute
-    return resolve_dispute(db, dispute, payload)
+    resolved = resolve_dispute(db, dispute, payload)
+    if resolved and resolved.order:
+        for party in (resolved.order.buyer, resolved.order.seller):
+            if party:
+                import asyncio
+                try:
+                    asyncio.run(NotificationService.dispatch_event(db, party, "ticket_resolved", priority="important", TICKET_REF=str(resolved.id)))
+                    asyncio.run(NotificationService.dispatch_event(db, party, "ticket_closed", priority="informational", TICKET_REF=str(resolved.id)))
+                    asyncio.run(NotificationService.dispatch_event(db, party, "ticket_satisfaction_request", priority="informational", TICKET_REF=str(resolved.id)))
+                except RuntimeError:
+                    loop = asyncio.get_event_loop()
+                    loop.create_task(NotificationService.dispatch_event(db, party, "ticket_resolved", priority="important", TICKET_REF=str(resolved.id)))
+    return resolved
 
 
 @router.post("/{dispute_id}/propose-settlement", response_model=DisputeResponse)

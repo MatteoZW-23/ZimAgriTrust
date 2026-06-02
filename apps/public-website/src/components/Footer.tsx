@@ -20,6 +20,8 @@ export default function Footer({ onOpenAuth }) {
  platform: [
  { label: 'Marketplace', to: '/', scrollTo: 'marketplace' },
  { label: 'Features', to: '/', scrollTo: 'features' },
+ { label: 'Supplier Marketplace', to: '/supplier-products' },
+ { label: 'Become a Supplier', to: '/suppliers' },
  { label: 'Join as Driver', to: '/driver-join' },
  { label: 'Become an Agent', to: '/agent-join' },
  ],
@@ -47,11 +49,12 @@ export default function Footer({ onOpenAuth }) {
  return (
  <footer className="bg-earth-900 text-white"><div className="container-custom py-16">{/* Main Footer Content */}
  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 lg:gap-8">{/* Brand Column */}
- <div className="lg:col-span-4"><Link to="/" className="flex items-center gap-3 mb-6"><div className="w-12 h-12 rounded-xl bg-primary-600 flex items-center justify-center overflow-hidden"><img 
+ <div className="lg:col-span-4"><Link to="/" className="flex items-center gap-3 mb-6"><div className="logo-surface">
+ <img
  src={logo} 
  alt="ZimAgritrust Logo" 
- className="w-8 h-8 object-contain"
- /></div><span className="font-display font-bold text-2xl text-white">Zim<span className="text-primary-400">Agri</span>trust
+ className="brand-mark"
+ /></div><span className="font-display font-bold text-2xl text-white">Zim<span className="text-secondary-300">Agri</span>Trust
  </span></Link><p className="text-earth-300 leading-relaxed mb-6">Connecting farmers directly with buyers across Zimbabwe. Trade crops safely with secure payments and reliable delivery.
  </p><div className="flex gap-3">{socialLinks.map((social) => (
  <a

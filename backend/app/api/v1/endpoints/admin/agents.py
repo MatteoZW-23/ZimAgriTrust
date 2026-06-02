@@ -33,7 +33,6 @@ def admin_view_practical_results(
     _: User = Depends(require_roles(UserRole.ADMIN)),
 ):
     """Admin view of an agent's practical assessment results (4 sub-tests)."""
-    from app.models.academy import PracticalAssessment, PracticalTestType
     rows = db.query(PracticalAssessment).filter(PracticalAssessment.agent_id == agent_id).all()
     by_type = {}
     for r in rows:
@@ -58,7 +57,6 @@ def admin_view_shadowing(
     _: User = Depends(require_roles(UserRole.ADMIN)),
 ):
     """Admin view of an agent's shadowing logs."""
-    from app.models.academy import ShadowingLog, ShadowingStatus
     rows = (
         db.query(ShadowingLog)
         .filter(ShadowingLog.agent_id == agent_id)
@@ -93,7 +91,6 @@ def admin_view_supervised(
     _: User = Depends(require_roles(UserRole.ADMIN)),
 ):
     """Admin view of an agent's supervised independent reviews."""
-    from app.models.academy import SupervisedTaskReview
     rows = (
         db.query(SupervisedTaskReview)
         .filter(SupervisedTaskReview.agent_id == agent_id)

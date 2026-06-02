@@ -62,8 +62,13 @@ def evaluate_shadowing(
     """Senior agent evaluation of an applicant's field performance"""
     return OnboardingService.log_shadowing(db, application_id, current_user, payload.dict())
 
-from app.services.academy_service import academy_service
 from app.models.recruitment import AgentApplication, ApplicationStatus
+from app.models.classroom import Resource, ResourceType, QuizQuestion, QuizAttempt, Enrollment
+from app.models.agent import AgentStatus, Agent
+from app.models.onboarding import AgentTrainingProgress
+from datetime import datetime, timezone, timedelta
+import random
+import hashlib
 
 @router.get("/exam")
 def get_certification_exam(application_id: uuid.UUID, db: Session = Depends(get_db)):
@@ -75,9 +80,34 @@ def get_certification_exam(application_id: uuid.UUID, db: Session = Depends(get_
     if application.status == ApplicationStatus.APPLIED:
         raise HTTPException(status_code=403, detail="Application Pending. Please wait for supervisor documentation approval before starting exams.")
     
-    questions = academy_service.get_random_exam(10) # 10 questions for harder test
-    # Hide correct answers before serving
-    return [{"id": q["id"], "question": q["question"], "options": q["options"]} for q in questions]
+    quiz_resources = db.query(Resource).filter(Resource.resource_type == ResourceType.QUIZ).all()
+    if not quiz_resources:
+        raise HTTPException(status_code=404, detail="No published academy exam configured")
+    pool = []
+    for r in quiz_resources:
+        for q in db.query(QuizQuestion).filter(QuizQuestion.resource_id == r.id).all():
+            pool.append({"resource_id": r.id, "question": q})
+    random.shuffle(pool)
+    selected = pool[: min(200, len(pool))]
+    if len(selected) == 0:
+        raise HTTPException(status_code=400, detail="Question bank is empty")
+
+    attempt = QuizAttempt(
+        enrollment_id=db.query(Enrollment).filter(Enrollment.agent_id == application.agent_id).first().id if application.agent_id else None,
+        resource_id=selected[0]["resource_id"],
+        answers={"exam_session": hashlib.sha256(f"{application_id}-{datetime.now(timezone.utc).isoformat()}".encode()).hexdigest()},
+        started_at=datetime.now(timezone.utc),
+    )
+    db.add(attempt)
+    db.commit()
+    db.refresh(attempt)
+    return {
+        "attempt_id": str(attempt.id),
+        "duration_minutes": 60,
+        "max_attempts": 2,
+        "pass_mark": 80,
+        "questions": [{"id": str(x["question"].id), "question": x["question"].question_text, "options": x["question"].options, "type": x["question"].question_type.value} for x in selected]
+    }
 
 @router.post("/exam/submit")
 def submit_certification_exam(
@@ -86,18 +116,37 @@ def submit_certification_exam(
     db: Session = Depends(get_db)
 ):
     """Phase 6: Self-mark exam and return results"""
-    grade_report = academy_service.grade_exam(answers)
-    
-    if grade_report["passed"]:
-        # Update training to 5/5 if they passed
-        application = db.query(AgentApplication).filter(AgentApplication.id == application_id).first()
-        if application:
-            # Step 5 Complete -> Move to Step 6: Practical Assessment (Master Plan)
-            application.training_modules_completed = ["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10", "FINAL_EXAM"]
-            application.status = ApplicationStatus.EXAM_PASSED
-            db.commit()
-            
-    return grade_report
+    application = db.query(AgentApplication).filter(AgentApplication.id == application_id).first()
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    training = db.query(AgentTrainingProgress).filter(AgentTrainingProgress.application_id == application.id).first()
+    if not training:
+        training = AgentTrainingProgress(application_id=application.id, status="in_progress")
+        db.add(training)
+        db.flush()
+    training.final_exam_attempts = (training.final_exam_attempts or 0) + 1
+    score = float(answers.get("score", 0))
+    passed = score >= 80.0
+    training.final_exam_score = score
+    if passed:
+        now = datetime.now(timezone.utc)
+        training.certification_status = "certified"
+        training.certification_level = "CERTIFIED"
+        training.certification_issued_at = now
+        training.certification_expires_at = now + timedelta(days=365)
+        training.certificate_id = f"ZAT-CERT-{str(application.id)[:8].upper()}"
+        training.qr_verification_code = hashlib.sha256(training.certificate_id.encode()).hexdigest()
+        training.review_required = False
+        application.status = ApplicationStatus.EXAM_PASSED
+        if application.user_id:
+            agent = db.query(Agent).filter(Agent.user_id == application.user_id).first()
+            if agent:
+                agent.status = AgentStatus.ACTIVE
+    elif training.final_exam_attempts >= 2:
+        training.review_required = True
+        training.certification_status = "review_required"
+    db.commit()
+    return {"passed": passed, "score": score, "attempts": training.final_exam_attempts, "status": training.certification_status}
 
 @router.get("/status/{application_id}")
 def get_onboarding_status(application_id: uuid.UUID, db: Session = Depends(get_db)):

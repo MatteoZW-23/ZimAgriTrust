@@ -459,8 +459,8 @@ async def logout(
                 ).first()
                 if session:
                     await revoke_session(db, session.id, reason="logout")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to revoke session during logout: {e}")
 
     # Audit
     audit = SecurityAuditLog(

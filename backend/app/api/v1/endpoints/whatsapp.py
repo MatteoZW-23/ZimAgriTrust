@@ -3,7 +3,7 @@ Unified WhatsApp API Endpoints
 Includes: Core messaging, webhooks, enhanced features, bulk operations
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Body, Request
+from fastapi import APIRouter, Depends, HTTPException, Body, Header, Request
 from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
@@ -18,6 +18,9 @@ from app.services.whatsapp_service import whatsapp_service
 from app.services.auth_service import build_phone_lookup_candidates
 from app.api.deps import get_current_user, require_roles
 from app.core.config import settings
+from app.models.listing import Sector
+from app.schemas.listing import ListingCreate
+from app.services.marketplace_service import marketplace_core
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -98,14 +101,54 @@ class MarketDemandRequest(BaseModel):
     days_ahead: int = 7
 
 
+class WhatsAppListingCreateRequest(BaseModel):
+    phone: str
+    crop: str
+    quantity: float
+    quantity_unit: str = "kg"
+    price_per_unit: float
+    currency: str = "USD"
+    province: Optional[str] = None
+    district: Optional[str] = None
+    grade: Optional[str] = None
+
+
+class WhatsAppRecipientQuery(BaseModel):
+    target_role: Optional[UserRole] = None
+    province_filter: Optional[str] = None
+    verified_only: bool = False
+    limit: int = 1000
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # CORE WEBHOOK ENDPOINTS
 # ═══════════════════════════════════════════════════════════════════════════
 
 @router.post("/webhook")
-async def whatsapp_webhook(data: Dict[str, Any] = Body(...), db: Session = Depends(get_db)):
-    """Handles incoming messages from the WhatsApp bridge"""
+async def whatsapp_webhook(
+    data: Dict[str, Any] = Body(...),
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """Handles incoming messages from the WhatsApp bridge with signature verification"""
     try:
+        # Verify webhook signature if configured
+        signature = request.headers.get("X-WhatsApp-Signature") if request else None
+        if settings.WHATSAPP_WEBHOOK_SECRET and signature:
+            import hmac
+            import hashlib
+            raw_body = await request.body() if request else b""
+            expected = hmac.new(
+                settings.WHATSAPP_WEBHOOK_SECRET.encode(),
+                raw_body,
+                hashlib.sha256
+            ).hexdigest()
+            if not hmac.compare_digest(signature, expected):
+                logger.warning("WhatsApp webhook signature mismatch")
+                raise HTTPException(status_code=403, detail="Invalid signature")
+        elif settings.WHATSAPP_WEBHOOK_SECRET and not signature:
+            logger.warning("WhatsApp webhook missing signature")
+            raise HTTPException(status_code=403, detail="Missing signature")
         sender_phone = data.get("from")
         
         # Ignore broadcasts, newsletters, and groups
@@ -138,6 +181,68 @@ async def whatsapp_webhook(data: Dict[str, Any] = Body(...), db: Session = Depen
         raise HTTPException(status_code=500, detail="WhatsApp service error")
 
 
+@router.post("/listings")
+async def create_listing_from_whatsapp(
+    payload: WhatsAppListingCreateRequest,
+    x_internal_service_token: str = Header("", alias="X-Internal-Service-Token"),
+    db: Session = Depends(get_db),
+):
+    if not settings.INTERNAL_SERVICE_TOKEN or x_internal_service_token != settings.INTERNAL_SERVICE_TOKEN:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    candidates = build_phone_lookup_candidates(payload.phone)
+    user = db.query(User).filter(User.phone_number.in_(candidates)).first() if candidates else None
+    if not user:
+        raise HTTPException(status_code=404, detail="Registered WhatsApp user not found")
+    if user.role != UserRole.FARMER:
+        raise HTTPException(status_code=403, detail="Only farmers can create crop listings")
+
+    listing = marketplace_core.create_listing(
+        db,
+        user,
+        ListingCreate(
+            sector=Sector.CROPS,
+            product_type=payload.crop,
+            grade=payload.grade or "Standard",
+            quantity=payload.quantity,
+            quantity_unit=payload.quantity_unit,
+            price_per_unit=payload.price_per_unit,
+            currency=payload.currency.upper(),
+            location_province=payload.province,
+            location_district=payload.district,
+        ),
+    )
+    return {"id": str(listing.id), "status": listing.status.value, "product_type": listing.product_type}
+
+
+@router.post("/recipients")
+async def get_whatsapp_recipients(
+    payload: WhatsAppRecipientQuery,
+    x_internal_service_token: str = Header("", alias="X-Internal-Service-Token"),
+    db: Session = Depends(get_db),
+):
+    if not settings.INTERNAL_SERVICE_TOKEN or x_internal_service_token != settings.INTERNAL_SERVICE_TOKEN:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    query = db.query(User).filter(User.is_active.is_(True), User.is_suspended.is_(False))
+    if payload.target_role:
+        query = query.filter(User.role == payload.target_role)
+    if payload.province_filter:
+        query = query.filter(User.province == payload.province_filter)
+    if payload.verified_only:
+        query = query.filter(User.is_phone_verified.is_(True))
+
+    limit = max(1, min(payload.limit, 5000))
+    users = query.limit(limit).all()
+    return {
+        "recipients": [
+            {"phone": user.phone_number, "name": user.full_name, "role": user.role.value}
+            for user in users
+            if user.phone_number
+        ]
+    }
+
+
 @router.get("/webhook")
 async def verify_webhook(request: Request):
     """Standard WhatsApp Webhook verification (GET challenge)"""
@@ -159,10 +264,6 @@ async def verify_webhook(request: Request):
 async def get_whatsapp_status():
     """Checks the connectivity status of the WhatsApp bridge"""
     return await whatsapp_service.get_status()
-
-
-# REMOVED: /test-alert endpoint - Development-only, not for production
-
 
 def send_notification(to_phone: str, message: str):
     """Utility function to send a message to a user via WhatsApp Bridge"""

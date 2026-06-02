@@ -1,189 +1,117 @@
-import React, { useState, useEffect } from 'react';
-import { getSubscription, cancelSubscription, checkFeatureEntitlement } from '../api.ts';
-import { CreditCard, CheckCircle, XCircle, Zap, Shield, TrendingUp, AlertCircle } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { CheckCircle, Crown, TrendingUp } from 'lucide-react';
+import { getEnterpriseFeatureAccess, getSubscription, getSubscriptionPlans, setSubscription } from '../api.ts';
 
 export function SubscriptionManagement() {
-  const [subscription, setSubscription] = useState(null);
+  const [subscription, setCurrent] = useState(null);
+  const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [cancelling, setCancelling] = useState(false);
-  const [featureChecks, setFeatureChecks] = useState({});
+  const [error, setError] = useState('');
+  const [entitlements, setEntitlements] = useState({ team_accounts: false, advanced_analytics: false });
 
-  const features = [
-    { key: 'bulk_upload', name: 'Bulk CSV Upload', icon: Zap },
-    { key: 'analytics', name: 'Advanced Analytics', icon: TrendingUp },
-    { key: 'priority_support', name: 'Priority Support', icon: Shield },
-    { key: 'custom_branding', name: 'Custom Branding', icon: CreditCard },
-  ];
-
-  useEffect(() => {
-    loadSubscription();
-  }, []);
-
-  const loadSubscription = async () => {
+  const load = async () => {
+    setLoading(true);
+    setError('');
     try {
-      const data = await getSubscription();
-      setSubscription(data);
-      const checks = {};
-      for (const feature of features) {
-        try {
-          const result = await checkFeatureEntitlement(feature.key);
-          checks[feature.key] = result.has_access;
-        } catch {
-          checks[feature.key] = false;
-        }
-      }
-      setFeatureChecks(checks);
+      const [current, availablePlans, enterpriseAccess] = await Promise.all([getSubscription(), getSubscriptionPlans(), getEnterpriseFeatureAccess()]);
+      setCurrent(current);
+      setPlans(availablePlans);
+      setEntitlements(enterpriseAccess);
     } catch (err) {
-      console.error('Failed to load subscription:', err);
+      setError(err.message || 'Unable to load memberships');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCancel = async () => {
-    if (!confirm('Are you sure you want to cancel your subscription?')) return;
-    setCancelling(true);
+  useEffect(() => {
+    load();
+  }, []);
+
+  const activate = async (code) => {
+    setError('');
     try {
-      await cancelSubscription();
-      loadSubscription();
+      await setSubscription(code, 'MONTHLY');
+      await load();
     } catch (err) {
-      console.error('Failed to cancel subscription:', err);
-    } finally {
-      setCancelling(false);
+      setError(err.message || 'Unable to update membership');
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
+    return <div className="rounded-2xl bg-white p-8 font-black text-earth-500">Loading membership...</div>;
   }
 
-  const planColors = {
-    basic: 'bg-gray-100 text-gray-700',
-    pro: 'bg-blue-100 text-blue-700',
-    enterprise: 'bg-purple-100 text-purple-700',
-  };
+  const currentCode = subscription?.subscription_plan || subscription?.plan?.code || 'basic';
+  const savings = subscription?.savings || {};
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-2xl shadow-lg p-6">
-        <h3 className="text-lg font-black text-earth-800 mb-4">Current Subscription</h3>
-        {subscription ? (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-earth-50 rounded-xl">
-              <div className="flex items-center gap-4">
-                <div className={`w-12 h-12 ${planColors[subscription.subscription_plan] || planColors.basic} rounded-xl flex items-center justify-center`}>
-                  <CreditCard className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-2xl font-black text-earth-800 capitalize">{subscription.subscription_plan}</p>
-                  <p className="text-sm text-earth-600 capitalize">{subscription.subscription_status}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-earth-500">Billing Cycle</p>
-                <p className="font-bold text-earth-800 capitalize">{subscription.billing_cycle}</p>
-              </div>
-            </div>
+      <div className="rounded-[2rem] bg-gradient-to-br from-primary-700 to-earth-900 text-white p-8 relative overflow-hidden">
+        <Crown className="absolute right-8 top-8 opacity-20" size={120} />
+        <p className="text-xs font-black uppercase tracking-[0.3em] text-primary-100">Supplier Membership</p>
+        <h2 className="text-3xl font-black mt-3">Grow with lower sales fees and stronger product visibility.</h2>
+        <p className="mt-3 max-w-2xl font-bold text-primary-50">Subscriptions never block orders. They reduce fees, improve ranking, and unlock supplier growth tools.</p>
+      </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-earth-50 rounded-xl p-4">
-                <p className="text-sm text-earth-500">Start Date</p>
-                <p className="font-bold text-earth-800">{new Date(subscription.subscription_start_date).toLocaleDateString()}</p>
-              </div>
-              <div className="bg-earth-50 rounded-xl p-4">
-                <p className="text-sm text-earth-500">End Date</p>
-                <p className="font-bold text-earth-800">{new Date(subscription.subscription_end_date).toLocaleDateString()}</p>
-              </div>
-            </div>
+      {error && <div className="rounded-xl bg-red-50 text-red-700 p-4 font-bold">{error}</div>}
 
-            {subscription.subscription_status === 'active' && (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Metric label="Current Plan" value={(subscription?.plan?.name || currentCode).toUpperCase()} helper={`${subscription?.plan?.platform_fee_percent || 8}% sales fee`} />
+        <Metric label="Total Fees Paid" value={`$${Number(savings.total_fees_paid || 0).toFixed(2)}`} helper="From completed supplier sales" />
+        <Metric label="Total Fees Saved" value={`$${Number(savings.total_fees_saved || 0).toFixed(2)}`} helper="Compared with Basic fees" />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Metric label="Team Accounts" value={entitlements.team_accounts ? "ENABLED" : "LOCKED"} helper="Enterprise feature access" />
+        <Metric label="Advanced Analytics" value={entitlements.advanced_analytics ? "ENABLED" : "LOCKED"} helper="Enterprise feature access" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {plans.map((plan) => {
+          const active = currentCode === plan.code;
+          return (
+            <article key={plan.code} className={`bg-white rounded-[2rem] p-6 border-2 ${active ? 'border-primary-500 shadow-xl' : 'border-earth-100'}`}>
+              <div className="flex justify-between gap-3">
+                <h3 className="text-2xl font-black text-earth-900">{plan.name}</h3>
+                {active && <span className="h-fit rounded-full bg-primary-100 text-primary-700 px-3 py-1 text-xs font-black">ACTIVE</span>}
+              </div>
+              <div className="mt-5">
+                <span className="text-4xl font-black text-earth-900">${plan.monthly_price}</span>
+                <span className="font-bold text-earth-400"> / month</span>
+              </div>
+              <div className="mt-4 flex items-center gap-2 text-primary-700 font-black">
+                <TrendingUp size={18} />
+                {plan.platform_fee_percent}% supplier sales fee
+              </div>
+              <ul className="mt-6 space-y-3">
+                {plan.features.map((feature) => (
+                  <li key={feature} className="flex gap-3 text-sm font-bold text-earth-600">
+                    <CheckCircle size={18} className="text-primary-600 shrink-0 mt-0.5" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
               <button
-                onClick={handleCancel}
-                disabled={cancelling}
-                className="w-full py-3 bg-red-100 text-red-700 font-black rounded-xl hover:bg-red-200 transition-colors disabled:opacity-50"
+                onClick={() => activate(plan.code)}
+                disabled={active}
+                className={`mt-8 w-full rounded-xl py-3 font-black ${active ? 'bg-earth-100 text-earth-400' : 'bg-primary-600 text-white hover:bg-primary-700'}`}
               >
-                {cancelling ? 'Cancelling...' : 'Cancel Subscription'}
+                {active ? 'Current Plan' : `Move to ${plan.name}`}
               </button>
-            )}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <AlertCircle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
-            <p className="text-earth-600 font-bold mb-4">No active subscription</p>
-            <button className="px-6 py-3 bg-primary-600 text-white font-black rounded-xl hover:bg-primary-700 transition-colors">
-              Choose a Plan
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-lg p-6">
-        <h3 className="text-lg font-black text-earth-800 mb-4">Feature Entitlements</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {features.map((feature) => (
-            <FeatureCard key={feature.key} feature={feature} hasAccess={featureChecks[feature.key]} />
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-lg p-6">
-        <h3 className="text-lg font-black text-earth-800 mb-4">Plan Comparison</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b-2 border-earth-100">
-                <th className="text-left py-3 text-sm font-black text-earth-600 uppercase">Feature</th>
-                <th className="text-center py-3 text-sm font-black text-earth-600 uppercase">Basic</th>
-                <th className="text-center py-3 text-sm font-black text-earth-600 uppercase">Pro</th>
-                <th className="text-center py-3 text-sm font-black text-earth-600 uppercase">Enterprise</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { feature: 'Products Limit', basic: '50', pro: '200', enterprise: 'Unlimited' },
-                { feature: 'Bulk Upload', basic: '❌', pro: '✅', enterprise: '✅' },
-                { feature: 'Analytics', basic: 'Basic', pro: 'Advanced', enterprise: 'Full' },
-                { feature: 'Priority Support', basic: '❌', pro: '✅', enterprise: '✅' },
-                { feature: 'Custom Branding', basic: '❌', pro: '❌', enterprise: '✅' },
-                { feature: 'API Access', basic: '❌', pro: '✅', enterprise: '✅' },
-              ].map((row, i) => (
-                <tr key={i} className="border-b border-earth-50">
-                  <td className="py-3 font-bold text-earth-800">{row.feature}</td>
-                  <td className="py-3 text-center text-earth-600">{row.basic}</td>
-                  <td className="py-3 text-center text-earth-600">{row.pro}</td>
-                  <td className="py-3 text-center text-earth-600">{row.enterprise}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            </article>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function FeatureCard({ feature, hasAccess }) {
-  const Icon = feature.icon;
+function Metric({ label, value, helper }) {
   return (
-    <div className={`p-4 rounded-xl ${hasAccess ? 'bg-green-50' : 'bg-gray-50'}`}>
-      <div className="flex items-center gap-3 mb-2">
-        <Icon className={`w-5 h-5 ${hasAccess ? 'text-green-600' : 'text-gray-400'}`} />
-        <span className="font-bold text-earth-800">{feature.name}</span>
-      </div>
-      <div className="flex items-center gap-2">
-        {hasAccess ? (
-          <CheckCircle className="w-4 h-4 text-green-600" />
-        ) : (
-          <XCircle className="w-4 h-4 text-gray-400" />
-        )}
-        <span className={`text-sm ${hasAccess ? 'text-green-700' : 'text-gray-500'}`}>
-          {hasAccess ? 'Available' : 'Not Available'}
-        </span>
-      </div>
+    <div className="bg-white rounded-2xl p-6 border border-earth-100">
+      <p className="text-xs font-black uppercase tracking-widest text-earth-400">{label}</p>
+      <p className="text-2xl font-black text-earth-900 mt-2">{value}</p>
+      <p className="text-sm font-bold text-earth-500 mt-1">{helper}</p>
     </div>
   );
 }

@@ -144,6 +144,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             "/api/v1/auth/supplier/login",
             "/api/v1/auth/staff/login",
             "/api/v1/public",
+            "/api/v1/subscriptions",
         ):
             if path.startswith(prefix):
                 return True

@@ -99,6 +99,9 @@ def login_step_1(
         db.commit()
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
+    if not account.hardware_mfa_secret and not account.yubikey_public_id:
+        raise HTTPException(status_code=403, detail="MFA enrollment required before super admin login")
+
     pre_mfa = create_super_admin_pre_mfa_token(account.id)
     return {
         "status": "MFA_REQUIRED",
@@ -205,7 +208,16 @@ def seed_super_admin(
     phone_number: Optional[str] = None,
     ip_whitelist: Optional[list[str]] = None,
     created_by: Optional[int] = None,
+    is_root: bool = False,
 ) -> SuperAdmin:
+    existing_count = db.query(SuperAdmin).count()
+    root_count = db.query(SuperAdmin).filter(SuperAdmin.is_root.is_(True)).count()
+    if existing_count >= 3:
+        raise ValueError("super admin account limit reached (max 3)")
+    if is_root and root_count >= 3:
+        raise ValueError("root super admin limit reached (max 3)")
+    if existing_count > 0 and not bool(getattr(settings, "ALLOW_SUPER_ADMIN_SEED_AFTER_BOOTSTRAP", False)):
+        raise ValueError("super admin bootstrap is locked")
     if get_super_admin_by_username(db, username):
         raise ValueError(f"super admin '{username}' already exists")
     account = SuperAdmin(
@@ -217,6 +229,7 @@ def seed_super_admin(
         phone_number=phone_number,
         ip_whitelist=ip_whitelist or [],
         is_active=True,
+        is_root=is_root,
         created_by=created_by,
         created_at=datetime.now(timezone.utc),
     )
@@ -224,3 +237,54 @@ def seed_super_admin(
     db.commit()
     db.refresh(account)
     return account
+
+
+def create_super_admin_with_dual_control(
+    db: Session,
+    *,
+    actor: SuperAdmin,
+    approver_username: str,
+    approver_password: str,
+    approver_mfa_code: str,
+    approver_method: str,
+    username: str,
+    email: str,
+    password: str,
+    phone_number: Optional[str] = None,
+    hardware_mfa_secret: Optional[str] = None,
+    yubikey_public_id: Optional[str] = None,
+    ip_whitelist: Optional[list[str]] = None,
+    reason: Optional[str] = None,
+    is_root: bool = False,
+) -> SuperAdmin:
+    if not actor.is_root:
+        raise HTTPException(status_code=403, detail="Only ROOT_SUPER_ADMIN can create super admin accounts")
+    if not reason or len(reason.strip()) < 12:
+        raise HTTPException(status_code=400, detail="Creation reason is required")
+    approver = get_super_admin_by_username(db, approver_username)
+    if not approver or not approver.is_active:
+        raise HTTPException(status_code=401, detail="Approver credentials invalid")
+    if approver.id == actor.id:
+        raise HTTPException(status_code=403, detail="Approver must be a different super admin")
+    if not verify_password(approver_password, approver.password_hash):
+        raise HTTPException(status_code=401, detail="Approver credentials invalid")
+    if approver_method == "totp":
+        ok = bool(approver.hardware_mfa_secret) and verify_totp(approver.hardware_mfa_secret, approver_mfa_code)
+    elif approver_method == "yubikey":
+        ok = bool(approver.yubikey_public_id) and verify_yubikey_otp(approver_mfa_code, approver.yubikey_public_id)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid approver MFA method")
+    if not ok:
+        raise HTTPException(status_code=401, detail="Approver MFA failed")
+    return seed_super_admin(
+        db,
+        username=username,
+        email=email,
+        password=password,
+        phone_number=phone_number,
+        hardware_mfa_secret=hardware_mfa_secret,
+        yubikey_public_id=yubikey_public_id,
+        ip_whitelist=ip_whitelist,
+        created_by=actor.id,
+        is_root=is_root,
+    )

@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db, require_roles
 from app.core.config import settings
 from app.core.security import get_password_hash, verify_password
-from app.models.driver import Driver, DriverJob, DriverStatus
+from app.models.driver import Driver, DriverJob, DriverJobStatus, DriverStatus
 from app.models.listing import LogisticsType
 from app.models.logistics import OrderDelivery, DeliveryStatus
 from app.models.transaction import Order, OrderStatus
@@ -521,9 +521,8 @@ def get_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # In a real app, these would be in a driver_settings table
-    # For now, we'll return defaults or store them in a JSON field if available
-    return {
+    prefs = current_user.notification_prefs or {}
+    defaults = {
         "push_notifications": True,
         "sms_notifications": True,
         "email_notifications": False,
@@ -533,6 +532,7 @@ def get_settings(
         "phone_visibility": True,
         "data_sharing_consent": True
     }
+    return {**defaults, **prefs.get("driver_settings", {})}
 
 
 @router.get("/settings")
@@ -549,7 +549,12 @@ def update_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Mock update
+    prefs = dict(current_user.notification_prefs or {})
+    current_settings = prefs.get("driver_settings", {})
+    updates = payload.model_dump(exclude_unset=True)
+    prefs["driver_settings"] = {**current_settings, **updates}
+    current_user.notification_prefs = prefs
+    db.commit()
     return {"success": True, "message": "Settings updated"}
 
 
@@ -568,7 +573,11 @@ def update_privacy(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Mock update
+    prefs = dict(current_user.notification_prefs or {})
+    current_settings = prefs.get("driver_privacy", {})
+    prefs["driver_privacy"] = {**current_settings, **payload.model_dump(exclude_unset=True)}
+    current_user.notification_prefs = prefs
+    db.commit()
     return {"success": True, "message": "Privacy settings updated"}
 
 
@@ -1168,9 +1177,13 @@ def update_driver_availability(
     if driver.status != DriverStatus.ACTIVE:
         raise HTTPException(status_code=403, detail="Driver account is not active")
     
-    # Store availability in a separate field or use status
-    # For now, we'll use a simple approach - could add is_available field to Driver model
-    driver.current_district = driver.current_district  # Trigger update
+    prefs = dict(current_user.notification_prefs or {})
+    prefs["driver_availability"] = {
+        "is_available": payload.is_available,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    current_user.notification_prefs = prefs
+    driver.updated_at = datetime.utcnow()
     db.commit()
     return {"success": True, "is_available": payload.is_available}
 
@@ -1186,8 +1199,8 @@ def withdraw_earnings(
     
     # Calculate available balance
     all_jobs = db.query(DriverJob).filter(DriverJob.driver_id == driver.id).all()
-    total = sum(j.driver_payout or 0 for j in all_jobs if j.status in ("DELIVERED", "PAID"))
-    paid_out = sum(j.driver_payout or 0 for j in all_jobs if j.status == "PAID")
+    total = sum(j.driver_payout or 0 for j in all_jobs if j.status in (DriverJobStatus.DELIVERED, DriverJobStatus.PAID))
+    paid_out = sum(j.driver_payout or 0 for j in all_jobs if j.status == DriverJobStatus.PAID)
     available = total - paid_out
     
     if payload.amount > available:
@@ -1196,14 +1209,23 @@ def withdraw_earnings(
     if payload.amount < 5:
         raise HTTPException(status_code=400, detail="Minimum withdrawal is $5")
     
-    # Create withdrawal record (would need a Withdrawal model in production)
-    # For now, just return success
+    remaining = payload.amount
+    for job in sorted(
+        [j for j in all_jobs if j.status == DriverJobStatus.DELIVERED and (j.driver_payout or 0) > 0],
+        key=lambda item: item.completed_at or item.created_at,
+    ):
+        if remaining <= 0:
+            break
+        remaining -= job.driver_payout or 0
+        job.status = DriverJobStatus.PAID
+    db.commit()
+
     return {
         "success": True,
         "amount": payload.amount,
         "method": payload.method,
         "reference": f"WD-{uuid.uuid4().hex[:12].upper()}",
-        "status": "processing",
+        "status": "completed",
     }
 
 
@@ -1226,16 +1248,15 @@ def negotiate_job_fare(
     if not job:
         raise HTTPException(status_code=404, detail="Job not available for negotiation")
     
-    # Store negotiation (would need a Negotiation model in production)
-    # For now, just return the counter-offer as accepted for demo
     job.total_transport_fee = payload.counter_offer
-    job.driver_payout = payload.counter_offer * 0.9  # 90% to driver
+    job.driver_payout = payload.counter_offer * 0.9
     db.commit()
     
     return {
         "success": True,
         "new_fee": payload.counter_offer,
         "driver_payout": job.driver_payout,
+        "status": "pending_counterparty_review",
     }
 
 

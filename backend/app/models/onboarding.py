@@ -49,6 +49,15 @@ class AgentTrainingProgress(Base):
     quiz_score: Mapped[Optional[float]] = mapped_column(Float)
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    certification_status: Mapped[str] = mapped_column(String(30), default="not_certified")
+    certification_level: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    certificate_id: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    certification_issued_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    certification_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    qr_verification_code: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    review_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    final_exam_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    final_exam_attempts: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class AgentContract(Base):

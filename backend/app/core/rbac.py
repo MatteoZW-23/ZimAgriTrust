@@ -3,16 +3,26 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.models.agent import Agent, AgentStatus
-from app.models.academy import AgentTraining, CertificationLevel
 from app.models.user import User, UserRole
+from app.models.onboarding import AgentTrainingProgress
+from app.services.certification_service import CertificationLevel
 from datetime import datetime, timedelta, timezone
+
+TrainingProgress = AgentTrainingProgress
+
+
+def _certification_level_value(training: Optional[TrainingProgress]) -> str:
+    if not training or not training.certification_level:
+        return CertificationLevel.NOT_CERTIFIED.value
+    level = training.certification_level
+    return level.value if hasattr(level, "value") else str(level)
 
 
 class RBACService:
     """Role-Based Access Control service for Academy vs Portal access"""
     
     @staticmethod
-    def check_academy_access(agent: Agent, training: Optional[AgentTraining] = None) -> bool:
+    def check_academy_access(agent: Agent, training: Optional[TrainingProgress] = None) -> bool:
         """
         Check if agent has access to Academy (TRAINEE or ACTIVE with valid certification)
         
@@ -43,7 +53,7 @@ class RBACService:
         return True
     
     @staticmethod
-    def check_portal_access(agent: Agent, training: Optional[AgentTraining] = None) -> bool:
+    def check_portal_access(agent: Agent, training: Optional[TrainingProgress] = None) -> bool:
         """
         Check if agent has access to full Agent Portal (ACTIVE with valid certification only)
         
@@ -143,13 +153,13 @@ class RBACService:
         return True
     
     @staticmethod
-    def get_access_level(agent: Agent, training: Optional[AgentTraining] = None) -> dict:
+    def get_access_level(agent: Agent, training: Optional[TrainingProgress] = None) -> dict:
         """
         Get the current access level for an agent
         """
         access_level = {
             "agent_status": agent.status.value,
-            "certification_level": training.certification_level.value if training else CertificationLevel.TRAINEE.value,
+            "certification_level": _certification_level_value(training),
             "academy_access": False,
             "portal_access": False,
             "marketplace_access": False,

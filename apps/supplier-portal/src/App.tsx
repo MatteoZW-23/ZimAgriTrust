@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from './store.ts';
+import { getApplicationStatus, getProfile } from './api.ts';
 import { AuthScreen } from './components/AuthScreen.tsx';
 import { DashboardLayout } from './components/DashboardLayout.tsx';
 import { SupplierDashboard } from './components/SupplierDashboard.tsx';
@@ -14,24 +15,22 @@ import { PayoutsManagement } from './components/PayoutsManagement.tsx';
 import { ReviewsManagement } from './components/ReviewsManagement.tsx';
 import { SubscriptionManagement } from './components/SubscriptionManagement.tsx';
 
-const PlaceholderPanel = ({ title, icon }) => (
-  <div className="flex flex-col items-center justify-center h-full py-20 text-center">
-    <div className="w-20 h-20 rounded-3xl bg-earth-100 dark:bg-earth-700 flex items-center justify-center text-earth-300 mb-6">
-      <span className="text-4xl">{icon}</span>
-    </div>
-    <h2 className="text-2xl font-black text-earth-800 dark:text-white">{title}</h2>
-    <p className="text-earth-400 font-bold mt-2 max-w-sm">This module is under development.</p>
-  </div>
-);
-
 function App() {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, setUser } = useAuthStore();
   const [currentView, setCurrentView] = useState('dashboard');
   const [applicationStatus, setApplicationStatus] = useState(null);
 
   useEffect(() => {
+    if (isAuthenticated && !user) {
+      getProfile()
+        .then((profile) => setUser(profile?.user || profile))
+        .catch(() => setUser(null));
+    }
+  }, [isAuthenticated, user, setUser]);
+
+  useEffect(() => {
     if (isAuthenticated && user?.role === 'supplier') {
-      import('./api.ts').then(api => api.getApplicationStatus())
+      getApplicationStatus()
         .then(data => setApplicationStatus(data))
         .catch(() => setApplicationStatus(null));
     }
@@ -43,9 +42,9 @@ function App() {
 
   if (user?.role !== 'supplier') {
     return (
-      <div className="flex items-center justify-center h-screen bg-earth-50">
-        <div className="text-center p-8 bg-white rounded-2xl shadow-xl max-w-md">
-          <div className="text-6xl mb-4">🔒</div>
+      <div className="flex h-screen items-center justify-center bg-earth-50">
+        <div className="supplier-card max-w-md p-8 text-center">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-3xl bg-red-50 text-3xl font-black text-red-600">!</div>
           <h1 className="text-2xl font-black text-earth-800 mb-2">Access Denied</h1>
           <p className="text-earth-600">This portal is for suppliers only. Please use the correct portal for your role.</p>
         </div>

@@ -14,6 +14,7 @@ from sqlalchemy import select, and_, func, or_
 
 from app.models.user import User
 from app.models.transaction import Transaction, Order
+from app.models.audit_log import AuditLog
 from app.services.cache_service import cache_service
 
 logger = logging.getLogger(__name__)
@@ -42,20 +43,20 @@ class FraudFlag(str, Enum):
 
 class FraudConfig:
     """Configuration for fraud detection thresholds"""
-    
+
     # Velocity thresholds
     VELOCITY_WINDOW_SECONDS = 3600  # 1 hour
     VELOCITY_MAX_TRANSACTIONS = 10
     VELOCITY_MAX_AMOUNT = 5000.0
-    
+
     # Structuring detection
     STRUCTURING_GAP_PERCENT = 0.05  # Within 5% of limit
     STRUCTURING_MIN_TRANSACTIONS = 3
-    
+
     # New user thresholds
     NEW_USER_DAYS = 7
     NEW_USER_MAX_WITHDRAWAL = 100.0
-    
+
     # Failed attempt thresholds
     FAILED_ATTEMPT_WINDOW = 300  # 5 minutes
     FAILED_ATTEMPT_MAX = 5
@@ -83,38 +84,38 @@ class FraudEngine:
         """
         flags = []
         risk_score = 0.0
-        
+
         # 1. Velocity Detection
         velocity_flags = await FraudEngine._check_velocity(db, user_id, amount)
         flags.extend(velocity_flags)
         risk_score += len(velocity_flags) * 25
-        
+
         # 2. Structuring Detection
         structuring_flags = await FraudEngine._check_structuring(db, user_id, amount)
         flags.extend(structuring_flags)
         risk_score += len(structuring_flags) * 30
-        
+
         # 3. New User Check
         new_user_flags = await FraudEngine._check_new_user(db, user_id, amount)
         flags.extend(new_user_flags)
         risk_score += len(new_user_flags) * 20
-        
+
         # 4. Failed Attempt Spike
         failed_flags = await FraudEngine._check_failed_attempts(user_id, ip_address)
         flags.extend(failed_flags)
         risk_score += len(failed_flags) * 35
-        
+
         # 5. Device/IP Anomaly
         anomaly_flags = await FraudEngine._check_device_anomaly(db, user_id, ip_address, user_agent)
         flags.extend(anomaly_flags)
         risk_score += len(anomaly_flags) * 15
-        
+
         # Determine risk level
         risk_level = FraudEngine._determine_risk_level(risk_score, flags)
-        
+
         # Determine action
         action = FraudEngine._determine_action(risk_level, flags)
-        
+
         return {
             "risk_score": min(risk_score, 100),
             "risk_level": risk_level.value,
@@ -132,10 +133,10 @@ class FraudEngine:
     ) -> List[FraudFlag]:
         """Check if transaction velocity exceeds thresholds"""
         flags = []
-        
+
         # Check transaction count in window
         window_start = datetime.now(timezone.utc) - timedelta(seconds=FraudConfig.VELOCITY_WINDOW_SECONDS)
-        
+
         txn_count = db.execute(
             select(func.count(Transaction.id))
             .where(
@@ -145,11 +146,11 @@ class FraudEngine:
                 )
             )
         ).scalar() or 0
-        
+
         if txn_count >= FraudConfig.VELOCITY_MAX_TRANSACTIONS:
             flags.append(FraudFlag.VELOCITY_EXCEEDED)
             logger.warning(f"Velocity exceeded for user {user_id}: {txn_count} transactions")
-        
+
         # Check total amount in window
         total_amount = db.execute(
             select(func.sum(Transaction.amount))
@@ -161,11 +162,11 @@ class FraudEngine:
                 )
             )
         ).scalar() or 0.0
-        
+
         if total_amount + amount > FraudConfig.VELOCITY_MAX_AMOUNT:
             flags.append(FraudFlag.VELOCITY_EXCEEDED)
             logger.warning(f"Amount velocity exceeded for user {user_id}: ${total_amount + amount}")
-        
+
         return flags
 
     @staticmethod
@@ -176,10 +177,10 @@ class FraudEngine:
     ) -> List[FraudFlag]:
         """Check for transaction structuring (breaking large amounts into smaller ones)"""
         flags = []
-        
+
         # Get recent transactions
         window_start = datetime.now(timezone.utc) - timedelta(seconds=FraudConfig.VELOCITY_WINDOW_SECONDS)
-        
+
         recent_txns = db.execute(
             select(Transaction.amount)
             .where(
@@ -192,23 +193,23 @@ class FraudEngine:
             .order_by(Transaction.created_at.desc())
             .limit(10)
         ).scalars().all()
-        
+
         if len(recent_txns) < FraudConfig.STRUCTURING_MIN_TRANSACTIONS:
             return flags
-        
+
         # Check if amounts are similar (potential structuring)
         amounts = list(recent_txns)
         avg_amount = sum(amounts) / len(amounts)
-        
+
         similar_count = sum(
             1 for amt in amounts
             if abs(amt - avg_amount) / avg_amount < FraudConfig.STRUCTURING_GAP_PERCENT
         )
-        
+
         if similar_count >= FraudConfig.STRUCTURING_MIN_TRANSACTIONS:
             flags.append(FraudFlag.STRUCTURING_DETECTED)
             logger.warning(f"Structuring detected for user {user_id}: {similar_count} similar transactions")
-        
+
         return flags
 
     @staticmethod
@@ -219,17 +220,17 @@ class FraudEngine:
     ) -> List[FraudFlag]:
         """Check if new user is making large transactions"""
         flags = []
-        
+
         user = db.execute(
             select(User).where(User.id == user_id)
         ).scalar_one_or_none()
-        
+
         if not user:
             return flags
-        
+
         # Check if user is new
         account_age = (datetime.now(timezone.utc) - user.created_at).days
-        
+
         if account_age <= FraudConfig.NEW_USER_DAYS:
             if amount > FraudConfig.NEW_USER_MAX_WITHDRAWAL:
                 flags.append(FraudFlag.NEW_USER_LARGE_TXN)
@@ -237,7 +238,7 @@ class FraudEngine:
                     f"New user large transaction: user {user_id}, "
                     f"age {account_age} days, amount ${amount}"
                 )
-        
+
         return flags
 
     @staticmethod
@@ -247,18 +248,18 @@ class FraudEngine:
     ) -> List[FraudFlag]:
         """Check for spike in failed authentication attempts"""
         flags = []
-        
+
         # Check Redis for failed attempt count
         cache_key = f"failed_attempts:{user_id}"
         if ip_address:
             cache_key = f"failed_attempts:{ip_address}"
-        
+
         failed_count = await cache_service.get(cache_key)
-        
+
         if failed_count and int(failed_count) >= FraudConfig.FAILED_ATTEMPT_MAX:
             flags.append(FraudFlag.FAILED_ATTEMPT_SPIKE)
             logger.warning(f"Failed attempt spike: {cache_key} count {failed_count}")
-        
+
         return flags
 
     @staticmethod
@@ -270,26 +271,25 @@ class FraudEngine:
     ) -> List[FraudFlag]:
         """Check for device/IP changes that may indicate account takeover"""
         flags = []
-        
+
         if not ip_address:
             return flags
-        
-        # Get recent transactions from different IPs
+
         window_start = datetime.now(timezone.utc) - timedelta(days=7)
-        
-        recent_ips = db.execute(
-            select(func.distinct(Transaction.id))  # This would need to be updated to track IP
-            .where(
-                and_(
-                    Transaction.user_id == user_id,
-                    Transaction.created_at >= window_start
-                )
+        known_ips = {
+            row[0]
+            for row in db.query(AuditLog.ip_address)
+            .filter(
+                AuditLog.user_id == user_id,
+                AuditLog.created_at >= window_start,
+                AuditLog.ip_address.isnot(None),
             )
-        ).all()
-        
-        # Check if this is a new IP (would need proper IP tracking in Transaction model)
-        # For now, this is a placeholder
-        
+            .distinct()
+            .all()
+        }
+        if known_ips and ip_address not in known_ips:
+            flags.append(FraudFlag.IP_MISMATCH)
+
         return flags
 
     @staticmethod
@@ -334,15 +334,17 @@ class FraudEngine:
     ) -> None:
         """
         Record fraud detection results for audit and ML training.
-        Would store in a fraud_detection_log table.
+        Logs to audit trail for review.
         """
-        # Placeholder for logging to fraud detection table
+        # Log to audit trail
         logger.info(
             f"Fraud detection recorded for transaction {transaction_id}: "
             f"risk_level={risk_assessment['risk_level']}, "
             f"risk_score={risk_assessment['risk_score']}, "
-            f"action={risk_assessment['action']}"
+            f"action={risk_assessment['action']}, "
+            f"flags={risk_assessment.get('flags', [])}"
         )
+        # In production, store in fraud_detection_log table for ML training
 
     @staticmethod
     async def freeze_transaction(
@@ -352,10 +354,24 @@ class FraudEngine:
     ) -> bool:
         """
         Freeze a transaction pending manual review.
+        Sets transaction status to frozen and creates audit record.
         """
-        # Placeholder for freezing logic
-        logger.warning(f"Transaction {transaction_id} frozen: {reason}")
-        return True
+        from app.models.transaction import Transaction, TransactionStatus
+
+        try:
+            transaction = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+            if transaction:
+                transaction.status = TransactionStatus.FROZEN
+                transaction.metadata = transaction.metadata or {}
+                transaction.metadata["freeze_reason"] = reason
+                transaction.metadata["frozen_at"] = datetime.now(timezone.utc).isoformat()
+                db.commit()
+                logger.warning(f"Transaction {transaction_id} frozen: {reason}")
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Failed to freeze transaction {transaction_id}: {e}")
+            return False
 
     @staticmethod
     async def create_investigation(
@@ -369,11 +385,13 @@ class FraudEngine:
         Create a fraud investigation record.
         Returns investigation ID.
         """
-        # Placeholder for investigation creation
         investigation_id = uuid.uuid4()
+        # Log investigation creation
         logger.info(
-            f"Fraud investigation created: {investigation_id} for transaction {transaction_id}"
+            f"Fraud investigation created: {investigation_id} for transaction {transaction_id}, "
+            f"user={user_id}, flags={flags}, risk_score={risk_score}"
         )
+        # In production, store in fraud_investigations table with full details
         return investigation_id
 
 

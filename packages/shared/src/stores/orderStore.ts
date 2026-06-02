@@ -8,9 +8,22 @@ interface Order {
   farmer_id: string;
   quantity: number;
   total_price: number;
-  status: 'pending' | 'in_progress' | 'delivered' | 'completed' | 'disputed';
+  status: 'pending' | 'in_progress' | 'delivered' | 'completed' | 'disputed' | string;
   created_at: string;
+  escrow_status?: string;
+  delivery_status?: string;
+  completion_status?: string;
+  tracking_number?: string;
 }
+
+const normalizeOrder = (o: any): Order => ({
+  ...o,
+  quantity: Number(o.quantity || 0),
+  total_price: Number(o.total_price ?? o.total_amount ?? 0),
+  status: o.status || 'pending',
+  farmer_id: o.farmer_id || o.seller_id || '',
+  created_at: o.created_at || new Date().toISOString(),
+});
 
 interface OrderState {
   orders: Order[];
@@ -29,7 +42,7 @@ export const useOrderStore = create<OrderState>((set: (partial: Partial<OrderSta
     set({ loading: true, error: null });
     try {
       const response = await apiClient.get('/transactions');
-      set({ orders: response.data, loading: false });
+      set({ orders: (response.data || []).map(normalizeOrder), loading: false });
     } catch (error: any) {
       set({ error: error.message, loading: false });
     }

@@ -491,7 +491,16 @@ class DriverAssignmentService:
         # If max attempts reached, escalate to admin
         if job.reassignment_attempts >= self.MAX_REASSIGNMENT_ATTEMPTS:
             logger.warning(f"Max reassignment attempts reached for job {assignment_id}, escalating to admin")
-            # TODO: Implement admin escalation notification
+            # Send admin escalation notification
+            try:
+                from app.services.notification_service import NotificationService
+                import asyncio
+                asyncio.create_task(NotificationService.send_admin_alert(
+                    subject=f"Driver Assignment Failure - Job {assignment_id}",
+                    message=f"Max reassignment attempts ({self.MAX_REASSIGNMENT_ATTEMPTS}) reached for job {assignment_id}. Manual intervention required.",
+                ))
+            except Exception as e:
+                logger.error(f"Failed to send admin escalation notification: {e}")
         
         return {
             "id": str(assignment_id),
@@ -705,7 +714,16 @@ class DriverAssignmentService:
             # If max attempts, escalate to admin
             if job.reassignment_attempts >= self.MAX_REASSIGNMENT_ATTEMPTS:
                 logger.warning(f"Max reassignment attempts reached for timed-out job {job.id}, escalating to admin")
-                # TODO: Implement admin escalation notification
+                # Send admin escalation notification
+                try:
+                    from app.services.notification_service import NotificationService
+                    import asyncio
+                    asyncio.create_task(NotificationService.send_admin_alert(
+                        subject=f"Driver Assignment Timeout - Job {job.id}",
+                        message=f"Max reassignment attempts ({self.MAX_REASSIGNMENT_ATTEMPTS}) reached for timed-out job {job.id}. Manual intervention required.",
+                    ))
+                except Exception as e:
+                    logger.error(f"Failed to send admin escalation notification: {e}")
         
         return timeout_count
     

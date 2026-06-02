@@ -60,6 +60,7 @@ async def forgot_password(payload: PasswordResetRequest, db: Session = Depends(g
     await _set_otp(payload.phone_number, otp)
     
     await NotificationService.send_verification_code(payload.phone_number, otp)
+    await NotificationService.dispatch_event(db, user, "otp_verification", priority="critical", CODE=otp)
     
     return {
         "message": "Verification code sent to your registered phone number via SMS and WhatsApp.",
@@ -76,6 +77,9 @@ async def reset_password(payload: PasswordResetConfirm, db: Session = Depends(ge
     cached_otp = await _get_otp(payload.phone_number)
     
     if not cached_otp or payload.otp != cached_otp:
+        user_for_alert = db.query(User).filter(User.phone_number == payload.phone_number).first()
+        if user_for_alert:
+            await NotificationService.dispatch_event(db, user_for_alert, "otp_invalid", priority="important")
         raise HTTPException(status_code=400, detail="Invalid or expired verification code.")
     
     user = db.query(User).filter(User.phone_number == payload.phone_number).first()
@@ -203,6 +207,9 @@ async def login(
     if not user:
         failures = await record_login_failure(payload.phone_number)
         if failures >= 5:
+            locked_user = db.query(User).filter(User.phone_number.in_(build_phone_lookup_candidates(payload.phone_number))).first()
+            if locked_user:
+                await NotificationService.dispatch_event(db, locked_user, "account_locked", priority="critical")
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Too many failed login attempts. Try again later.",
@@ -268,6 +275,7 @@ async def login_pin(
     if not user:
         failures = await record_login_failure(payload.phone_number)
         if failures >= 5:
+            await NotificationService.dispatch_event(db, user, "account_locked", priority="critical")
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Too many failed login attempts. Try again later.",
@@ -278,6 +286,7 @@ async def login_pin(
     
     # Ensure only farmers/buyers use this endpoint
     if user.role in {UserRole.ADMIN, UserRole.AGENT}:
+        await NotificationService.dispatch_event(db, user, "access_denied", priority="important")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Staff should use password login with MFA. Please use the admin dashboard."
@@ -546,7 +555,7 @@ async def request_email_verification(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> dict:
-    """Request an email verification token to be sent (placeholder for email provider)."""
+    """Request an email verification token to be sent."""
     if current_user.email_verified:
         return {"message": "Email already verified."}
     if not current_user.email:
@@ -556,12 +565,23 @@ async def request_email_verification(
     current_user.email_verification_token = token
     db.commit()
 
-    # In production: send email via SMTP/SES
-    # For now: return token in dev mode or log it
-    return {
-        "message": "Verification email sent. Check your inbox.",
-        "dev_token": token,  # REMOVE in production — for testing only
-    }
+    from app.core.config import settings
+    from app.services.email_service import email_service
+
+    verification_link = f"{settings.FRONTEND_URL.rstrip('/')}/verify-email/{token}"
+    if not email_service.send_template(
+        "email.security_alert",
+        current_user.email,
+        {
+            "name": current_user.full_name,
+            "event": "Email verification requested",
+            "ip": "not captured",
+            "reset_link": verification_link,
+        },
+    ):
+        raise HTTPException(status_code=503, detail="Unable to send verification email")
+
+    return {"message": "Verification email sent. Check your inbox."}
 
 
 @router.post("/verify-email/{token}")

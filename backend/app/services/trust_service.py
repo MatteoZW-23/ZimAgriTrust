@@ -98,7 +98,8 @@ def recompute_user_scores(db: Session, user: User) -> User:
     score -= failed_orders * 10
     score -= leakage_penalty
     
-    user.trust_score = clamp_score(score)
+    # Enterprise rule: trust should not go down during a successful-settlement recompute.
+    user.trust_score = max(user.trust_score or 0, clamp_score(score))
     
     # Also update predictive risk
     from app.services.risk_service import evaluate_user_risk
@@ -138,7 +139,8 @@ def update_farmer_scores(db: Session, farmer: User) -> User:
     score += min(listings_count, 5)
     score -= leakage_penalty
     
-    farmer.trust_score = clamp_score(score)
+    # Enterprise rule: trust should not go down during a successful-settlement recompute.
+    farmer.trust_score = max(farmer.trust_score or 0, clamp_score(score))
     db.commit()
     db.refresh(farmer)
     return farmer

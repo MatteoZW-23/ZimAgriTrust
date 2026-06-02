@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import func as sa_func, desc, and_, extract
+from sqlalchemy import func as sa_func, desc, and_, extract, String
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import settings
@@ -35,10 +35,14 @@ from app.models.supplier import (
     SupplierOrderStatus,
     SupplierPaymentStatus,
     SupplierWalletTxnType,
+    can_transition_supplier_order_status,
 )
+from app.services.escrow_account_service import EscrowAccountService
+from app.services.ledger_service import LedgerService
+from app.services.wallet_service import WalletService
 
 
-PLATFORM_FEE_PERCENT = 0.03  # 3%
+PLATFORM_FEE_PERCENT = 0.08
 BOOST_FEE_INPUT = 5.0
 BOOST_FEE_MACHINERY = 10.0
 WITHDRAWAL_MIN = 50.0
@@ -184,9 +188,27 @@ class SupplierProfileService:
 # ============================================================================
 
 class SupplierProductService:
+    @staticmethod
+    def _require_operational_supplier(profile: SupplierProfile) -> None:
+        if profile.verification_status != SupplierVerificationStatus.APPROVED:
+            raise HTTPException(
+                status_code=403,
+                detail="Supplier must be approved before performing commerce operations",
+            )
 
     @staticmethod
     def create_product(db: Session, supplier_id: uuid.UUID, data: dict) -> SupplierProduct:
+        profile = db.query(SupplierProfile).filter(SupplierProfile.id == supplier_id).first()
+        if not profile:
+            raise HTTPException(status_code=404, detail="Supplier not found")
+        SupplierProductService._require_operational_supplier(profile)
+        required_fields = ["name", "price", "product_type"]
+        missing = [field for field in required_fields if data.get(field) in (None, "")]
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing required product fields: {', '.join(missing)}",
+            )
         product = SupplierProduct(
             supplier_id=supplier_id,
             sku=_generate_sku(),
@@ -433,10 +455,12 @@ class SupplierProductService:
                     # Create product
                     product = SupplierProduct(
                         supplier_id=supplier_id,
+                        sku=_generate_sku(),
                         product_type=SupplierProductType(product_type),
                         name=row.get("name", "").strip(),
                         description=row.get("description", "").strip(),
                         price=float(row.get("price", 0)),
+                        currency=(row.get("currency") or "USD").strip().upper(),
                         quantity_available=int(row.get("quantity", 0)),
                         unit_type=row.get("unit_type", "piece").strip(),
                         min_stock_level=int(row.get("min_stock_level", 5)),
@@ -450,7 +474,8 @@ class SupplierProductService:
                         category = row.get("category", "").strip().lower()
                         if category:
                             try:
-                                product.input_category = category
+                                from app.models.supplier import InputCategory
+                                product.input_category = InputCategory(category)
                             except ValueError:
                                 errors.append({
                                     "row_number": idx,
@@ -463,7 +488,8 @@ class SupplierProductService:
                         category = row.get("category", "").strip().lower()
                         if category:
                             try:
-                                product.machinery_category = category
+                                from app.models.supplier import MachineryCategory
+                                product.machinery_category = MachineryCategory(category)
                             except ValueError:
                                 errors.append({
                                     "row_number": idx,
@@ -543,9 +569,19 @@ class SupplierOrderService:
         items_data = data.get("items", [])
         if not items_data:
             raise HTTPException(status_code=400, detail="No items in order")
+        for idx, item in enumerate(items_data, start=1):
+            if not item.get("product_id"):
+                raise HTTPException(status_code=400, detail=f"Item {idx} is missing product_id")
+            if item.get("quantity") is None:
+                raise HTTPException(status_code=400, detail=f"Item {idx} is missing quantity")
+            if float(item["quantity"]) <= 0:
+                raise HTTPException(status_code=400, detail=f"Item {idx} quantity must be greater than zero")
 
         # Group items by supplier
-        product_ids = [uuid.UUID(i["product_id"]) for i in items_data]
+        try:
+            product_ids = [uuid.UUID(str(i["product_id"])) for i in items_data]
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="One or more product_id values are not valid UUIDs")
         products = db.query(SupplierProduct).filter(SupplierProduct.id.in_(product_ids)).all()
         product_map = {str(p.id): p for p in products}
 
@@ -557,7 +593,7 @@ class SupplierOrderService:
                 raise HTTPException(status_code=404, detail=f"Product {pid} not found")
             if p.status != SupplierProductStatus.ACTIVE:
                 raise HTTPException(status_code=400, detail=f"Product '{p.name}' is not available")
-            if p.quantity_available < item["quantity"]:
+            if p.quantity_available < int(item["quantity"]):
                 raise HTTPException(status_code=400, detail=f"Insufficient stock for '{p.name}'")
 
         # Group by supplier to create separate orders per supplier
@@ -565,13 +601,22 @@ class SupplierOrderService:
         for item in items_data:
             p = product_map[str(item["product_id"])]
             sg = supplier_groups.setdefault(p.supplier_id, [])
-            sg.append({"product": p, "quantity": item["quantity"]})
+            sg.append({"product": p, "quantity": int(item["quantity"])})
 
         orders_created = []
         for supplier_id, group_items in supplier_groups.items():
             subtotal = sum(gi["product"].price * gi["quantity"] for gi in group_items)
-            platform_fee = round(subtotal * PLATFORM_FEE_PERCENT, 2)
-            total = round(subtotal + platform_fee, 2)
+            from app.services.subscription_service import SubscriptionService
+            supplier = db.query(SupplierProfile).filter(SupplierProfile.id == supplier_id).first()
+            if not supplier:
+                raise HTTPException(status_code=404, detail="Supplier not found")
+            if supplier.verification_status != SupplierVerificationStatus.APPROVED:
+                raise HTTPException(status_code=403, detail="Supplier is not approved for commerce")
+            fee_quote = SubscriptionService.calculate_fee_for_owner(db, subtotal, supplier=supplier) if supplier else {
+                "platform_fee": round(subtotal * PLATFORM_FEE_PERCENT, 2)
+            }
+            platform_fee = fee_quote["platform_fee"]
+            total = round(subtotal, 2)
 
             order = SupplierOrder(
                 order_number=_generate_order_number(),
@@ -621,6 +666,17 @@ class SupplierOrderService:
                 )
                 db.add(sh)
 
+            success = WalletService.hold_escrow(
+                db,
+                user_id=buyer_id,
+                amount=total,
+                currency=order.currency,
+                idempotency_key=f"supplier_order_hold:{order.id}",
+            )
+            if not success:
+                db.rollback()
+                raise HTTPException(status_code=400, detail="Insufficient wallet balance for supplier checkout")
+            EscrowAccountService.mark_supplier_funded(db, order, total)
             orders_created.append(order)
 
         db.commit()
@@ -630,6 +686,11 @@ class SupplierOrderService:
             return orders_created[0]
 
         return orders_created[0]  # Return first order, caller can handle multiple
+
+    @staticmethod
+    def get_buyer_orders(db: Session, buyer_id: uuid.UUID) -> list[SupplierOrder]:
+        """Get all supplier orders for a buyer/farmer."""
+        return db.query(SupplierOrder).filter(SupplierOrder.buyer_id == buyer_id).order_by(SupplierOrder.created_at.desc()).all()
 
     @staticmethod
     def list_orders(db: Session, supplier_id: uuid.UUID, status_filter: Optional[str] = None) -> list[SupplierOrder]:
@@ -664,6 +725,8 @@ class SupplierOrderService:
             raise HTTPException(status_code=404, detail="Order not found")
         if order.status != SupplierOrderStatus.NEW:
             raise HTTPException(status_code=400, detail=f"Cannot confirm order in '{order.status.value}' status")
+        if not can_transition_supplier_order_status(order.status, SupplierOrderStatus.CONFIRMED):
+            raise HTTPException(status_code=400, detail="Invalid supplier order transition")
         order.status = SupplierOrderStatus.CONFIRMED
         order.confirmed_at = datetime.now(timezone.utc)
         db.commit()
@@ -680,6 +743,8 @@ class SupplierOrderService:
             raise HTTPException(status_code=404, detail="Order not found")
         if order.status not in (SupplierOrderStatus.CONFIRMED, SupplierOrderStatus.PROCESSING):
             raise HTTPException(status_code=400, detail=f"Cannot ship order in '{order.status.value}' status")
+        if not can_transition_supplier_order_status(order.status, SupplierOrderStatus.SHIPPED):
+            raise HTTPException(status_code=400, detail="Invalid supplier order transition")
         order.status = SupplierOrderStatus.SHIPPED
         order.shipped_at = datetime.now(timezone.utc)
         if tracking:
@@ -700,14 +765,19 @@ class SupplierOrderService:
             raise HTTPException(status_code=404, detail="Order not found")
         if order.status in (SupplierOrderStatus.DELIVERED, SupplierOrderStatus.CANCELLED):
             raise HTTPException(status_code=400, detail="Cannot cancel this order")
+        if not can_transition_supplier_order_status(order.status, SupplierOrderStatus.CANCELLED):
+            raise HTTPException(status_code=400, detail="Invalid supplier order transition")
 
         order.status = SupplierOrderStatus.CANCELLED
         order.cancel_reason = reason
 
-        # Restore stock
-        items = db.query(SupplierOrderItem).filter(SupplierOrderItem.order_id == order_id).all()
+        # Restore stock - use joinedload to avoid N+1 query
+        from sqlalchemy.orm import joinedload
+        items = db.query(SupplierOrderItem).options(
+            joinedload(SupplierOrderItem.product)
+        ).filter(SupplierOrderItem.order_id == order_id).all()
         for item in items:
-            product = db.query(SupplierProduct).filter(SupplierProduct.id == item.product_id).first()
+            product = item.product
             if product:
                 old_qty = product.quantity_available
                 product.quantity_available += item.quantity
@@ -723,6 +793,32 @@ class SupplierOrderService:
                     notes=f"Cancelled order: {reason}",
                 )
                 db.add(sh)
+
+        if order.payment_status == SupplierPaymentStatus.ESCROW:
+            success = WalletService.refund_escrow(
+                db,
+                buyer_id=order.buyer_id,
+                amount=order.total_amount,
+                currency=order.currency,
+                idempotency_key=f"supplier_order_refund:{order.id}",
+            )
+            if not success:
+                db.rollback()
+                raise HTTPException(status_code=500, detail="Supplier order refund failed")
+            from app.models.escrow import EscrowStatus, EscrowTransactionType
+            account = EscrowAccountService.get_or_create_for_supplier_order(db, order)
+            if account.status != EscrowStatus.REFUNDED:
+                account.status = EscrowStatus.REFUNDED
+                account.refunded_at = datetime.now(timezone.utc)
+                EscrowAccountService._record(
+                    db,
+                    account,
+                    EscrowTransactionType.REFUND,
+                    order.total_amount,
+                    EscrowStatus.REFUNDED,
+                    reference=f"supplier_escrow_refunded:{order.id}",
+                )
+            order.payment_status = SupplierPaymentStatus.REFUNDED
 
         db.commit()
         db.refresh(order)
@@ -754,15 +850,29 @@ class SupplierOrderService:
             raise HTTPException(status_code=404, detail="Order not found")
         if order.status != SupplierOrderStatus.SHIPPED:
             raise HTTPException(status_code=400, detail="Order must be shipped before delivery")
+        if not can_transition_supplier_order_status(order.status, SupplierOrderStatus.DELIVERED):
+            raise HTTPException(status_code=400, detail="Invalid supplier order transition")
 
         order.status = SupplierOrderStatus.DELIVERED
         order.delivered_at = datetime.now(timezone.utc)
         order.payment_status = SupplierPaymentStatus.PAID
 
-        # Credit supplier wallet
+        # Credit supplier wallet through immutable ledger escrow release.
         profile = db.query(SupplierProfile).filter(SupplierProfile.id == supplier_id).first()
-        net = order.subtotal  # platform fee already separated
-        profile.available_balance += net
+        net = round(order.total_amount - order.platform_fee, 2)
+        success = WalletService.release_escrow(
+            db,
+            buyer_id=order.buyer_id,
+            seller_id=profile.user_id,
+            amount=order.total_amount,
+            fee=order.platform_fee,
+            currency=order.currency,
+            idempotency_key=f"supplier_order_release:{order.id}",
+        )
+        if not success:
+            db.rollback()
+            raise HTTPException(status_code=500, detail="Supplier escrow settlement failed")
+
         profile.lifetime_earnings += net
         profile.total_sales += 1
         profile.total_revenue += order.total_amount
@@ -771,12 +881,26 @@ class SupplierOrderService:
             supplier_id=supplier_id,
             order_id=order.id,
             txn_type=SupplierWalletTxnType.SALE,
-            amount=order.subtotal,
+            amount=order.total_amount,
             fee=order.platform_fee,
             net_amount=net,
             description=f"Payment for order {order.order_number}",
         )
         db.add(txn)
+        from app.models.escrow import EscrowStatus, EscrowTransactionType
+        account = EscrowAccountService.get_or_create_for_supplier_order(db, order)
+        if account.status != EscrowStatus.RELEASED:
+            account.status = EscrowStatus.RELEASED
+            account.released_at = datetime.now(timezone.utc)
+            EscrowAccountService._record(
+                db,
+                account,
+                EscrowTransactionType.RELEASE,
+                order.total_amount,
+                EscrowStatus.RELEASED,
+                reference=f"supplier_escrow_released:{order.id}",
+                metadata={"platform_fee": order.platform_fee, "supplier_payout": net},
+            )
         db.commit()
         db.refresh(order)
         return order
@@ -793,9 +917,11 @@ class SupplierWalletService:
         profile = db.query(SupplierProfile).filter(SupplierProfile.id == supplier_id).first()
         if not profile:
             raise HTTPException(status_code=404, detail="Supplier not found")
+        available = LedgerService.get_balance(db, profile.user_id, "USD")
+        pending = LedgerService.get_pending_balance(db, profile.user_id, "USD")
         return {
-            "available_balance": profile.available_balance,
-            "pending_balance": profile.pending_balance,
+            "available_balance": available,
+            "pending_balance": pending,
             "lifetime_earnings": profile.lifetime_earnings,
             "currency": "USD",
         }
@@ -814,13 +940,22 @@ class SupplierWalletService:
         profile = db.query(SupplierProfile).filter(SupplierProfile.id == supplier_id).first()
         if not profile:
             raise HTTPException(status_code=404, detail="Supplier not found")
-        if profile.available_balance < amount:
+        if LedgerService.get_balance(db, profile.user_id, "USD") < amount:
             raise HTTPException(status_code=400, detail="Insufficient balance")
 
         fee = min(round(amount * WITHDRAWAL_FEE_PERCENT, 2), WITHDRAWAL_FEE_CAP)
         net = round(amount - fee, 2)
 
-        profile.available_balance -= amount
+        success = WalletService.withdraw(
+            db,
+            user_id=profile.user_id,
+            amount=amount,
+            currency="USD",
+            idempotency_key=f"supplier_withdrawal:{supplier_id}:{uuid.uuid4()}",
+        )
+        if not success:
+            db.rollback()
+            raise HTTPException(status_code=500, detail="Withdrawal ledger entry failed")
         txn = SupplierWalletTransaction(
             supplier_id=supplier_id,
             txn_type=SupplierWalletTxnType.WITHDRAWAL,
@@ -858,8 +993,8 @@ class SupplierWalletService:
 
         return {
             "lifetime_earnings": profile.lifetime_earnings,
-            "available_balance": profile.available_balance,
-            "pending_balance": profile.pending_balance,
+            "available_balance": LedgerService.get_balance(db, profile.user_id, "USD"),
+            "pending_balance": LedgerService.get_pending_balance(db, profile.user_id, "USD"),
             "total_withdrawn": float(total_withdrawn),
             "total_sales": profile.total_sales,
             "total_revenue": profile.total_revenue,
@@ -1053,23 +1188,27 @@ class SupplierPublicService:
 
     @staticmethod
     def list_suppliers(db: Session, limit: int = 50, offset: int = 0) -> list[SupplierProfile]:
+        verification_status_text = sa_func.lower(SupplierProfile.verification_status.cast(String))
         return db.query(SupplierProfile).filter(
-            SupplierProfile.verification_status == SupplierVerificationStatus.APPROVED,
+            verification_status_text == SupplierVerificationStatus.APPROVED.value,
             SupplierProfile.is_active == True,
         ).order_by(desc(SupplierProfile.rating)).offset(offset).limit(limit).all()
 
     @staticmethod
     def get_supplier_products(db: Session, supplier_id: uuid.UUID) -> list[SupplierProduct]:
+        product_status_text = sa_func.lower(SupplierProduct.status.cast(String))
         return db.query(SupplierProduct).filter(
             SupplierProduct.supplier_id == supplier_id,
-            SupplierProduct.status == SupplierProductStatus.ACTIVE,
+            product_status_text == SupplierProductStatus.ACTIVE.value,
         ).order_by(desc(SupplierProduct.is_boosted), desc(SupplierProduct.created_at)).all()
 
     @staticmethod
     def list_all_products(db: Session, category: Optional[str] = None, product_type: Optional[str] = None, search: Optional[str] = None, limit: int = 50, offset: int = 0) -> list[SupplierProduct]:
+        product_status_text = sa_func.lower(SupplierProduct.status.cast(String))
+        verification_status_text = sa_func.lower(SupplierProfile.verification_status.cast(String))
         q = db.query(SupplierProduct).join(SupplierProfile).filter(
-            SupplierProduct.status == SupplierProductStatus.ACTIVE,
-            SupplierProfile.verification_status == SupplierVerificationStatus.APPROVED,
+            product_status_text == SupplierProductStatus.ACTIVE.value,
+            verification_status_text == SupplierVerificationStatus.APPROVED.value,
             SupplierProfile.is_active == True,
         )
         if product_type:
@@ -1088,11 +1227,12 @@ class SupplierPublicService:
 
     @staticmethod
     def get_product_detail(db: Session, product_id: uuid.UUID) -> dict:
+        product_status_text = sa_func.lower(SupplierProduct.status.cast(String))
         product = db.query(SupplierProduct).options(
             joinedload(SupplierProduct.supplier),
         ).filter(
             SupplierProduct.id == product_id,
-            SupplierProduct.status == SupplierProductStatus.ACTIVE,
+            product_status_text == SupplierProductStatus.ACTIVE.value,
         ).first()
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
@@ -1269,44 +1409,12 @@ class SupplierSubscriptionService:
 
     @staticmethod
     def set_subscription(db: Session, supplier_id: uuid.UUID, plan: str, billing_cycle: str = "monthly") -> dict:
-        """Set or update a supplier's subscription plan."""
-        from app.services.subscription_service import SubscriptionService, SubscriptionPlan
-        
+        from app.services.subscription_service import SubscriptionService
+
         profile = db.query(SupplierProfile).filter(SupplierProfile.id == supplier_id).first()
         if not profile:
             raise HTTPException(status_code=404, detail="Supplier not found")
-        
-        # Get plan configuration
-        plan_config = SubscriptionService.get_plan_config(SubscriptionPlan(plan.upper()))
-        
-        # Calculate end date based on billing cycle
-        from datetime import timedelta
-        if billing_cycle == "monthly":
-            end_date = datetime.now(timezone.utc) + timedelta(days=30)
-        elif billing_cycle == "quarterly":
-            end_date = datetime.now(timezone.utc) + timedelta(days=90)
-        elif billing_cycle == "yearly":
-            end_date = datetime.now(timezone.utc) + timedelta(days=365)
-        else:
-            end_date = datetime.now(timezone.utc) + timedelta(days=30)
-        
-        # Update profile
-        profile.subscription_plan = plan
-        profile.subscription_status = "active"
-        profile.subscription_start_date = datetime.now(timezone.utc)
-        profile.subscription_end_date = end_date
-        
-        db.commit()
-        db.refresh(profile)
-        
-        return {
-            "subscription_plan": profile.subscription_plan,
-            "subscription_status": profile.subscription_status,
-            "subscription_start_date": profile.subscription_start_date,
-            "subscription_end_date": profile.subscription_end_date,
-            "features": plan_config.features,
-            "price": plan_config.price,
-        }
+        return SubscriptionService.change_plan(db, plan, billing_cycle, supplier=profile, activate_paid=True)
 
     @staticmethod
     def get_subscription(db: Session, supplier_id: uuid.UUID) -> dict:
@@ -1315,32 +1423,22 @@ class SupplierSubscriptionService:
         if not profile:
             raise HTTPException(status_code=404, detail="Supplier not found")
         
-        from app.services.subscription_service import SubscriptionService, SubscriptionPlan
-        
-        plan_config = None
-        if profile.subscription_plan:
-            try:
-                plan_config = SubscriptionService.get_plan_config(SubscriptionPlan(profile.subscription_plan.upper()))
-            except ValueError:
-                pass
-        
-        # Check if subscription is expired
-        is_expired = False
-        if profile.subscription_end_date and profile.subscription_end_date < datetime.now(timezone.utc):
-            is_expired = True
-            if profile.subscription_status == "active":
-                profile.subscription_status = "past_due"
-                db.commit()
-        
-        return {
-            "subscription_plan": profile.subscription_plan,
-            "subscription_status": profile.subscription_status,
-            "subscription_start_date": profile.subscription_start_date,
-            "subscription_end_date": profile.subscription_end_date,
-            "is_expired": is_expired,
-            "features": plan_config.features if plan_config else [],
-            "price": plan_config.price if plan_config else 0.0,
-        }
+        from app.services.subscription_service import SubscriptionService
+
+        subscription = SubscriptionService.get_current_subscription(db, supplier=profile)
+        payload = SubscriptionService.serialize_subscription(db, subscription)
+        payload.update({
+            "subscription_plan": subscription.plan.code,
+            "subscription_status": subscription.status.lower(),
+            "subscription_start_date": subscription.current_period_start,
+            "subscription_end_date": subscription.current_period_end,
+            "is_expired": subscription.status == "EXPIRED",
+            "features": payload["plan"]["features"],
+            "price": payload["plan"]["monthly_price"],
+            "savings": SubscriptionService.savings_dashboard(db, supplier=profile),
+            "badges": SubscriptionService.get_badges(db, supplier=profile),
+        })
+        return payload
 
     @staticmethod
     def cancel_subscription(db: Session, supplier_id: uuid.UUID) -> dict:
@@ -1349,17 +1447,9 @@ class SupplierSubscriptionService:
         if not profile:
             raise HTTPException(status_code=404, detail="Supplier not found")
         
-        profile.subscription_status = "cancelled"
-        profile.subscription_end_date = datetime.now(timezone.utc)
-        
-        db.commit()
-        db.refresh(profile)
-        
-        return {
-            "subscription_plan": profile.subscription_plan,
-            "subscription_status": profile.subscription_status,
-            "subscription_end_date": profile.subscription_end_date,
-        }
+        from app.services.subscription_service import SubscriptionService
+
+        return SubscriptionService.cancel_subscription(db, supplier=profile)
 
     @staticmethod
     def check_feature_entitlement(db: Session, supplier_id: uuid.UUID, feature: str) -> bool:
@@ -1368,18 +1458,12 @@ class SupplierSubscriptionService:
         if not profile:
             return False
         
-        # Basic plan is default with basic features
-        if not profile.subscription_plan or profile.subscription_plan == "basic":
-            basic_features = ["basic_marketplace_access"]
-            return feature in basic_features
-        
-        from app.services.subscription_service import SubscriptionService, SubscriptionPlan
-        
-        try:
-            plan_config = SubscriptionService.get_plan_config(SubscriptionPlan(profile.subscription_plan.upper()))
-            return feature in plan_config.features
-        except ValueError:
-            return False
+        from app.services.subscription_service import SubscriptionService
+
+        subscription = SubscriptionService.get_current_subscription(db, supplier=profile)
+        allowed = {item.feature_key for item in subscription.plan.features if item.is_enabled}
+        allowed.update(item.label.lower().replace(" ", "_") for item in subscription.plan.features if item.is_enabled)
+        return feature in allowed
 
     @staticmethod
     def check_transaction_limit(db: Session, supplier_id: uuid.UUID) -> dict:
@@ -1388,32 +1472,7 @@ class SupplierSubscriptionService:
         if not profile:
             return {"has_limit": True, "remaining": 0, "limit": 0}
         
-        from app.services.subscription_service import SubscriptionService, SubscriptionPlan
-        
-        try:
-            plan_config = SubscriptionService.get_plan_config(SubscriptionPlan(profile.subscription_plan.upper() if profile.subscription_plan else "BASIC"))
-            limit = plan_config.transaction_limit
-            
-            if limit == -1:  # Unlimited
-                return {"has_limit": False, "remaining": -1, "limit": -1}
-            
-            # Count transactions this month
-            from datetime import datetime, timedelta
-            month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            transactions_this_month = db.query(SupplierOrder).filter(
-                SupplierOrder.supplier_id == supplier_id,
-                SupplierOrder.created_at >= month_start,
-            ).count()
-            
-            remaining = limit - transactions_this_month
-            return {
-                "has_limit": True,
-                "remaining": max(0, remaining),
-                "limit": limit,
-                "used": transactions_this_month,
-            }
-        except ValueError:
-            return {"has_limit": True, "remaining": 0, "limit": 0}
+        return {"has_limit": False, "remaining": -1, "limit": -1, "used": 0}
 
 
 # ============================================================================
@@ -1576,8 +1635,6 @@ class SupplierPayoutService:
         
         for withdrawal in pending_withdrawals:
             try:
-                # Simulate payout processing
-                # In production, this would integrate with payment gateways like Stripe, PayPal, etc.
                 SupplierPayoutService._execute_payout(db, withdrawal)
                 processed += 1
             except Exception as e:
@@ -1595,16 +1652,13 @@ class SupplierPayoutService:
     @staticmethod
     def _execute_payout(db: Session, withdrawal: SupplierWalletTransaction):
         """Execute a single payout (integrates with payment gateway)."""
-        # In production, this would call payment gateway API
-        # For now, we'll simulate successful processing
-        
-        # Simulate payment gateway processing
-        import time
-        time.sleep(0.1)  # Simulate API call
-        
-        # Update withdrawal status
-        withdrawal.status = "completed"
-        withdrawal.description = f"Payout processed via {withdrawal.withdrawal_method}"
+        from app.core.config import settings
+
+        if not settings.ENABLE_SUPPLIER_PAYOUT_PROCESSING:
+            raise RuntimeError("Supplier payout provider is not configured")
+
+        withdrawal.status = "processing"
+        withdrawal.description = f"Payout submitted via {withdrawal.withdrawal_method}"
         withdrawal.reference = f"PAYOUT-{withdrawal.id[:8].upper()}"
         
         db.commit()

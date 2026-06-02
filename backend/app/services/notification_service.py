@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
 from app.core.config import settings
+from app.models.security_enhanced import NotificationLog, NotificationChannel, NotificationCategory
 
 logger = logging.getLogger(__name__)
 
@@ -186,12 +187,158 @@ NOTIFICATION_TEMPLATES = {
         "whatsapp": "✅ Approved!",
         "email": "<h2>Approved</h2><p>Your account is ready.</p>"
     },
+    "subscription_upgraded": {
+        "title": "Subscription Upgraded",
+        "sms": "Your subscription was upgraded to {PLAN}.",
+        "whatsapp": "✅ Subscription upgraded to *{PLAN}*.",
+        "email": "<h2>Subscription Upgraded</h2><p>Plan: {PLAN}</p>"
+    },
+    "subscription_cancelled": {
+        "title": "Subscription Cancelled",
+        "sms": "Your subscription has been cancelled.",
+        "whatsapp": "⚠️ Your subscription has been cancelled.",
+        "email": "<h2>Subscription Cancelled</h2><p>Your plan has been cancelled.</p>"
+    },
+    "ticket_created": {
+        "title": "Ticket Created",
+        "sms": "Support ticket {TICKET_REF} created.",
+        "whatsapp": "🎫 Ticket created: {TICKET_REF}",
+        "email": "<h2>Ticket Created</h2><p>Reference: {TICKET_REF}</p>"
+    },
+    "ticket_assigned": {
+        "title": "Ticket Assigned",
+        "sms": "Ticket {TICKET_REF} assigned to support.",
+        "whatsapp": "👤 Ticket assigned: {TICKET_REF}",
+        "email": "<h2>Ticket Assigned</h2><p>{TICKET_REF}</p>"
+    },
+    "ticket_replied": {
+        "title": "Ticket Update",
+        "sms": "New update on ticket {TICKET_REF}.",
+        "whatsapp": "💬 New update on ticket {TICKET_REF}",
+        "email": "<h2>Ticket Updated</h2><p>{TICKET_REF}</p>"
+    },
+    "ticket_resolved": {
+        "title": "Ticket Resolved",
+        "sms": "Ticket {TICKET_REF} resolved.",
+        "whatsapp": "✅ Ticket resolved: {TICKET_REF}",
+        "email": "<h2>Ticket Resolved</h2><p>{TICKET_REF}</p>"
+    },
+    "ticket_closed": {
+        "title": "Ticket Closed",
+        "sms": "Ticket {TICKET_REF} closed.",
+        "whatsapp": "📁 Ticket closed: {TICKET_REF}",
+        "email": "<h2>Ticket Closed</h2><p>{TICKET_REF}</p>"
+    },
+    "ticket_satisfaction_request": {
+        "title": "Rate Support",
+        "sms": "Please rate your support for ticket {TICKET_REF}.",
+        "whatsapp": "⭐ Please rate your support experience: {TICKET_REF}",
+        "email": "<h2>Rate Support</h2><p>Ticket: {TICKET_REF}</p>"
+    },
+    "otp_invalid": {
+        "title": "OTP Rejected",
+        "sms": "Invalid or expired OTP attempt detected.",
+        "whatsapp": "❌ Invalid or expired OTP attempt detected.",
+        "email": "<h2>OTP Rejected</h2><p>An invalid OTP attempt was detected.</p>"
+    },
+    "access_denied": {
+        "title": "Access Denied",
+        "sms": "Access denied for attempted restricted action.",
+        "whatsapp": "🚫 Access denied for restricted action.",
+        "email": "<h2>Access Denied</h2><p>A restricted action was blocked.</p>"
+    },
 }
 
 
 class NotificationService:
     """Multi-channel notification service"""
     
+    @staticmethod
+    def _channels_for_priority(priority: str) -> list[str]:
+        level = (priority or "important").lower()
+        if level == "critical":
+            return ["in_app", "whatsapp", "sms", "email"]
+        if level == "informational":
+            return ["in_app"]
+        return ["in_app", "email"]
+
+    @staticmethod
+    async def dispatch_event(
+        db: Session,
+        user,
+        event_key: str,
+        priority: str = "important",
+        **template_vars,
+    ) -> Dict:
+        """
+        Unified notification entrypoint.
+        Routes by event template + priority to keep business flows consistent.
+        """
+        results: Dict[str, object] = {"event": event_key, "priority": priority, "channels": {}}
+
+        # Reuse existing template renderer/senders
+        if event_key not in NOTIFICATION_TEMPLATES:
+            logger.warning("dispatch_event: unknown event template key=%s", event_key)
+            results["error"] = "unknown_template"
+            return results
+
+        template = NOTIFICATION_TEMPLATES[event_key]
+        channels = NotificationService._channels_for_priority(priority)
+
+        def _category_for_event(key: str) -> NotificationCategory:
+            k = (key or "").lower()
+            if any(x in k for x in ["otp", "login", "password", "pin", "locked", "access_denied"]):
+                return NotificationCategory.AUTH_SECURITY
+            if any(x in k for x in ["payment", "deposit", "withdrawal", "refund", "subscription"]):
+                return NotificationCategory.TRANSACTION_PAYMENT
+            if any(x in k for x in ["delivery", "driver"]):
+                return NotificationCategory.DELIVERY_LOGISTICS
+            if any(x in k for x in ["dispute", "ticket"]):
+                return NotificationCategory.DISPUTE_SUPPORT
+            if any(x in k for x in ["verify", "id_", "farm_verified"]):
+                return NotificationCategory.VERIFICATION_KYC
+            return NotificationCategory.ADMIN_SYSTEM
+
+        category = _category_for_event(event_key)
+
+        if "sms" in channels and user.phone_number:
+            sms_msg = template["sms"].format(**template_vars)
+            sms_ok = NotificationService._send_sms(user.phone_number, sms_msg)
+            results["channels"]["sms"] = sms_ok
+            db.add(NotificationLog(
+                user_id=user.id, channel=NotificationChannel.SMS, category=category,
+                recipient=user.phone_number, title=template["title"], body=sms_msg,
+                status="sent" if sms_ok else "failed",
+            ))
+
+        if "whatsapp" in channels and user.phone_number:
+            wa_msg = template["whatsapp"].format(**template_vars)
+            wa_ok = await NotificationService._send_whatsapp(user.phone_number, wa_msg)
+            results["channels"]["whatsapp"] = wa_ok
+            db.add(NotificationLog(
+                user_id=user.id, channel=NotificationChannel.WHATSAPP, category=category,
+                recipient=user.phone_number, title=template["title"], body=wa_msg,
+                status="sent" if wa_ok else "failed",
+            ))
+
+        if "email" in channels and user.email:
+            email_msg = template["email"].format(**template_vars)
+            em_ok = await NotificationService._send_email(user.email, template["title"], email_msg)
+            results["channels"]["email"] = em_ok
+            db.add(NotificationLog(
+                user_id=user.id, channel=NotificationChannel.EMAIL, category=category,
+                recipient=user.email, title=template["title"], body=email_msg,
+                status="sent" if em_ok else "failed",
+            ))
+
+        # In-app channel placeholder for current architecture.
+        # This keeps flows explicit even before a persisted in-app center is wired.
+        if "in_app" in channels:
+            results["channels"]["in_app"] = True
+        db.commit()
+
+        return results
+
     @staticmethod
     def _send_sms(phone: str, message: str) -> bool:
         """Delegate to SMS service"""
@@ -570,26 +717,6 @@ class NotificationService:
         )
         await NotificationService._send_whatsapp(phone, msg)
             
-    @staticmethod
-    async def send_whatsapp_vision_result(phone: str, result: dict):
-        """Sends AI vision analysis results directly to farmer's WhatsApp."""
-        from app.services.whatsapp_service import whatsapp_service
-        
-        status_emoji = "✅" if result.get("success") else "⚠️"
-        crop_name = result.get("crop", {}).get("crop_name", "Produce")
-        grade = result.get("grade", {}).get("grade", "Standard")
-        
-        message = (
-            f"{status_emoji} *ZimAgritrust AI Analysis Complete*\n\n"
-            f"🌿 *Produce:* {crop_name}\n"
-            f"⭐ *Grade Estimate:* {grade}\n"
-            f"📊 *AI Confidence:* {int(result.get('crop', {}).get('confidence', 0)*100)}%\n\n"
-            f"This analysis has been logged to your listing. "
-            f"Our agents will use this to fast-track your verification."
-        )
-        
-        return await whatsapp_service.send_whatsapp_message(phone, message)
-
 
     @staticmethod
     async def send_bootstrap_secret(phone: str, secret: str):

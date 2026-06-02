@@ -16,6 +16,3 @@ class AuditLogResponse(BaseModel):
     entity: str
     status: str
     timestamp: str
-
-# REMOVED: /security-logs endpoint - Mock implementation, not for production
-# Security logs should be queried from actual AuditLog table

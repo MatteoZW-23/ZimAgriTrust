@@ -24,12 +24,14 @@ class Dispute(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id"), nullable=False, index=True)
-    raised_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
-    resolved_by_agent_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("agents.id"), nullable=True)  # Agent who resolved dispute
+    raised_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    resolved_by_agent_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("agents.id"), nullable=True, index=True)  # Agent who resolved dispute
     
     type: Mapped[str] = mapped_column(String(30))
     description: Mapped[str] = mapped_column(Text)
-    status: Mapped[DisputeStatus] = mapped_column(Enum(DisputeStatus), default=DisputeStatus.OPEN)
+    status: Mapped[DisputeStatus] = mapped_column(
+        Enum(DisputeStatus, name="coredisputestatus"), default=DisputeStatus.OPEN
+    )
     resolution: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     
     # Financial Resolution Data

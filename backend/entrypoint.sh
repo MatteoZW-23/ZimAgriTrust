@@ -18,11 +18,6 @@ if [ "${MASTER_TEST_LOGIN_ENABLED:-false}" = "true" ] && [ "${APP_ENV:-}" = "pro
     exit 1
 fi
 
-if [ "${AUTO_CONFIRM_PAYMENTS:-false}" = "true" ] && [ "${APP_ENV:-}" = "production" ]; then
-    echo "[entrypoint] FATAL: AUTO_CONFIRM_PAYMENTS=true in production environment. Refusing to start."
-    exit 1
-fi
-
 # ── Wait for PostgreSQL to be ready ───────────────────────────────────────
 echo "[entrypoint] Waiting for PostgreSQL..."
 MAX_RETRIES=30

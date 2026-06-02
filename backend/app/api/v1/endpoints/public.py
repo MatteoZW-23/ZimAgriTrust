@@ -4,11 +4,28 @@ Serves the public marketplace dashboard with real data.
 """
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from time import time
 
 from app.api.deps import get_db
 from app.core.policy import calculate_full_order_breakdown
 
 router = APIRouter()
+_PUBLIC_CACHE: dict[str, tuple[float, object]] = {}
+
+
+def _cache_get(key: str):
+    rec = _PUBLIC_CACHE.get(key)
+    if not rec:
+        return None
+    expires_at, payload = rec
+    if time() >= expires_at:
+        _PUBLIC_CACHE.pop(key, None)
+        return None
+    return payload
+
+
+def _cache_set(key: str, payload: object, ttl_seconds: int):
+    _PUBLIC_CACHE[key] = (time() + ttl_seconds, payload)
 
 
 @router.get("/prices/current")
@@ -34,7 +51,7 @@ def public_prices(db: Session = Depends(get_db)):
         date_str = order.created_at.date().isoformat()
         if date_str not in price_by_date:
             price_by_date[date_str] = []
-        price_by_date[date_str].append(order.total_price / order.quantity if order.quantity > 0 else 0)
+        price_by_date[date_str].append(order.total_amount / order.quantity if order.quantity > 0 else 0)
 
     # Calculate averages
     trends = []
@@ -42,6 +59,7 @@ def public_prices(db: Session = Depends(get_db)):
         avg_price = sum(price_by_date[date_str]) / len(price_by_date[date_str]) if price_by_date[date_str] else 0
         trends.append({"date": date_str, "price": avg_price, "source": "platform"})
 
+    _cache_set("public_prices_current", trends, 120)
     return trends
 
 
@@ -83,19 +101,33 @@ def public_stats(db: Session = Depends(get_db)):
     """
     High-level platform statistics for the public homepage.
     """
-    from app.models.user import User
+    from app.models.user import User, UserRole
     from app.models.listing import Listing, ListingStatus
-    
+    from app.models.transaction import Transaction
+
     total_users = db.query(User).count()
+    farmers = db.query(User).filter(User.role == UserRole.FARMER).count()
+    buyers = db.query(User).filter(User.role == UserRole.BUYER).count()
+    suppliers = db.query(User).filter(User.role == UserRole.SUPPLIER).count()
     active_listings = db.query(Listing).filter(Listing.status == ListingStatus.ACTIVE).count()
+    total_transactions = db.query(Transaction).count()
     
-    return {
+    payload = {
         "stats": {
+            "users": total_users,
+            "listings": active_listings,
+            "transactions": total_transactions,
+            "farmers": farmers,
+            "buyers": buyers,
+            "suppliers": suppliers,
+            "provinces_covered": 10,
             "total_users": total_users,
             "active_listings": active_listings,
-            "total_transactions": 0
+            "total_transactions": total_transactions,
         }
     }
+    _cache_set("public_stats", payload, 60)
+    return payload
 
 
 @router.get("/listings")

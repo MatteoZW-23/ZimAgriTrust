@@ -1,6 +1,9 @@
 import uuid
 import logging
+import asyncio
 from sqlalchemy.orm import Session
+from fastapi import HTTPException
+from datetime import datetime, timezone
 from app.models.user import User
 from app.models.transaction import Transaction, TransactionType
 from app.services.ledger_service import LedgerService, LedgerAccountType, LedgerEntryType
@@ -9,6 +12,23 @@ from app.core.idempotency import generate_idempotency_key
 logger = logging.getLogger(__name__)
 
 class WalletService:
+    @staticmethod
+    def _notify_event(db: Session, user_id: uuid.UUID, event_key: str, priority: str = "important", **template_vars) -> None:
+        """Best-effort notification dispatch for sync wallet flows."""
+        try:
+            from app.services.notification_service import NotificationService
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                return
+            try:
+                asyncio.run(NotificationService.dispatch_event(db, user, event_key, priority=priority, **template_vars))
+            except RuntimeError:
+                # Already in event loop (e.g. async endpoint calling sync service)
+                loop = asyncio.get_event_loop()
+                loop.create_task(NotificationService.dispatch_event(db, user, event_key, priority=priority, **template_vars))
+        except Exception as e:
+            logger.warning("Notification dispatch skipped for %s: %s", event_key, e)
+
     @staticmethod
     def deposit(
         db: Session,
@@ -32,13 +52,13 @@ class WalletService:
             # Generate idempotency key if not provided
             if not idempotency_key:
                 idempotency_key = generate_idempotency_key()
-            
+
             # Check for idempotency
             existing_entry = LedgerService.check_idempotency(db, idempotency_key)
             if existing_entry:
                 logger.info(f"Idempotent deposit: {idempotency_key}")
                 return True
-            
+
             # Get or create transaction record
             txn = Transaction(
                 user_id=user_id,
@@ -49,11 +69,11 @@ class WalletService:
             )
             db.add(txn)
             db.flush()  # Get transaction ID
-            
+
             # Create ledger entries (double-entry)
             debit_account = LedgerAccountType.CASH_USD if currency.upper() == "USD" else LedgerAccountType.CASH_ZIG
             credit_account = LedgerAccountType.USER_BALANCE_USD if currency.upper() == "USD" else LedgerAccountType.USER_BALANCE_ZIG
-            
+
             debit_entry, credit_entry = LedgerService.create_double_entry(
                 db=db,
                 transaction_id=txn.id,
@@ -66,9 +86,17 @@ class WalletService:
                 description=f"Wallet deposit",
                 idempotency_key=idempotency_key,
             )
-            
+
             db.commit()
             logger.info(f"Wallet deposit (ledger): {amount} {currency} for user {user_id}")
+            WalletService._notify_event(
+                db,
+                user_id,
+                "deposit_confirmed",
+                priority="important",
+                AMOUNT=f"{amount:.2f} {currency.upper()}",
+                BALANCE=f"{LedgerService.get_balance(db, user_id, currency):.2f} {currency.upper()}",
+            )
             return True
         finally:
             LedgerService.release_lock_sync(user_id, "deposit")
@@ -94,21 +122,21 @@ class WalletService:
         try:
             # Check balance from ledger (not from user.balance_usd)
             current_balance = LedgerService.get_balance(db, user_id, currency)
-            
+
             if current_balance < amount:
                 logger.warning(f"Insufficient balance for withdrawal: user {user_id}, balance={current_balance}, amount={amount}")
                 return False
-            
+
             # Generate idempotency key if not provided
             if not idempotency_key:
                 idempotency_key = generate_idempotency_key()
-            
+
             # Check for idempotency
             existing_entry = LedgerService.check_idempotency(db, idempotency_key)
             if existing_entry:
                 logger.info(f"Idempotent withdrawal: {idempotency_key}")
                 return True
-            
+
             # Get or create transaction record
             txn = Transaction(
                 user_id=user_id,
@@ -119,11 +147,11 @@ class WalletService:
             )
             db.add(txn)
             db.flush()
-            
+
             # Create ledger entries (double-entry)
             debit_account = LedgerAccountType.USER_BALANCE_USD if currency.upper() == "USD" else LedgerAccountType.USER_BALANCE_ZIG
             credit_account = LedgerAccountType.CASH_USD if currency.upper() == "USD" else LedgerAccountType.CASH_ZIG
-            
+
             debit_entry, credit_entry = LedgerService.create_double_entry(
                 db=db,
                 transaction_id=txn.id,
@@ -135,9 +163,18 @@ class WalletService:
                 description=f"Wallet withdrawal",
                 idempotency_key=idempotency_key,
             )
-            
+
             db.commit()
             logger.info(f"Wallet withdrawal (ledger): {amount} {currency} for user {user_id}")
+            WalletService._notify_event(
+                db,
+                user_id,
+                "withdrawal_completed",
+                priority="important",
+                AMOUNT=f"{amount:.2f} {currency.upper()}",
+                METHOD="wallet transfer",
+                REF=str(idempotency_key),
+            )
             return True
         finally:
             LedgerService.release_lock_sync(user_id, "withdraw")
@@ -161,17 +198,17 @@ class WalletService:
         try:
             # Check balance from ledger
             current_balance = LedgerService.get_balance(db, user_id, currency)
-            
+
             if current_balance < amount:
                 return False
-            
+
             if not idempotency_key:
                 idempotency_key = generate_idempotency_key()
-            
+
             existing_entry = LedgerService.check_idempotency(db, idempotency_key)
             if existing_entry:
                 return True
-            
+
             txn = Transaction(
                 user_id=user_id,
                 type=TransactionType.ESCROW_HOLD,
@@ -181,11 +218,11 @@ class WalletService:
             )
             db.add(txn)
             db.flush()
-            
+
             # Debit user balance, credit pending escrow
             debit_account = LedgerAccountType.USER_BALANCE_USD if currency.upper() == "USD" else LedgerAccountType.USER_BALANCE_ZIG
             credit_account = LedgerAccountType.PENDING_ESCROW_USD if currency.upper() == "USD" else LedgerAccountType.PENDING_ESCROW_ZIG
-            
+
             debit_entry, credit_entry = LedgerService.create_double_entry(
                 db=db,
                 transaction_id=txn.id,
@@ -199,8 +236,16 @@ class WalletService:
                 description=f"Escrow hold",
                 idempotency_key=idempotency_key,
             )
-            
+
             db.commit()
+            WalletService._notify_event(
+                db,
+                user_id,
+                "payment_confirmed",
+                priority="important",
+                AMOUNT=f"{amount:.2f} {currency.upper()}",
+                REF=str(order_id or txn.id),
+            )
             return True
         finally:
             LedgerService.release_lock_sync(user_id, "hold_escrow")
@@ -387,7 +432,7 @@ class WalletService:
                                     currency=currency,
                                     reference=f"verification_commission_{order.listing_id}",
                                     description=f"Listing verification commission",
-                                    metadata={"listing_id": str(order.listing_id), "agent_id": str(agent.id)}
+                                    entry_metadata={"listing_id": str(order.listing_id), "agent_id": str(agent.id)}
                                 )
 
             db.commit()
@@ -402,6 +447,7 @@ class WalletService:
         buyer_id: uuid.UUID,
         amount: float,
         currency: str,
+        order_id: uuid.UUID = None,
         idempotency_key: str = None,
     ) -> bool:
         """
@@ -461,11 +507,20 @@ class WalletService:
                 currency=currency,
                 debit_user_id=buyer_id,
                 credit_user_id=buyer_id,
+                order_id=order_id,
                 description="Escrow refund",
                 idempotency_key=idempotency_key,
             )
             db.commit()
             logger.info(f"Escrow refund committed: {amount} {currency} for buyer {buyer_id}")
+            WalletService._notify_event(
+                db,
+                buyer_id,
+                "payment_released",
+                priority="important",
+                AMOUNT=f"{amount:.2f} {currency.upper()}",
+                REF=str(order_id or txn.id),
+            )
             return True
         finally:
             LedgerService.release_lock_sync(buyer_id, "refund_escrow")
@@ -606,28 +661,160 @@ class WalletService:
     @staticmethod
     def initiate_external_payment(db: Session, user_id: uuid.UUID, amount: float, currency: str, provider: str = "EcoCash") -> dict:
         """
-        Simulates integration with Zimbabwean payment gateways (EcoCash, OneMoney, Banks).
+        Initiates integration with Zimbabwean payment gateways (EcoCash, OneMoney, Banks).
+        Uses Paynow/Pesepay API for real payment processing.
         """
-        # In a real system, this would call an external API (e.g., Paynow, Pesepay)
+        from app.models.transaction import Payment, PaymentStatus
+        from app.core.config import settings
+
         payment_id = f"PAY-{uuid.uuid4().hex[:8].upper()}"
-        
-        logger.info(f"Initiated {provider} payment of {amount} {currency} for user {user_id}. Ref: {payment_id}")
-        
-        return {
-            "status": "pending",
-            "payment_id": payment_id,
-            "provider": provider,
-            "instruction": "Please check your phone for a USSD prompt to authorize the transaction."
-        }
+
+        # Create payment record
+        payment = Payment(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            amount=amount,
+            currency=currency.upper(),
+            provider=provider.upper(),
+            reference=payment_id,
+            status=PaymentStatus.PENDING,
+            created_at=datetime.now(timezone.utc)
+        )
+        db.add(payment)
+        db.commit()
+
+        # Call Paynow API (or configured provider)
+        try:
+            import requests
+            api_base_url = (
+                getattr(settings, "API_URL", None)
+                or getattr(settings, "BACKEND_URL", None)
+                or "http://localhost:8000"
+            )
+
+            provider_code = provider.upper()
+            supported_push_providers = {"ECOCASH", "ONEMONEY", "ZIPIT", "INNBUCKS"}
+            if provider_code in supported_push_providers:
+                # Provider-agnostic mobile push integration via configured gateway.
+                payload = {
+                    "id": payment_id,
+                    "amount": amount,
+                    "currency": currency.upper(),
+                    "phone": db.query(User.phone_number).filter(User.id == user_id).scalar(),
+                    "provider": provider_code,
+                    "reference": f"ZAT-{payment_id}",
+                    "return_url": f"{settings.FRONTEND_URL}/payment/return/{payment_id}",
+                    "result_url": f"{api_base_url}/api/v1/payments/webhook/{payment_id}"
+                }
+
+                response = requests.post(
+                    settings.PAYNOW_API_URL,
+                    json=payload,
+                    headers={"Authorization": f"Bearer {settings.PAYNOW_API_KEY}"},
+                    timeout=30
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    payment.provider_reference = data.get("poll_url")
+                    payment.status = PaymentStatus.PROCESSING
+                    db.commit()
+
+                    logger.info(f"Initiated {provider} payment of {amount} {currency} for user {user_id}. Ref: {payment_id}")
+
+                    return {
+                        "status": "processing",
+                        "payment_id": payment_id,
+                        "provider": provider_code,
+                        "instruction": data.get("instructions", "Please check your phone for a USSD prompt to authorize the transaction."),
+                        "poll_url": data.get("poll_url")
+                    }
+                else:
+                    payment.status = PaymentStatus.FAILED
+                    payment.error_message = f"Provider API error: {response.status_code}"
+                    db.commit()
+                    raise HTTPException(status_code=502, detail="Payment provider unavailable")
+            else:
+                # OneMoney or Bank integration
+                payment.status = PaymentStatus.FAILED
+                payment.error_message = f"Provider {provider} not yet implemented"
+                db.commit()
+                raise HTTPException(status_code=501, detail=f"Payment provider {provider} not yet implemented")
+
+        except requests.RequestException as e:
+            payment.status = PaymentStatus.FAILED
+            payment.error_message = str(e)
+            db.commit()
+            logger.error(f"Payment initiation failed: {e}")
+            raise HTTPException(status_code=503, detail="Payment service unavailable")
 
     @staticmethod
     def confirm_external_payment(db: Session, payment_id: str) -> bool:
         """
-        Webhook verification of payment — implement real provider callback logic here.
+        Webhook verification of payment - checks provider callback status.
         """
-        # Real logic: check a 'Payment' table or call provider API
-        logger.info(f"External payment {payment_id} — awaiting real provider confirmation.")
-        return False
+        from app.models.transaction import Payment, PaymentStatus
+
+        payment = db.query(Payment).filter(Payment.reference == payment_id).first()
+        if not payment:
+            logger.error(f"Payment not found: {payment_id}")
+            return False
+
+        if payment.status == PaymentStatus.COMPLETED:
+            return True
+
+        if payment.status == PaymentStatus.FAILED:
+            return False
+
+        try:
+            import requests
+            from app.core.config import settings
+
+            # Poll configured gateway for provider status
+            if payment.provider in {"ECOCASH", "ONEMONEY", "ZIPIT", "INNBUCKS"}:
+                response = requests.get(
+                    f"{settings.PAYNOW_API_URL}/status/{payment.provider_reference}",
+                    headers={"Authorization": f"Bearer {settings.PAYNOW_API_KEY}"},
+                    timeout=30
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("status") == "paid":
+                        payment.status = PaymentStatus.COMPLETED
+                        payment.completed_at = datetime.now(timezone.utc)
+                        db.commit()
+
+                        # Credit user wallet
+                        WalletService.deposit(
+                            db=db,
+                            user_id=payment.user_id,
+                            amount=payment.amount,
+                            currency=payment.currency,
+                            reference=payment_id,
+                            idempotency_key=f"payment_{payment_id}"
+                        )
+
+                        logger.info(f"Payment confirmed: {payment_id}")
+                        return True
+                    elif data.get("status") == "cancelled":
+                        payment.status = PaymentStatus.FAILED
+                        payment.error_message = "Payment cancelled by user"
+                        db.commit()
+                        return False
+                    else:
+                        # Still pending
+                        return False
+                else:
+                    logger.error(f"Payment status check failed: {response.status_code}")
+                    return False
+            else:
+                logger.error(f"Provider {payment.provider} status check not implemented")
+                return False
+
+        except Exception as e:
+            logger.error(f"Payment confirmation error: {e}")
+            return False
 
     @staticmethod
     def get_balance(db: Session, user_id: uuid.UUID) -> float:
@@ -639,7 +826,7 @@ class WalletService:
         """Returns full wallet balance breakdown from ledger."""
         available = LedgerService.get_balance(db, user_id, "USD")
         pending = LedgerService.get_pending_balance(db, user_id, "USD")
-        
+
         return {
             "balance": round(available + pending, 2),
             "held_in_escrow": round(pending, 2),
@@ -660,10 +847,10 @@ class WalletService:
 
         # Use withdraw method which handles ledger entries
         success = WalletService.withdraw(db, user_id, amount, "USD")
-        
+
         if not success:
             raise ValueError("Withdrawal failed")
-        
+
         logger.info(f"Withdrawal requested: {amount} USD for user {user_id} → {phone_number}. Ref: {reference}")
         return {"reference": reference, "amount": amount, "phone_number": phone_number, "status": "pending"}
 
@@ -689,7 +876,7 @@ class WalletService:
         total_withdrawn  = _sum(TT.WITHDRAWAL)
         total_received   = _sum(TT.ESCROW_RELEASE)
         total_spent      = _sum(TT.ESCROW_HOLD)
-        
+
         # Get balances from ledger
         available = LedgerService.get_balance(db, user_id, "USD")
         pending = LedgerService.get_pending_balance(db, user_id, "USD")

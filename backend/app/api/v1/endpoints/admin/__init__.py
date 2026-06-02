@@ -11,7 +11,6 @@ from . import (
     config,
     notifications,
     permissions,
-    academy,
     command_center,
     invitations,
     broadcast,
@@ -24,7 +23,6 @@ router = APIRouter()
 router.include_router(overview.router, tags=["admin-overview"])
 router.include_router(users.router, prefix="/users", tags=["admin-users"])
 router.include_router(agents.router, prefix="/agents", tags=["admin-agents"])
-router.include_router(academy.router, prefix="/academy", tags=["admin-academy"])
 router.include_router(transactions.router, prefix="/transactions", tags=["admin-transactions"])
 router.include_router(listings.router, prefix="/listings", tags=["admin-listings"])
 router.include_router(analytics.router, prefix="/analytics", tags=["admin-analytics"])

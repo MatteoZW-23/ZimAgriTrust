@@ -1,4 +1,4 @@
-# System Migration Guides
+﻿# System Migration Guides
 
 This document consolidates all migration guides for the ZimAgritrust platform, including verification system, transaction flow, and onboarding/recruitment system unifications.
 
@@ -17,7 +17,7 @@ This document consolidates all migration guides for the ZimAgritrust platform, i
 
 This document describes the migration from the legacy verification system (`/verification`) to the new verification workflow system (`/verification-workflow`). The new system provides enhanced functionality, better data modeling, and improved scalability.
 
-### Migration Status: Phase 1 Complete ✅
+### Migration Status: Phase 1 Complete âœ…
 
 ### Completed Changes
 
@@ -35,11 +35,11 @@ This document describes the migration from the legacy verification system (`/ver
 
 | Legacy Endpoint | New Endpoint | Status |
 |----------------|--------------|--------|
-| `/verification/submit` | `/verification-workflow/submit` | ✅ Migrated |
-| `/verification/my-status` | `/verification-workflow/my-status` | ✅ Migrated |
-| `/verification/queue` | `/verification-workflow/review-queue` | ✅ Migrated |
-| `/verification/{id}/approve` | `/verification-workflow/review/{document_id}` | ✅ Migrated |
-| `/verification/{id}/reject` | `/verification-workflow/review/{document_id}` | ✅ Migrated |
+| `/verification/submit` | `/verification-workflow/submit` | âœ… Migrated |
+| `/verification/my-status` | `/verification-workflow/my-status` | âœ… Migrated |
+| `/verification/queue` | `/verification-workflow/review-queue` | âœ… Migrated |
+| `/verification/{id}/approve` | `/verification-workflow/review/{document_id}` | âœ… Migrated |
+| `/verification/{id}/reject` | `/verification-workflow/review/{document_id}` | âœ… Migrated |
 
 ### New Verification Workflow API
 
@@ -205,7 +205,7 @@ Response:
 
 #### New Model: DocumentVerificationRecord
 - Enhanced fraud detection with scoring
-- Multi-stage review workflow (agent → admin)
+- Multi-stage review workflow (agent â†’ admin)
 - Comprehensive audit logging
 - Resubmission tracking
 - Trust score integration
@@ -257,7 +257,7 @@ The legacy endpoints will remain functional for a transition period to allow:
 
 This document describes the unification of the transaction-related endpoints (`listings.py`, `trades.py`, `transactions.py`, and `requests.py`) into a single, coherent `TransactionService`. This consolidation eliminates duplicated functionality, provides a single source of truth for transaction operations, and simplifies the codebase.
 
-### Migration Status: Phase 3 Complete ✅
+### Migration Status: Phase 3 Complete âœ…
 
 ### Completed Changes
 
@@ -282,21 +282,21 @@ This document describes the unification of the transaction-related endpoints (`l
 
 | Legacy Service | New Service | Status |
 |----------------|--------------|--------|
-| marketplace_core.create_listing | TransactionService.create_listing | ✅ Unified |
-| marketplace_core.search_listings | TransactionService.search_listings | ✅ Unified |
-| marketplace_core.create_offer | TransactionService.create_offer | ✅ Unified |
-| marketplace_core.accept_offer | TransactionService.accept_offer | ✅ Unified |
-| marketplace_core.reject_offer | TransactionService.reject_offer | ✅ Unified |
-| marketplace_core.counter_offer | TransactionService.counter_offer | ✅ Unified |
-| marketplace_core.create_buyer_request | TransactionService.create_buyer_request | ✅ Unified |
-| marketplace_core.farmer_respond_to_request | TransactionService.respond_to_request | ✅ Unified |
-| marketplace_core.accept_farmer_response | TransactionService.create_order_from_response | ✅ Unified |
-| Direct DB operations (trades.py) | TransactionService.start_trade_session | ✅ Unified |
-| Direct DB operations (trades.py) | TransactionService.send_trade_message | ✅ Unified |
-| Direct DB operations (trades.py) | TransactionService.get_trade_messages | ✅ Unified |
-| escrow_service.release_payment | TransactionService.confirm_delivery | ✅ Unified |
-| receipt_service.generate_receipt_pdf | TransactionService.generate_receipt | ✅ Unified |
-| verification_service.record_positive_rating | TransactionService.submit_review | ✅ Unified |
+| marketplace_core.create_listing | TransactionService.create_listing | âœ… Unified |
+| marketplace_core.search_listings | TransactionService.search_listings | âœ… Unified |
+| marketplace_core.create_offer | TransactionService.create_offer | âœ… Unified |
+| marketplace_core.accept_offer | TransactionService.accept_offer | âœ… Unified |
+| marketplace_core.reject_offer | TransactionService.reject_offer | âœ… Unified |
+| marketplace_core.counter_offer | TransactionService.counter_offer | âœ… Unified |
+| marketplace_core.create_buyer_request | TransactionService.create_buyer_request | âœ… Unified |
+| marketplace_core.farmer_respond_to_request | TransactionService.respond_to_request | âœ… Unified |
+| marketplace_core.accept_farmer_response | TransactionService.create_order_from_response | âœ… Unified |
+| Direct DB operations (trades.py) | TransactionService.start_trade_session | âœ… Unified |
+| Direct DB operations (trades.py) | TransactionService.send_trade_message | âœ… Unified |
+| Direct DB operations (trades.py) | TransactionService.get_trade_messages | âœ… Unified |
+| escrow_service.release_payment | TransactionService.confirm_delivery | âœ… Unified |
+| receipt_service.generate_receipt_pdf | TransactionService.generate_receipt | âœ… Unified |
+| verification_service.record_positive_rating | TransactionService.submit_review | âœ… Unified |
 
 ### Unified TransactionService API
 
@@ -416,7 +416,7 @@ listing = transaction_service.create_listing(db, seller, payload)
 
 This document describes the unification of the recruitment and onboarding services into a single, coherent `AgentOnboardingService`. This consolidation eliminates duplicated functionality, provides a single source of truth for agent onboarding, and simplifies the codebase.
 
-### Migration Status: Phase 2 Complete ✅
+### Migration Status: Phase 2 Complete âœ…
 
 ### Completed Changes
 
@@ -439,18 +439,18 @@ This document describes the unification of the recruitment and onboarding servic
 
 | Legacy Service | New Service | Status |
 |----------------|--------------|--------|
-| RecruitmentService.submit_application | AgentOnboardingService.submit_application | ✅ Unified |
-| RecruitmentService.complete_documentation | AgentOnboardingService.complete_documentation | ✅ Unified |
-| RecruitmentService.complete_training_module | AgentOnboardingService.complete_training_module | ✅ Unified (enhanced) |
-| RecruitmentService.setup_equipment | AgentOnboardingService.setup_equipment | ✅ Unified |
-| RecruitmentService.complete_practical_assessment | AgentOnboardingService.complete_practical_assessment | ✅ Unified |
-| RecruitmentService.complete_shadowing | AgentOnboardingService.complete_shadowing | ✅ Unified (enhanced) |
-| RecruitmentService.record_supervised_work | AgentOnboardingService.record_supervised_work | ✅ Unified |
-| RecruitmentService.certify_agent | AgentOnboardingService.certify_agent | ✅ Unified |
-| OnboardingService.sign_contract | AgentOnboardingService.complete_documentation (with sign_contract) | ✅ Unified |
-| OnboardingService.submit_quiz | AgentOnboardingService.complete_training_module (with answers) | ✅ Unified |
-| OnboardingService.log_shadowing | AgentOnboardingService.complete_shadowing (with rubric) | ✅ Unified |
-| OnboardingService.get_onboarding_status | AgentOnboardingService.get_onboarding_status | ✅ Unified |
+| RecruitmentService.submit_application | AgentOnboardingService.submit_application | âœ… Unified |
+| RecruitmentService.complete_documentation | AgentOnboardingService.complete_documentation | âœ… Unified |
+| RecruitmentService.complete_training_module | AgentOnboardingService.complete_training_module | âœ… Unified (enhanced) |
+| RecruitmentService.setup_equipment | AgentOnboardingService.setup_equipment | âœ… Unified |
+| RecruitmentService.complete_practical_assessment | AgentOnboardingService.complete_practical_assessment | âœ… Unified |
+| RecruitmentService.complete_shadowing | AgentOnboardingService.complete_shadowing | âœ… Unified (enhanced) |
+| RecruitmentService.record_supervised_work | AgentOnboardingService.record_supervised_work | âœ… Unified |
+| RecruitmentService.certify_agent | AgentOnboardingService.certify_agent | âœ… Unified |
+| OnboardingService.sign_contract | AgentOnboardingService.complete_documentation (with sign_contract) | âœ… Unified |
+| OnboardingService.submit_quiz | AgentOnboardingService.complete_training_module (with answers) | âœ… Unified |
+| OnboardingService.log_shadowing | AgentOnboardingService.complete_shadowing (with rubric) | âœ… Unified |
+| OnboardingService.get_onboarding_status | AgentOnboardingService.get_onboarding_status | âœ… Unified |
 
 ### Unified AgentOnboardingService API
 
@@ -558,7 +558,6 @@ The unified service uses the same underlying data models as the legacy services:
 - **AgentTrainingProgress**: Detailed quiz progress (unchanged)
 - **ShadowingLog**: Detailed shadowing evaluations (unchanged)
 - **Agent**: Agent profiles (unchanged)
-- **AgentTraining**: Academy training progress (unchanged)
 
 ### Running Data Validation
 

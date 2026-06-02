@@ -1,148 +1,883 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useAuthStore, useListingStore, useOrderStore, useWalletStore, Card } from '@agritrust/shared';
-import { Sprout, Truck, Wallet, Star, TrendingUp, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import {
+  Sprout, Truck, Wallet, Star, TrendingUp, ArrowUpRight, ArrowDownRight, Bell, PlusCircle, Crown, ShieldCheck,
+  LayoutDashboard, Store, Package, ShoppingCart, Heart, FileText, DollarSign, BarChart3, LineChart, Award,
+  Settings, User, ChevronLeft, ChevronRight, Search, Menu, X, Home, CreditCard, Activity, Clock, CheckCircle,
+  AlertCircle, LogOut, HelpCircle, Layers, Box, Navigation, MoreHorizontal, ChevronDown, Lock, Zap, Globe,
+  Filter, RefreshCw, Download, Upload, ArrowRight, Calendar, MapPin, Users, MessageSquare, Archive
+} from 'lucide-react';
+import { getMySubscription } from '../api';
 
-export const FarmerDashboard: React.FC = () => {
+type DashboardView = 'dashboard' | 'create-listing' | 'marketplace' | 'my-listings' | 'offers' | 'my-orders' | 'wallet' | 'subscriptions' | 'profile' | 'settings' | 'buyer-requests' | 'saved-listings' | 'supplier-marketplace';
+
+interface MenuItem {
+  id: string;
+  label: string;
+  icon: any;
+  view?: DashboardView;
+  badge?: number | string;
+  children?: MenuItem[];
+  roles?: string[];
+}
+
+const SIDEBAR_WIDTH_EXPANDED = 280;
+const SIDEBAR_WIDTH_COLLAPSED = 80;
+
+export const FarmerDashboard: React.FC<{ onNavigate?: (view: DashboardView) => void }> = ({ onNavigate }) => {
   const { user } = useAuthStore();
   const { myListings, fetchMyListings } = useListingStore();
   const { orders, fetchOrders } = useOrderStore();
   const { balance, fetchWalletData } = useWalletStore();
+  const [subscription, setSubscription] = useState<any>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('farmer-sidebar-collapsed') === 'true';
+    }
+    return false;
+  });
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   useEffect(() => {
     fetchMyListings();
     fetchOrders();
     fetchWalletData();
+    getMySubscription().then(setSubscription).catch(() => setSubscription(null));
+  }, [fetchMyListings, fetchOrders, fetchWalletData]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('farmer-sidebar-collapsed', String(sidebarCollapsed));
+    }
+  }, [sidebarCollapsed]);
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed(prev => !prev);
   }, []);
 
-  const activeListings = myListings.filter(l => l.status === 'active' || l.status === 'verified').length;
-  const activeOrders = orders.filter(o => o.status === 'pending' || o.status === 'in_progress').length;
+  const toggleMobileDrawer = useCallback(() => {
+    setMobileDrawerOpen(prev => !prev);
+  }, []);
 
-  const stats = [
-    { label: 'Active Listings', value: activeListings, icon: Sprout, color: 'text-primary-600', bg: 'bg-primary-50' },
-    { label: 'Active Orders', value: activeOrders, icon: Truck, color: 'text-secondary-600', bg: 'bg-secondary-50' },
-    { label: 'Wallet Balance', value: `$${balance.toFixed(2)}`, icon: Wallet, color: 'text-earth-600', bg: 'bg-earth-50' },
-    { label: 'Trust Score', value: user?.trust_score || '—', icon: Star, color: 'text-yellow-500', bg: 'bg-yellow-50' },
-  ];
+  const handleNavigate = useCallback((view: DashboardView) => {
+    onNavigate?.(view);
+    setMobileDrawerOpen(false);
+  }, [onNavigate]);
 
-  return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div>
-        <h1 className="text-3xl font-black text-earth-800 dark:text-white">Farmer Dashboard</h1>
-        <p className="text-earth-500 dark:text-earth-400 font-bold mt-1">Welcome back, {user?.full_name?.split(' ')[0]}! Here's what's happening today.</p>
+  const activeListings = useMemo(() =>
+    myListings.filter(l => ['active', 'verified', 'published'].includes(String(l.status).toLowerCase())).length,
+    [myListings]
+  );
+
+  const activeOrders = useMemo(() =>
+    orders.filter(o => ['pending', 'in_progress', 'escrow_held'].includes(String(o.status).toLowerCase())).length,
+    [orders]
+  );
+
+  const pendingDeliveries = useMemo(() =>
+    orders.filter(o => ['in_progress', 'escrow_held'].includes(String(o.status).toLowerCase())).length,
+    [orders]
+  );
+
+  const escrowActivity = useMemo(() =>
+    orders.filter(o => String(o.status).toLowerCase() === 'escrow_held').length,
+    [orders]
+  );
+
+  const menuItems: MenuItem[] = useMemo(() => [
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      icon: LayoutDashboard,
+      view: 'dashboard',
+    },
+    {
+      id: 'marketplace',
+      label: 'Marketplace',
+      icon: Store,
+      view: 'marketplace',
+    },
+    {
+      id: 'listings',
+      label: 'My Listings',
+      icon: Package,
+      children: [
+        { id: 'create-listing', label: 'Create Listing', icon: PlusCircle, view: 'create-listing' },
+        { id: 'my-listings', label: 'All Listings', icon: Layers, view: 'my-listings' },
+        { id: 'saved-listings', label: 'Saved Listings', icon: Heart, view: 'saved-listings', badge: myListings.length },
+      ],
+    },
+    {
+      id: 'orders',
+      label: 'Orders',
+      icon: ShoppingCart,
+      children: [
+        { id: 'my-orders', label: 'My Orders', icon: Box, view: 'my-orders', badge: activeOrders },
+        { id: 'deliveries', label: 'Deliveries', icon: Truck, view: 'my-orders' },
+        { id: 'escrow', label: 'Escrow', icon: Lock, view: 'my-orders' },
+      ],
+    },
+    {
+      id: 'wallet',
+      label: 'Wallet',
+      icon: Wallet,
+      view: 'wallet',
+    },
+    {
+      id: 'analytics',
+      label: 'Analytics',
+      icon: BarChart3,
+      children: [
+        { id: 'market-intelligence', label: 'Market Intelligence', icon: TrendingUp, view: 'marketplace' },
+        { id: 'trust-score', label: 'Trust Score', icon: Award, view: 'profile' },
+        { id: 'subscriptions', label: 'Subscriptions', icon: Crown, view: 'subscriptions' },
+      ],
+    },
+    {
+      id: 'notifications',
+      label: 'Notifications',
+      icon: Bell,
+      badge: 3,
+    },
+    {
+      id: 'profile',
+      label: 'Profile',
+      icon: User,
+      view: 'profile',
+    },
+    {
+      id: 'settings',
+      label: 'Settings',
+      icon: Settings,
+      view: 'settings',
+    },
+  ], [myListings.length, activeOrders]);
+
+  const stats = useMemo(() => [
+    {
+      label: 'Active Listings',
+      value: activeListings,
+      icon: Sprout,
+      color: 'emerald',
+      trend: '+12%',
+      trendUp: true,
+    },
+    {
+      label: 'Active Orders',
+      value: activeOrders,
+      icon: Truck,
+      color: 'blue',
+      trend: '+8%',
+      trendUp: true,
+    },
+    {
+      label: 'Wallet Balance',
+      value: `$${Number(balance || 0).toFixed(2)}`,
+      icon: Wallet,
+      color: 'violet',
+      trend: '+23%',
+      trendUp: true,
+    },
+    {
+      label: 'Trust Score',
+      value: user?.trust_score ?? '—',
+      icon: Star,
+      color: 'amber',
+      trend: '+5',
+      trendUp: true,
+    },
+  ], [activeListings, activeOrders, balance, user?.trust_score]);
+
+  const analyticsMetrics = useMemo(() => [
+    {
+      label: 'Total Revenue',
+      value: `$${(orders.reduce((sum, o) => sum + (o.total_price || 0), 0)).toFixed(2)}`,
+      change: '+18%',
+      positive: true,
+    },
+    {
+      label: 'Orders Completed',
+      value: orders.filter(o => String(o.status).toLowerCase() === 'completed').length,
+      change: '+12%',
+      positive: true,
+    },
+    {
+      label: 'Growth Rate',
+      value: '+24%',
+      change: '+6%',
+      positive: true,
+    },
+    {
+      label: 'Performance',
+      value: '94%',
+      change: '+2%',
+      positive: true,
+    },
+  ], [orders]);
+
+  const quickActions = useMemo(() => [
+    {
+      label: 'Create Listing',
+      icon: PlusCircle,
+      description: 'Add new crop to marketplace',
+      color: 'emerald',
+      view: 'create-listing' as DashboardView,
+    },
+    {
+      label: 'Withdraw Funds',
+      icon: Wallet,
+      description: 'Transfer to bank account',
+      color: 'blue',
+      view: 'wallet' as DashboardView,
+    },
+    {
+      label: 'Buyer Requests',
+      icon: MessageSquare,
+      description: 'View incoming requests',
+      color: 'violet',
+      view: 'buyer-requests' as DashboardView,
+    },
+    {
+      label: 'Subscription',
+      icon: Crown,
+      description: subscription?.plan?.name || 'Manage plan',
+      color: 'amber',
+      view: 'subscriptions' as DashboardView,
+    },
+  ], [subscription]);
+
+  const renderSidebar = useCallback(() => (
+    <aside
+      className={`
+        fixed left-0 top-0 h-screen bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800
+        transition-all duration-300 ease-in-out z-40
+        ${sidebarCollapsed ? 'w-[80px]' : 'w-[280px]'}
+        lg:translate-x-0 ${mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0
+      `}
+      role="navigation"
+      aria-label="Main navigation"
+    >
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
+          {!sidebarCollapsed && (
+            <div className="flex items-center gap-2">
+              <Sprout className="w-8 h-8 text-emerald-600" />
+              <span className="font-bold text-lg text-gray-900 dark:text-white">AgriTrust</span>
+            </div>
+          )}
+          <button
+            onClick={toggleSidebar}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {sidebarCollapsed ? <ChevronRight size={20} className="text-gray-600 dark:text-gray-400" /> : <ChevronLeft size={20} className="text-gray-600 dark:text-gray-400" />}
+          </button>
+        </div>
+
+        <nav className="flex-1 overflow-y-auto p-2 space-y-1">
+          {menuItems.map((item) => (
+            <div key={item.id}>
+              {item.children ? (
+                <div className="space-y-1">
+                  <div className={`
+                    flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer
+                    hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors
+                    ${sidebarCollapsed ? 'justify-center' : ''}
+                  `}>
+                    <item.icon size={20} className="text-gray-600 dark:text-gray-400" />
+                    {!sidebarCollapsed && (
+                      <>
+                        <span className="font-medium text-gray-700 dark:text-gray-300">{item.label}</span>
+                        <ChevronDown size={16} className="ml-auto text-gray-400" />
+                      </>
+                    )}
+                  </div>
+                  {!sidebarCollapsed && (
+                    <div className="ml-4 space-y-1">
+                      {item.children.map((child) => (
+                        <button
+                          key={child.id}
+                          onClick={() => child.view && handleNavigate(child.view)}
+                          className={`
+                            w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm
+                            hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors
+                            text-gray-600 dark:text-gray-400
+                          `}
+                        >
+                          <child.icon size={16} />
+                          <span className="flex-1 text-left">{child.label}</span>
+                          {child.badge && (
+                            <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-medium rounded-full">
+                              {child.badge}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button
+                  onClick={() => item.view && handleNavigate(item.view)}
+                  className={`
+                    w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
+                    hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors
+                    ${sidebarCollapsed ? 'justify-center' : ''}
+                    text-gray-600 dark:text-gray-400
+                  `}
+                  aria-label={item.label}
+                >
+                  <item.icon size={20} />
+                  {!sidebarCollapsed && (
+                    <>
+                      <span className="font-medium">{item.label}</span>
+                      {item.badge && (
+                        <span className="ml-auto px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-medium rounded-full">
+                          {item.badge}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          ))}
+        </nav>
+
+        {!sidebarCollapsed && (
+          <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
+            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Current Plan</span>
+                <Crown size={14} className="text-amber-500" />
+              </div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">{subscription?.plan?.name || 'Free'}</p>
+            </div>
+            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Trust Score</span>
+                <Star size={14} className="text-amber-500" />
+              </div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">{user?.trust_score ?? 0}/100</p>
+            </div>
+            <div className="flex items-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+              <CheckCircle size={14} className="text-emerald-600" />
+              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Account Active</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </aside>
+  ), [sidebarCollapsed, mobileDrawerOpen, menuItems, toggleSidebar, handleNavigate, subscription, user?.trust_score]);
+
+  const renderTopNavigation = useCallback(() => (
+    <header className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+      <div className="flex items-center justify-between px-4 lg:px-6 h-16">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={toggleMobileDrawer}
+            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label="Toggle mobile menu"
+          >
+            <Menu size={20} className="text-gray-600 dark:text-gray-400" />
+          </button>
+          <button
+            onClick={toggleSidebar}
+            className="hidden lg:block p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label="Toggle sidebar"
+          >
+            <Menu size={20} className="text-gray-600 dark:text-gray-400" />
+          </button>
+          <div className="hidden sm:block">
+            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Dashboard</h1>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Farmer Command Center</p>
+          </div>
+        </div>
+
+        <div className="flex-1 max-w-md mx-4 hidden md:block">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              placeholder="Search listings, orders, analytics..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setNotificationsOpen(!notificationsOpen)}
+            className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label="Notifications"
+          >
+            <Bell size={20} className="text-gray-600 dark:text-gray-400" />
+            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+          </button>
+
+          <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+            <Wallet size={16} className="text-gray-600 dark:text-gray-400" />
+            <span className="text-sm font-medium text-gray-900 dark:text-white">
+              ${Number(balance || 0).toFixed(2)}
+            </span>
+          </div>
+
+          <div className="relative">
+            <button
+              onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+              className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-label="User menu"
+            >
+              <div className="w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-medium">
+                  {user?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
+                </span>
+              </div>
+              <ChevronDown size={16} className="text-gray-400 hidden sm:block" />
+            </button>
+
+            {profileMenuOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 py-1">
+                <button
+                  onClick={() => { handleNavigate('profile'); setProfileMenuOpen(false); }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2"
+                >
+                  <User size={16} />
+                  Profile
+                </button>
+                <button
+                  onClick={() => { handleNavigate('settings'); setProfileMenuOpen(false); }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2"
+                >
+                  <Settings size={16} />
+                  Settings
+                </button>
+                <hr className="my-1 border-gray-200 dark:border-gray-800" />
+                <button
+                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+                >
+                  <LogOut size={16} />
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </header>
+  ), [toggleSidebar, toggleMobileDrawer, searchQuery, balance, user?.full_name, notificationsOpen, profileMenuOpen, handleNavigate]);
+
+  const renderWelcomeHeader = useCallback(() => (
+    <div className="mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Welcome back, {user?.full_name?.split(' ')[0] || 'farmer'}
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            Manage your agricultural business from one centralized dashboard
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => handleNavigate('create-listing')}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-colors"
+          >
+            <PlusCircle size={18} />
+            <span className="hidden sm:inline">Create Listing</span>
+          </button>
+          <button
+            onClick={() => handleNavigate('marketplace')}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          >
+            <TrendingUp size={18} />
+            <span className="hidden sm:inline">View Market</span>
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((s, i) => (
-          <Card key={i} className="group hover:border-primary-100 transition-all">
+      <div className="flex flex-wrap gap-3 mt-4">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-full">
+          <Crown size={14} className="text-emerald-600" />
+          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+            {subscription?.plan?.name || 'Free Plan'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-900/20 rounded-full">
+          <Star size={14} className="text-amber-600" />
+          <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
+            Trust Score: {user?.trust_score ?? 0}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 rounded-full">
+          <CheckCircle size={14} className="text-blue-600" />
+          <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
+            Account Active
+          </span>
+        </div>
+      </div>
+    </div>
+  ), [user?.full_name, user?.trust_score, subscription?.plan?.name, handleNavigate]);
+
+  const renderStatCard = useCallback((stat: any, index: number) => {
+    const colorClasses = {
+      emerald: { bg: 'bg-emerald-50 dark:bg-emerald-900/20', icon: 'from-emerald-500 to-emerald-600', text: 'text-emerald-700 dark:text-emerald-400' },
+      blue: { bg: 'bg-blue-50 dark:bg-blue-900/20', icon: 'from-blue-500 to-blue-600', text: 'text-blue-700 dark:text-blue-400' },
+      violet: { bg: 'bg-violet-50 dark:bg-violet-900/20', icon: 'from-violet-500 to-violet-600', text: 'text-violet-700 dark:text-violet-400' },
+      amber: { bg: 'bg-amber-50 dark:bg-amber-900/20', icon: 'from-amber-500 to-amber-600', text: 'text-amber-700 dark:text-amber-400' },
+    };
+    const colors = colorClasses[stat.color as keyof typeof colorClasses] || colorClasses.emerald;
+
+    return (
+      <div
+        key={index}
+        className="group relative overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm hover:shadow-lg transition-all duration-300"
+      >
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br opacity-5 group-hover:opacity-10 transition-opacity duration-300" style={{ background: `linear-gradient(135deg, ${stat.color === 'emerald' ? '#10b981' : stat.color === 'blue' ? '#3b82f6' : stat.color === 'violet' ? '#8b5cf6' : '#f59e0b'}, transparent)` }} />
+        <div className="relative p-6">
+          <div className="flex items-start justify-between">
             <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-2xl ${s.bg} ${s.color} flex items-center justify-center transition-transform group-hover:scale-110`}>
-                <s.icon size={28} />
+              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${colors.icon} flex items-center justify-center shadow-md transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg`}>
+                <stat.icon size={20} className="text-white" />
               </div>
               <div>
-                <p className="text-[10px] font-black text-earth-400 uppercase tracking-widest">{s.label}</p>
-                <p className="text-2xl font-black text-earth-800 dark:text-white">{s.value}</p>
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{stat.label}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{stat.value}</p>
               </div>
             </div>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Recent Activity */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-black text-earth-800 dark:text-white">Recent Listings</h3>
-              <button className="text-sm font-black text-primary-600 hover:text-primary-700">View All</button>
-            </div>
-            
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left border-b-2 border-earth-50 dark:border-earth-700">
-                    <th className="pb-4 text-[10px] font-black text-earth-400 uppercase tracking-widest">Crop</th>
-                    <th className="pb-4 text-[10px] font-black text-earth-400 uppercase tracking-widest">Quantity</th>
-                    <th className="pb-4 text-[10px] font-black text-earth-400 uppercase tracking-widest">Price/kg</th>
-                    <th className="pb-4 text-[10px] font-black text-earth-400 uppercase tracking-widest">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y-2 divide-earth-50 dark:divide-earth-700">
-                  {myListings.slice(0, 5).map((l) => (
-                    <tr key={l.id} className="group hover:bg-earth-50/50 dark:hover:bg-earth-700/50 transition-colors">
-                      <td className="py-4 font-bold text-earth-800 dark:text-earth-200">{l.crop_type}</td>
-                      <td className="py-4 font-bold text-earth-600 dark:text-earth-300">{l.quantity} kg</td>
-                      <td className="py-4 font-bold text-earth-800 dark:text-earth-200">${l.price_per_unit.toFixed(2)}</td>
-                      <td className="py-4">
-                        <span className={`
-                          px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider
-                          ${l.status === 'active' || l.status === 'verified' ? 'bg-green-100 text-green-600' : 'bg-earth-100 text-earth-500'}
-                        `}>
-                          {l.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  {myListings.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="py-8 text-center text-earth-400 font-bold italic">
-                        No listings found. Create your first listing to start selling!
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+            {stat.trend && (
+              <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold ${stat.trendUp ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'}`}>
+                {stat.trendUp ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                {stat.trend}
+              </div>
+            )}
+          </div>
         </div>
+      </div>
+    );
+  }, []);
 
-        {/* Market Trends */}
-        <div className="space-y-6">
-          <Card className="bg-primary-600 text-white border-none shadow-xl shadow-primary-200">
-            <h3 className="text-lg font-black mb-4">Market Trends</h3>
-            <div className="space-y-4">
-              {[
-                { name: 'Maize', price: '$0.35', trend: '+5.2%', up: true },
-                { name: 'Soybeans', price: '$0.58', trend: '-2.1%', up: false },
-                { name: 'Wheat', price: '$0.42', trend: '+1.8%', up: true },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-2xl bg-white/10 backdrop-blur-sm">
-                  <div className="flex items-center gap-3">
-                    <TrendingUp size={18} className="text-white/60" />
-                    <span className="font-black text-sm">{item.name}</span>
+  const renderAnalyticsOverview = useCallback(() => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {analyticsMetrics.map((metric, index) => (
+        <div
+          key={index}
+          className="group relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-all duration-300"
+        >
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{metric.label}</p>
+              <div className={`w-8 h-8 rounded-lg ${metric.positive ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-red-50 dark:bg-red-900/20'} flex items-center justify-center`}>
+                {metric.positive ? <ArrowUpRight size={16} className="text-emerald-600 dark:text-emerald-400" /> : <ArrowDownRight size={16} className="text-red-600 dark:text-red-400" />}
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{metric.value}</p>
+            <div className={`flex items-center gap-1 mt-2 text-sm ${metric.positive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+              <span className="font-semibold">{metric.change}</span>
+              <span className="text-gray-500 dark:text-gray-400">vs last month</span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  ), [analyticsMetrics]);
+
+  const renderRecentListings = useCallback(() => (
+    <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+        <div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Recent Listings</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Your latest crop offerings</p>
+        </div>
+        <button
+          onClick={() => handleNavigate('my-listings')}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all"
+        >
+          View All
+          <ArrowRight size={16} />
+        </button>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="text-left border-b border-gray-200 dark:border-gray-700">
+              <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Crop</th>
+              <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Quantity</th>
+              <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Price/kg</th>
+              <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+            {myListings.slice(0, 5).map((l) => (
+              <tr key={l.id} className="group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">{l.crop_type}</td>
+                <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{l.quantity} kg</td>
+                <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">${Number(l.price_per_unit || 0).toFixed(2)}</td>
+                <td className="px-6 py-4">
+                  <span className={`
+                    px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider
+                    ${['active', 'verified', 'published'].includes(String(l.status).toLowerCase())
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                      : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}
+                  `}>
+                    {l.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+            {myListings.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-6 py-16 text-center">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="w-20 h-20 rounded-2xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                      <Sprout size={40} className="text-gray-400" />
+                    </div>
+                    <p className="text-gray-500 dark:text-gray-400 font-semibold">No listings found</p>
+                    <button
+                      onClick={() => handleNavigate('create-listing')}
+                      className="px-6 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 transition-colors shadow-md hover:shadow-lg"
+                    >
+                      Create Your First Listing
+                    </button>
                   </div>
-                  <div className="text-right">
-                    <p className="font-black text-sm">{item.price}/kg</p>
-                    <p className={`text-[10px] font-black flex items-center justify-end gap-1 ${item.up ? 'text-green-300' : 'text-red-300'}`}>
-                      {item.up ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
-                      {item.trend}
-                    </p>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  ), [myListings, handleNavigate]);
+
+  const renderMarketIntelligence = useCallback(() => (
+    <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+      <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+            <TrendingUp size={18} className="text-emerald-600 dark:text-emerald-400" />
+          </div>
+          Market Intelligence
+        </h3>
+      </div>
+      <div className="p-6 space-y-3">
+        {[
+          { name: 'Maize', price: '$0.35', trend: '+5.2%', up: true, icon: 'MZ' },
+          { name: 'Soybeans', price: '$0.58', trend: '-2.1%', up: false, icon: 'SB' },
+          { name: 'Wheat', price: '$0.42', trend: '+1.8%', up: true, icon: 'WH' },
+        ].map((item, i) => (
+          <div key={i} className="group flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-md transition-all">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">{item.icon}</span>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 dark:text-white">{item.name}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{item.price}/kg</p>
+              </div>
+            </div>
+            <div className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider ${item.up ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+              {item.up ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+              {item.trend}
+            </div>
+          </div>
+        ))}
+        <button
+          onClick={() => handleNavigate('marketplace')}
+          className="w-full mt-4 py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-colors shadow-md hover:shadow-lg"
+        >
+          View Full Market Analysis
+        </button>
+      </div>
+    </div>
+  ), [handleNavigate]);
+
+  const renderOperationsCenter = useCallback(() => (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+              <Box size={18} className="text-blue-600 dark:text-blue-400" />
+            </div>
+            Recent Orders
+          </h3>
+        </div>
+        <div className="p-6">
+          <div className="space-y-3">
+            {orders.slice(0, 3).map((order) => (
+              <div key={order.id} className="group flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <ShoppingCart size={20} className="text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900 dark:text-white">Order #{order.id.slice(-6)}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">${Number(order.total_price || 0).toFixed(2)}</p>
                   </div>
                 </div>
-              ))}
-            </div>
-            <button className="w-full mt-6 py-3 rounded-xl bg-white text-primary-600 font-black text-sm hover:bg-earth-50 transition-colors">
-              Full Market Analysis
-            </button>
-          </Card>
-
-          <Card>
-            <h3 className="text-lg font-black text-earth-800 dark:text-white mb-4">Quick Actions</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: 'New Listing', icon: Sprout, color: 'bg-primary-50 text-primary-600' },
-                { label: 'Withdraw', icon: Wallet, color: 'bg-secondary-50 text-secondary-600' },
-                { label: 'Support', icon: TrendingUp, color: 'bg-earth-50 text-earth-600' },
-                { label: 'Profile', icon: Star, color: 'bg-yellow-50 text-yellow-600' },
-              ].map((act, i) => (
-                <button key={i} className={`flex flex-col items-center justify-center p-4 rounded-2xl ${act.color} font-black text-[10px] uppercase tracking-widest gap-2 hover:scale-105 transition-transform`}>
-                  <act.icon size={20} />
-                  {act.label}
-                </button>
-              ))}
-            </div>
-          </Card>
+                <span className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider ${
+                  String(order.status).toLowerCase() === 'completed'
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                }`}>
+                  {order.status}
+                </span>
+              </div>
+            ))}
+            {orders.length === 0 && (
+              <div className="py-8 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center mx-auto mb-3 text-gray-400">
+                  <ShoppingCart size={32} />
+                </div>
+                <p className="text-gray-500 dark:text-gray-400 font-medium">No orders yet</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+              <Activity size={18} className="text-violet-600 dark:text-violet-400" />
+            </div>
+            Activity Overview
+          </h3>
+        </div>
+        <div className="p-6 grid grid-cols-2 gap-4">
+          <div className="group p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:border-violet-300 dark:hover:border-violet-700 hover:shadow-md transition-all">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Lock size={18} className="text-violet-600 dark:text-violet-400" />
+              </div>
+              <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">Escrow</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white">{escrowActivity}</p>
+          </div>
+          <div className="group p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Truck size={18} className="text-blue-600 dark:text-blue-400" />
+              </div>
+              <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">Deliveries</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white">{pendingDeliveries}</p>
+          </div>
+          <div className="group p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:border-amber-300 dark:hover:border-amber-700 hover:shadow-md transition-all">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Clock size={18} className="text-amber-600 dark:text-amber-400" />
+              </div>
+              <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">Pending</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white">
+              {orders.filter(o => String(o.status).toLowerCase() === 'pending').length}
+            </p>
+          </div>
+          <div className="group p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-md transition-all">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <CheckCircle size={18} className="text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">Completed</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white">
+              {orders.filter(o => String(o.status).toLowerCase() === 'completed').length}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  ), [orders, escrowActivity, pendingDeliveries]);
+
+  const renderQuickActions = useCallback(() => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {quickActions.map((action, index) => {
+        const colorClasses = {
+          emerald: { border: 'hover:border-emerald-400 dark:hover:border-emerald-600', shadow: 'hover:shadow-emerald-500/20', icon: 'from-emerald-500 to-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
+          blue: { border: 'hover:border-blue-400 dark:hover:border-blue-600', shadow: 'hover:shadow-blue-500/20', icon: 'from-blue-500 to-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+          violet: { border: 'hover:border-violet-400 dark:hover:border-violet-600', shadow: 'hover:shadow-violet-500/20', icon: 'from-violet-500 to-violet-600', bg: 'bg-violet-50 dark:bg-violet-900/20' },
+          amber: { border: 'hover:border-amber-400 dark:hover:border-amber-600', shadow: 'hover:shadow-amber-500/20', icon: 'from-amber-500 to-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+        };
+        const colors = colorClasses[action.color as keyof typeof colorClasses] || colorClasses.emerald;
+
+        return (
+          <button
+            key={index}
+            onClick={() => handleNavigate(action.view)}
+            className={`
+              group relative overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800
+              shadow-sm hover:shadow-lg ${colors.shadow} transition-all duration-300 ${colors.border}
+              text-left p-6
+            `}
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br opacity-0 group-hover:opacity-10 transition-opacity duration-300" style={{ background: `linear-gradient(135deg, ${action.color === 'emerald' ? '#10b981' : action.color === 'blue' ? '#3b82f6' : action.color === 'violet' ? '#8b5cf6' : '#f59e0b'}, transparent)` }} />
+            <div className="relative">
+              <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${colors.icon} flex items-center justify-center mb-4 shadow-md group-hover:scale-110 group-hover:shadow-lg transition-all duration-300`}>
+                <action.icon size={24} className="text-white" />
+              </div>
+              <h4 className="font-bold text-gray-900 dark:text-white mb-1">{action.label}</h4>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{action.description}</p>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  ), [quickActions, handleNavigate]);
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      {renderSidebar()}
+      {renderTopNavigation()}
+
+      <main
+        className={`
+          transition-all duration-300 ease-in-out
+          ${sidebarCollapsed ? 'lg:ml-[80px]' : 'lg:ml-[280px]'}
+        `}
+      >
+        <div className="p-4 lg:p-8">
+          {renderWelcomeHeader()}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {stats.map(renderStatCard)}
+          </div>
+
+          {renderAnalyticsOverview()}
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+            <div className="lg:col-span-2">
+              {renderRecentListings()}
+            </div>
+            <div>
+              {renderMarketIntelligence()}
+            </div>
+          </div>
+
+          <div className="mt-8">
+            {renderOperationsCenter()}
+          </div>
+
+          <div className="mt-8">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
+            {renderQuickActions()}
+          </div>
+        </div>
+      </main>
+
+      {mobileDrawerOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={toggleMobileDrawer}
+          aria-label="Close mobile drawer"
+        />
+      )}
     </div>
   );
 };

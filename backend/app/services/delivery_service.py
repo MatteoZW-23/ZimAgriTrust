@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -15,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.models.logistics import DeliveryMethod, DeliveryStatus, OrderDelivery
 from app.models.transaction import Order, OrderStatus
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -270,6 +272,20 @@ def _sms(phone: Optional[str], msg: str):
         logger.warning("SMS failed to %s: %s", phone, e)
 
 
+def _dispatch_event(db: Session, user: Optional[User], event_key: str, priority: str = "important", **vars) -> None:
+    if not user:
+        return
+    try:
+        from app.services.notification_service import NotificationService
+        try:
+            asyncio.run(NotificationService.dispatch_event(db, user, event_key, priority=priority, **vars))
+        except RuntimeError:
+            loop = asyncio.get_event_loop()
+            loop.create_task(NotificationService.dispatch_event(db, user, event_key, priority=priority, **vars))
+    except Exception as e:
+        logger.warning("dispatch_event failed %s: %s", event_key, e)
+
+
 def _notify_method_confirmed(db: Session, order_id: uuid.UUID, method: DeliveryMethod):
     farmer, buyer, order = _get_parties(db, order_id)
     msg = f"ZimAgritrust Order #{order.order_number}: Delivery method confirmed ({method.value.replace('_', ' ')}). Arrange within 48 hours."
@@ -295,6 +311,7 @@ def _notify_driver_assigned(db: Session, order_id: uuid.UUID):
     msg = f"ZimAgritrust Order #{order.order_number}: Driver {delivery.driver_name or 'assigned'} ({delivery.vehicle_reg or 'N/A'}) will handle transport."
     _sms(farmer, msg)
     _sms(buyer, msg)
+    _dispatch_event(db, order.buyer, "driver_assigned", priority="important", NAME=delivery.driver_name or "Assigned", PHONE="N/A")
 
 
 def _notify_pickup_in_progress(db: Session, order_id: uuid.UUID):
@@ -307,6 +324,7 @@ def _notify_pickup_completed(db: Session, order_id: uuid.UUID, eta: Optional[dat
     eta_str = eta.strftime("%d %b %H:%M") if eta else "TBD"
     _sms(farmer, f"ZimAgritrust Order #{order.order_number}: Goods picked up successfully.")
     _sms(buyer,  f"ZimAgritrust Order #{order.order_number}: Goods picked up. ETA: {eta_str}.")
+    _dispatch_event(db, order.buyer, "delivery_in_transit", priority="important", ETA=eta_str, LINK=f"/orders/{order.id}")
 
 
 def _notify_delay(db: Session, order_id: uuid.UUID, new_eta: Optional[datetime]):
@@ -326,6 +344,8 @@ def _notify_delivery_completed(db: Session, order_id: uuid.UUID, deadline: Optio
     deadline_str = deadline.strftime("%d %b %H:%M") if deadline else "24 hours"
     _sms(farmer, f"ZimAgritrust Order #{order.order_number}: Goods handed over. Awaiting buyer confirmation.")
     _sms(buyer,  f"ZimAgritrust Order #{order.order_number}: Goods delivered. You have until {deadline_str} to inspect and confirm or raise a dispute.")
+    _dispatch_event(db, order.buyer, "delivery_confirmed", priority="important")
+    _dispatch_event(db, order.seller, "delivery_confirmed", priority="important")
 
 
 def _notify_buyer_confirmed(db: Session, order_id: uuid.UUID):

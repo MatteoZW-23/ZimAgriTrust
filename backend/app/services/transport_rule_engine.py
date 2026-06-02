@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 class TransportMode(str, Enum):
     PLATFORM_DELIVERY_BUYER_REQUESTED = "PLATFORM_DELIVERY_BUYER_REQUESTED"
     PLATFORM_DELIVERY_FARMER_REQUESTED = "PLATFORM_DELIVERY_FARMER_REQUESTED"
+    PLATFORM_DELIVERY_SUPPLIER_REQUESTED = "PLATFORM_DELIVERY_SUPPLIER_REQUESTED"
     SELF_PICKUP = "SELF_PICKUP"
     SELF_DELIVERY = "SELF_DELIVERY"
     NEGOTIATED_TRANSPORT = "NEGOTIATED_TRANSPORT"
@@ -82,6 +83,10 @@ class TransportRuleEngine:
                 )
             elif mode == TransportMode.PLATFORM_DELIVERY_FARMER_REQUESTED:
                 return await self._apply_farmer_requested_delivery(
+                    order_id, transport_request_data
+                )
+            elif mode == TransportMode.PLATFORM_DELIVERY_SUPPLIER_REQUESTED:
+                return await self._apply_supplier_requested_delivery(
                     order_id, transport_request_data
                 )
             elif mode == TransportMode.SELF_PICKUP:
@@ -223,7 +228,62 @@ class TransportRuleEngine:
             payment_allocations=[allocation],
             notifications=notifications,
         )
-    
+
+    async def _apply_supplier_requested_delivery(
+        self,
+        order_id: uuid.UUID,
+        transport_data: Dict[str, Any],
+    ) -> RuleResult:
+        """
+        RULE: Supplier Requested Delivery
+        - Supplier pays transport fee
+        - Transport fee deducted from supplier settlement
+        - Buyer pays goods price only
+        - Driver assigned automatically
+        """
+        logger.info(f"Applying Rule: Supplier Requested Delivery for order {order_id}")
+
+        # Calculate transport fee
+        quote = await self._calculate_transport_quote(transport_data)
+
+        # Create payment allocation
+        allocation = {
+            "order_id": str(order_id),
+            "allocation_type": "TRANSPORT_FEE",
+            "payer": "SUPPLIER",
+            "payee": "DRIVER",
+            "amount": quote["total_amount"],
+            "currency": "USD",
+            "payment_method": "ESCROW",
+        }
+
+        # Create notifications
+        notifications = [
+            {
+                "user_type": "SUPPLIER",
+                "type": "TRANSPORT_FEE_DEDUCTED",
+                "title": "Transport Fee Deducted",
+                "body": f"${quote['total_amount']:.2f} will be deducted from your settlement for transport.",
+                "data": {"transport_fee": quote["total_amount"]},
+            },
+            {
+                "user_type": "BUYER",
+                "type": "SUPPLIER_PROVIDING_DELIVERY",
+                "title": "Supplier Providing Delivery",
+                "body": "The supplier will arrange delivery for your order.",
+                "data": {},
+            },
+        ]
+
+        return RuleResult(
+            success=True,
+            transport_fee_payer="SUPPLIER",
+            transport_fee=quote["total_amount"],
+            driver_assignment="AUTO_ASSIGNED",
+            payment_allocations=[allocation],
+            notifications=notifications,
+        )
+
     async def _apply_self_pickup(
         self,
         order_id: uuid.UUID,
@@ -572,4 +632,4 @@ def validate_transport_mode(mode: str) -> bool:
 
 def validate_requested_by(requested_by: str) -> bool:
     """Validate requested_by value"""
-    return requested_by in ["BUYER", "FARMER"]
+    return requested_by in ["BUYER", "FARMER", "SUPPLIER"]

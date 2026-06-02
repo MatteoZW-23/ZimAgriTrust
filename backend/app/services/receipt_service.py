@@ -9,6 +9,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from datetime import datetime
 import uuid
 
+from app.core.config import settings
 from app.models.transaction import Order
 
 class ReceiptService:
@@ -65,8 +66,7 @@ class ReceiptService:
         elements.append(Spacer(1, 2*cm))
 
         # 3. VERIFICATION QR CODE
-        # We encode a verification URL (simulated)
-        verification_data = f"https://ZimAgritrust.zw/verify/{order.id}"
+        verification_data = f"{settings.FRONTEND_URL.rstrip('/')}/receipts/verify/{order.id}"
         qr = qrcode.QRCode(version=1, box_size=10, border=5)
         qr.add_data(verification_data)
         qr.make(fit=True)

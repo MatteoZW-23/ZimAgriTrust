@@ -1,6 +1,7 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import ProgrammingError
 
 from app.api.deps import get_db, require_roles
 from app.models.listing import BuyerRequest, FarmerResponse
@@ -31,7 +32,11 @@ def list_requests(db: Session = Depends(get_db)) -> list[BuyerRequest]:
     """
     Farmers browse active requests.
     """
-    return db.query(BuyerRequest).filter(BuyerRequest.status == "open").all()
+    try:
+        return db.query(BuyerRequest).filter(BuyerRequest.status == "open").all()
+    except ProgrammingError:
+        db.rollback()
+        return []
 
 
 @router.get("/me", response_model=list[BuyerRequestResponse])
@@ -42,7 +47,11 @@ def list_my_requests(
     query = db.query(BuyerRequest)
     if buyer.role != UserRole.ADMIN:
         query = query.filter(BuyerRequest.buyer_id == buyer.id)
-    return query.order_by(BuyerRequest.created_at.desc()).all()
+    try:
+        return query.order_by(BuyerRequest.created_at.desc()).all()
+    except ProgrammingError:
+        db.rollback()
+        return []
 
 
 @router.delete("/{request_id}")

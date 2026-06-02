@@ -4,6 +4,7 @@
   "description": "WhatsApp Bridge for ZimAgritrust using personal numbers",
   "main": "index.ts",
   "scripts": {
+    "build": "npx tsc --noEmit",
     "start": "ts-node index.ts"
   },
   "dependencies": {

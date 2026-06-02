@@ -121,11 +121,11 @@ PEAK_DEMAND_MULTIPLIERS = {
 
 class TransportPricingEngine:
     """Dynamic transport pricing engine"""
-    
+
     def __init__(self):
         self.pricing_algorithm = "DYNAMIC_V2"
         self.pricing_version = "2.0.0"
-    
+
     def calculate_quote(
         self,
         factors: PricingFactors,
@@ -133,7 +133,7 @@ class TransportPricingEngine:
     ) -> Dict[str, Any]:
         """
         Calculate transport quote based on all pricing factors.
-        
+
         Returns complete breakdown with:
         - base_fee
         - distance_fee
@@ -150,9 +150,9 @@ class TransportPricingEngine:
         # Validate vehicle type
         if factors.vehicle_type not in VEHICLE_PRICING:
             raise ValueError(f"Invalid vehicle type: {factors.vehicle_type}")
-        
+
         vehicle_pricing = VEHICLE_PRICING[factors.vehicle_type]
-        
+
         # Calculate base components
         base_fee = vehicle_pricing.base_fee
         distance_fee = self._calculate_distance_fee(
@@ -164,10 +164,10 @@ class TransportPricingEngine:
             factors.cargo_volume_m3,
             factors.cargo_weight_kg
         )
-        
+
         # Calculate subtotal before multipliers
         subtotal_before_multipliers = base_fee + distance_fee + weight_fee + volume_fee
-        
+
         # Calculate multipliers
         urgency_multiplier = URGENCY_MULTIPLIERS.get(
             factors.urgency_level,
@@ -185,7 +185,7 @@ class TransportPricingEngine:
             factors.driver_availability,
             DRIVER_AVAILABILITY_MULTIPLIERS["HIGH"]
         )
-        
+
         # Apply combined multiplier
         combined_multiplier = (
             urgency_multiplier *
@@ -195,31 +195,31 @@ class TransportPricingEngine:
             factors.peak_demand_multiplier *
             factors.fuel_multiplier
         )
-        
+
         # Calculate adjusted subtotal
         subtotal = subtotal_before_multipliers * combined_multiplier
-        
+
         # Calculate surcharges
         rural_surcharge = self._calculate_rural_surcharge(
             subtotal,
             factors.rural_accessibility_score
         )
-        
+
         # Calculate individual fee components for transparency
         urgency_fee = subtotal_before_multipliers * (urgency_multiplier - 1.0)
         weather_surcharge = subtotal_before_multipliers * (weather_multiplier - 1.0)
         peak_surcharge = subtotal_before_multipliers * (factors.peak_demand_multiplier - 1.0)
-        
+
         # Add surcharges
         subtotal += rural_surcharge
-        
+
         # Calculate tax (15% VAT for Zimbabwe)
         tax_rate = 0.15
         tax_amount = round(subtotal * tax_rate, 2)
-        
+
         # Calculate total
         total_amount = round(subtotal + tax_amount, 2)
-        
+
         # Apply min/max fee constraints
         if total_amount < vehicle_pricing.min_fee:
             total_amount = vehicle_pricing.min_fee
@@ -229,7 +229,7 @@ class TransportPricingEngine:
             total_amount = vehicle_pricing.max_fee
             tax_amount = round(total_amount / (1 + tax_rate) * tax_rate, 2)
             subtotal = total_amount - tax_amount
-        
+
         # Build pricing factors for audit
         pricing_factors = {
             "distance_km": factors.distance_km,
@@ -250,7 +250,7 @@ class TransportPricingEngine:
             "combined_multiplier": combined_multiplier,
             "tax_rate": tax_rate,
         }
-        
+
         return {
             "base_fee": round(base_fee, 2),
             "distance_km": round(factors.distance_km, 2),
@@ -274,33 +274,33 @@ class TransportPricingEngine:
             "pricing_version": self.pricing_version,
             "pricing_factors": pricing_factors,
         }
-    
+
     def _calculate_distance_fee(self, distance_km: float, per_km_rate: float) -> float:
         """Calculate distance-based fee"""
         return round(distance_km * per_km_rate, 2)
-    
+
     def _calculate_weight_fee(self, weight_kg: float) -> float:
         """Calculate weight-based surcharge"""
         # No surcharge for weights under 100kg
         if weight_kg <= 100:
             return 0.0
-        
+
         # $0.05 per kg over 100kg
         excess_weight = weight_kg - 100
         return round(excess_weight * 0.05, 2)
-    
+
     def _calculate_volume_fee(self, volume_m3: Optional[float], weight_kg: float) -> float:
         """Calculate volume-based surcharge"""
         if not volume_m3:
             return 0.0
-        
+
         # $2.00 per cubic meter over 2m3
         if volume_m3 <= 2.0:
             return 0.0
-        
+
         excess_volume = volume_m3 - 2.0
         return round(excess_volume * 2.00, 2)
-    
+
     def _calculate_rural_surcharge(self, subtotal: float, rural_score: float) -> float:
         """Calculate rural accessibility surcharge"""
         # rural_score: 1.0 (urban) to 5.0 (remote)
@@ -312,7 +312,7 @@ class TransportPricingEngine:
             return round(subtotal * 0.15, 2)
         else:
             return round(subtotal * 0.25, 2)
-    
+
     def estimate_distance(
         self,
         pickup_lat: float,
@@ -325,22 +325,22 @@ class TransportPricingEngine:
         In production, this would use Google Maps Distance Matrix API.
         """
         from math import radians, cos, sin, asin, sqrt
-        
+
         # Convert to radians
         lat1, lon1 = radians(pickup_lat), radians(pickup_lon)
         lat2, lon2 = radians(delivery_lat), radians(delivery_lon)
-        
+
         # Haversine formula
         dlat = lat2 - lat1
         dlon = lon2 - lon1
         a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
         c = 2 * asin(sqrt(a))
-        
+
         # Earth's radius in kilometers
         r = 6371
-        
+
         return round(c * r, 2)
-    
+
     def determine_rural_accessibility(
         self,
         latitude: float,
@@ -349,35 +349,46 @@ class TransportPricingEngine:
     ) -> float:
         """
         Determine rural accessibility score (1.0-5.0).
-        In production, this would use geospatial data.
+        Uses district-based mapping for Zimbabwe regions.
         """
         # Simplified logic based on Zimbabwe regions
         # Harare/Bulawayo = 1.0 (urban)
         # Major towns = 2.5 (suburban)
         # Rural areas = 3.5 (rural)
         # Remote areas = 5.0 (remote)
-        
-        # This is a placeholder - implement with actual geospatial data
-        return 2.0
-    
+
+        urban_districts = ["harare", "bulawayo"]
+        major_towns = ["chitungwiza", "gweru", "mutare", "masvingo", "kwekwe"]
+
+        district_lower = district.lower() if district else ""
+
+        if any(urban in district_lower for urban in urban_districts):
+            return 1.0
+        elif any(town in district_lower for town in major_towns):
+            return 2.5
+        elif district_lower:
+            return 3.5
+        else:
+            return 2.0  # Default to suburban if unknown
+
     def get_peak_demand_multiplier(self, datetime: datetime) -> float:
         """
         Determine peak demand multiplier based on time.
         """
         hour = datetime.hour
         day = datetime.weekday()
-        
+
         # Peak hours: 7-9 AM and 5-7 PM on weekdays
         if day < 5 and (7 <= hour <= 9 or 17 <= hour <= 19):
             return PEAK_DEMAND_MULTIPLIERS["HIGH"]
-        
+
         # Moderate: weekends and weekday evenings
         if day >= 5 or (10 <= hour <= 16 or 20 <= hour <= 22):
             return PEAK_DEMAND_MULTIPLIERS["MODERATE"]
-        
+
         # Off-peak: late night and early morning
         return PEAK_DEMAND_MULTIPLIERS["OFF_PEAK"]
-    
+
     def calculate_multi_stop_pricing(
         self,
         factors: PricingFactors,
@@ -389,10 +400,10 @@ class TransportPricingEngine:
         """
         if not stops:
             return self.calculate_quote(factors, db)
-        
+
         # Calculate total distance with stops
         total_distance = factors.distance_km
-        
+
         # Add distance for each additional stop
         for i, stop in enumerate(stops):
             if i == 0:
@@ -417,10 +428,10 @@ class TransportPricingEngine:
                         stop["longitude"],
                     )
                     total_distance += dist
-        
+
         # Multi-stop surcharge: $2.00 per additional stop
         multi_stop_surcharge = len(stops) * 2.00
-        
+
         # Update factors with total distance
         updated_factors = PricingFactors(
             distance_km=total_distance,
@@ -435,16 +446,16 @@ class TransportPricingEngine:
             driver_availability=factors.driver_availability,
             peak_demand_multiplier=factors.peak_demand_multiplier,
         )
-        
+
         quote = self.calculate_quote(updated_factors, db)
-        
+
         # Add multi-stop surcharge
         quote["subtotal"] += multi_stop_surcharge
         quote["total_amount"] = round(quote["subtotal"] + quote["tax_amount"], 2)
         quote["multi_stop_surcharge"] = multi_stop_surcharge
         quote["number_of_stops"] = len(stops)
         quote["total_distance_km"] = round(total_distance, 2)
-        
+
         return quote
 
 
@@ -485,28 +496,28 @@ def estimate_delivery_time(
         "van": 30,
         "truck": 25,
     }
-    
+
     base_speed = vehicle_speeds.get(vehicle_type, 30)
-    
+
     # Urgency affects speed (urgent = faster)
     urgency_speed_multiplier = URGENCY_MULTIPLIERS.get(urgency_level, 1.0)
     adjusted_speed = base_speed * urgency_speed_multiplier
-    
+
     # Calculate base time in hours
     time_hours = distance_km / adjusted_speed
-    
+
     # Add pickup/dropoff time (30 minutes each)
     handling_time_hours = 1.0
-    
+
     total_time_hours = time_hours + handling_time_hours
-    
+
     # Convert to minutes
     total_minutes = int(total_time_hours * 60)
-    
+
     # Add buffer time
     buffer_minutes = int(total_minutes * 0.2)
     estimated_minutes = total_minutes + buffer_minutes
-    
+
     return {
         "estimated_minutes": estimated_minutes,
         "estimated_hours": round(estimated_minutes / 60, 1),

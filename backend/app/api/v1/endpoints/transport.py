@@ -32,6 +32,7 @@ from app.models.transport import (
     TrackingStatus,
     AllocationType,
     AllocationStatus,
+    DisputeStatus,
 )
 from app.models.driver import Driver
 from app.models.transaction import Order
@@ -57,7 +58,7 @@ router = APIRouter()
 class TransportRequestCreate(BaseModel):
     """Request to initiate transport"""
     order_id: uuid.UUID
-    requested_by: str = Field(..., description="'BUYER' or 'FARMER'")
+    requested_by: str = Field(..., description="'BUYER', 'FARMER', or 'SUPPLIER'")
     mode: str = Field(..., description="Transport mode")
     
     # Pickup details
@@ -83,7 +84,7 @@ class TransportRequestCreate(BaseModel):
     # Timing
     preferred_pickup_time: Optional[datetime] = None
     preferred_delivery_time: Optional[datetime] = None
-    urgency_level: str = Field(default="STANDARD", regex="^(STANDARD|URGENT|EXPEDITED)$")
+    urgency_level: str = Field(default="STANDARD", pattern="^(STANDARD|URGENT|EXPEDITED)$")
     
     # Vehicle preferences
     preferred_vehicle_type: Optional[str] = None
@@ -93,15 +94,15 @@ class TransportRequestCreate(BaseModel):
 class TransportQuoteRequest(BaseModel):
     """Request to calculate transport quote"""
     distance_km: float = Field(..., ge=0)
-    vehicle_type: str = Field(..., regex="^(motorcycle|car|van|truck)$")
+    vehicle_type: str = Field(..., pattern="^(motorcycle|car|van|truck)$")
     cargo_weight_kg: float = Field(..., gt=0)
     cargo_volume_m3: Optional[float] = None
-    urgency_level: str = Field(default="STANDARD", regex="^(STANDARD|URGENT|EXPEDITED)$")
+    urgency_level: str = Field(default="STANDARD", pattern="^(STANDARD|URGENT|EXPEDITED)$")
     fuel_multiplier: float = Field(default=1.0, ge=0.5, le=2.0)
-    road_accessibility: str = Field(default="GOOD", regex="^(EXCELLENT|GOOD|FAIR|POOR)$")
-    weather_risk: str = Field(default="LOW", regex="^(LOW|MODERATE|HIGH|SEVERE)$")
+    road_accessibility: str = Field(default="GOOD", pattern="^(EXCELLENT|GOOD|FAIR|POOR)$")
+    weather_risk: str = Field(default="LOW", pattern="^(LOW|MODERATE|HIGH|SEVERE)$")
     rural_accessibility_score: float = Field(default=1.0, ge=1.0, le=5.0)
-    driver_availability: str = Field(default="HIGH", regex="^(HIGH|MEDIUM|LOW|CRITICAL)$")
+    driver_availability: str = Field(default="HIGH", pattern="^(HIGH|MEDIUM|LOW|CRITICAL)$")
     peak_demand_multiplier: float = Field(default=1.0, ge=1.0, le=2.0)
     pickup_latitude: Optional[float] = None
     pickup_longitude: Optional[float] = None
@@ -124,7 +125,7 @@ class TransportDeferPayload(BaseModel):
 class NegotiationOfferPayload(BaseModel):
     """Submit negotiation offer"""
     negotiation_id: uuid.UUID
-    payer: str = Field(..., regex="^(BUYER|FARMER|SPLIT)$")
+    payer: str = Field(..., pattern="^(BUYER|FARMER|SPLIT)$")
     amount: float = Field(..., gt=0)
     split_ratio: Optional[Dict[str, float]] = None  # For split payments: {"buyer": 0.6, "farmer": 0.4}
     message: Optional[str] = None
@@ -133,6 +134,23 @@ class NegotiationOfferPayload(BaseModel):
 class NegotiationAcceptPayload(BaseModel):
     """Accept negotiation offer"""
     negotiation_id: uuid.UUID
+
+
+class NegotiationMessagePayload(BaseModel):
+    """Send a negotiation message"""
+    negotiation_id: uuid.UUID
+    message: str = Field(..., min_length=1, max_length=2000)
+
+
+class NegotiationRejectPayload(BaseModel):
+    """Reject the current negotiation offer"""
+    negotiation_id: uuid.UUID
+    reason: Optional[str] = None
+
+
+def _ensure_negotiation_party(negotiation: TransportNegotiation, current_user: User) -> None:
+    if current_user.id not in {negotiation.initiator_id, negotiation.counterparty_id}:
+        raise HTTPException(status_code=403, detail="You are not part of this negotiation")
 
 
 # ── Transport Request Endpoints ────────────────────────────────────────────────
@@ -156,22 +174,29 @@ async def request_transport(
     """
     # Validate inputs
     if not validate_requested_by(payload.requested_by):
-        raise HTTPException(status_code=400, detail="Invalid requested_by. Must be 'BUYER' or 'FARMER'")
-    
+        raise HTTPException(status_code=400, detail="Invalid requested_by. Must be 'BUYER', 'FARMER', or 'SUPPLIER'")
+
     if not validate_transport_mode(payload.mode):
         raise HTTPException(status_code=400, detail="Invalid transport mode")
-    
+
     # Verify user can make this request
     if payload.requested_by == "BUYER" and current_user.role != UserRole.BUYER:
         raise HTTPException(status_code=403, detail="Only buyers can request buyer-paid transport")
-    
+
     if payload.requested_by == "FARMER" and current_user.role != UserRole.FARMER:
         raise HTTPException(status_code=403, detail="Only farmers can request farmer-paid transport")
+
+    if payload.requested_by == "SUPPLIER" and current_user.role != UserRole.SUPPLIER:
+        raise HTTPException(status_code=403, detail="Only suppliers can request supplier-paid transport")
     
     # Calculate distance if coordinates provided
     distance_km = 0.0
-    if (payload.pickup_latitude and payload.pickup_longitude and
-        payload.delivery_latitude and payload.delivery_longitude):
+    if (
+        payload.pickup_latitude is not None
+        and payload.pickup_longitude is not None
+        and payload.delivery_latitude is not None
+        and payload.delivery_longitude is not None
+    ):
         distance_km = transport_pricing_engine.estimate_distance(
             payload.pickup_latitude,
             payload.pickup_longitude,
@@ -293,7 +318,7 @@ def get_transport_status(
         "order_id": str(order_id),
         "status": transport_request.status.value,
         "mode": transport_request.mode.value,
-        "transport_fee_payer": transport_request.requested_by if transport_request.mode in [DBTransportMode.PLATFORM_DELIVERY_BUYER_REQUESTED, DBTransportMode.PLATFORM_DELIVERY_FARMER_REQUESTED] else None,
+        "transport_fee_payer": transport_request.requested_by if transport_request.mode in [DBTransportMode.PLATFORM_DELIVERY_BUYER_REQUESTED, DBTransportMode.PLATFORM_DELIVERY_FARMER_REQUESTED, DBTransportMode.PLATFORM_DELIVERY_SUPPLIER_REQUESTED] else None,
         "transport_fee": 0.0,  # Would need to calculate from payment_allocations
         "driver_assigned": db.query(DriverAssignment).filter(
             DriverAssignment.transport_request_id == transport_request.id,
@@ -595,6 +620,7 @@ async def submit_negotiation_offer(
     
     if not negotiation:
         raise HTTPException(status_code=404, detail="Negotiation not found")
+    _ensure_negotiation_party(negotiation, current_user)
     
     if negotiation.status not in [DBNegotiationStatus.INITIATED, DBNegotiationStatus.COUNTER_OFFER]:
         raise HTTPException(status_code=400, detail="Negotiation is not active")
@@ -620,6 +646,9 @@ async def submit_negotiation_offer(
     
     # Update negotiation status
     negotiation.status = DBNegotiationStatus.COUNTER_OFFER
+    negotiation.final_amount = payload.amount
+    negotiation.final_payer = payload.payer
+    negotiation.split_ratio = payload.split_ratio
     negotiation.updated_at = datetime.now(timezone.utc)
     
     db.commit()
@@ -640,6 +669,80 @@ async def submit_negotiation_offer(
     }
 
 
+@router.post("/negotiations/message")
+async def send_negotiation_message(
+    payload: NegotiationMessagePayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    negotiation = db.query(TransportNegotiation).filter(
+        TransportNegotiation.id == payload.negotiation_id
+    ).first()
+    if not negotiation:
+        raise HTTPException(status_code=404, detail="Negotiation not found")
+    _ensure_negotiation_party(negotiation, current_user)
+    if negotiation.status not in [DBNegotiationStatus.INITIATED, DBNegotiationStatus.COUNTER_OFFER]:
+        raise HTTPException(status_code=400, detail="Negotiation is not active")
+
+    message = NegotiationMessage(
+        negotiation_id=negotiation.id,
+        sender_id=current_user.id,
+        message_type=MessageType.TEXT,
+        content=payload.message.strip(),
+    )
+    db.add(message)
+    negotiation.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    await notification_service.send_notification(
+        db=db,
+        user_id=negotiation.counterparty_id if current_user.id == negotiation.initiator_id else negotiation.initiator_id,
+        notification_type="transport_negotiation_message",
+        title="New Transport Message",
+        body=payload.message.strip(),
+        data={"negotiation_id": str(negotiation.id)},
+    )
+    return {"success": True, "message": "Message sent"}
+
+
+@router.post("/negotiations/reject")
+async def reject_negotiation(
+    payload: NegotiationRejectPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    negotiation = db.query(TransportNegotiation).filter(
+        TransportNegotiation.id == payload.negotiation_id
+    ).first()
+    if not negotiation:
+        raise HTTPException(status_code=404, detail="Negotiation not found")
+    _ensure_negotiation_party(negotiation, current_user)
+    if negotiation.status not in [DBNegotiationStatus.INITIATED, DBNegotiationStatus.COUNTER_OFFER]:
+        raise HTTPException(status_code=400, detail="Negotiation is not active")
+
+    reason = (payload.reason or "Offer rejected").strip()
+    message = NegotiationMessage(
+        negotiation_id=negotiation.id,
+        sender_id=current_user.id,
+        message_type=MessageType.REJECTION,
+        content=reason,
+    )
+    db.add(message)
+    negotiation.status = DBNegotiationStatus.REJECTED
+    negotiation.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    await notification_service.send_notification(
+        db=db,
+        user_id=negotiation.counterparty_id if current_user.id == negotiation.initiator_id else negotiation.initiator_id,
+        notification_type="transport_negotiation_rejected",
+        title="Transport Offer Rejected",
+        body=reason,
+        data={"negotiation_id": str(negotiation.id)},
+    )
+    return {"success": True, "message": "Offer rejected"}
+
+
 @router.post("/negotiations/accept")
 async def accept_negotiation(
     payload: NegotiationAcceptPayload,
@@ -656,6 +759,7 @@ async def accept_negotiation(
     
     if not negotiation:
         raise HTTPException(status_code=404, detail="Negotiation not found")
+    _ensure_negotiation_party(negotiation, current_user)
     
     if negotiation.status not in [DBNegotiationStatus.INITIATED, DBNegotiationStatus.COUNTER_OFFER]:
         raise HTTPException(status_code=400, detail="Negotiation is not active")
@@ -669,8 +773,6 @@ async def accept_negotiation(
     )
     db.add(message)
     
-    # Check if both parties have accepted (simplified - in production would track acceptances per party)
-    # For now, mark as accepted and process
     negotiation.status = DBNegotiationStatus.ACCEPTED
     negotiation.completed_at = datetime.now(timezone.utc)
     
@@ -745,6 +847,7 @@ def get_negotiation(
     
     if not negotiation:
         raise HTTPException(status_code=404, detail="Negotiation not found")
+    _ensure_negotiation_party(negotiation, current_user)
     
     # Query negotiation_messages table
     messages = db.query(NegotiationMessage).filter(
@@ -1070,15 +1173,12 @@ async def raise_delivery_dispute(
         title=f"Delivery Dispute - {dispute_type}",
         description=description,
         disputed_amount=disputed_amount,
-        status=TransportDisputeStatus.OPEN,
+        status=DisputeStatus.OPEN,
         response_due_at=datetime.now(timezone.utc) + timedelta(hours=48),
     )
     db.add(dispute)
     db.flush()
-    
-    # Update delivery status
-    delivery.status = DeliveryStatus.DISPUTED
-    
+
     db.commit()
     
     # Notify admin
@@ -1106,15 +1206,11 @@ async def raise_delivery_dispute(
             data={"dispute_id": str(dispute.id)},
         )
     
-    # Hold payment in escrow (would update payment allocations status to HELD)
-    
     return {
         "success": True,
-        "dispute_id": str(uuid.uuid4()),
+        "dispute_id": str(dispute.id),
         "message": "Dispute raised",
     }
-
-dispte
 # ── Tracking Endpoints ───────────────────────────────────────────────────────
 
 @router.post("/tracking/location")

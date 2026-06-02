@@ -1,0 +1,363 @@
+version: '3.8'
+
+# Production Docker Compose Configuration for ZimAgriTrust
+# This configuration is optimized for VPS deployment with:
+# - Production builds (no dev mode)
+# - NGINX reverse proxy with SSL support
+# - Celery queue workers
+# - Proper domain-based configuration
+# - No development volume mounts
+# - Health checks and restart policies
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-zimagritrust}
+      POSTGRES_USER: ${POSTGRES_USER:-agritrust}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+    restart: unless-stopped
+    # No ports exposed - internal only
+
+  # Redis Cache & Queue
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      retries: 3
+      timeout: 5s
+    restart: unless-stopped
+    # No ports exposed - internal only
+
+  # Backend API (Production)
+  backend:
+    build:
+      context: ./backend
+      target: production-slim
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      WHATSAPP_SERVICE_URL: http://whatsapp-service:8000
+      WHATSAPP_USE_REDIS: "false"
+      APP_ENV: production
+      SECRET_KEY: ${SECRET_KEY}
+      REFRESH_SECRET_KEY: ${REFRESH_SECRET_KEY}
+      ADMIN_BOOTSTRAP_TOKEN: ${ADMIN_BOOTSTRAP_TOKEN}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+      FORCE_HTTPS: ${FORCE_HTTPS:-true}
+      # Security Configuration
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_REQUESTS: "100"
+      RATE_LIMIT_WINDOW_SECONDS: "60"
+      ADMIN_RATE_LIMIT_REQUESTS: "30"
+      ADMIN_RATE_LIMIT_WINDOW_SECONDS: "60"
+      ADMIN_IP_WHITELIST: ${ADMIN_IP_WHITELIST:-}
+      ADMIN_SESSION_TIMEOUT_MINUTES: "30"
+      ADMIN_MFA_ENABLED: "true"
+      ADMIN_AUDIT_LOGGING: "true"
+      ACCOUNT_LOCKOUT_ENABLED: "true"
+      ACCOUNT_LOCKOUT_ATTEMPTS: "5"
+      ACCOUNT_LOCKOUT_DURATION_MINUTES: "30"
+      PASSWORD_MIN_LENGTH: "8"
+      PASSWORD_REQUIRE_UPPERCASE: "true"
+      PASSWORD_REQUIRE_LOWERCASE: "true"
+      PASSWORD_REQUIRE_DIGIT: "true"
+      PASSWORD_REQUIRE_SPECIAL: "true"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+      REFRESH_TOKEN_EXPIRE_MINUTES: "10080"
+      REQUIRE_MFA_ADMIN: "true"
+      # Gunicorn tuning
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-60}
+      GUNICORN_MAX_REQUESTS: ${GUNICORN_MAX_REQUESTS:-1000}
+      GUNICORN_MAX_REQUESTS_JITTER: ${GUNICORN_MAX_REQUESTS_JITTER:-100}
+      # DB pool
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-20}
+      DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-30}
+      DB_STATEMENT_TIMEOUT_MS: ${DB_STATEMENT_TIMEOUT_MS:-30000}
+      AUTO_CONFIRM_PAYMENTS: "false"
+      MASTER_TEST_LOGIN_ENABLED: "false"
+      # Financial security
+      TRANSACTION_SIGNING_KEY: ${TRANSACTION_SIGNING_KEY}
+      AUDIT_CHAIN_KEY: ${AUDIT_CHAIN_KEY}
+      SUPER_ADMIN_SECRET_KEY: ${SUPER_ADMIN_SECRET_KEY}
+      SUPER_ADMIN_IP_WHITELIST: ${SUPER_ADMIN_IP_WHITELIST:-}
+    networks:
+      - backend-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    # No ports exposed - NGINX will proxy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Celery Worker (Background Tasks)
+  celery-worker:
+    build:
+      context: ./backend
+      target: production-slim
+    command: celery -A app.worker.celery_app worker --loglevel=info --concurrency=4
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      APP_ENV: production
+      SECRET_KEY: ${SECRET_KEY}
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
+    networks:
+      - backend-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.worker.celery_app", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Celery Beat (Scheduled Tasks)
+  celery-beat:
+    build:
+      context: ./backend
+      target: production-slim
+    command: celery -A app.worker.celery_app beat --loglevel=info
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      APP_ENV: production
+      SECRET_KEY: ${SECRET_KEY}
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
+    networks:
+      - backend-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Flower (Celery Monitoring)
+  flower:
+    build:
+      context: ./backend
+      target: production-slim
+    command: celery -A app.worker.celery_app flower --port=5555
+    environment:
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
+      FLOWER_BASIC_AUTH: ${FLOWER_USER:-admin}:${FLOWER_PASSWORD}
+    networks:
+      - backend-network
+    depends_on:
+      - redis
+    restart: unless-stopped
+    # No ports exposed - NGINX will proxy
+
+  # WhatsApp Service
+  whatsapp-service:
+    build: ./apps/whatsapp-service
+    environment:
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      WHATSAPP_BRIDGE_URL: http://whatsapp-bridge:3006
+      MAIN_BACKEND_URL: http://backend:8000
+      LOG_LEVEL: INFO
+    networks:
+      - backend-network
+    depends_on:
+      - redis
+    restart: unless-stopped
+    # No ports exposed - NGINX will proxy
+
+  # WhatsApp Bridge
+  whatsapp-bridge:
+    build: ./apps/whatsapp-bridge
+    shm_size: "1gb"
+    environment:
+      BACKEND_URL: http://backend:8000/api/v1/whatsapp/webhook
+      PORT: 3006
+    volumes:
+      - wwebjs_auth:/app/.wwebjs_auth
+      - wwebjs_cache:/app/.wwebjs_cache
+    networks:
+      - backend-network
+    depends_on:
+      - backend
+    restart: unless-stopped
+    # No ports exposed - NGINX will proxy
+
+  # Public Website (Production Build)
+  public-website:
+    build:
+      context: .
+      dockerfile: apps/public-website/Dockerfile.prod
+    environment:
+      - VITE_API_URL=${API_URL:-https://api.${DOMAIN:-agritrust.co.zw}}
+      - VITE_ADMIN_URL=${ADMIN_URL:-https://admin.${DOMAIN:-agritrust.co.zw}}
+      - VITE_AGENT_URL=${AGENT_URL:-https://agent.${DOMAIN:-agritrust.co.zw}}
+      - VITE_APP_PORTAL_URL=${APP_PORTAL_URL:-https://app.${DOMAIN:-agritrust.co.zw}}
+    networks:
+      - backend-network
+    depends_on:
+      - backend
+    restart: unless-stopped
+    # No ports exposed - NGINX will proxy
+
+  # Admin Dashboard (Production Build)
+  admin-dashboard:
+    build:
+      context: .
+      dockerfile: apps/admin-dashboard/Dockerfile.prod
+    environment:
+      - VITE_API_URL=${API_URL:-https://api.${DOMAIN:-agritrust.co.zw}}
+    networks:
+      - backend-network
+    depends_on:
+      - backend
+    restart: unless-stopped
+    # No ports exposed - NGINX will proxy
+
+  # Agent Portal (Production Build)
+  agent-portal:
+    build:
+      context: .
+      dockerfile: apps/agent-portal/Dockerfile.prod
+    environment:
+      - VITE_API_URL=${API_URL:-https://api.${DOMAIN:-agritrust.co.zw}}
+    networks:
+      - backend-network
+    depends_on:
+      - backend
+    restart: unless-stopped
+    # No ports exposed - NGINX will proxy
+
+  # App Portal (Production Build)
+  app-portal:
+    build:
+      context: .
+      dockerfile: apps/app-portal/Dockerfile.prod
+    environment:
+      - VITE_API_URL=${API_URL:-https://api.${DOMAIN:-agritrust.co.zw}}
+    networks:
+      - backend-network
+    depends_on:
+      - backend
+    restart: unless-stopped
+    # No ports exposed - NGINX will proxy
+
+  # Supplier Portal (Production Build)
+  supplier-portal:
+    build:
+      context: .
+      dockerfile: apps/supplier-portal/Dockerfile.prod
+    environment:
+      - VITE_API_URL=${API_URL:-https://api.${DOMAIN:-agritrust.co.zw}}
+    networks:
+      - backend-network
+    depends_on:
+      - backend
+    restart: unless-stopped
+    # No ports exposed - NGINX will proxy
+
+  # NGINX Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    networks:
+      - backend-network
+    depends_on:
+      - backend
+      - public-website
+      - admin-dashboard
+      - agent-portal
+      - app-portal
+      - supplier-portal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Prometheus (Monitoring)
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - backend-network
+    restart: unless-stopped
+    # No ports exposed - NGINX will proxy
+
+  # Grafana (Monitoring Dashboard)
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    networks:
+      - backend-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    # No ports exposed - NGINX will proxy
+
+volumes:
+  postgres_data:
+  redis_data:
+  wwebjs_auth:
+  wwebjs_cache:
+  nginx_logs:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  backend-network:
+    driver: bridge

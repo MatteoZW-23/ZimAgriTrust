@@ -44,7 +44,7 @@ class Agent(Base):
     
     # Agent details
     agent_code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
-    pin_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    pin_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     specialization: Mapped[AgentSpecialization] = mapped_column(SQLEnum(AgentSpecialization), default=AgentSpecialization.ALL)
     status: Mapped[AgentStatus] = mapped_column(SQLEnum(AgentStatus), default=AgentStatus.ACTIVE)
     

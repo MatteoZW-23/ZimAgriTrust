@@ -36,6 +36,7 @@ class SqliteCompatibleARRAY(TypeDecorator):
 class TransportMode(str, enum.Enum):
     PLATFORM_DELIVERY_BUYER_REQUESTED = "PLATFORM_DELIVERY_BUYER_REQUESTED"
     PLATFORM_DELIVERY_FARMER_REQUESTED = "PLATFORM_DELIVERY_FARMER_REQUESTED"
+    PLATFORM_DELIVERY_SUPPLIER_REQUESTED = "PLATFORM_DELIVERY_SUPPLIER_REQUESTED"
     SELF_PICKUP = "SELF_PICKUP"
     SELF_DELIVERY = "SELF_DELIVERY"
     NEGOTIATED_TRANSPORT = "NEGOTIATED_TRANSPORT"
@@ -157,7 +158,9 @@ class TransportRequest(Base):
     requested_by: Mapped[str] = mapped_column(String(20), nullable=False)  # 'BUYER' or 'FARMER'
     requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     
-    mode: Mapped[TransportMode] = mapped_column(Enum(TransportMode), nullable=False)
+    mode: Mapped[TransportMode] = mapped_column(
+        Enum(TransportMode, name="transportmode"), nullable=False
+    )
     
     # Pickup details
     pickup_address: Mapped[str] = mapped_column(Text, nullable=False)
@@ -189,7 +192,11 @@ class TransportRequest(Base):
     vehicle_requirements: Mapped[Optional[List[str]]] = mapped_column(SqliteCompatibleARRAY(String), nullable=True)
     
     # Status
-    status: Mapped[TransportRequestStatus] = mapped_column(Enum(TransportRequestStatus), default=TransportRequestStatus.PENDING, nullable=False)
+    status: Mapped[TransportRequestStatus] = mapped_column(
+        Enum(TransportRequestStatus, name="transportrequeststatus"),
+        default=TransportRequestStatus.PENDING,
+        nullable=False,
+    )
     decision_deadline: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     decision_made_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     decision_made_by: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
@@ -246,7 +253,11 @@ class TransportQuote(Base):
     # Validity
     valid_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     valid_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    status: Mapped[TransportQuoteStatus] = mapped_column(Enum(TransportQuoteStatus), default=TransportQuoteStatus.ACTIVE, nullable=False)
+    status: Mapped[TransportQuoteStatus] = mapped_column(
+        Enum(TransportQuoteStatus, name="transportquotestatus"),
+        default=TransportQuoteStatus.ACTIVE,
+        nullable=False,
+    )
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
@@ -277,7 +288,11 @@ class TransportNegotiation(Base):
     initiator_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     counterparty_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     
-    status: Mapped[NegotiationStatus] = mapped_column(Enum(NegotiationStatus), default=NegotiationStatus.INITIATED, nullable=False)
+    status: Mapped[NegotiationStatus] = mapped_column(
+        Enum(NegotiationStatus, name="transportnegotiationstatus"),
+        default=NegotiationStatus.INITIATED,
+        nullable=False,
+    )
     
     # Timing
     initiated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
@@ -317,7 +332,9 @@ class NegotiationMessage(Base):
     negotiation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("transport_negotiations.id", ondelete="CASCADE"), nullable=False, index=True)
     
     sender_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    message_type: Mapped[MessageType] = mapped_column(Enum(MessageType), nullable=False)
+    message_type: Mapped[MessageType] = mapped_column(
+        Enum(MessageType, name="transportmessagetype"), nullable=False
+    )
     content: Mapped[str] = mapped_column(Text, nullable=False)
     structured_offer: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     
@@ -342,7 +359,11 @@ class DriverAssignment(Base):
     assigned_by: Mapped[str] = mapped_column(String(20), nullable=False)  # 'AUTO', 'ADMIN', 'MANUAL'
     assigned_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     
-    status: Mapped[AssignmentStatus] = mapped_column(Enum(AssignmentStatus), default=AssignmentStatus.ASSIGNED, nullable=False)
+    status: Mapped[AssignmentStatus] = mapped_column(
+        Enum(AssignmentStatus, name="transportassignmentstatus"),
+        default=AssignmentStatus.ASSIGNED,
+        nullable=False,
+    )
     
     # Driver response
     driver_response_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -385,7 +406,11 @@ class Delivery(Base):
     order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
     driver_assignment_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("driver_assignments.id", ondelete="SET NULL"), nullable=True)
     
-    status: Mapped[DeliveryStatus] = mapped_column(Enum(DeliveryStatus), default=DeliveryStatus.PENDING, nullable=False)
+    status: Mapped[DeliveryStatus] = mapped_column(
+        Enum(DeliveryStatus, name="transportdeliverystatus"),
+        default=DeliveryStatus.PENDING,
+        nullable=False,
+    )
     
     # Pickup confirmation
     pickup_confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -450,7 +475,9 @@ class DeliveryTracking(Base):
     # Movement
     speed_kmh: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
     heading_degrees: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
-    status: Mapped[TrackingStatus] = mapped_column(Enum(TrackingStatus), nullable=False)
+    status: Mapped[TrackingStatus] = mapped_column(
+        Enum(TrackingStatus, name="transporttrackingstatus"), nullable=False
+    )
     
     # Device info
     device_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -474,7 +501,9 @@ class PaymentAllocation(Base):
     order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
     transport_request_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("transport_requests.id", ondelete="SET NULL"), nullable=True)
     
-    allocation_type: Mapped[AllocationType] = mapped_column(Enum(AllocationType), nullable=False)
+    allocation_type: Mapped[AllocationType] = mapped_column(
+        Enum(AllocationType, name="transportallocationtype"), nullable=False
+    )
     payer: Mapped[str] = mapped_column(String(20), nullable=False)  # 'BUYER', 'FARMER', 'PLATFORM'
     payee: Mapped[str] = mapped_column(String(20), nullable=False)  # 'FARMER', 'DRIVER', 'PLATFORM', 'BUYER'
     amount: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False)
@@ -485,7 +514,11 @@ class PaymentAllocation(Base):
     payment_reference: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     
     # Status tracking
-    status: Mapped[AllocationStatus] = mapped_column(Enum(AllocationStatus), default=AllocationStatus.PENDING, nullable=False)
+    status: Mapped[AllocationStatus] = mapped_column(
+        Enum(AllocationStatus, name="transportallocationstatus"),
+        default=AllocationStatus.PENDING,
+        nullable=False,
+    )
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
@@ -516,7 +549,9 @@ class Settlement(Base):
     order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     
-    settlement_type: Mapped[SettlementType] = mapped_column(Enum(SettlementType), nullable=False)
+    settlement_type: Mapped[SettlementType] = mapped_column(
+        Enum(SettlementType, name="transportsettlementtype"), nullable=False
+    )
     
     # Amounts
     gross_amount: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False)
@@ -535,7 +570,11 @@ class Settlement(Base):
     payout_reference: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     
     # Status tracking
-    status: Mapped[SettlementStatus] = mapped_column(Enum(SettlementStatus), default=SettlementStatus.PENDING, nullable=False)
+    status: Mapped[SettlementStatus] = mapped_column(
+        Enum(SettlementStatus, name="transportsettlementstatus"),
+        default=SettlementStatus.PENDING,
+        nullable=False,
+    )
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
@@ -580,7 +619,11 @@ class TransportDispute(Base):
     currency: Mapped[str] = mapped_column(String(3), default="USD", nullable=False)
     
     # Status
-    status: Mapped[DisputeStatus] = mapped_column(Enum(DisputeStatus), default=DisputeStatus.OPEN, nullable=False)
+    status: Mapped[DisputeStatus] = mapped_column(
+        Enum(DisputeStatus, name="transportdisputestatus"),
+        default=DisputeStatus.OPEN,
+        nullable=False,
+    )
     priority: Mapped[str] = mapped_column(String(20), default="NORMAL", nullable=False)
     
     # Resolution

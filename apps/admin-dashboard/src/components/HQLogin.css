@@ -29,7 +29,7 @@
   inset: 0;
   background:
     linear-gradient(130deg, rgba(3,13,24,0.96), rgba(15,23,42,0.88)),
-    url('/admin_bg.jpg') center/cover no-repeat;
+    url('/hero-bg.png') center/cover no-repeat;
   pointer-events: none;
 }
 

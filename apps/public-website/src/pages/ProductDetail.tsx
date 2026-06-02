@@ -7,11 +7,19 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 
 export default function ProductDetail() {
  const { productId } = useParams();
- const [product, setProduct] = useState(null);
- const [supplier, setSupplier] = useState(null);
+ const [product, setProduct] = useState<any>(null);
+ const [supplier, setSupplier] = useState<any>(null);
  const [loading, setLoading] = useState(true);
  const [quantity, setQuantity] = useState(1);
  const [selectedImage, setSelectedImage] = useState(0);
+ const [showCheckout, setShowCheckout] = useState(false);
+ const [checkoutData, setCheckoutData] = useState({
+   delivery_address: '',
+   delivery_phone: '',
+    shipping_method: 'driver',
+   buyer_notes: '',
+ });
+ const [orderLoading, setOrderLoading] = useState(false);
 
  useEffect(() => {
  fetchProductDetail();
@@ -25,14 +33,14 @@ export default function ProductDetail() {
  if (data.supplier) {
  setSupplier(data.supplier);
  }
- } catch (error) {
- console.error("Error fetching product detail:", error);
+ } catch {
+  setProduct(null);
  } finally {
  setLoading(false);
  }
  };
 
- const getCategoryLabel = (cat) => {
+ const getCategoryLabel = (cat: string) => {
  const labels = {
  seeds: "Seeds",
  fertilizer: "Fertilizer",
@@ -53,6 +61,43 @@ export default function ProductDetail() {
  const getProductType = () => {
  const machineryCategories = ["tractor", "sprayer", "irrigation", "tiller", "harvester", "tools"];
  return machineryCategories.includes(product?.category) ? "machinery" : "input";
+ };
+
+ const handleBuyNow = () => {
+  if (quantity > (product?.quantity_available || 0)) {
+    alert('Insufficient stock');
+    return;
+  }
+  setShowCheckout(true);
+ };
+
+ const handlePlaceOrder = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setOrderLoading(true);
+  try {
+    const response = await fetch(`${API}/suppliers/public/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        items: [{ product_id: productId, quantity }],
+        delivery_address: checkoutData.delivery_address,
+        delivery_phone: checkoutData.delivery_phone,
+        shipping_method: checkoutData.shipping_method,
+        buyer_notes: checkoutData.buyer_notes,
+      }),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Order failed');
+    }
+    alert('Order placed successfully! Please log in to view your order.');
+    setShowCheckout(false);
+  } catch (err) {
+    alert('Error placing order: ' + (err as Error).message);
+  } finally {
+    setOrderLoading(false);
+  }
  };
 
  if (loading) {
@@ -134,7 +179,7 @@ export default function ProductDetail() {
  </div>
 <div className="space-y-3 mb-6"><button className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"><ShoppingCart size={20} />{isMachinery ? "Contact Supplier" : "Add to Cart"}
  </button>{!isMachinery && (
- <button className="w-full bg-gray-900 hover:bg-gray-800 text-white font-medium py-3 px-6 rounded-lg transition-colors">Buy Now
+ <button onClick={handleBuyNow} className="w-full bg-gray-900 hover:bg-gray-800 text-white font-medium py-3 px-6 rounded-lg transition-colors">Buy Now
  </button>)}
  <button className="w-full border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"><Heart size={20} />Add to Wishlist
  </button></div>
@@ -170,6 +215,7 @@ export default function ProductDetail() {
  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors text-center"
  >View Supplier Profile
  </Link><button className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors">Contact Supplier
- </button></div></div></div></div></motion.div>)}
+ </button></div></div></div></div></motion.div>
+ )}
  </div></div>);
 }

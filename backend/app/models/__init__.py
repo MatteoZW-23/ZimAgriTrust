@@ -14,7 +14,6 @@ from app.models.recruitment import AgentApplication, ApplicationStatus
 from app.models.onboarding import OnboardingPhase, TrainingModule, AgentTrainingProgress, AgentContract, ShadowingLog
 from app.models.system_config import SystemConfig, ConfigGroup
 from app.models.notification_template import NotificationTemplate, TemplateChannel
-from app.models.academy import AgentTraining, AcademyModule, ExamAttempt
 from app.models.classroom import (
     Course, CourseTopic, Resource, QuizQuestion, Enrollment,
     TopicProgress, QuizAttempt, EssayAnswer, Announcement,
@@ -52,6 +51,12 @@ from app.models.deposits import (
     RefundStatus,
     DepositLimit,
 )
+from app.models.payout_method import (
+    UserPayoutMethod,
+    PayoutMethodType,
+    PayoutMethodProvider,
+    PayoutMethodStatus,
+)
 from app.models.input_marketplace import (
     InputCategory,
     InputListing,
@@ -64,6 +69,7 @@ from app.models.input_marketplace import (
     InputReportReason,
     InputReportStatus,
     InputPriceAlert,
+    InputSavedSearch,
 )
 from app.models.ledger import (
     LedgerEntry,
@@ -120,6 +126,22 @@ from app.models.supplier import (
     SupplierPaymentStatus,
     SupplierWalletTxnType,
 )
+from app.models.subscription import (
+    SubscriptionPlanModel,
+    Subscription,
+    SubscriptionFeature,
+    SubscriptionBenefit,
+    BillingHistory,
+    SubscriptionRenewal,
+    SubscriptionUpgrade,
+    SubscriptionDowngrade,
+)
+from app.models.escrow import (
+    EscrowAccount,
+    EscrowTransaction,
+    EscrowStatus,
+    EscrowTransactionType,
+)
 from app.models.transport import (
     TransportMode,
     TransportRequestStatus,
@@ -146,6 +168,19 @@ from app.models.transport import (
     TransportDispute,
     TransportDisputeEvidence,
 )
+from app.models.governance import (
+    GovernancePolicy,
+    UserConsentRecord,
+    UserCommunicationPreference,
+    PrivacyRequest,
+    PolicyScope,
+    ConsentType,
+    DataClassification,
+    PolicyStatus,
+    PrivacyRequestType,
+    PrivacyRequestStatus,
+)
+from app.models.ticket import SupportTicket, TicketStatus
 
 __all__ = [
     "AdminUser", "AdminRole", "BroadcastMessage", "BroadcastStatus", "BroadcastAudience", "AuditLog",
@@ -160,7 +195,6 @@ __all__ = [
     "ListingVerificationReport", "DeliveryReport",
     "AgentApplication", "ApplicationStatus",
     "OnboardingPhase", "TrainingModule", "AgentTrainingProgress", "AgentContract", "ShadowingLog",
-    "AgentTraining", "AcademyModule", "ExamAttempt",
     "Course", "CourseTopic", "Resource", "QuizQuestion", "Enrollment",
     "TopicProgress", "QuizAttempt", "EssayAnswer", "Announcement",
     "EnrollmentStatus", "ResourceType", "QuestionType",
@@ -185,9 +219,10 @@ __all__ = [
     "PaymentMethod", "DepositIntent", "DepositChannel", "DepositIntentStatus",
     "AutoDepositRule", "RecurringDepositSchedule", "RecurrenceCadence",
     "DepositRefundRequest", "RefundStatus", "DepositLimit",
+    "UserPayoutMethod", "PayoutMethodType", "PayoutMethodProvider", "PayoutMethodStatus",
     "InputCategory", "InputListing", "InputListingStatus",
     "InputOffer", "InputOfferStatus", "InputOrder", "InputOrderStatus",
-    "InputReport", "InputReportReason", "InputReportStatus", "InputPriceAlert",
+    "InputReport", "InputReportReason", "InputReportStatus", "InputPriceAlert", "InputSavedSearch",
     "LedgerEntry", "LedgerEntryType", "LedgerAccountType", "LedgerReconciliation",
     "Role", "Permission", "RolePermission", "Invitation", "InvitationStatus",
     "SupplierProfile", "SupplierDocument", "SupplierProduct", "SupplierOrder",
@@ -196,11 +231,17 @@ __all__ = [
     "SupplierInputCategory", "MachineryCategory", "ProductCondition",
     "SupplierProductStatus", "SupplierOrderStatus", "SupplierPaymentStatus",
     "SupplierWalletTxnType",
+    "SubscriptionPlanModel", "Subscription", "SubscriptionFeature", "SubscriptionBenefit",
+    "BillingHistory", "SubscriptionRenewal", "SubscriptionUpgrade", "SubscriptionDowngrade",
+    "EscrowAccount", "EscrowTransaction", "EscrowStatus", "EscrowTransactionType",
     "TransportMode", "TransportRequestStatus", "TransportQuoteStatus", "NegotiationStatus",
     "MessageType", "AssignmentStatus", "DeliveryStatus", "TrackingStatus",
     "AllocationType", "AllocationStatus", "SettlementType", "SettlementStatus",
     "TransportDisputeStatus", "TransportRequest", "TransportQuote", "TransportNegotiation",
     "NegotiationMessage", "DriverAssignment", "Delivery", "DeliveryTracking",
     "PaymentAllocation", "Settlement", "TransportDispute", "TransportDisputeEvidence",
+    "GovernancePolicy", "UserConsentRecord", "UserCommunicationPreference", "PrivacyRequest",
+    "PolicyScope", "PolicyStatus", "ConsentType", "DataClassification", "PrivacyRequestType", "PrivacyRequestStatus",
+    "SupportTicket", "TicketStatus",
 ]
 

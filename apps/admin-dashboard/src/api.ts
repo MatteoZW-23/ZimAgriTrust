@@ -32,7 +32,6 @@ export async function request(path, options = {}) {
     ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
   };
 
-  // Strip Authorization if the token is still null/undefined/placeholder
   if (
     headers["Authorization"] === "Bearer null" ||
     headers["Authorization"] === "Bearer undefined" ||
@@ -178,6 +177,31 @@ export function verifySuperAdminMFA(pre_mfa_token, mfa_code) {
   return request("/super-admin/verify-mfa", {
     method: "POST",
     body: JSON.stringify({ pre_mfa_token, mfa_code, method: "totp" }),
+  });
+}
+
+export function fetchSubscriptionAnalytics() {
+  return request("/admin/subscriptions/analytics");
+}
+
+export function fetchSubscribers() {
+  return request("/admin/subscriptions/subscribers");
+}
+
+export function fetchSubscriptionPlans(role) {
+  return request(`/subscriptions/plans?role=${role}`);
+}
+
+export function updateSubscriptionPlan(planId, data) {
+  return request(`/admin/subscriptions/plans/${planId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export function setSubscriptionPlanEnabled(planId, enabled) {
+  return request(`/admin/subscriptions/plans/${planId}/${enabled ? "enable" : "disable"}`, {
+    method: "POST",
   });
 }
 

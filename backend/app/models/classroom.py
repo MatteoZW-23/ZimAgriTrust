@@ -56,7 +56,7 @@ class CourseTopic(Base):
     __tablename__ = "classroom_course_topics"
     
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_courses.id"), nullable=False)
+    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_courses.id"), nullable=False, index=True)
     topic_number: Mapped[int] = mapped_column(Integer, nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     order_sequence: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -73,8 +73,8 @@ class Resource(Base):
     __tablename__ = "classroom_resources"
     
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_courses.id"), nullable=False)
-    topic_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_course_topics.id"), nullable=True)
+    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_courses.id"), nullable=False, index=True)
+    topic_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_course_topics.id"), nullable=True, index=True)
     resource_type: Mapped[ResourceType] = mapped_column(SQLEnum(ResourceType), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     content_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
@@ -119,8 +119,8 @@ class Enrollment(Base):
     __tablename__ = "classroom_enrollments"
     
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"), nullable=False)
-    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_courses.id"), nullable=False)
+    agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"), nullable=False, index=True)
+    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_courses.id"), nullable=False, index=True)
     status: Mapped[EnrollmentStatus] = mapped_column(SQLEnum(EnrollmentStatus), default=EnrollmentStatus.ENROLLED)
     enrolled_at = mapped_column(DateTime(timezone=True), server_default=func.now())
     completed_at = mapped_column(DateTime(timezone=True), nullable=True)
@@ -139,8 +139,8 @@ class TopicProgress(Base):
     __tablename__ = "classroom_topic_progress"
     
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    enrollment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_enrollments.id"), nullable=False)
-    topic_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_course_topics.id"), nullable=False)
+    enrollment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_enrollments.id"), nullable=False, index=True)
+    topic_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_course_topics.id"), nullable=False, index=True)
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     completed_at = mapped_column(DateTime(timezone=True), nullable=True)
     
@@ -155,8 +155,8 @@ class QuizAttempt(Base):
     __tablename__ = "classroom_quiz_attempts"
     
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    enrollment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_enrollments.id"), nullable=False)
-    resource_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_resources.id"), nullable=False)
+    enrollment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_enrollments.id"), nullable=False, index=True)
+    resource_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_resources.id"), nullable=False, index=True)
     score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     answers: Mapped[Optional[Dict]] = mapped_column(JSON, nullable=True)
     passed: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
@@ -175,12 +175,12 @@ class EssayAnswer(Base):
     __tablename__ = "classroom_essay_answers"
     
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    quiz_attempt_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_quiz_attempts.id"), nullable=False)
-    question_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_quiz_questions.id"), nullable=False)
+    quiz_attempt_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_quiz_attempts.id"), nullable=False, index=True)
+    question_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_quiz_questions.id"), nullable=False, index=True)
     answer: Mapped[str] = mapped_column(Text, nullable=False)
     grade: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     feedback: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    graded_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    graded_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     graded_at = mapped_column(DateTime(timezone=True), nullable=True)
     
     created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -195,8 +195,8 @@ class Announcement(Base):
     __tablename__ = "classroom_announcements"
     
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_courses.id"), nullable=False)
-    admin_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("classroom_courses.id"), nullable=False, index=True)
+    admin_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     
     created_at = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -49,7 +49,6 @@ class RecruitmentService:
         # PROVISION TRAINEE ACCOUNT
         from app.core.security import get_password_hash
         from app.models.agent import Agent, AgentStatus, AgentSpecialization
-        from app.models.academy import AgentTraining
         from app.services.whatsapp_service import whatsapp_service
         import random, string
         
@@ -95,12 +94,6 @@ class RecruitmentService:
             )
             db.add(agent)
             db.flush()
-
-        # Initialize Academy Progress (Step 2-5 Foundation)
-        training = db.query(AgentTraining).filter(AgentTraining.agent_id == agent.id).first()
-        if not training:
-            training = AgentTraining(agent_id=agent.id)
-            db.add(training)
 
         application.user_id = user.id
 

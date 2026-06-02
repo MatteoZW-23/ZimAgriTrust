@@ -6,8 +6,6 @@ from app.services.ledger_service import LedgerService
 import logging
 
 class AgentEarningsService:
-    # Industry Standard Bounties (USD) - REMOVED, now using commission-based system
-    
     # Commission configurations
     ONBOARDING_TRACKING_DAYS = 30  # Track first N days after onboarding
     ONBOARDING_TRANSACTION_LIMIT = 10  # First N transactions count
@@ -40,6 +38,7 @@ class AgentEarningsService:
         # Determine agent tier based on rating
         agent_tier = FeeEngine.determine_agent_tier(agent.rating)
         multiplier = FeeConfig.AGENT_TIER_MULTIPLIERS.get(agent_tier, 1.0)
+        speed_bonus = 0.0
         
         # Calculate commission based on service type and value created
         commission = 0.0
@@ -55,7 +54,6 @@ class AgentEarningsService:
                     # Set verified_by_agent_id if not already set
                     if not listing.verified_by_agent_id:
                         listing.verified_by_agent_id = assignment.agent_id
-                        listing.verified_by_ai = False
                     db.commit()
             
             # Commission will be calculated when listing generates revenue
@@ -77,7 +75,7 @@ class AgentEarningsService:
                         dispute.resolved_by_agent_id = assignment.agent_id
                     
                     dispute_commission = FeeEngine.calculate_agent_dispute_commission(
-                        order.amount,
+                        order.total_amount,
                         FeeConfig.DEFAULT_PLATFORM_FEE_PERCENT,  # Platform fee percentage
                         True,  # Assume resolved favorably
                         agent_tier
@@ -96,7 +94,7 @@ class AgentEarningsService:
                         order.field_support_by_agent_id = assignment.agent_id
                     
                     support_commission = FeeEngine.calculate_agent_field_support_commission(
-                        order.amount,
+                        order.total_amount,
                         FeeConfig.DEFAULT_PLATFORM_FEE_PERCENT,  # Platform fee percentage
                         agent_tier
                     )
@@ -114,7 +112,7 @@ class AgentEarningsService:
                         order.fulfilled_by_agent_id = assignment.agent_id
                     
                     fulfillment_commission = FeeEngine.calculate_agent_fulfillment_commission(
-                        order.amount,
+                        order.total_amount,
                         FeeConfig.DEFAULT_PLATFORM_FEE_PERCENT,  # Platform fee percentage
                         agent_tier
                     )
@@ -145,7 +143,7 @@ class AgentEarningsService:
                     currency="USD",
                     reference=f"agent_commission_{assignment.id}",
                     description=f"Commission for {commission_type} (Tier: {agent_tier.value})",
-                    metadata={
+                    entry_metadata={
                         "assignment_id": str(assignment.id),
                         "assignment_type": assignment.assignment_type,
                         "agent_tier": agent_tier.value,
@@ -155,8 +153,7 @@ class AgentEarningsService:
                 )
             except Exception as e:
                 logging.error(f"Failed to credit agent commission via ledger: {str(e)}")
-                # Fallback to direct wallet update if ledger fails
-                agent.wallet_balance += total_earned
+                raise
         
         logging.info(
             f"EARNINGS | Agent {agent.agent_code} (${total_earned:.2f}) | "
@@ -405,11 +402,6 @@ class AgentEarningsService:
             amount = agent.wallet_balance
             phone = agent.user.phone_number
             
-            # --- OFFICIAL ECO_CASH DISBURSAL POINT ---
-            # In production, this calls payment_service.send_bulk_payout([agent])
-            # For now, we simulate the success callback.
-            
-            # Debit agent's wallet through ledger
             try:
                 LedgerService.debit_user_balance(
                     db=db,
@@ -418,15 +410,15 @@ class AgentEarningsService:
                     currency="USD",
                     reference=f"agent_payout_{agent.id}",
                     description=f"Agent payout to EcoCash",
-                    metadata={
+                    entry_metadata={
                         "agent_id": str(agent.id),
                         "agent_code": agent.agent_code,
                         "phone": phone,
                     }
                 )
                 
-                # Update agent wallet balance to zero after successful payout
-                agent.wallet_balance = 0.0
+                # Keep denormalized display field in sync with ledger-derived balance.
+                agent.wallet_balance = LedgerService.get_balance(db, agent.user_id, "USD")
                 
                 results.append({
                     "agent_id": str(agent.id),

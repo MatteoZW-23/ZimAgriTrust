@@ -1,6 +1,15 @@
 import { create } from 'zustand';
 
-export const useAuthStore = create((set) => ({
+interface AuthStore {
+  user: any;
+  token: string | null;
+  isAuthenticated: boolean;
+  login: (user: any, token: string) => void;
+  logout: () => Promise<void>;
+  setUser: (user: any) => void;
+}
+
+export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
   token: localStorage.getItem('zimagritrust_token'),
   isAuthenticated: !!localStorage.getItem('zimagritrust_token'),

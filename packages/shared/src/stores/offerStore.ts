@@ -7,9 +7,21 @@ interface Offer {
   buyer_id: string;
   price: number;
   quantity: number;
-  status: 'pending' | 'accepted' | 'rejected' | 'countered';
+  status: 'pending' | 'accepted' | 'rejected' | 'countered' | string;
   created_at: string;
+  offered_price_per_unit?: number;
+  total_amount?: number;
 }
+
+const normalizeOffer = (o: any): Offer => ({
+  ...o,
+  price: Number(o.price ?? o.offered_price_per_unit ?? 0),
+  quantity: Number(o.quantity || 0),
+  status: o.status || 'pending',
+  created_at: o.created_at || new Date().toISOString(),
+  offered_price_per_unit: Number(o.offered_price_per_unit ?? o.price ?? 0),
+  total_amount: Number(o.total_amount ?? 0),
+});
 
 interface OfferState {
   offersReceived: Offer[];
@@ -33,7 +45,7 @@ export const useOfferStore = create<OfferState>((set) => ({
     set({ loading: true, error: null });
     try {
       const response = await apiClient.get('/offers/received');
-      set({ offersReceived: response.data, loading: false });
+      set({ offersReceived: (response.data || []).map(normalizeOffer), loading: false });
     } catch (error: any) {
       set({ error: error.message, loading: false });
     }
@@ -42,7 +54,7 @@ export const useOfferStore = create<OfferState>((set) => ({
     set({ loading: true, error: null });
     try {
       const response = await apiClient.get('/offers/made');
-      set({ offersMade: response.data, loading: false });
+      set({ offersMade: (response.data || []).map(normalizeOffer), loading: false });
     } catch (error: any) {
       set({ error: error.message, loading: false });
     }
@@ -51,7 +63,7 @@ export const useOfferStore = create<OfferState>((set) => ({
     set({ loading: true, error: null });
     try {
       const response = await apiClient.post(`/listings/${listingId}/offers`, data);
-      set((state) => ({ offersMade: [response.data, ...state.offersMade], loading: false }));
+      set((state) => ({ offersMade: [normalizeOffer(response.data), ...state.offersMade], loading: false }));
     } catch (error: any) {
       set({ error: error.message, loading: false });
       throw error;
@@ -63,6 +75,7 @@ export const useOfferStore = create<OfferState>((set) => ({
       await apiClient.post(`/offers/${id}/accept`);
       set((state) => ({
         offersReceived: state.offersReceived.map((o) => (o.id === id ? { ...o, status: 'accepted' } : o)),
+        offersMade: state.offersMade.map((o) => (o.id === id ? { ...o, status: 'accepted' } : o)),
         loading: false,
       }));
     } catch (error: any) {
@@ -76,6 +89,7 @@ export const useOfferStore = create<OfferState>((set) => ({
       await apiClient.post(`/offers/${id}/reject`);
       set((state) => ({
         offersReceived: state.offersReceived.map((o) => (o.id === id ? { ...o, status: 'rejected' } : o)),
+        offersMade: state.offersMade.map((o) => (o.id === id ? { ...o, status: 'rejected' } : o)),
         loading: false,
       }));
     } catch (error: any) {
@@ -88,7 +102,8 @@ export const useOfferStore = create<OfferState>((set) => ({
     try {
       const response = await apiClient.post(`/offers/${id}/counter`, data);
       set((state) => ({
-        offersReceived: state.offersReceived.map((o) => (o.id === id ? response.data : o)),
+        offersReceived: state.offersReceived.map((o) => (o.id === id ? normalizeOffer(response.data) : o)),
+        offersMade: state.offersMade.map((o) => (o.id === id ? normalizeOffer(response.data) : o)),
         loading: false,
       }));
     } catch (error: any) {

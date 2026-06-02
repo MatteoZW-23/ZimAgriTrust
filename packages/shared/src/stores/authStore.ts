@@ -4,8 +4,9 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 interface User {
   id: string;
   phone: string;
+  phone_number?: string;
   full_name: string;
-  role: 'farmer' | 'buyer';
+  role: 'farmer' | 'buyer' | 'supplier' | 'driver' | 'agent' | 'admin' | 'super_admin' | string;
   trust_score: number;
   [key: string]: any;
 }
@@ -29,7 +30,15 @@ export const useAuthStore = create<AuthState>()(
         if (typeof window !== 'undefined') {
           localStorage.setItem('zimagritrust_token', token);
         }
-        set({ user, token, isAuthenticated: true });
+        set({
+          user: {
+            ...user,
+            phone: user.phone || user.phone_number || '',
+            trust_score: user.trust_score ?? 0,
+          },
+          token,
+          isAuthenticated: true,
+        });
       },
       logout: () => {
         if (typeof window !== 'undefined') {

@@ -39,6 +39,13 @@ admin_auth_router = APIRouter()
 agent_auth_router = APIRouter()
 
 
+def _enforce_portal_host(request: Request, expected: str) -> None:
+    host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").split(":")[0].lower()
+    expected_host = (expected or "").strip().lower()
+    if expected_host and host and host != expected_host:
+        raise HTTPException(status_code=403, detail=f"Portal host mismatch. Use {expected_host}")
+
+
 # Global OPTIONS handler for driver auth router
 @driver_auth_router.options("/{path:path}")
 async def driver_auth_options(path: str):
@@ -156,6 +163,7 @@ async def begin_admin_login(
     db: Session = Depends(get_db),
 ) -> dict:
     """Password + MFA login for Admin/HQ web portal only."""
+    _enforce_portal_host(request, getattr(settings, "ADMIN_PORTAL_HOST", ""))
     return await begin_mfa_login(
         db=db,
         request=request,
@@ -173,6 +181,7 @@ async def verify_admin_mfa(
     response: Response,
     db: Session = Depends(get_db),
 ) -> Token:
+    _enforce_portal_host(request, getattr(settings, "ADMIN_PORTAL_HOST", ""))
     return await complete_mfa_login(
         db=db,
         request=request,
@@ -191,6 +200,7 @@ async def begin_agent_login(
     db: Session = Depends(get_db),
 ) -> dict:
     """Password + MFA login for Agent web portal only."""
+    _enforce_portal_host(request, getattr(settings, "AGENT_PORTAL_HOST", ""))
     return await begin_mfa_login(
         db=db,
         request=request,

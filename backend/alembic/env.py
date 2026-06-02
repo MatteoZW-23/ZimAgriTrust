@@ -7,20 +7,16 @@ import os
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
+import app.models  # noqa: F401
 from app.db.base import Base
-from app.models.user import User
-from app.models.listing import Listing
-from app.models.transaction import Transaction
-from app.models.dispute import Dispute
-from app.models.agent import Agent, AgentAssignment
-from app.models.classroom import (
-    Course, CourseTopic, Resource, QuizQuestion, Enrollment,
-    TopicProgress, QuizAttempt, EssayAnswer, Announcement
-)
-from app.api.v1.endpoints.verification import IDVerificationRequest  # noqa: F401
 
 config = context.config
 fileConfig(config.config_file_name)
+
+# Override the sqlalchemy.url with the DATABASE_URL environment variable
+if 'DATABASE_URL' in os.environ:
+    config.set_main_option('sqlalchemy.url', os.environ['DATABASE_URL'])
+
 target_metadata = Base.metadata
 
 def run_migrations_offline():

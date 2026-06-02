@@ -18,6 +18,7 @@ from app.models.input_marketplace import (
     InputOffer,
     InputOrder,
     InputPriceAlert,
+    InputSavedSearch,
     InputReport,
     InputReportReason,
 )
@@ -36,12 +37,15 @@ from app.schemas.inputs import (
     InputOrderShipIn,
     InputPriceAlertIn,
     InputPriceAlertOut,
+    InputSavedSearchIn,
+    InputSavedSearchOut,
     InputReportIn,
     InputReportOut,
     InputReportResolveIn,
     InputVerificationDecisionIn,
 )
 from app.services import input_marketplace_service as svc
+from app.services.subscription_service import SubscriptionService
 
 router = APIRouter()
 
@@ -438,6 +442,8 @@ def create_price_alert(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    if not SubscriptionService.has_feature(db, "Price Alerts", user=user):
+        raise HTTPException(status_code=403, detail="Price alerts require Buyer Pro or Enterprise plan")
     alert = svc.upsert_price_alert(
         db, user=user, target_price=body.target_price,
         listing_id=body.listing_id, category_id=body.category_id, brand=body.brand,
@@ -452,6 +458,8 @@ def list_price_alerts(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    if not SubscriptionService.has_feature(db, "Price Alerts", user=user):
+        raise HTTPException(status_code=403, detail="Price alerts require Buyer Pro or Enterprise plan")
     return (
         db.query(InputPriceAlert).filter(InputPriceAlert.user_id == user.id)
         .order_by(InputPriceAlert.created_at.desc()).all()
@@ -464,10 +472,70 @@ def delete_price_alert(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    if not SubscriptionService.has_feature(db, "Price Alerts", user=user):
+        raise HTTPException(status_code=403, detail="Price alerts require Buyer Pro or Enterprise plan")
     alert = db.query(InputPriceAlert).filter(
         InputPriceAlert.id == alert_id, InputPriceAlert.user_id == user.id,
     ).first()
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
     db.delete(alert)
+    db.commit()
+
+
+@router.post("/saved-searches", response_model=InputSavedSearchOut, status_code=201)
+def create_saved_search(
+    body: InputSavedSearchIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if not SubscriptionService.has_feature(db, "Saved Searches", user=user):
+        raise HTTPException(status_code=403, detail="Saved searches require Buyer Pro or Enterprise plan")
+    rec = InputSavedSearch(
+        user_id=user.id,
+        name=body.name,
+        query_text=body.query_text,
+        category_id=body.category_id,
+        brand=body.brand,
+        province=body.province,
+        min_price=body.min_price,
+        max_price=body.max_price,
+        notify_on_match=body.notify_on_match,
+    )
+    db.add(rec)
+    db.commit()
+    db.refresh(rec)
+    return rec
+
+
+@router.get("/saved-searches", response_model=list[InputSavedSearchOut])
+def list_saved_searches(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if not SubscriptionService.has_feature(db, "Saved Searches", user=user):
+        raise HTTPException(status_code=403, detail="Saved searches require Buyer Pro or Enterprise plan")
+    return (
+        db.query(InputSavedSearch)
+        .filter(InputSavedSearch.user_id == user.id, InputSavedSearch.is_active.is_(True))
+        .order_by(InputSavedSearch.created_at.desc())
+        .all()
+    )
+
+
+@router.delete("/saved-searches/{search_id}", status_code=204)
+def delete_saved_search(
+    search_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if not SubscriptionService.has_feature(db, "Saved Searches", user=user):
+        raise HTTPException(status_code=403, detail="Saved searches require Buyer Pro or Enterprise plan")
+    rec = db.query(InputSavedSearch).filter(
+        InputSavedSearch.id == search_id,
+        InputSavedSearch.user_id == user.id,
+    ).first()
+    if not rec:
+        raise HTTPException(status_code=404, detail="Saved search not found")
+    rec.is_active = False
     db.commit()

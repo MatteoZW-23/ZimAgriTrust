@@ -147,6 +147,37 @@ def _check_config() -> dict[str, Any]:
     }
 
 
+def _check_schema_guardrails(db: Session) -> dict[str, Any]:
+    """
+    Detect critical schema drift that breaks settlement and ledger flows.
+    """
+    required = {
+        "ledger_entries": {"entry_metadata"},
+        "transactions": {"transaction_type"},
+    }
+    missing: dict[str, list[str]] = {}
+    try:
+        for table, cols in required.items():
+            found_rows = db.execute(
+                text(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = :table
+                    """
+                ),
+                {"table": table},
+            ).fetchall()
+            found = {r[0] for r in found_rows}
+            miss = sorted(cols - found)
+            if miss:
+                missing[table] = miss
+        return {"status": "unhealthy" if missing else "healthy", "missing": missing}
+    except Exception as exc:
+        logger.error("health_schema_guardrails_fail", extra={"error": str(exc)})
+        return {"status": "unknown", "error": str(exc)}
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -195,6 +226,7 @@ def detailed(db: Session = Depends(get_db)):
         "queues":             _check_queues(),
         "payment_providers":  _check_payment_providers(),
         "config":             _check_config(),
+        "schema_guardrails":  _check_schema_guardrails(db),
     }
     unhealthy = [k for k, v in checks.items() if v["status"] == "unhealthy"]
     degraded  = [k for k, v in checks.items() if v["status"] == "degraded"]
@@ -213,3 +245,20 @@ def detailed(db: Session = Depends(get_db)):
         "service": settings.APP_NAME,
         "checks": checks,
     }
+
+
+@router.get("/critical")
+def critical_health(db: Session = Depends(get_db)):
+    """
+    Strict readiness gate for critical production safety.
+    Returns 503 if schema guardrails are broken.
+    """
+    schema = _check_schema_guardrails(db)
+    postgres = _check_postgres(db)
+    healthy = schema.get("status") == "healthy" and postgres.get("status") == "healthy"
+    body = {
+        "status": "healthy" if healthy else "unhealthy",
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "checks": {"postgres": postgres, "schema_guardrails": schema},
+    }
+    return JSONResponse(status_code=200 if healthy else 503, content=body)

@@ -15,6 +15,7 @@ class Settings(BaseSettings):
 
     # Main Backend
     main_backend_url: str = "http://backend:8000"
+    internal_service_token: str = ""
 
     # Application
     app_name: str = "whatsapp-service"

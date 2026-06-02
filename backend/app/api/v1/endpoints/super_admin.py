@@ -32,6 +32,7 @@ from app.schemas.security import (
     SuperAdminMfaVerifyRequest,
     SuperAdminPreMfaResponse,
     SuperAdminTokenResponse,
+    SuperAdminCreateRequest,
     WithdrawalLimitOut,
     WithdrawalLimitUpdateIn,
 )
@@ -40,6 +41,7 @@ from app.schemas.security import (
     EscrowReleaseRequestIn,
 )
 from app.services import super_admin_service
+from app.core.super_admin_security import verify_totp, verify_yubikey_otp
 from app.services.audit_chain_service import verify_chain, verify_record
 from app.services.fraud_detection_service import list_open_alerts, resolve_alert
 from app.services.reconciliation_service import run_daily_reconciliation
@@ -47,6 +49,16 @@ from app.services.transaction_signing_service import sign_admin_decision
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _require_step_up_mfa(current: SuperAdmin, mfa_code: str, method: str) -> None:
+    ok = False
+    if method == "totp":
+        ok = bool(current.hardware_mfa_secret) and verify_totp(current.hardware_mfa_secret, mfa_code)
+    elif method == "yubikey":
+        ok = bool(current.yubikey_public_id) and verify_yubikey_otp(mfa_code, current.yubikey_public_id)
+    if not ok:
+        raise HTTPException(status_code=401, detail="Step-up MFA verification failed")
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +105,124 @@ def super_admin_me(current: SuperAdmin = Depends(get_current_super_admin)):
         "email": current.email,
         "last_login_at": current.last_login_at,
         "last_login_ip": current.last_login_ip,
+    }
+
+
+@router.post("/accounts")
+def create_super_admin_account(
+    body: SuperAdminCreateRequest,
+    db: Session = Depends(get_db),
+    current: SuperAdmin = Depends(get_current_super_admin),
+):
+    if not current.hardware_mfa_secret and not current.yubikey_public_id:
+        raise HTTPException(status_code=403, detail="Current super admin must enroll MFA first")
+    account = super_admin_service.create_super_admin_with_dual_control(
+        db,
+        actor=current,
+        approver_username=body.approver_username,
+        approver_password=body.approver_password,
+        approver_mfa_code=body.approver_mfa_code,
+        approver_method=body.approver_method,
+        username=body.username,
+        email=body.email,
+        password=body.password,
+        phone_number=body.phone_number,
+        hardware_mfa_secret=body.hardware_mfa_secret,
+        yubikey_public_id=body.yubikey_public_id,
+        ip_whitelist=body.ip_whitelist,
+        reason=body.reason,
+        is_root=body.is_root,
+    )
+    _log_action(
+        db,
+        current,
+        "create_super_admin_account",
+        "super_admin",
+        str(account.id),
+        payload={"username": account.username, "reason": body.reason, "is_root": body.is_root},
+    )
+    db.commit()
+    return {"id": account.id, "username": account.username, "email": account.email, "is_active": account.is_active}
+
+
+@router.post("/register-initial")
+async def register_initial_super_admin(
+    username: str = Query(...),
+    email: str = Query(...),
+    password: str = Query(...),
+    phone_number: str = Query(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Register the initial super admin account with automatic MFA setup.
+    This endpoint is only allowed when no super admins exist in the database.
+    Returns MFA setup information including QR code data.
+    """
+    # Check if any super admins already exist
+    existing_count = db.query(SuperAdmin).count()
+    if existing_count > 0:
+        raise HTTPException(
+            status_code=403,
+            detail="Initial registration only allowed when no super admins exist"
+        )
+    
+    # Check for duplicate username/email
+    existing = db.query(SuperAdmin).filter(
+        (SuperAdmin.username == username) | (SuperAdmin.email == email)
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail="Super admin with this username or email already exists"
+        )
+    
+    # Create super admin account
+    super_admin = super_admin_service.seed_super_admin(
+        db,
+        username=username,
+        email=email,
+        password=password,
+        phone_number=phone_number,
+        ip_whitelist=[],
+    )
+    
+    # Generate MFA secret
+    import pyotp
+    import qrcode
+    import io
+    import base64
+    
+    secret = pyotp.random_base32(32)
+    totp = pyotp.TOTP(secret, interval=30)
+    account_name = email or phone_number
+    provisioning_uri = totp.provisioning_uri(
+        name=account_name,
+        issuer_name="ZimAgriTrust",
+    )
+    
+    # Generate QR code
+    qr = qrcode.QRCode(version=1, box_size=10, border=4)
+    qr.add_data(provisioning_uri)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    qr_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    
+    # Store MFA secret
+    super_admin.hardware_mfa_secret = secret
+    db.commit()
+    
+    return {
+        "id": super_admin.id,
+        "username": super_admin.username,
+        "email": super_admin.email,
+        "phone_number": super_admin.phone_number,
+        "mfa_setup": {
+            "secret": secret,
+            "provisioning_uri": provisioning_uri,
+            "qr_code_base64": qr_base64,
+        }
     }
 
 
@@ -183,6 +313,7 @@ def update_limit(
     db: Session = Depends(get_db),
     current: SuperAdmin = Depends(get_current_super_admin),
 ):
+    _require_step_up_mfa(current, body.mfa_code, body.mfa_method)
     row = db.query(WithdrawalLimit).filter(WithdrawalLimit.user_tier == tier).first()
     if not row:
         raise HTTPException(status_code=404, detail="Tier not found")
@@ -212,6 +343,7 @@ def emergency_shutdown(
     db: Session = Depends(get_db),
     current: SuperAdmin = Depends(get_current_super_admin),
 ):
+    _require_step_up_mfa(current, body.mfa_code, body.mfa_method)
     if not body.confirm:
         raise HTTPException(status_code=400, detail="Set confirm=true to execute shutdown")
     from app.models.system_config import SystemConfig
@@ -233,6 +365,7 @@ async def escrow_request_release(
     db: Session = Depends(get_db),
     current: SuperAdmin = Depends(get_current_super_admin),
 ):
+    _require_step_up_mfa(current, body.mfa_code, body.mfa_method)
     """Step 1 of two-key release: generate platform signature + send admin OTP."""
     from app.services.escrow_two_key_service import request_release
     # Build a synthetic User-like actor for the audit trail / SMS routing.
@@ -257,6 +390,7 @@ async def escrow_confirm_release(
     db: Session = Depends(get_db),
     current: SuperAdmin = Depends(get_current_super_admin),
 ):
+    _require_step_up_mfa(current, body.mfa_code, body.mfa_method)
     """Step 2: validate OTP + signature, execute release."""
     from app.services.escrow_two_key_service import confirm_release
     from types import SimpleNamespace

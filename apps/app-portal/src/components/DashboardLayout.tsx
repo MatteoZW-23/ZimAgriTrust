@@ -1,26 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@agritrust/shared';
 import { useThemeStore } from '../utils/themeStore';
-import { 
-  LayoutDashboard, 
-  PlusCircle, 
-  List, 
-  Handshake, 
-  Truck, 
-  Wallet, 
-  User, 
-  Settings, 
-  LogOut,
+import {
+  Bell,
   ChevronLeft,
   ChevronRight,
-  Bell,
-  Search,
-  ShoppingCart,
+  Crown,
+  Handshake,
   Heart,
-  Sun,
+  LayoutDashboard,
+  Leaf,
+  List,
+  LogOut,
   Moon,
-  ShoppingBag
+  PlusCircle,
+  Search,
+  Settings,
+  ShieldCheck,
+  ShoppingBag,
+  ShoppingCart,
+  Sun,
+  Truck,
+  User,
+  Wallet,
 } from 'lucide-react';
+import logo from '../assets/logo.png';
 
 interface SidebarItem {
   id: string;
@@ -36,18 +40,25 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'my-listings', label: 'My Listings', icon: List, roles: ['farmer'] },
   { id: 'buyer-requests', label: 'Buyer Requests', icon: ShoppingBag, roles: ['buyer'] },
   { id: 'offers', label: 'Offers', icon: Handshake, roles: ['farmer', 'buyer'] },
-  { id: 'my-orders', label: 'My Orders', icon: Truck, roles: ['farmer', 'buyer'] },
+  { id: 'my-orders', label: 'Orders', icon: Truck, roles: ['farmer', 'buyer'] },
   { id: 'saved-listings', label: 'Saved', icon: Heart, roles: ['buyer'] },
   { id: 'wallet', label: 'Wallet', icon: Wallet, roles: ['farmer', 'buyer'] },
+  { id: 'subscriptions', label: 'Membership', icon: Crown, roles: ['farmer', 'buyer'] },
   { id: 'profile', label: 'Profile', icon: User, roles: ['farmer', 'buyer'] },
   { id: 'settings', label: 'Settings', icon: Settings, roles: ['farmer', 'buyer'] },
 ];
 
-export const DashboardLayout: React.FC<{ children: React.ReactNode, currentView: string, onViewChange: (view: string) => void }> = ({ 
-  children, 
-  currentView, 
-  onViewChange 
-}) => {
+const viewTitle = (view: string) =>
+  view
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+
+export const DashboardLayout: React.FC<{
+  children: React.ReactNode;
+  currentView: string;
+  onViewChange: (view: string) => void;
+}> = ({ children, currentView, onViewChange }) => {
   const { user, logout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const [collapsed, setCollapsed] = useState(false);
@@ -56,114 +67,123 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode, currentView:
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
-  const filteredItems = SIDEBAR_ITEMS.filter(item => item.roles.includes(user?.role || ''));
+  const filteredItems = useMemo(
+    () => SIDEBAR_ITEMS.filter((item) => item.roles.includes(user?.role || '')),
+    [user?.role]
+  );
+
+  const isFarmer = user?.role === 'farmer';
+  const firstName = user?.full_name?.split(' ')[0] || 'Partner';
 
   return (
-    <div className="flex h-screen bg-earth-50 dark:bg-earth-900 overflow-hidden font-sans transition-colors duration-300">
-      {/* Sidebar */}
-      <aside 
-        className={`
-          ${collapsed ? 'w-20' : 'w-72'} 
-          bg-white dark:bg-earth-800 border-r-2 border-earth-100 dark:border-earth-700 flex flex-col transition-all duration-300 z-30
-        `}
-      >
-        <div className="p-6 flex items-center justify-between">
-          {collapsed ? (
-            <img src="/logo.png" alt="ZimAgriTrust" className="w-8 h-8 rounded-lg object-contain mx-auto" />
-          ) : (
-            <div className="flex items-center gap-3">
-              <img src="/logo.png" alt="ZimAgriTrust" className="w-10 h-10 rounded-xl object-contain" />
-              <span className="font-black text-earth-800 dark:text-white tracking-tight text-xl">ZimAgri<span className="text-primary-600">Trust</span></span>
+    <div className={`shell ${isFarmer ? 'role-farmer' : 'role-buyer'}`}>
+      <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
+        <div className="sidebar-header">
+          <div className="sidebar-brand">
+            <div className="portal-logo-surface logo">
+              <img src={logo} alt="ZimAgriTrust" className="portal-logo" />
             </div>
-          )}
-          <button 
+            {!collapsed && (
+              <div>
+                <div className="name">ZimAgriTrust</div>
+                <div className="tagline">Trade protected by escrow</div>
+              </div>
+            )}
+          </div>
+          <button
             onClick={() => setCollapsed(!collapsed)}
-            className="p-2 hover:bg-earth-50 dark:hover:bg-earth-700 rounded-lg transition-colors text-earth-400"
+            className="rounded-2xl border border-border bg-white/70 p-2 text-dim transition-colors hover:text-primary"
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
         </div>
 
-        <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+        <nav className="sidebar-nav">
+          {!collapsed && (
+            <div className="mx-2 mb-4 rounded-3xl border border-primary-100 bg-primary-50 p-4">
+              <div className="flex items-center gap-2 text-primary-800">
+                <ShieldCheck size={16} />
+                <span className="text-[10px] font-black uppercase tracking-[0.16em]">Verified workspace</span>
+              </div>
+              <p className="mt-2 text-xs font-bold leading-relaxed text-earth-600">
+                Listings, offers, orders, wallet, and trust tools are connected in one secure portal.
+              </p>
+            </div>
+          )}
+          {!collapsed && <div className="nav-section-label">Workspace</div>}
           {filteredItems.map((item) => (
             <button
               key={item.id}
               onClick={() => onViewChange(item.id)}
-              className={`
-                w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all group
-                ${currentView === item.id 
-                  ? 'bg-primary-50 dark:bg-primary-600/20 text-primary-600 shadow-sm shadow-primary-100 dark:shadow-none' 
-                  : 'text-earth-500 dark:text-earth-400 hover:bg-earth-50 dark:hover:bg-earth-700 hover:text-earth-800 dark:hover:text-white'}
-              `}
+              className={`nav-item ${currentView === item.id ? 'active' : ''}`}
+              title={collapsed ? item.label : undefined}
             >
-              <item.icon 
-                size={22} 
-                className={currentView === item.id ? 'text-primary-600' : 'text-earth-400 group-hover:text-earth-800 dark:group-hover:text-white'} 
-              />
-              {!collapsed && <span className="font-black text-sm tracking-wide">{item.label}</span>}
+              <item.icon size={20} />
+              {!collapsed && <span>{item.label}</span>}
             </button>
           ))}
         </nav>
 
-        <div className="p-4 border-t-2 border-earth-50 dark:border-earth-700">
-          <button
-            onClick={logout}
-            className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all font-black text-sm tracking-wide"
-          >
-            <LogOut size={22} />
+        <div className="sidebar-footer">
+          <button className="logout-btn" onClick={logout}>
+            <LogOut size={18} />
             {!collapsed && <span>Logout</span>}
           </button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col relative overflow-hidden">
-        {/* Top Bar */}
-        <header className="h-20 bg-white dark:bg-earth-800 border-b-2 border-earth-100 dark:border-earth-700 flex items-center justify-between px-8 z-20 transition-colors duration-300">
-          <div className="flex items-center flex-1 max-w-xl">
+      <main className="main-content">
+        <header className="main-header">
+          <div className="hidden min-w-[220px] md:block">
+            <div className="header-title">{viewTitle(currentView)}</div>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted">
+              {isFarmer ? 'Farmer operations' : 'Buyer procurement'} for {firstName}
+            </p>
+          </div>
+
+          <div className="flex flex-1 items-center md:max-w-xl">
             <div className="relative w-full">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-earth-300 dark:text-earth-500" size={18} />
-              <input 
-                type="text" 
-                placeholder="Search for crops, orders, or markets..."
-                className="w-full bg-earth-50 dark:bg-earth-700 border-2 border-transparent focus:border-primary-500 focus:bg-white dark:focus:bg-earth-600 rounded-2xl pl-12 pr-4 py-2.5 text-sm font-bold text-earth-800 dark:text-white outline-none transition-all placeholder:text-earth-300 dark:placeholder:text-earth-500"
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={18} />
+              <input
+                type="text"
+                placeholder="Search crops, orders, payments..."
+                className="form-input pl-12"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* Dark Mode Toggle */}
-            <button 
+          <div className="header-right">
+            <div className="hidden items-center gap-2 rounded-full bg-secondary-50 px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-secondary-800 lg:flex">
+              <Leaf size={14} />
+              Live market
+            </div>
+            <button
               onClick={toggleTheme}
-              className="p-2.5 bg-earth-50 dark:bg-earth-700 text-earth-500 dark:text-earth-300 hover:text-primary-600 dark:hover:text-primary-400 rounded-xl transition-all"
+              className="rounded-2xl border border-border bg-white/70 p-2.5 text-dim transition-all hover:text-primary"
               title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
               {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
             </button>
 
-            <button className="relative p-2.5 bg-earth-50 dark:bg-earth-700 text-earth-500 dark:text-earth-300 hover:text-primary-600 dark:hover:text-primary-400 rounded-xl transition-all">
+            <button className="relative rounded-2xl border border-border bg-white/70 p-2.5 text-dim transition-all hover:text-primary">
               <Bell size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-earth-800"></span>
+              <span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-white bg-danger-500" />
             </button>
-            
-            <div className="h-10 w-px bg-earth-100 dark:bg-earth-700 mx-1"></div>
 
-            <div className="flex items-center gap-4">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-black text-earth-800 dark:text-white leading-none">{user?.full_name}</p>
-                <p className="text-[10px] font-black text-primary-600 uppercase tracking-widest mt-1">{user?.role} NODE</p>
-              </div>
-              <div className="w-12 h-12 rounded-2xl bg-earth-100 dark:bg-earth-700 border-2 border-earth-200 dark:border-earth-600 flex items-center justify-center text-earth-600 dark:text-earth-200 font-black">
-                {user?.full_name?.charAt(0)}
+            <div className="mx-1 h-10 w-px bg-border" />
+
+            <div className="sidebar-user">
+              <div className="sidebar-avatar">{firstName.charAt(0)}</div>
+              <div className="sidebar-user-info hidden sm:block">
+                <div className="uname">{user?.full_name || 'ZimAgriTrust User'}</div>
+                <div className="urole">{user?.role} Portal</div>
               </div>
             </div>
           </div>
         </header>
 
-        {/* View Container */}
-        <div className="flex-1 overflow-y-auto p-8">
-          {children}
-        </div>
+        <div className="page-content">{children}</div>
       </main>
     </div>
   );

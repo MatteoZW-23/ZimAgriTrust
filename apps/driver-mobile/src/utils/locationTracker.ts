@@ -42,7 +42,6 @@ class LocationTracker {
   // Start tracking location
   async startTracking(token, updateInterval = 30000) { // 30 seconds default
     if (this.isTracking) {
-      console.log('Location tracking already active');
       return;
     }
 
@@ -72,7 +71,6 @@ class LocationTracker {
         (location) => this.handleLocationUpdate(location)
       );
 
-      console.log('Location tracking started');
       return true;
     } catch (error) {
       console.error('Failed to start location tracking:', error);
@@ -89,7 +87,6 @@ class LocationTracker {
     }
     
     this.isTracking = false;
-    console.log('Location tracking stopped');
   }
 
   // Handle location update

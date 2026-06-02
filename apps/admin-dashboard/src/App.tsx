@@ -44,6 +44,7 @@ import AuditLogScreen from './components/AuditLogScreen';
 import BroadcastScreen from './components/BroadcastScreen';
 import SupplierManagementPanel from './components/SupplierManagementPanel';
 import AcademyManagement from './components/AcademyManagement';
+import SubscriptionRevenuePanel from './components/SubscriptionRevenuePanel';
 
 // ── Health Check Panel (live backend health) ────────────────────────────────────
 const HEALTH_API = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
@@ -320,6 +321,7 @@ function App() {
  roles: ['SUPER_ADMIN', 'FINANCE_ADMIN', 'BRANCH_ADMIN'],
  children: [
  { view: 'transactions-admin', icon: 'fa-wallet', label: 'Escrow & Revenue', roles: ['SUPER_ADMIN', 'FINANCE_ADMIN'] },
+ { view: 'subscriptions', icon: 'fa-crown', label: 'Subscriptions', roles: ['SUPER_ADMIN', 'FINANCE_ADMIN'] },
  { view: 'disputes', icon: 'fa-gavel', label: 'Arbitration', roles: ['SUPER_ADMIN', 'FINANCE_ADMIN', 'SUPPORT_ADMIN'] },
  { view: 'wallet', icon: 'fa-credit-card', label: 'My Wallet' },
  { view: 'reports', icon: 'fa-chart-pie', label: 'Financial Reports', roles: ['SUPER_ADMIN', 'FINANCE_ADMIN'] },
@@ -506,6 +508,7 @@ function App() {
  {currentView === 'id-verification' && <IDVerificationQueuePanel token={token} />}
  {currentView === 'driver-verification' && <DriverVerificationPanel token={token} />}
  {currentView === 'transactions-admin' && <EscrowRevenuePanel token={token} onEscrowAction={handleGovernance} />}
+ {currentView === 'subscriptions' && <SubscriptionRevenuePanel />}
  {currentView === 'disputes' && <DisputeResolutionPanel disputes={disputes} onResolve={handleResolveDispute} />}
  {currentView === 'network' && <AgentPerformancePanel agents={agents} onRefresh={loadAllData} profile={profile} />}
  {currentView === 'transport' && <TransportManagementPanel token={token} />}

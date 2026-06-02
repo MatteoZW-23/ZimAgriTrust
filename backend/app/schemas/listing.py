@@ -147,6 +147,8 @@ class ListingResponse(BaseModel):
     seller_name: str
     seller_trust_score: int
     seller_phone_masked: str
+    seller_subscription_plan: str = "free"
+    seller_badges: List[str] = Field(default_factory=list)
     
     created_at: datetime
 

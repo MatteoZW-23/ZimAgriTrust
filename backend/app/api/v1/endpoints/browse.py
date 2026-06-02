@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.models.input_marketplace import InputListing, InputListingStatus
 from app.models.listing import Listing, ListingStatus
+from app.services.subscription_service import SubscriptionService
 
 router = APIRouter()
 
@@ -55,6 +56,8 @@ def unified_search(
         crops = cq.order_by(Listing.created_at.desc()).offset(offset).limit(limit).all()
         counts["crops"] = len(crops)
         for l in crops:
+            weight = SubscriptionService.visibility_weight(db, user=l.seller) if l.seller else 100
+            trust_score = int(getattr(l.seller, "trust_score", 0) or 0) if l.seller else 0
             items.append({
                 "kind": "crop",
                 "id": str(l.id),
@@ -70,6 +73,10 @@ def unified_search(
                 "verified": bool(getattr(l, "verified_at", None)),
                 "expiry_date": None,
                 "boosted": bool(getattr(l, "is_boosted", False)),
+                "subscription_plan": getattr(l, "seller_subscription_plan", "free"),
+                "badges": getattr(l, "seller_badges", []),
+                "visibility_weight": weight,
+                "trust_score": trust_score,
                 "created_at": l.created_at,
             })
 
@@ -102,6 +109,14 @@ def unified_search(
         )
         counts["inputs"] = len(inputs)
         for l in inputs:
+            weight = 100
+            badges = []
+            plan = "basic"
+            supplier_profile = getattr(getattr(l, "seller", None), "supplier_profile", None)
+            if supplier_profile:
+                weight = SubscriptionService.visibility_weight(db, supplier=supplier_profile)
+                badges = SubscriptionService.get_badges(db, supplier=supplier_profile)
+                plan = supplier_profile.subscription_plan or "basic"
             items.append({
                 "kind": "input",
                 "id": str(l.id),
@@ -118,8 +133,19 @@ def unified_search(
                 "expiry_date": l.expiry_date,
                 "category_id": l.category_id,
                 "boosted": bool(l.is_boosted),
+                "subscription_plan": plan,
+                "badges": badges,
+                "visibility_weight": weight,
                 "created_at": l.created_at,
             })
 
-    items.sort(key=lambda x: (not x["boosted"], x["created_at"]), reverse=True)
+    items.sort(
+        key=lambda x: (
+            bool(x["boosted"]),
+            x.get("visibility_weight", 100),
+            x.get("trust_score", 0),
+            x["created_at"],
+        ),
+        reverse=True,
+    )
     return {"results": items[:limit], "counts": counts}

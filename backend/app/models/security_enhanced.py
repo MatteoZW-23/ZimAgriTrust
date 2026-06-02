@@ -10,7 +10,6 @@ Enhanced security models for ZimAgriTrust with:
 import enum
 import uuid
 from datetime import datetime
-from typing import Optional, List
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -67,10 +66,10 @@ class PINHistory(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     pin_hash: Mapped[str] = mapped_column(String(255), nullable=False)  # bcrypt + pepper
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    changed_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    change_reason: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # 'user_initiated', 'forced_change', 'compromised'
-    changed_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    change_reason: Mapped[str | None] = mapped_column(String(50), nullable=True)  # 'user_initiated', 'forced_change', 'compromised'
+    changed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
 
 class PINLockout(Base):
@@ -80,11 +79,11 @@ class PINLockout(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     failed_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    locked_until: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     lockout_count: Mapped[int] = mapped_column(Integer, default=0)  # Number of lockouts (reset after 3)
-    last_attempt_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=False)
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=False)
 
 
 class PINAttempt(Base):
@@ -95,9 +94,9 @@ class PINAttempt(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     channel: Mapped[str] = mapped_column(String(20), nullable=False)  # 'ussd', 'app'
     success: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
-    device_fingerprint: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    attempted_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    device_fingerprint: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    attempted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
 
 
 # ============================================================================
@@ -120,9 +119,9 @@ class TokenBlacklist(Base):
     token_hash: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     token_type: Mapped[TokenType] = mapped_column(Enum(TokenType), nullable=False)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    reason: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    expires_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    reason: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
 
 
 # ============================================================================
@@ -149,21 +148,21 @@ class MFAConfiguration(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
     
     # TOTP Method
-    totp_secret: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Encrypted
-    totp_backup_codes: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)  # List of hashed backup codes
+    totp_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)  # Encrypted
+    totp_backup_codes: Mapped[list | None] = mapped_column(JSON, nullable=True)  # List of hashed backup codes
     
     # Hardware MFA
-    yubikey_public_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
-    webauthn_credential_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    yubikey_public_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    webauthn_credential_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     
     # SMS Recovery
-    recovery_phone: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    recovery_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     
     # Status
     status: Mapped[MFAStatus] = mapped_column(Enum(MFAStatus), default=MFAStatus.DISABLED, nullable=False)
-    enabled_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=False)
+    enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=False)
 
 
 class MFAAttempt(Base):
@@ -174,8 +173,8 @@ class MFAAttempt(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     method: Mapped[MFAMethod] = mapped_column(Enum(MFAMethod), nullable=False)
     success: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
-    attempted_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    attempted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
 
 
 # ============================================================================
@@ -201,8 +200,8 @@ class RateLimit(Base):
     identifier: Mapped[str] = mapped_column(String(255), nullable=False, index=True)  # User ID or IP
     key: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    window_start: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    expires_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
 
 
 class SecurityThreat(Base):
@@ -212,12 +211,12 @@ class SecurityThreat(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     threat_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)  # 'brute_force', 'suspicious_login', 'abnormal_activity'
     severity: Mapped[str] = mapped_column(String(20), nullable=False)  # 'low', 'medium', 'high', 'critical'
-    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     details: Mapped[dict] = mapped_column(JSON, nullable=True)
-    detected_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
-    resolved_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    admin_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    admin_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 # ============================================================================
@@ -249,24 +248,24 @@ class SecurityAuditLog(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     action: Mapped[AuditLogAction] = mapped_column(Enum(AuditLogAction), nullable=False, index=True)
-    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
-    actor_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)  # Admin who performed action
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)  # Admin who performed action
     
-    resource_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)  # 'user', 'transaction', 'role'
-    resource_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    resource_type: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)  # 'user', 'transaction', 'role'
+    resource_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
     
     # Request context
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
-    user_agent: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    session_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("user_sessions.id"), nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    session_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("user_sessions.id"), nullable=True)
     
     # Event details
-    details: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="success")  # 'success', 'failure', 'warning'
-    status_code: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
     
     # Timestamp (immutable)
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
     
     __table_args__ = (
         Index('ix_audit_logs_user_action', 'user_id', 'action'),
@@ -310,8 +309,8 @@ class NotificationPreference(Base):
     # Per-category settings (JSON for flexibility)
     category_preferences: Mapped[dict] = mapped_column(JSON, default={})
     
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=False)
 
 
 class NotificationLog(Base):
@@ -330,15 +329,15 @@ class NotificationLog(Base):
     
     # Delivery tracking
     status: Mapped[str] = mapped_column(String(20), default="pending")  # 'pending', 'sent', 'failed', 'delivered'
-    sent_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    delivered_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    failure_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     
     # Response tracking
-    opened_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    clicked_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    clicked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
     
     __table_args__ = (
         Index('ix_notification_logs_user_status', 'user_id', 'status'),
@@ -356,7 +355,7 @@ class PasswordHistory(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class BreachedCredential(Base):
@@ -366,7 +365,7 @@ class BreachedCredential(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     breach_type: Mapped[str] = mapped_column(String(50), nullable=False)  # 'password', 'email', 'phone'
-    detected_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    remediated_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    breach_source: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # e.g., 'HaveIBeenPwned'
-    remediation_action: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # 'password_reset', 'email_verified'
+    detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    remediated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    breach_source: Mapped[str | None] = mapped_column(String(255), nullable=True)  # e.g., 'HaveIBeenPwned'
+    remediation_action: Mapped[str | None] = mapped_column(String(100), nullable=True)  # 'password_reset', 'email_verified'

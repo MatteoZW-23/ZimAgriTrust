@@ -180,9 +180,8 @@ def _check_duplicate_bank(db: Session, user: User, bank_fingerprint: str) -> lis
     A `bank_fingerprint` is a stable hash of (account_number + bank_code) or
     (mobile_money_number) — caller computes it. We look up other users.
     """
-    # The current schema does not yet store fingerprints on User. Keep this as a
-    # service-level extension point: callers that DO have fingerprint storage
-    # invoke it. For now we treat any fingerprint match as a soft signal.
+    # The current schema does not store fingerprints on all deployments. Callers
+    # with fingerprint storage receive this as a soft fraud signal.
     matches = (
         db.query(User.id)
         .filter(User.bank_fingerprint == bank_fingerprint, User.id != user.id)

@@ -10,6 +10,7 @@ import time
 import logging
 import traceback
 import os
+from sqlalchemy import text
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -49,9 +50,16 @@ async def lifespan(app: FastAPI):
         # Run `alembic upgrade head` in the Docker entrypoint before starting.
 
         with SessionLocal() as db:
-            logger.info("SYSLOG | Seeding RBAC roles and permissions...")
-            from app.services.rbac_service import RBACService
-            RBACService.create_default_roles(db)
+            lock_acquired = bool(db.execute(text("SELECT pg_try_advisory_lock(93422117)")).scalar())
+            if lock_acquired:
+                try:
+                    logger.info("SYSLOG | Seeding RBAC roles and permissions...")
+                    from app.services.rbac_service import RBACService
+                    RBACService.create_default_roles(db)
+                finally:
+                    db.execute(text("SELECT pg_advisory_unlock(93422117)"))
+            else:
+                logger.info("SYSLOG | RBAC seed skipped (another worker owns startup lock).")
 
 
     except Exception as exc:
@@ -185,7 +193,7 @@ class AuditPerformanceMiddleware(BaseHTTPMiddleware):
 
         try:
             response = await call_next(request)
-            process_time = time.time() - start_time
+            process_time = max(0, time.time() - start_time)
             logging.info(
                 f"AUDIT | {request.method} {request.url.path} | "
                 f"STATUS: {response.status_code} | TIME: {process_time:.4f}s | ID: {request_id}"

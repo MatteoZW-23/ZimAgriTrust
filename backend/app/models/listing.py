@@ -65,13 +65,17 @@ class Listing(Base):
     seller_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     
     # Product Details
+    title: Mapped[str] = mapped_column(String(255), nullable=False, default="Listing")
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     sector: Mapped[Sector] = mapped_column(Enum(Sector), nullable=False)
     product_type: Mapped[str] = mapped_column(String(50), nullable=False)
     product_subtype: Mapped[Optional[str]] = mapped_column(String(50))
     grade: Mapped[Optional[str]] = mapped_column(String(20))
     quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    quantity_kg: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     quantity_unit: Mapped[str] = mapped_column(String(20), default="kg")
     price_per_unit: Mapped[float] = mapped_column(Float, nullable=False)
+    price_per_kg: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     currency: Mapped[str] = mapped_column(String(5), default="USD")
     
     # Location (GPS Enforced)
@@ -97,20 +101,29 @@ class Listing(Base):
     def seller_phone_masked(self) -> str:
         return self.seller.masked_phone if self.seller else "****"
 
-    # AI Vision Fields
-    ai_verified: Mapped[bool] = mapped_column(Boolean, default=False)
-    ai_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    ai_crop_type: Mapped[Optional[str]] = mapped_column(String(50))
-    ai_confidence: Mapped[Optional[float]] = mapped_column(Float)
-    ai_grade_estimate: Mapped[Optional[str]] = mapped_column(String(10))
-    ai_health_status: Mapped[Optional[str]] = mapped_column(String(100))
-    ai_verification_level: Mapped[Optional[str]] = mapped_column(String(20))  # auto_approve, suggest_approve, flag_review, reject
-    ai_raw_response: Mapped[Optional[dict]] = mapped_column(JSON)
-    
+    @property
+    def seller_subscription_plan(self) -> str:
+        if not self.seller:
+            return "free"
+        tier = getattr(self.seller, "subscription_tier", None)
+        raw = tier.value if hasattr(tier, "value") else str(tier or "basic")
+        return "pro" if raw == "premium" else ("enterprise" if raw == "enterprise" else "free")
+
+    @property
+    def seller_badges(self) -> list[str]:
+        badges: list[str] = []
+        plan = self.seller_subscription_plan
+        if plan == "pro":
+            badges.append("PRO")
+        if plan == "enterprise":
+            badges.append("ENTERPRISE")
+        if self.seller and getattr(self.seller, "id_verified", False):
+            badges.append("VERIFIED FARMER" if self.seller.role.value == "farmer" else "VERIFIED BUYER")
+        return badges
+
     # Verification tracking
     verification_status: Mapped[str] = mapped_column(String(20), default="pending") # pending, verified, rejected
-    verified_by_agent_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("agents.id"), nullable=True)  # Agent who verified
-    verified_by_ai: Mapped[bool] = mapped_column(Boolean, default=False)  # True if verified by AI
+    verified_by_agent_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("agents.id"), nullable=True, index=True)  # Agent who verified
     verification_notes: Mapped[Optional[str]] = mapped_column(Text)
     
     is_boosted: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -125,6 +138,7 @@ class Listing(Base):
 
     # F#58 — auto-expire support
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    available_from: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
     # Metadata
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -137,6 +151,7 @@ class Listing(Base):
     storage_requirements: Mapped[Optional[str]] = mapped_column(String(100)) # e.g., "Cold Storage", "Ambient", "Dry"
     
     crop: Mapped[Optional[str]] = mapped_column(String(50))
+    crop_type: Mapped[str] = mapped_column(String(50), nullable=False, default="general")
     location: Mapped[Optional[str]] = mapped_column(String(200))
     notes: Mapped[Optional[str]] = mapped_column(Text)
     data_records: Mapped[Optional[dict]] = mapped_column(JSON)
@@ -172,6 +187,8 @@ class Offer(Base):
     listing_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("listings.id"), nullable=False, index=True)
     buyer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     seller_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    offered_price_per_kg: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    offered_quantity_kg: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     
     currency: Mapped[str] = mapped_column(String(5), default="USD")
     

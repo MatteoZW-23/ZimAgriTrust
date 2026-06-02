@@ -23,7 +23,6 @@ class RealtimeSync {
     // Start periodic sync
     this.startPeriodicSync();
     
-    console.log('Real-time sync initialized');
   }
 
   // Setup network monitoring
@@ -89,8 +88,6 @@ class RealtimeSync {
     }
 
     try {
-      console.log('Starting real-time sync...');
-      
       const result = await syncData(this.token, this.lastSyncTime);
       
       if (result.success) {
@@ -106,7 +103,6 @@ class RealtimeSync {
         // Emit sync success event
         this.emitEvent('sync-success', result.data);
         
-        console.log('Real-time sync completed successfully');
         return { success: true, data: result.data };
       } else {
         throw new Error(result.error || 'Sync failed');
@@ -206,13 +202,8 @@ class RealtimeSync {
   // Force refresh specific data type
   async refreshDataType(dataType) {
     try {
-      // This would call specific API endpoints to refresh data
-      console.log(`Refreshing ${dataType}...`);
-      
-      // Emit refresh event
       this.emitEvent(`${dataType}-refresh`, null);
-      
-      // Trigger sync to get latest data
+
       return await this.syncNow();
     } catch (error) {
       console.error(`Failed to refresh ${dataType}:`, error);

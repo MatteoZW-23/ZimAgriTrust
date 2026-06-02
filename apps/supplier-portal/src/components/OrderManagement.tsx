@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getOrders, confirmOrder, shipOrder, cancelOrder, addTracking } from '../api.ts';
-import { CheckCircle, Truck, X, Search, Download, FileText } from 'lucide-react';
+import { getOrders, confirmOrder, shipOrder, cancelOrder, addTracking, requestSupplierTransport } from '../api.ts';
+import { CheckCircle, Truck, X, Search, Download, FileText, MapPin } from 'lucide-react';
 
 export function OrderManagement() {
   const [orders, setOrders] = useState([]);
@@ -9,8 +9,26 @@ export function OrderManagement() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showTrackingModal, setShowTrackingModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showTransportModal, setShowTransportModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [trackingData, setTrackingData] = useState({ tracking_number: '', shipping_method: '' });
+  const [transportData, setTransportData] = useState({
+    pickup_address: '',
+    pickup_latitude: null,
+    pickup_longitude: null,
+    pickup_contact_name: '',
+    pickup_contact_phone: '',
+    delivery_address: '',
+    delivery_latitude: null,
+    delivery_longitude: null,
+    delivery_contact_name: '',
+    delivery_contact_phone: '',
+    cargo_weight_kg: 100,
+    cargo_volume_m3: null,
+    cargo_description: '',
+    preferred_vehicle_type: 'van',
+  });
+  const [transportLoading, setTransportLoading] = useState(false);
 
   useEffect(() => {
     loadOrders();
@@ -54,6 +72,20 @@ export function OrderManagement() {
       loadOrders();
     } catch (err) {
       alert('Error cancelling order: ' + err.message);
+    }
+  };
+
+  const handleRequestTransport = async () => {
+    setTransportLoading(true);
+    try {
+      await requestSupplierTransport(selectedOrder.id, transportData);
+      setShowTransportModal(false);
+      alert('Transport request submitted successfully!');
+      loadOrders();
+    } catch (err) {
+      alert('Error requesting transport: ' + err.message);
+    } finally {
+      setTransportLoading(false);
     }
   };
 
@@ -124,9 +156,14 @@ export function OrderManagement() {
                       </button>
                     )}
                     {(order.status === 'confirmed' || order.status === 'processing') && (
-                      <button onClick={() => { setSelectedOrder(order); setShowTrackingModal(true); }} className="p-2 hover:bg-orange-100 rounded-lg" title="Ship">
-                        <Truck className="w-4 h-4 text-orange-600" />
-                      </button>
+                      <>
+                        <button onClick={() => { setSelectedOrder(order); setShowTransportModal(true); }} className="p-2 hover:bg-blue-100 rounded-lg" title="Request Platform Transport">
+                          <MapPin className="w-4 h-4 text-blue-600" />
+                        </button>
+                        <button onClick={() => { setSelectedOrder(order); setShowTrackingModal(true); }} className="p-2 hover:bg-orange-100 rounded-lg" title="Ship (External)">
+                          <Truck className="w-4 h-4 text-orange-600" />
+                        </button>
+                      </>
                     )}
                     {order.status !== 'delivered' && order.status !== 'cancelled' && (
                       <button onClick={() => { setSelectedOrder(order); setShowCancelModal(true); }} className="p-2 hover:bg-red-100 rounded-lg" title="Cancel">
@@ -201,6 +238,131 @@ export function OrderManagement() {
               </button>
               <button onClick={() => setShowCancelModal(false)} className="flex-1 bg-earth-200 hover:bg-earth-300 text-earth-800 font-bold py-2 rounded-xl">
                 Back
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTransportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-black text-earth-800 mb-4">Request Platform Transport - Order {selectedOrder?.order_number}</h3>
+            <div className="space-y-4">
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm text-blue-800 font-bold">ZimAgriTrust Driver Delivery</p>
+                <p className="text-xs text-blue-600">Transport fee will be deducted from your settlement</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-earth-700 mb-1">Pickup Address *</label>
+                <input
+                  type="text"
+                  value={transportData.pickup_address}
+                  onChange={(e) => setTransportData({ ...transportData, pickup_address: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border-2 border-earth-200 focus:border-primary-500 focus:outline-none"
+                  placeholder="Your warehouse/office address"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-bold text-earth-700 mb-1">Pickup Contact Name</label>
+                  <input
+                    type="text"
+                    value={transportData.pickup_contact_name}
+                    onChange={(e) => setTransportData({ ...transportData, pickup_contact_name: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border-2 border-earth-200 focus:border-primary-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-earth-700 mb-1">Pickup Contact Phone</label>
+                  <input
+                    type="tel"
+                    value={transportData.pickup_contact_phone}
+                    onChange={(e) => setTransportData({ ...transportData, pickup_contact_phone: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border-2 border-earth-200 focus:border-primary-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-earth-700 mb-1">Delivery Address *</label>
+                <input
+                  type="text"
+                  value={transportData.delivery_address}
+                  onChange={(e) => setTransportData({ ...transportData, delivery_address: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border-2 border-earth-200 focus:border-primary-500 focus:outline-none"
+                  placeholder={selectedOrder?.delivery_address || "Buyer's delivery address"}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-bold text-earth-700 mb-1">Delivery Contact Name</label>
+                  <input
+                    type="text"
+                    value={transportData.delivery_contact_name}
+                    onChange={(e) => setTransportData({ ...transportData, delivery_contact_name: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border-2 border-earth-200 focus:border-primary-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-earth-700 mb-1">Delivery Contact Phone</label>
+                  <input
+                    type="tel"
+                    value={transportData.delivery_contact_phone}
+                    onChange={(e) => setTransportData({ ...transportData, delivery_contact_phone: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border-2 border-earth-200 focus:border-primary-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-bold text-earth-700 mb-1">Cargo Weight (kg) *</label>
+                  <input
+                    type="number"
+                    value={transportData.cargo_weight_kg}
+                    onChange={(e) => setTransportData({ ...transportData, cargo_weight_kg: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 rounded-lg border-2 border-earth-200 focus:border-primary-500 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-earth-700 mb-1">Vehicle Type</label>
+                  <select
+                    value={transportData.preferred_vehicle_type}
+                    onChange={(e) => setTransportData({ ...transportData, preferred_vehicle_type: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border-2 border-earth-200 focus:border-primary-500 focus:outline-none"
+                  >
+                    <option value="motorcycle">Motorcycle</option>
+                    <option value="car">Car</option>
+                    <option value="van">Van</option>
+                    <option value="truck">Truck</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-earth-700 mb-1">Cargo Description</label>
+                <textarea
+                  value={transportData.cargo_description}
+                  onChange={(e) => setTransportData({ ...transportData, cargo_description: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border-2 border-earth-200 focus:border-primary-500 focus:outline-none"
+                  rows={2}
+                  placeholder="Brief description of items"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={handleRequestTransport} disabled={transportLoading} className="flex-1 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 text-white font-bold py-2 rounded-xl">
+                {transportLoading ? 'Requesting...' : 'Request Transport'}
+              </button>
+              <button onClick={() => setShowTransportModal(false)} className="flex-1 bg-earth-200 hover:bg-earth-300 text-earth-800 font-bold py-2 rounded-xl">
+                Cancel
               </button>
             </div>
           </div>

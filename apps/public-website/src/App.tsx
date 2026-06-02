@@ -5,7 +5,7 @@ import {
  Menu, X, ChevronDown, ChevronRight, TrendingUp, Shield, Truck, Phone, Users, Star, ArrowRight, CheckCircle2, MapPin, Zap, Award, PhoneCall, Smartphone,
  Wheat, Sprout, Leaf, Sun, Package
 } from "lucide-react";
-import logo from "../assets/logo.png";
+import logo from "./assets/logo.png";
 
 // Components
 import Header from "./components/Header";
@@ -81,15 +81,23 @@ function App() {
  .then((data) => {
  const s = data.stats || {};
  setStats({
- farmers: s.users ?? s.farmers ?? 0,
- buyers: s.listings ?? s.buyers ?? 0,
- transactions: s.transactions ?? 0,
+ farmers: s.farmers ?? 0,
+ buyers: s.buyers ?? 0,
+ transactions: s.transactions ?? s.total_transactions ?? 0,
  });
  })
  .catch(() => setStats({ farmers: 0, buyers: 0, transactions: 0 }));
 
- // Check auth status
- fetch(`${API}/auth/me`, { credentials: "include" })
+ // Check auth status only when we actually have a token/cookie signal
+ const token = localStorage.getItem("token");
+ if (!token) {
+ setIsAuthenticated(false);
+ return;
+ }
+ fetch(`${API}/auth/me`, {
+ credentials: "include",
+ headers: { Authorization: `Bearer ${token}` },
+ })
  .then((r) => setIsAuthenticated(r.ok))
  .catch(() => setIsAuthenticated(false));
  }, []);
@@ -100,24 +108,24 @@ function App() {
  };
 
  return (
- <Router><ScrollToTop /><div className="min-h-screen bg-earth-50"><Header 
- onOpenAuth={() => openAuth("login")} 
+ <Router><ScrollToTop /><div className="min-h-screen"><Header
+ onOpenAuth={() => openAuth("login")}
  isAuthenticated={isAuthenticated}
  onSignUp={() => openAuth("signup")}
  />
- <main><Routes><Route 
- path="/" 
+ <main><Routes><Route
+ path="/"
  element={
- <LandingPage 
- stats={stats} 
+ <LandingPage
+ stats={stats}
  onOpenAuth={openAuth}
  isAuthenticated={isAuthenticated}
- />} 
+ />}
  /><Route path="/about" element={<About onOpenAuth={openAuth} />} /><Route path="/about-us" element={<AboutUs />} /><Route path="/pricing" element={<Pricing />} /><Route path="/help-center" element={<HelpCenter />} /><Route path="/terms" element={<TermsConditions />} /><Route path="/privacy" element={<PrivacyPolicy />} /><Route path="/returns" element={<ReturnsPolicy />} /><Route path="/company-profile" element={<CompanyProfile onOpenAuth={openAuth} />} /><Route path="/company-hierarchy" element={<CompanyHierarchy />} /><Route path="/driver-join" element={<DriverJoin />} /><Route path="/agent-join" element={<AgentJoin />} /><Route path="/dispute-resolution" element={<DisputeResolution onOpenAuth={openAuth} />} /><Route path="/marketplace" element={<Marketplace />} /><Route path="/products/:productId" element={<ProductDetail />} /><Route path="/suppliers" element={<Suppliers />} /><Route path="/suppliers/:supplierId" element={<SupplierDetail />} /><Route path="/supplier-products" element={<SupplierProducts />} /><Route path="/dashboard" element={<Dashboard />} /><Route path="/download-mobile-app" element={<DownloadMobileApp />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></main>
 <Footer onOpenAuth={openAuth} />
- <AuthModal 
- isOpen={authOpen} 
- onClose={() => setAuthOpen(false)} 
+ <AuthModal
+ isOpen={authOpen}
+ onClose={() => setAuthOpen(false)}
  initialMode={authMode}
  onAuthSuccess={() => setIsAuthenticated(true)}
  /></div></Router>);
@@ -143,11 +151,11 @@ function HeroSection({ stats, onOpenAuth }) {
  </h1>
  <p className="text-lg sm:text-xl text-white/80 mb-8 max-w-xl leading-relaxed">Connect farmers directly to buyers. Secure escrow payments. Works on any phone via USSD <span className="font-bold text-secondary-400">*123#</span>.
  </p>
- <div className="flex flex-wrap gap-4"><button 
+ <div className="flex flex-wrap gap-4"><button
  onClick={() => onOpenAuth("signup")}
  className="btn btn-primary btn-lg bg-white text-primary-700 hover:bg-white/90 shadow-xl"
  >Get Started Free
- <ArrowRight className="w-5 h-5" /></button><a 
+ <ArrowRight className="w-5 h-5" /></button><a
  href="#marketplace"
  className="btn btn-outline btn-lg border-white/30 text-white hover:bg-white/10"
  >Browse Crops
@@ -190,14 +198,19 @@ function StatsSection({ stats }) {
  viewport={{ once: true }}
  transition={{ delay: i * 0.1 }}
  className="bg-white rounded-2xl p-6 text-center shadow-lg shadow-earth-200/50"
- ><div className="w-14 h-14 rounded-xl bg-primary-100 flex items-center justify-center mx-auto mb-4 overflow-hidden">{stat.isLogo ? (
- <img src={logo} alt="ZimAgritrust Logo" className="w-7 h-7 object-contain" />) : (
+ ><div className="w-14 h-14 rounded-2xl bg-primary-50 flex items-center justify-center mx-auto mb-4 overflow-hidden border border-primary-100">{stat.isLogo ? (
+ <img src={logo} alt="ZimAgritrust Logo" className="w-12 h-12 object-contain" />) : (
  <stat.icon className="w-7 h-7 text-primary-600" />)}
  </div><p className="text-3xl font-bold text-earth-800 mb-1">{stat.value}</p><p className="text-sm text-earth-500">{stat.label}</p></motion.div>))}
  </div></div></section>);
 }
 
 function FeaturesSection() {
+ const featureTone = {
+ primary: "bg-primary-50 text-primary-700",
+ secondary: "bg-secondary-50 text-secondary-800",
+ accent: "bg-accent-50 text-accent-700",
+ };
  const features = [
  {
  icon: Shield,
@@ -238,7 +251,7 @@ function FeaturesSection() {
  ];
 
  return (
- <section className="section-padding bg-earth-50"><div className="container-custom"><div className="text-center max-w-2xl mx-auto mb-16"><span className="badge badge-primary mb-4">Why Choose Us</span><h2 className="text-3xl sm:text-4xl font-bold text-earth-900 mb-4">Everything You Need to Trade Safely
+ <section id="features" className="section-padding bg-earth-50"><div className="container-custom"><div className="text-center max-w-2xl mx-auto mb-16"><span className="badge badge-primary mb-4">Why Choose Us</span><h2 className="text-3xl sm:text-4xl font-bold text-earth-900 mb-4">Everything You Need to Trade Safely
  </h2><p className="text-earth-600 text-lg">Built for Zimbabwean farmers and buyers with features that make agricultural trading simple, secure, and profitable.
  </p></div>
 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">{features.map((feature, i) => (
@@ -249,7 +262,7 @@ function FeaturesSection() {
  viewport={{ once: true }}
  transition={{ delay: i * 0.1 }}
  className="card p-8"
- ><div className={`w-14 h-14 rounded-2xl bg-${feature.color}-100 flex items-center justify-center mb-6`}><feature.icon className={`w-7 h-7 text-${feature.color}-600`} /></div><h3 className="text-xl font-bold text-earth-800 mb-3">{feature.title}</h3><p className="text-earth-600 leading-relaxed">{feature.description}</p></motion.div>))}
+ ><div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 ${featureTone[feature.color]}`}><feature.icon className="w-7 h-7" /></div><h3 className="text-xl font-bold text-earth-800 mb-3">{feature.title}</h3><p className="text-earth-600 leading-relaxed">{feature.description}</p></motion.div>))}
  </div></div></section>);
 }
 
@@ -280,6 +293,12 @@ function HowItWorksSection() {
  { title: "Train", desc: "Complete our digital training modules and pass the exam." },
  { title: "Verify", desc: "Help farmers with onboarding and quality verification." },
  { title: "Reward", desc: "Earn commissions for every verified listing and user." },
+ ],
+ suppliers: [
+ { title: "Register Business", desc: "Create a supplier account and submit your company documents." },
+ { title: "Get Approved", desc: "Admin reviews your credentials and activates your supplier portal." },
+ { title: "List Products", desc: "Publish inputs and machinery with stock, pricing, and delivery options." },
+ { title: "Sell & Get Paid", desc: "Receive orders, fulfill delivery, and get settlement to your supplier wallet." },
  ]
  };
 
@@ -287,7 +306,7 @@ function HowItWorksSection() {
  <section id="how-it-works" className="section-padding bg-white"><div className="container-custom"><div className="text-center max-w-2xl mx-auto mb-16"><span className="badge badge-secondary mb-4">The Platform</span><h2 className="text-3xl sm:text-4xl font-bold text-earth-900 mb-4">How ZimAgriTrust Works
  </h2><p className="text-earth-600 text-lg">Empowering every participant in the agricultural value chain.
  </p></div>
-<div className="flex flex-wrap justify-center gap-4 mb-12">{['farmers', 'buyers', 'drivers', 'agents'].map(role => (
+<div className="flex flex-wrap justify-center gap-4 mb-12">{['farmers', 'buyers', 'drivers', 'agents', 'suppliers'].map(role => (
  <button
  key={role}
  onClick={() => setActiveRole(role)}
@@ -333,7 +352,7 @@ function MarketplaceSection({ onOpenAuth, isAuthenticated }) {
  return (
  <section id="marketplace" className="section-padding bg-earth-50"><div className="container-custom"><div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-12"><div className="max-w-xl"><span className="badge badge-accent mb-4">Live Marketplace</span><h2 className="text-3xl sm:text-4xl font-bold text-earth-900 mb-4">Current Crop Listings
  </h2><p className="text-earth-600 text-lg">Browse verified listings from farmers across all 10 provinces. Updated in real-time.
- </p></div><button 
+ </p></div><button
  onClick={() => onOpenAuth("signup")}
  className="btn btn-primary self-start lg:self-auto"
  >View All Listings
@@ -351,7 +370,7 @@ function MarketplaceSection({ onOpenAuth, isAuthenticated }) {
  className="bg-white rounded-2xl p-6 shadow-lg shadow-earth-200/50 hover:shadow-xl transition-shadow"
  ><div className="flex items-start justify-between mb-4"><div className="w-12 h-12 rounded-xl bg-primary-50 flex items-center justify-center">{cropIcon(crop.commodity || crop.product_type || "")}</div>{crop.grade && <span className="badge badge-primary">{crop.grade}</span>}
  </div><h3 className="text-xl font-bold text-earth-800 mb-1">{crop.commodity || crop.product_type || crop.name}</h3><p className="text-sm text-earth-500 mb-4 flex items-center gap-1"><MapPin className="w-4 h-4" />{crop.province || crop.region || "Zimbabwe"}
- </p><div className="flex items-center justify-between pt-4 border-t border-earth-100"><div><p className="text-2xl font-bold text-primary-600">${typeof crop.price === "number" ? crop.price.toFixed(2) : crop.price}</p><p className="text-sm text-earth-500">{crop.unit || "per unit"}</p></div><button 
+ </p><div className="flex items-center justify-between pt-4 border-t border-earth-100"><div><p className="text-2xl font-bold text-primary-600">${typeof crop.price === "number" ? crop.price.toFixed(2) : crop.price}</p><p className="text-sm text-earth-500">{crop.unit || "per unit"}</p></div><button
  onClick={() => onOpenAuth("login")}
  className="btn btn-sm btn-primary"
  >Buy Now
@@ -375,8 +394,6 @@ function TrustSection() {
 }
 
 function TestimonialsSection() {
- // REMOVED: Hardcoded testimonials data for production
- // Testimonials should be loaded from backend API or CMS
  const testimonials = [];
 
  return (
@@ -408,7 +425,7 @@ function CTASection({ onOpenAuth }) {
  <div className="absolute inset-0 opacity-20"><div className="absolute top-0 left-0 w-72 h-72 bg-white rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" /><div className="absolute bottom-0 right-0 w-96 h-96 bg-secondary-400 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" /></div>
 <div className="relative z-10 max-w-2xl mx-auto"><h2 className="text-3xl sm:text-4xl font-bold mb-4">Ready to Start Trading?
  </h2><p className="text-lg text-white/80 mb-8">Join Zimbabwe's most trusted agricultural marketplace. Create your free account in minutes and start trading with confidence.
- </p><div className="flex flex-wrap justify-center gap-4"><button 
+ </p><div className="flex flex-wrap justify-center gap-4"><button
  onClick={() => onOpenAuth("signup")}
  className="btn btn-lg bg-white text-primary-700 hover:bg-white/90 shadow-xl"
  >Create Free Account
@@ -430,22 +447,22 @@ function FeaturedInputsSection() {
  const data = await response.json();
  setInputs(data.slice(0, 6));
  } catch (error) {
- console.error("Error fetching inputs:", error);
+ console.warn("Featured inputs unavailable:", error);
  } finally {
  setLoading(false);
  }
  };
 
  const getCategoryEmoji = (category) => {
- const emojis = {
- seeds: "",
- fertilizer: "",
- pesticides: "️",
- herbicides: "",
- fungicides: "",
- animal_feed: "�",
+ const labels = {
+ seeds: "Seeds",
+ fertilizer: "Fertilizer",
+ pesticides: "Pesticides",
+ herbicides: "Herbicides",
+ fungicides: "Fungicides",
+ animal_feed: "Animal Feed",
  };
- return emojis[category] || "";
+ return labels[category] || "Input";
  };
 
  return (
@@ -464,9 +481,9 @@ function FeaturedInputsSection() {
  transition={{ delay: i * 0.1 }}
  className="bg-earth-50 rounded-2xl p-6 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
  onClick={() => (window.location.href = `/products/${item.id}`)}
- ><div className="flex items-start justify-between mb-4"><span className="text-4xl">{getCategoryEmoji(item.input_category)}</span><div className="flex items-center gap-1 text-yellow-500"><Star className="w-4 h-4 fill-current" /><span className="text-sm font-medium">{item.supplier_rating?.toFixed(1) || "N/A"}</span></div></div><h3 className="text-lg font-bold text-earth-800 mb-1">{item.name}</h3><p className="text-sm text-earth-500 mb-4">{item.supplier_name || "Verified Supplier"}</p><div className="flex items-center justify-between mb-4"><div><p className="text-2xl font-bold text-primary-600">${item.price?.toFixed(2)}</p><p className="text-xs text-earth-500">{item.quantity_available || 0} in stock</p></div></div><button className="w-full btn btn-primary btn-sm">View Details</button></motion.div>))}
+ ><div className="flex items-start justify-between mb-4"><span className="text-xs font-black uppercase tracking-widest text-primary-700 bg-primary-50 px-3 py-2 rounded-xl">{getCategoryEmoji(item.input_category)}</span><div className="flex items-center gap-1 text-yellow-500"><Star className="w-4 h-4 fill-current" /><span className="text-sm font-medium">{item.supplier_rating?.toFixed(1) || "N/A"}</span></div></div><h3 className="text-lg font-bold text-earth-800 mb-1">{item.name}</h3><p className="text-sm text-earth-500 mb-4">{item.supplier_name || "Verified Supplier"}</p><div className="flex items-center justify-between mb-4"><div><p className="text-2xl font-bold text-primary-600">${item.price?.toFixed(2)}</p><p className="text-xs text-earth-500">{item.quantity_available || 0} in stock</p></div></div><button className="w-full btn btn-primary btn-sm">View Details</button></motion.div>))}
  </div>
-<div className="text-center"><Link to="/marketplace" className="btn btn-outline">View All Inputs →
+<div className="text-center"><Link to="/marketplace" className="btn btn-outline">View All Inputs
  </Link></div></>)}
  </div></section>);
 }
@@ -485,22 +502,22 @@ function FeaturedMachinerySection() {
  const data = await response.json();
  setMachinery(data.slice(0, 6));
  } catch (error) {
- console.error("Error fetching machinery:", error);
+ console.warn("Featured machinery unavailable:", error);
  } finally {
  setLoading(false);
  }
  };
 
  const getCategoryEmoji = (category) => {
- const emojis = {
- tractor: "",
- sprayer: "",
- irrigation: "",
- tiller: "️",
- harvester: "",
- tools: "",
+ const labels = {
+ tractor: "Tractor",
+ sprayer: "Sprayer",
+ irrigation: "Irrigation",
+ tiller: "Tiller",
+ harvester: "Harvester",
+ tools: "Tools",
  };
- return emojis[category] || "�";
+ return labels[category] || "Equipment";
  };
 
  return (
@@ -519,9 +536,9 @@ function FeaturedMachinerySection() {
  transition={{ delay: i * 0.1 }}
  className="bg-white rounded-2xl p-6 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
  onClick={() => (window.location.href = `/products/${item.id}`)}
- ><div className="flex items-start justify-between mb-4"><span className="text-4xl">{getCategoryEmoji(item.machinery_category)}</span><div className="flex items-center gap-1 text-yellow-500"><Star className="w-4 h-4 fill-current" /><span className="text-sm font-medium">{item.supplier_rating?.toFixed(1) || "N/A"}</span></div></div><h3 className="text-lg font-bold text-earth-800 mb-1">{item.name}</h3><p className="text-sm text-earth-500 mb-4">{item.supplier_name || "Verified Supplier"}</p><div className="flex items-center justify-between mb-4"><div><p className="text-2xl font-bold text-primary-600">${item.price?.toFixed(2)}</p><p className="text-xs text-earth-500">{item.condition || "Standard"}</p></div></div><button className="w-full btn btn-primary btn-sm">View Details</button></motion.div>))}
+ ><div className="flex items-start justify-between mb-4"><span className="text-xs font-black uppercase tracking-widest text-primary-700 bg-primary-50 px-3 py-2 rounded-xl">{getCategoryEmoji(item.machinery_category)}</span><div className="flex items-center gap-1 text-yellow-500"><Star className="w-4 h-4 fill-current" /><span className="text-sm font-medium">{item.supplier_rating?.toFixed(1) || "N/A"}</span></div></div><h3 className="text-lg font-bold text-earth-800 mb-1">{item.name}</h3><p className="text-sm text-earth-500 mb-4">{item.supplier_name || "Verified Supplier"}</p><div className="flex items-center justify-between mb-4"><div><p className="text-2xl font-bold text-primary-600">${item.price?.toFixed(2)}</p><p className="text-xs text-earth-500">{item.condition || "Standard"}</p></div></div><button className="w-full btn btn-primary btn-sm">View Details</button></motion.div>))}
  </div>
-<div className="text-center"><Link to="/marketplace" className="btn btn-outline">View All Machinery →
+<div className="text-center"><Link to="/marketplace" className="btn btn-outline">View All Machinery
  </Link></div></>)}
  </div></section>);
 }

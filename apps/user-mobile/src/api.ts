@@ -371,6 +371,42 @@ export async function getUserSettings(token) {
   });
 }
 
+export async function getWithdrawalQuote(token, amount, currency = 'USD') {
+  return jsonFetch(`/payments/withdraw/quote?amount=${encodeURIComponent(String(amount))}&currency=${encodeURIComponent(currency)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function getPayoutMethods(token) {
+  return jsonFetch('/payments/wallet/payout-methods', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function getSubscriptionPlans(role) {
+  return jsonFetch(`/subscriptions/plans?role=${encodeURIComponent(role)}`);
+}
+
+export async function getMySubscription(token) {
+  return jsonFetch('/subscriptions/me', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function upgradeSubscription(token, planCode, billingCycle = 'MONTHLY') {
+  return jsonFetch('/subscriptions/upgrade', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ plan_code: planCode, billing_cycle: billingCycle }),
+  });
+}
+
+export async function getSubscriptionSavings(token) {
+  return jsonFetch('/subscriptions/savings', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export async function updateUserSettings(token, payload) {
   return jsonFetch('/users/settings', {
     method: 'PUT',
@@ -518,6 +554,60 @@ export async function submitTransportSurvey(token, orderId, payload) {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
+  });
+}
+
+export async function calculateTransportQuote(token, payload) {
+  return jsonFetch('/transport/calculate', {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function requestTransport(token, payload) {
+  return jsonFetch('/transport/request', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getTransportNegotiation(token, negotiationId) {
+  return jsonFetch(`/transport/negotiations/${negotiationId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function sendTransportNegotiationMessage(token, negotiationId, message) {
+  return jsonFetch('/transport/negotiations/message', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ negotiation_id: negotiationId, message }),
+  });
+}
+
+export async function sendTransportNegotiationOffer(token, payload) {
+  return jsonFetch('/transport/negotiations/offer', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function acceptTransportNegotiation(token, negotiationId) {
+  return jsonFetch('/transport/negotiations/accept', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ negotiation_id: negotiationId }),
+  });
+}
+
+export async function rejectTransportNegotiation(token, negotiationId, reason) {
+  return jsonFetch('/transport/negotiations/reject', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ negotiation_id: negotiationId, reason }),
   });
 }
 

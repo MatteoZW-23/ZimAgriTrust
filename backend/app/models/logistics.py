@@ -51,8 +51,13 @@ class OrderDelivery(Base):
     order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id"), nullable=False, unique=True, index=True)
 
     # Method & Status
-    method: Mapped[Optional[DeliveryMethod]] = mapped_column(Enum(DeliveryMethod), nullable=True)
-    status: Mapped[DeliveryStatus] = mapped_column(Enum(DeliveryStatus), default=DeliveryStatus.PENDING_PICKUP)
+    method: Mapped[Optional[DeliveryMethod]] = mapped_column(
+        Enum(DeliveryMethod, name="orderdeliverymethod"), nullable=True
+    )
+    status: Mapped[DeliveryStatus] = mapped_column(
+        Enum(DeliveryStatus, name="orderdeliverystatus"),
+        default=DeliveryStatus.PENDING_PICKUP,
+    )
 
     # Scheduling
     pickup_scheduled_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

@@ -69,12 +69,12 @@ class DocumentVerificationRecord(Base):
     manual_review_required: Mapped[bool] = mapped_column(Boolean, default=True)
     
     # Reviewers
-    agent_reviewer_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
+    agent_reviewer_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"), index=True)
     agent_reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     agent_decision: Mapped[Optional[str]] = mapped_column(String(20))
     agent_notes: Mapped[Optional[str]] = mapped_column(Text)
     
-    admin_reviewer_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
+    admin_reviewer_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"), index=True)
     admin_reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     admin_decision: Mapped[Optional[str]] = mapped_column(String(20))
     admin_notes: Mapped[Optional[str]] = mapped_column(Text)
@@ -120,11 +120,11 @@ class VerificationQueue(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("document_verification_records.id", ondelete="CASCADE"), unique=True)
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     
     priority_score: Mapped[float] = mapped_column(Float, default=0)
     status: Mapped[str] = mapped_column(String(20), default="pending") # pending, assigned, completed
-    assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
+    assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"), index=True)
     assigned_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -133,10 +133,10 @@ class VerificationAuditLog(Base):
     __tablename__ = "verification_audit_logs"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("document_verification_records.id", ondelete="CASCADE"))
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("document_verification_records.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     action: Mapped[str] = mapped_column(String(50))
-    actor_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
+    actor_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"), index=True)
     actor_role: Mapped[str] = mapped_column(String(20))
     
     previous_status: Mapped[Optional[str]] = mapped_column(String(20))

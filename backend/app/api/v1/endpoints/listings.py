@@ -107,10 +107,20 @@ def search_market_listings(
 @router.get("/", response_model=list[ListingResponse], include_in_schema=False)
 def list_market_listings(db: Session = Depends(get_db)) -> list[Listing]:
     try:
-        return (
+        listings = (
             db.query(Listing)
             .filter(Listing.status == ListingStatus.ACTIVE)
             .all()
+        )
+        from app.services.subscription_service import SubscriptionService
+        return sorted(
+            listings,
+            key=lambda item: (
+                bool(getattr(item, "is_boosted", False)),
+                SubscriptionService.visibility_weight(db, user=item.seller) if item.seller else 100,
+                item.created_at,
+            ),
+            reverse=True,
         )
     except Exception as e:
         logger.error(f"List listings error: {str(e)}")

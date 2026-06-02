@@ -49,12 +49,38 @@ export const verifyRegOtp = (phone_number: string, otp: string) =>
 export const getProfile = () => request("/auth/me");
 export const updateProfile = (data: Record<string, any>) => request("/auth/profile", { method: "PATCH", body: JSON.stringify(data) });
 export const logout = () => request("/auth/logout", { method: "POST" }).catch(() => {});
+export const getUserSettings = () => request("/users/settings");
+export const updateUserSettings = (data: Record<string, any>) => request("/users/settings", { method: "PUT", body: JSON.stringify(data) });
+export const changeUserPin = (current_pin: string, new_pin: string) =>
+  request("/users/pin/change", { method: "POST", body: JSON.stringify({ current_pin, new_pin }) });
 
 // ── Listings & Browse ─────────────────────────────────────────────────────────
 export const getMyListings = () => request("/listings/me");
-export const createListing = (data: Record<string, any>) => request("/listings", { method: "POST", body: JSON.stringify(data) });
+export const createListing = (data: Record<string, any>) => {
+  const payload = {
+    sector: data.sector || "CROPS",
+    product_type: data.product_type || data.product_name || data.crop_type || "",
+    product_subtype: data.product_subtype || null,
+    grade: data.grade || null,
+    quantity: Number(data.quantity || 0),
+    quantity_unit: data.quantity_unit || "kg",
+    price_per_unit: Number(data.price_per_unit || 0),
+    currency: data.currency || "USD",
+    location_province: data.location_province || data.province || data.location || null,
+    location_district: data.location_district || null,
+    pickup_address: data.pickup_address || null,
+    is_perishable: Boolean(data.is_perishable),
+    expiry_date: data.expiry_date || null,
+    harvest_date: data.harvest_date || null,
+    storage_requirements: data.storage_requirements || null,
+  };
+  return request("/listings", { method: "POST", body: JSON.stringify(payload) });
+};
 export const updateListing = (id: string, data: Record<string, any>) => request(`/listings/${id}`, { method: "PATCH", body: JSON.stringify(data) });
 export const deleteListing = (id: string) => request(`/listings/${id}`, { method: "DELETE" });
+export const getSavedListings = () => request("/listings/me/saved");
+export const saveListing = (listingId: string) => request(`/listings/${listingId}/save`, { method: "POST" });
+export const unsaveListing = (listingId: string) => request(`/listings/${listingId}/save`, { method: "DELETE" });
 export const getAllListings = (params: Record<string, string> = {}) => {
   const qs = new URLSearchParams(params).toString();
   return request(`/listings${qs ? `?${qs}` : ""}`);
@@ -83,6 +109,8 @@ export const getMyOffers = () => request("/offers/me");
 export const getListingOffers = (listingId: string) => request(`/listings/${listingId}/offers`);
 export const acceptOffer = (offerId: string) => request(`/offers/${offerId}/accept`, { method: "POST" });
 export const rejectOffer = (offerId: string) => request(`/offers/${offerId}/reject`, { method: "POST" });
+export const counterOffer = (offerId: string, counter_price: number) =>
+  request(`/offers/${offerId}/counter`, { method: "POST", body: JSON.stringify({ counter_price }) });
 
 // ── Procurement Requests (Buyers) ─────────────────────────────────────────────
 export const getMyRequests = () => request("/procurement/me");
@@ -106,6 +134,12 @@ export const createDeposit = (data: Record<string, any>) => {
   return request("/wallet/top-up", { method: "POST", body: JSON.stringify(data) });
 };
 export const getDepositHistory = () => request("/wallet/history");
+export const getPayoutMethods = () => request("/wallet/payout-methods");
+export const createPayoutMethod = (data: Record<string, any>) => request("/wallet/payout-methods", { method: "POST", body: JSON.stringify(data) });
+export const updatePayoutMethod = (id: string, data: Record<string, any>) => request(`/wallet/payout-methods/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+export const deletePayoutMethod = (id: string) => request(`/wallet/payout-methods/${id}`, { method: "DELETE" });
+export const verifyPayoutMethod = (id: string) => request(`/wallet/payout-methods/${id}/verify`, { method: "POST" });
+export const setDefaultPayoutMethod = (id: string) => request(`/wallet/payout-methods/${id}/default`, { method: "POST" });
 
 // ── Loans & Financing ─────────────────────────────────────────────────────────
 export const getLoanProducts = () => request("/loans/products");
@@ -127,6 +161,20 @@ export const getMarketPrices = () =>
   request("/market/prices/current").catch(() => request("/market/summary"));
 
 export const getTrustScore = () => request("/auth/me").then((d) => d?.trust_score ?? 0);
+
+// Subscriptions
+export const getSubscriptionPlans = (role: string) => request(`/subscriptions/plans?role=${role}`);
+export const getMySubscription = () => request("/subscriptions/me");
+export const getSubscriptionSavings = () => request("/subscriptions/savings");
+export const upgradeSubscription = (plan_code: string, billing_cycle = "MONTHLY") =>
+  request("/subscriptions/upgrade", { method: "POST", body: JSON.stringify({ plan_code, billing_cycle }) });
+export const cancelSubscription = () => request("/subscriptions/cancel", { method: "POST" });
+
+// Support Tickets (standalone, beyond disputes)
+export const createTicket = (subject: string, description: string) =>
+  request("/tickets", { method: "POST", body: JSON.stringify({ subject, description }) });
+export const assignTicket = (ticketId: string, assigneeId: string) =>
+  request(`/tickets/${ticketId}/assign?assignee_id=${encodeURIComponent(assigneeId)}`, { method: "POST" });
 
 // ── Transport Payment System ───────────────────────────────────────────────────
 export const requestTransport = (data: Record<string, any>) =>
@@ -161,3 +209,18 @@ export const updateDriverLocation = (data: Record<string, any>) =>
   request("/transport/tracking/location", { method: "POST", body: JSON.stringify(data) });
 export const getTrackingHistory = (deliveryId: string) =>
   request(`/transport/tracking/${deliveryId}`);
+
+// ── Supplier Marketplace ───────────────────────────────────────────────────────
+export const getSuppliersList = (limit = 50, offset = 0) =>
+  request(`/suppliers/public/list?limit=${limit}&offset=${offset}`);
+export const getSupplierProducts = (supplierId: string) =>
+  request(`/suppliers/public/${supplierId}/products`);
+export const getAllSupplierProducts = (params: Record<string, string> = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return request(`/suppliers/public/products${qs ? `?${qs}` : ""}`);
+};
+export const getSupplierProductDetail = (productId: string) =>
+  request(`/suppliers/public/products/${productId}`);
+export const createSupplierOrder = (data: Record<string, any>) =>
+  request("/suppliers/public/orders", { method: "POST", body: JSON.stringify(data) });
+export const getMySupplierOrders = () => request("/suppliers/public/orders");

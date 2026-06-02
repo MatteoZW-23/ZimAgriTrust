@@ -204,12 +204,20 @@ class Settings(BaseSettings):
     SMS_USERNAME: str = "sandbox"
     SMS_SENDER_ID: str = "ZimAgriTrust"
     SMS_ENABLE: bool = True
+    # Payment Gateway Configuration (Paynow, EcoCash, OneMoney)
+    PAYNOW_API_URL: str = "https://www.paynow.co.zw/interface/initiatetransaction"
+    PAYNOW_API_KEY: str = ""
+    PAYNOW_INTEGRATION_ID: str = ""
+    PAYNOW_ENABLE: bool = True
     
     # WhatsApp Configuration (WhatsApp Business API)
     WHATSAPP_API_KEY: str = ""
     WHATSAPP_PHONE_NUMBER_ID: str = ""
     WHATSAPP_BUSINESS_ACCOUNT_ID: str = ""
     WHATSAPP_VERIFY_TOKEN: str = ""
+    WHATSAPP_WEBHOOK_SECRET: str = ""  # HMAC-SHA256 secret for webhook signature verification
+    INTERNAL_SERVICE_TOKEN: str = ""
+    ENABLE_SUPPLIER_PAYOUT_PROCESSING: bool = False
     WHATSAPP_ENABLE: bool = True
     
     # Email Configuration
@@ -359,10 +367,6 @@ class Settings(BaseSettings):
 
     # --- EMERGENCY SHUTDOWN ---
     PLATFORM_SHUTDOWN: bool = False  # toggled by super-admin emergency endpoint
-
-    # --- PAYMENT SAFETY ---
-    # CRITICAL: Must be False in production. True only for local dev/test.
-    AUTO_CONFIRM_PAYMENTS: bool = False
 
     # --- DEVELOPMENT TOOLING ---
     # Debug/simulator endpoints must stay off unless explicitly enabled.

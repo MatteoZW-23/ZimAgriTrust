@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from app.core.config import settings
-from app.api.v1.endpoints import admin, audit, auth, disputes, listings, market, payments, transactions, ussd, agents, logistics, whatsapp, trades, recruitment, onboarding, requests, academy, academy_websocket, public, drivers, verification, portal_auth, agent_portal, super_admin, admin_approvals, deposits, inputs, browse, wallet, agent_practical, agent_shadowing, users, offers, suppliers, security_auth, agent_classroom, fintech, admin_fintech
+from app.api.v1.endpoints import admin, audit, auth, disputes, listings, market, payments, transactions, ussd, agents, logistics, transport, whatsapp, trades, recruitment, onboarding, requests, public, drivers, verification, portal_auth, agent_portal, super_admin, admin_approvals, deposits, inputs, browse, wallet, users, offers, suppliers, security_auth, agent_classroom, fintech, admin_fintech, subscriptions, governance, tickets
 from app.api.v1.endpoints.admin import certification
 
 api_router = APIRouter()
@@ -22,21 +22,17 @@ api_router.include_router(trades.router, prefix="/trades", tags=["trades"])
 api_router.include_router(transactions.router, prefix="/transactions", tags=["transactions"])
 api_router.include_router(disputes.router, prefix="/disputes", tags=["disputes"])
 api_router.include_router(logistics.router, prefix="/logistics", tags=["logistics"])
+api_router.include_router(transport.router, prefix="/transport", tags=["transport"])
 api_router.include_router(drivers.router, prefix="/drivers", tags=["drivers"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(logistics.admin_router, prefix="/admin/transport", tags=["admin-transport"])
 api_router.include_router(certification.router, prefix="/admin/certification", tags=["admin-certification"])
 api_router.include_router(ussd.router, prefix="/ussd", tags=["ussd"])
-# REMOVED: USSD simulator/debugger/replay routers - development tools removed for production
 api_router.include_router(recruitment.router, prefix="/recruitment", tags=["recruitment"])
 api_router.include_router(onboarding.router, prefix="/onboarding", tags=["onboarding"])
-api_router.include_router(academy.router, prefix="/academy", tags=["academy"])
-api_router.include_router(academy_websocket.router, prefix="/academy", tags=["academy-websocket"])
 api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
 api_router.include_router(audit.router, prefix="/audit", tags=["audit"])
 api_router.include_router(agents.router, prefix="/agents", tags=["agents"])
-api_router.include_router(agent_practical.router, prefix="/agents/practical", tags=["agent-practical"])
-api_router.include_router(agent_shadowing.router, prefix="/agents", tags=["agent-shadowing"])
 api_router.include_router(public.router, prefix="/public", tags=["public"])
 api_router.include_router(verification.router, prefix="/verification", tags=["verification"])
 api_router.include_router(admin_approvals.router, prefix="/admin/approvals", tags=["admin-approvals"])
@@ -48,9 +44,13 @@ api_router.include_router(wallet.router, prefix="/wallet", tags=["wallet"])
 api_router.include_router(suppliers.router, prefix="/suppliers", tags=["suppliers"])
 api_router.include_router(suppliers.public_router, prefix="/suppliers/public", tags=["supplier-public"])
 api_router.include_router(suppliers.admin_router, prefix="/admin/suppliers", tags=["admin-suppliers"])
+api_router.include_router(subscriptions.router, prefix="/subscriptions", tags=["subscriptions"])
+api_router.include_router(subscriptions.admin_router, prefix="/admin/subscriptions", tags=["admin-subscriptions"])
 api_router.include_router(security_auth.mfa_router, prefix="/auth/mfa", tags=["mfa"])
 api_router.include_router(security_auth.security_router, prefix="/auth/security", tags=["security"])
 api_router.include_router(security_auth.supplier_auth_router, prefix="/auth/supplier", tags=["supplier-auth"])
 api_router.include_router(security_auth.staff_auth_router, prefix="/auth/staff", tags=["staff-auth"])
 api_router.include_router(fintech.router, prefix="/fintech", tags=["fintech"])
 api_router.include_router(admin_fintech.router, prefix="/admin/fintech", tags=["admin-fintech"])
+api_router.include_router(governance.router, prefix="/governance", tags=["governance"])
+api_router.include_router(tickets.router, prefix="/tickets", tags=["tickets"])

@@ -14,7 +14,9 @@ Critical invariants enforced here:
      the order without re-crediting.
 """
 import logging
+import json
 import uuid
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
@@ -23,9 +25,38 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-from app.models.transaction import Order, OrderStatus, Transaction, TransactionType
+from app.models.transaction import Order, OrderStatus, Transaction, TransactionType, can_transition_order_status
 
 AUTO_SETTLEMENT_DAYS = 7
+
+
+def _notify_order_event(db: Session, order: Order, event_key: str, priority: str = "important", **vars) -> None:
+    try:
+        from app.models.user import User
+        from app.services.notification_service import NotificationService
+        buyer = db.query(User).filter(User.id == order.buyer_id).first()
+        seller = db.query(User).filter(User.id == order.seller_id).first()
+        for user in (buyer, seller):
+            if not user:
+                continue
+            try:
+                asyncio.run(NotificationService.dispatch_event(db, user, event_key, priority=priority, **vars))
+            except RuntimeError:
+                loop = asyncio.get_event_loop()
+                loop.create_task(NotificationService.dispatch_event(db, user, event_key, priority=priority, **vars))
+    except Exception as exc:
+        logger.warning("Order notification failed for %s order=%s: %s", event_key, getattr(order, "id", None), exc)
+
+
+def _set_status(order: Order, next_status: OrderStatus) -> None:
+    if order.status == next_status:
+        return
+    if not can_transition_order_status(order.status, next_status):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid order transition {order.status.value} -> {next_status.value}",
+        )
+    order.status = next_status
 
 
 def _lock_order(db: Session, order_id: uuid.UUID) -> Order:
@@ -63,7 +94,7 @@ def hold_payment(db: Session, order: Order) -> Order:
             detail=f"Order must be PENDING to hold escrow, current state: {locked.status}",
         )
 
-    locked.status = OrderStatus.ESCROW_HELD
+    _set_status(locked, OrderStatus.ESCROW_HELD)
     db.commit()
     db.refresh(locked)
     return locked
@@ -85,7 +116,7 @@ def mark_delivered(db: Session, order: Order) -> Order:
             detail=f"Order must be ESCROW_HELD to mark delivered, current state: {locked.status}",
         )
 
-    locked.status = OrderStatus.DELIVERED
+    _set_status(locked, OrderStatus.DELIVERED)
     locked.delivered_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(locked)
@@ -126,12 +157,14 @@ def release_payment(db: Session, order: Order, handover_code: str = None) -> Ord
     from app.services.wallet_service import WalletService
 
     idempotency_key = f"escrow_release:{locked.id}"
+    escrow_amount = round(locked.total_amount + (locked.transport_insurance_fee or 0), 2)
+    settlement_fee = round(locked.platform_fee + (locked.transport_insurance_fee or 0), 2)
     success = WalletService.release_escrow(
         db,
         buyer_id=locked.buyer_id,
         seller_id=locked.seller_id,
-        amount=locked.total_amount,
-        fee=locked.platform_fee,
+        amount=escrow_amount,
+        fee=settlement_fee,
         currency=locked.currency,
         order_id=locked.id,
         idempotency_key=idempotency_key,
@@ -140,8 +173,13 @@ def release_payment(db: Session, order: Order, handover_code: str = None) -> Ord
         db.rollback()
         raise HTTPException(status_code=500, detail="Financial Settlement Failed")
 
-    locked.status = OrderStatus.COMPLETED
+    if locked.status in {OrderStatus.ESCROW_HELD, OrderStatus.DELIVERED}:
+        _set_status(locked, OrderStatus.SETTLEMENT_PENDING)
+    _set_status(locked, OrderStatus.COMPLETED)
     locked.completed_at = datetime.now(timezone.utc)
+
+    from app.services.escrow_account_service import EscrowAccountService
+    EscrowAccountService.release_for_order(db, locked, escrow_amount, settlement_fee)
 
     db.add(Transaction(
         order_id=locked.id, user_id=locked.seller_id,
@@ -151,7 +189,7 @@ def release_payment(db: Session, order: Order, handover_code: str = None) -> Ord
     db.add(Transaction(
         order_id=locked.id, user_id=locked.buyer_id,
         type=TransactionType.FEE,
-        amount=locked.platform_fee, currency=locked.currency, status="completed",
+        amount=settlement_fee, currency=locked.currency, status="completed",
     ))
 
     db.commit()
@@ -159,6 +197,14 @@ def release_payment(db: Session, order: Order, handover_code: str = None) -> Ord
 
     # Best-effort post-commit side effects
     _post_release_side_effects(db, locked)
+    _notify_order_event(
+        db,
+        locked,
+        "payment_released",
+        priority="important",
+        AMOUNT=f"{locked.seller_payout:.2f} {locked.currency}",
+        REF=str(locked.id),
+    )
     return locked
 
 
@@ -247,28 +293,41 @@ def refund_payment(db: Session, order: Order) -> Order:
     from app.services.wallet_service import WalletService
 
     idempotency_key = f"refund:{locked.id}"
+    escrow_amount = round(locked.total_amount + (locked.transport_insurance_fee or 0), 2)
     success = WalletService.refund_escrow(
         db,
         buyer_id=locked.buyer_id,
-        amount=locked.total_amount,
+        amount=escrow_amount,
         currency=locked.currency,
+        order_id=locked.id,
         idempotency_key=idempotency_key,
     )
     if not success:
         db.rollback()
         raise HTTPException(status_code=500, detail="Refund Transaction Failed")
 
-    locked.status = OrderStatus.REFUNDED
+    _set_status(locked, OrderStatus.REFUNDED)
     locked.refunded_at = datetime.now(timezone.utc)
+
+    from app.services.escrow_account_service import EscrowAccountService
+    EscrowAccountService.refund_for_order(db, locked, escrow_amount)
 
     db.add(Transaction(
         order_id=locked.id, user_id=locked.buyer_id,
         type=TransactionType.REFUND,
-        amount=locked.total_amount, currency=locked.currency, status="completed",
+        amount=escrow_amount, currency=locked.currency, status="completed",
     ))
 
     db.commit()
     db.refresh(locked)
+    _notify_order_event(
+        db,
+        locked,
+        "payment_confirmed",
+        priority="important",
+        AMOUNT=f"{escrow_amount:.2f} {locked.currency}",
+        REF=str(locked.id),
+    )
     return locked
 
 
@@ -306,6 +365,12 @@ def process_auto_settlement(db: Session, order: Order) -> bool:
         return True
     except Exception as exc:
         logger.error("AUTO_SETTLEMENT failed order=%s: %s", locked.id, exc)
+        logger.error(json.dumps({
+            "event": "AUTO_SETTLEMENT_FAILURE",
+            "order_id": str(locked.id),
+            "order_status": str(locked.status.value if hasattr(locked.status, "value") else locked.status),
+            "error": str(exc),
+        }))
         return False
 
 
@@ -336,11 +401,13 @@ def resolve_dispute(
             detail=f"Order must be DISPUTED for resolution, current state: {locked.status}",
         )
 
-    total = buyer_refund + seller_payout + fee
-    if abs(total - locked.total_amount) > 0.01:
+    escrow_total = round(locked.total_amount + (locked.transport_insurance_fee or 0), 2)
+    settlement_fee = round(fee + (locked.transport_insurance_fee or 0), 2)
+    total = buyer_refund + seller_payout + settlement_fee
+    if abs(total - escrow_total) > 0.01:
         raise HTTPException(
             status_code=400,
-            detail=f"Split amounts ({total}) do not match order total ({locked.total_amount})",
+            detail=f"Split amounts ({total}) do not match escrow total ({escrow_total})",
         )
 
     from app.services.wallet_service import WalletService
@@ -350,7 +417,7 @@ def resolve_dispute(
         db,
         buyer_id=locked.buyer_id,
         seller_id=locked.seller_id,
-        total_amount=locked.total_amount,
+        total_amount=escrow_total,
         buyer_refund=buyer_refund,
         seller_payout=seller_payout,
         currency=locked.currency,
@@ -361,11 +428,14 @@ def resolve_dispute(
         db.rollback()
         raise HTTPException(status_code=500, detail="Split Settlement Failed")
 
-    locked.status = OrderStatus.SETTLED
+    _set_status(locked, OrderStatus.SETTLED)
     locked.refunded_amount = buyer_refund
     locked.seller_payout = seller_payout
-    locked.platform_fee = fee
+    locked.platform_fee = settlement_fee
     locked.settled_at = datetime.now(timezone.utc)
+
+    from app.services.escrow_account_service import EscrowAccountService
+    EscrowAccountService.partial_release_for_order(db, locked, buyer_refund, seller_payout, settlement_fee)
 
     db.add(Transaction(
         order_id=locked.id, user_id=locked.buyer_id, type=TransactionType.REFUND,
@@ -377,7 +447,7 @@ def resolve_dispute(
     ))
     db.add(Transaction(
         order_id=locked.id, user_id=locked.buyer_id, type=TransactionType.FEE,
-        amount=fee, currency=locked.currency, status="completed",
+        amount=settlement_fee, currency=locked.currency, status="completed",
     ))
 
     db.commit()

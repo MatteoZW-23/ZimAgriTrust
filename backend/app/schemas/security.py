@@ -35,6 +35,22 @@ class SuperAdminTokenResponse(BaseModel):
     super_admin: dict[str, Any]
 
 
+class SuperAdminCreateRequest(BaseModel):
+    username: str
+    email: str
+    password: str = Field(min_length=12)
+    phone_number: Optional[str] = None
+    hardware_mfa_secret: Optional[str] = None
+    yubikey_public_id: Optional[str] = None
+    ip_whitelist: list[str] = Field(default_factory=list)
+    approver_username: str
+    approver_password: str
+    approver_mfa_code: str
+    approver_method: str = Field(default="totp", pattern="^(totp|yubikey)$")
+    reason: str = Field(min_length=12, max_length=500)
+    is_root: bool = False
+
+
 # ---------- Admin approvals ----------
 
 class ApprovalRequestIn(BaseModel):
@@ -107,6 +123,8 @@ class WithdrawalLimitUpdateIn(BaseModel):
     monthly_limit: float = Field(ge=0)
     per_transaction_limit: float = Field(ge=0)
     min_trust_score: Optional[int] = Field(default=None, ge=0, le=100)
+    mfa_code: str = Field(min_length=6, max_length=48)
+    mfa_method: str = Field(default="totp", pattern="^(totp|yubikey)$")
 
 
 # ---------- Audit ----------
@@ -122,12 +140,16 @@ class AuditChainStatus(BaseModel):
 
 class EscrowReleaseRequestIn(BaseModel):
     order_id: UUID
+    mfa_code: str = Field(min_length=6, max_length=48)
+    mfa_method: str = Field(default="totp", pattern="^(totp|yubikey)$")
 
 
 class EscrowReleaseConfirmIn(BaseModel):
     order_id: UUID
     otp: str
     handover_code: Optional[str] = None
+    mfa_code: str = Field(min_length=6, max_length=48)
+    mfa_method: str = Field(default="totp", pattern="^(totp|yubikey)$")
 
 
 # ---------- Emergency ----------
@@ -135,3 +157,5 @@ class EscrowReleaseConfirmIn(BaseModel):
 class EmergencyShutdownIn(BaseModel):
     reason: str
     confirm: bool = False
+    mfa_code: str = Field(min_length=6, max_length=48)
+    mfa_method: str = Field(default="totp", pattern="^(totp|yubikey)$")

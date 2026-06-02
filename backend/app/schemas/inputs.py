@@ -220,3 +220,30 @@ class InputPriceAlertOut(BaseModel):
     is_active: bool
     last_triggered_at: Optional[datetime]
     created_at: datetime
+
+
+class InputSavedSearchIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    query_text: Optional[str] = None
+    category_id: Optional[int] = None
+    brand: Optional[str] = None
+    province: Optional[str] = None
+    min_price: Optional[float] = Field(default=None, gt=0)
+    max_price: Optional[float] = Field(default=None, gt=0)
+    notify_on_match: bool = True
+
+
+class InputSavedSearchOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    name: str
+    query_text: Optional[str]
+    category_id: Optional[int]
+    brand: Optional[str]
+    province: Optional[str]
+    min_price: Optional[float]
+    max_price: Optional[float]
+    notify_on_match: bool
+    is_active: bool
+    last_matched_at: Optional[datetime]
+    created_at: datetime

@@ -3,21 +3,38 @@ import hashlib
 import os
 import uuid as _uuid
 import logging
+from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel
-from app.api.deps import get_db, get_current_user
+from app.api.deps import get_db, get_current_user, require_policy_requirement
 from app.services.payment_service import process_ecocash_callback
 from app.services.wallet_service import wallet_service
 from app.schemas.transaction import WalletDepositRequest, WalletWithdrawRequest, WalletBalanceResponse, TransactionResponse
 from app.models.user import User
 from app.models.transaction import Transaction, TransactionType, Order, OrderStatus
+from app.models.payout_method import UserPayoutMethod, PayoutMethodType, PayoutMethodProvider, PayoutMethodStatus
 from app.core.policy import calculate_platform_fees, calculate_seller_settlement, calculate_full_order_breakdown
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+@router.get("/methods")
+def list_payment_methods():
+    """
+    Provider abstraction surface used by web/mobile clients.
+    """
+    return {
+        "providers": [
+            {"code": "ecocash", "name": "EcoCash", "enabled": True},
+            {"code": "onemoney", "name": "OneMoney", "enabled": True},
+            {"code": "innbucks", "name": "Innbucks", "enabled": True},
+            {"code": "zipit", "name": "ZIPIT", "enabled": True},
+            {"code": "bank_transfer", "name": "Bank Transfer", "enabled": True},
+        ]
+    }
 
 
 def _required_env(name: str) -> str:
@@ -55,6 +72,73 @@ class OneMoneyCBPayload(BaseModel):
     status: str
     amount: float
     mobile_number: str
+
+
+class ZIPITCallbackPayload(BaseModel):
+    reference: str
+    status: str
+    amount: float
+    bank_reference: Optional[str] = None
+
+
+class InnbucksCallbackPayload(BaseModel):
+    reference: str
+    status: str
+    amount: float
+    wallet_id: Optional[str] = None
+
+
+class PayoutMethodCreateRequest(BaseModel):
+    method_type: str
+    provider: str
+    account_name: str
+    account_number: Optional[str] = None
+    bank_name: Optional[str] = None
+    branch_code: Optional[str] = None
+    is_default: bool = False
+
+
+class PayoutMethodUpdateRequest(BaseModel):
+    account_name: Optional[str] = None
+    account_number: Optional[str] = None
+    bank_name: Optional[str] = None
+    branch_code: Optional[str] = None
+    is_default: Optional[bool] = None
+    status: Optional[str] = None
+
+
+class PayoutMethodResponse(BaseModel):
+    id: str
+    user_id: str
+    method_type: str
+    provider: str
+    account_name: str
+    account_number: Optional[str] = None
+    bank_name: Optional[str] = None
+    branch_code: Optional[str] = None
+    is_default: bool
+    status: str
+    verified_at: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+def _serialize_payout_method(pm: UserPayoutMethod) -> dict:
+    return {
+        "id": str(pm.id),
+        "user_id": str(pm.user_id),
+        "method_type": pm.method_type.value,
+        "provider": pm.provider.value,
+        "account_name": pm.account_name,
+        "account_number": pm.account_number,
+        "bank_name": pm.bank_name,
+        "branch_code": pm.branch_code,
+        "is_default": bool(pm.is_default),
+        "status": pm.status.value,
+        "verified_at": pm.verified_at.isoformat() if pm.verified_at else None,
+        "created_at": pm.created_at.isoformat(),
+        "updated_at": pm.updated_at.isoformat(),
+    }
 
 @router.post("/ecocash/callback")
 async def ecocash_webhook(payload: EcoCashCallbackPayload, request: Request, db: Session = Depends(get_db)):
@@ -137,6 +221,65 @@ async def onemoney_webhook(
         raise HTTPException(status_code=500, detail="OneMoney service error")
 
 
+@router.post("/zipit/callback")
+async def zipit_webhook(
+    payload: ZIPITCallbackPayload,
+    request: Request,
+    db: Session = Depends(get_db),
+    x_signature: str = Header(None, alias="X-Signature"),
+):
+    try:
+        if x_signature:
+            body = await request.body()
+            from app.services.webhook_verification import WebhookVerifier
+            secret_key = os.getenv("ZIPIT_WEBHOOK_SECRET", "")
+            if secret_key and not WebhookVerifier.verify_zipit(body, x_signature, secret_key):
+                raise HTTPException(status_code=401, detail="Invalid signature")
+        success = process_ecocash_callback(
+            db,
+            payload.reference,
+            "PAID" if payload.status.upper() in ("SUCCESS", "COMPLETED", "PAID") else "FAILED",
+            payload.reference,
+        )
+        if not success:
+            raise HTTPException(status_code=400, detail="ZIPIT callback failed")
+        return {"status": "accepted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"ZIPIT webhook error: {str(e)}")
+        raise HTTPException(status_code=500, detail="ZIPIT service error")
+
+
+@router.post("/innbucks/callback")
+async def innbucks_webhook(
+    payload: InnbucksCallbackPayload,
+    request: Request,
+    db: Session = Depends(get_db),
+    x_signature: str = Header(None, alias="X-Signature"),
+):
+    try:
+        if x_signature:
+            body = await request.body()
+            from app.services.webhook_verification import WebhookVerifier, ProviderType
+            if not await WebhookVerifier.verify_webhook(ProviderType.INNBUCKS, body, x_signature):
+                raise HTTPException(status_code=401, detail="Invalid signature")
+        success = process_ecocash_callback(
+            db,
+            payload.reference,
+            "PAID" if payload.status.upper() in ("SUCCESS", "COMPLETED", "PAID") else "FAILED",
+            payload.reference,
+        )
+        if not success:
+            raise HTTPException(status_code=400, detail="Innbucks callback failed")
+        return {"status": "accepted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Innbucks webhook error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Innbucks service error")
+
+
 @router.get("/balance", response_model=WalletBalanceResponse)
 def get_wallet_balance(
     current_user: User = Depends(get_current_user),
@@ -213,6 +356,7 @@ def initiate_payment(
     payload: PaymentInitiateRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: bool = Depends(require_policy_requirement("transaction_first")),
 ):
     """
     Initiates payment for an existing order.
@@ -301,20 +445,6 @@ def initiate_payment(
                 "Agent will confirm payment on the platform",
             ],
             "expires_minutes": 1440,
-        }
-
-    auto_confirm = os.getenv("AUTO_CONFIRM_PAYMENTS", "false").lower() == "true"
-    if auto_confirm and order.total_amount <= 500:
-        process_ecocash_callback(db, payment_ref, "PAID", merchant_ref)
-        return {
-            "status": "confirmed",
-            "payment_ref": payment_ref,
-            "order_id": str(order.id),
-            "order_number": order.order_number,
-            "amount": order.total_amount,
-            "currency": order.currency,
-            "message": "Payment confirmed. Funds held in escrow.",
-            "instructions": instructions,
         }
 
     return {
@@ -455,6 +585,141 @@ def get_wallet_transactions(
     )
 
 
+@router.get("/wallet/payout-methods", response_model=list[PayoutMethodResponse])
+def list_payout_methods(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    methods = (
+        db.query(UserPayoutMethod)
+        .filter(UserPayoutMethod.user_id == current_user.id)
+        .order_by(UserPayoutMethod.is_default.desc(), UserPayoutMethod.created_at.desc())
+        .all()
+    )
+    return [_serialize_payout_method(method) for method in methods]
+
+
+@router.post("/wallet/payout-methods", response_model=PayoutMethodResponse, status_code=status.HTTP_201_CREATED)
+def create_payout_method(
+    payload: PayoutMethodCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    method_type = PayoutMethodType(payload.method_type.lower())
+    provider = PayoutMethodProvider(payload.provider.lower())
+    if method_type == PayoutMethodType.BANK_ACCOUNT and not (payload.bank_name and payload.account_number and payload.branch_code):
+        raise HTTPException(status_code=400, detail="Bank account requires bank_name, account_name, account_number, and branch_code")
+    if method_type in (PayoutMethodType.ECOCASH, PayoutMethodType.ONEMONEY) and not payload.account_number:
+        raise HTTPException(status_code=400, detail="Mobile money payout methods require account_number")
+    if payload.is_default:
+        db.query(UserPayoutMethod).filter(UserPayoutMethod.user_id == current_user.id).update({"is_default": False})
+    method = UserPayoutMethod(
+        user_id=current_user.id,
+        method_type=method_type,
+        provider=provider,
+        account_name=payload.account_name,
+        account_number=payload.account_number,
+        bank_name=payload.bank_name,
+        branch_code=payload.branch_code,
+        is_default=payload.is_default,
+        status=PayoutMethodStatus.PENDING,
+    )
+    db.add(method)
+    db.commit()
+    db.refresh(method)
+    return _serialize_payout_method(method)
+
+
+@router.patch("/wallet/payout-methods/{method_id}", response_model=PayoutMethodResponse)
+def update_payout_method(
+    method_id: _uuid.UUID,
+    payload: PayoutMethodUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    method = (
+        db.query(UserPayoutMethod)
+        .filter(UserPayoutMethod.id == method_id, UserPayoutMethod.user_id == current_user.id)
+        .first()
+    )
+    if not method:
+        raise HTTPException(status_code=404, detail="Payout method not found")
+    if payload.account_name is not None:
+        method.account_name = payload.account_name
+    if payload.account_number is not None:
+        method.account_number = payload.account_number
+    if payload.bank_name is not None:
+        method.bank_name = payload.bank_name
+    if payload.branch_code is not None:
+        method.branch_code = payload.branch_code
+    if payload.is_default is True:
+        db.query(UserPayoutMethod).filter(UserPayoutMethod.user_id == current_user.id, UserPayoutMethod.id != method.id).update({"is_default": False})
+        method.is_default = True
+    if payload.status and payload.status.upper() in PayoutMethodStatus.__members__:
+        method.status = PayoutMethodStatus[payload.status.upper()]
+    db.commit()
+    db.refresh(method)
+    return _serialize_payout_method(method)
+
+
+@router.delete("/wallet/payout-methods/{method_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_payout_method(
+    method_id: _uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    method = (
+        db.query(UserPayoutMethod)
+        .filter(UserPayoutMethod.id == method_id, UserPayoutMethod.user_id == current_user.id)
+        .first()
+    )
+    if not method:
+        raise HTTPException(status_code=404, detail="Payout method not found")
+    db.delete(method)
+    db.commit()
+    return None
+
+
+@router.post("/wallet/payout-methods/{method_id}/verify", response_model=PayoutMethodResponse)
+def verify_payout_method(
+    method_id: _uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    method = (
+        db.query(UserPayoutMethod)
+        .filter(UserPayoutMethod.id == method_id, UserPayoutMethod.user_id == current_user.id)
+        .first()
+    )
+    if not method:
+        raise HTTPException(status_code=404, detail="Payout method not found")
+    method.status = PayoutMethodStatus.VERIFIED
+    method.verified_at = datetime.utcnow()
+    db.commit()
+    db.refresh(method)
+    return _serialize_payout_method(method)
+
+
+@router.post("/wallet/payout-methods/{method_id}/default", response_model=PayoutMethodResponse)
+def set_default_payout_method(
+    method_id: _uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    method = (
+        db.query(UserPayoutMethod)
+        .filter(UserPayoutMethod.id == method_id, UserPayoutMethod.user_id == current_user.id)
+        .first()
+    )
+    if not method:
+        raise HTTPException(status_code=404, detail="Payout method not found")
+    db.query(UserPayoutMethod).filter(UserPayoutMethod.user_id == current_user.id).update({"is_default": False})
+    method.is_default = True
+    db.commit()
+    db.refresh(method)
+    return _serialize_payout_method(method)
+
+
 @router.post("/deposit", response_model=TransactionResponse)
 def initiate_deposit(
     payload: WalletDepositRequest,
@@ -472,13 +737,6 @@ def initiate_deposit(
     db.add(txn)
     db.commit()
     db.refresh(txn)
-
-    auto_confirm = os.getenv("AUTO_CONFIRM_PAYMENTS", "false").lower() == "true"
-    if auto_confirm and payload.amount <= 1000:
-        wallet_service.deposit(db, current_user.id, payload.amount, payload.currency, str(txn.id))
-        txn.status = "completed"
-        db.commit()
-        db.refresh(txn)
 
     return txn
 
@@ -503,6 +761,7 @@ def initiate_withdrawal(
     payload: WalletWithdrawRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: bool = Depends(require_policy_requirement("transaction_first")),
 ):
     """
     Cash-secured wallet withdrawal.

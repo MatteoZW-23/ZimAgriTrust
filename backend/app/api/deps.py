@@ -11,6 +11,8 @@ from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.user import User, UserRole
 from app.models.agent import Agent, AgentStatus
+from app.models.governance import ConsentType, UserConsentRecord
+from app.services.governance_service import governance_service
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
 
@@ -207,3 +209,32 @@ def check_lockdown(db: Session = Depends(get_db), current_user: User = Depends(g
             detail="PLATFORM_LOCKDOWN: The system is currently in emergency read-only mode."
         )
     return True
+
+
+def require_core_consents(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    required = {ConsentType.TERMS, ConsentType.PRIVACY, ConsentType.DATA_PROCESSING}
+    rows = db.query(UserConsentRecord).filter(
+        UserConsentRecord.user_id == current_user.id,
+        UserConsentRecord.accepted == True
+    ).all()
+    accepted = {r.consent_type for r in rows}
+    missing = [c.value for c in required if c not in accepted]
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"CONSENT_REQUIRED: missing_required_consents={','.join(missing)}"
+        )
+    return True
+
+
+def require_policy_requirement(requirement_key: str):
+    def dependency(
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+    ):
+        governance_service.enforce_requirements(db, current_user, requirement_key)
+        return True
+    return dependency

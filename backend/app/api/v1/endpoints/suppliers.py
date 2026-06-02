@@ -7,8 +7,9 @@ from __future__ import annotations
 import uuid
 import logging
 from typing import Optional
+from time import time
 
-from fastapi import APIRouter, Depends, Query, Request, Response, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, Query, Request, Response, HTTPException, UploadFile, File, Body
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user, require_roles
@@ -65,6 +66,22 @@ router = APIRouter()
 admin_router = APIRouter()
 public_router = APIRouter()
 logger = logging.getLogger(__name__)
+_SUPPLIER_PUBLIC_CACHE: dict[str, tuple[float, object]] = {}
+
+
+def _supplier_cache_get(key: str):
+    rec = _SUPPLIER_PUBLIC_CACHE.get(key)
+    if not rec:
+        return None
+    expires_at, payload = rec
+    if time() >= expires_at:
+        _SUPPLIER_PUBLIC_CACHE.pop(key, None)
+        return None
+    return payload
+
+
+def _supplier_cache_set(key: str, payload: object, ttl_seconds: int):
+    _SUPPLIER_PUBLIC_CACHE[key] = (time() + ttl_seconds, payload)
 
 
 # ── Helper: get current supplier profile ──────────────────────────────────────
@@ -570,7 +587,19 @@ def public_list_suppliers(
     db: Session = Depends(get_db),
 ):
     suppliers = SupplierPublicService.list_suppliers(db, limit, offset)
-    return [PublicSupplierResponse.model_validate(s) for s in suppliers]
+    from app.services.subscription_service import SubscriptionService
+    enriched = []
+    for supplier in sorted(
+        suppliers,
+        key=lambda item: (SubscriptionService.visibility_weight(db, supplier=item), item.rating, item.total_sales),
+        reverse=True,
+    ):
+        response = PublicSupplierResponse.model_validate(supplier)
+        response.subscription_plan = supplier.subscription_plan or "basic"
+        response.badges = SubscriptionService.get_badges(db, supplier=supplier)
+        response.visibility_weight = SubscriptionService.visibility_weight(db, supplier=supplier)
+        enriched.append(response)
+    return enriched
 
 
 @public_router.get("/{supplier_id}/products", tags=["supplier-public"])
@@ -581,12 +610,17 @@ def public_supplier_products(
     products = SupplierPublicService.get_supplier_products(db, supplier_id)
     result = []
     for p in products:
+        from app.services.subscription_service import SubscriptionService
+        supplier = p.supplier
         resp = SupplierProductResponse.model_validate(p)
-        resp.supplier_name = p.supplier.business_name if p.supplier else None
-        resp.supplier_rating = p.supplier.rating if p.supplier else None
-        resp.supplier_verification = p.supplier.verification_status.value if p.supplier else None
+        resp.supplier_name = supplier.business_name if supplier else None
+        resp.supplier_rating = supplier.rating if supplier else None
+        resp.supplier_verification = supplier.verification_status.value if supplier else None
+        resp.supplier_subscription_plan = supplier.subscription_plan if supplier else "basic"
+        resp.supplier_badges = SubscriptionService.get_badges(db, supplier=supplier) if supplier else []
+        resp.visibility_weight = SubscriptionService.visibility_weight(db, supplier=supplier) if supplier else 100
         result.append(resp)
-    return result
+    return sorted(result, key=lambda item: (item.visibility_weight, item.is_boosted, item.is_featured, item.created_at), reverse=True)
 
 
 @public_router.get("/products", tags=["supplier-public"])
@@ -598,15 +632,26 @@ def public_list_products(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    cache_key = f"public_products:{category}:{product_type}:{search}:{limit}:{offset}"
+    cached = _supplier_cache_get(cache_key)
+    if cached is not None:
+        return cached
     products = SupplierPublicService.list_all_products(db, category, product_type, search, limit, offset)
     result = []
     for p in products:
+        from app.services.subscription_service import SubscriptionService
+        supplier = p.supplier
         resp = SupplierProductResponse.model_validate(p)
-        resp.supplier_name = p.supplier.business_name if p.supplier else None
-        resp.supplier_rating = p.supplier.rating if p.supplier else None
-        resp.supplier_verification = p.supplier.verification_status.value if p.supplier else None
+        resp.supplier_name = supplier.business_name if supplier else None
+        resp.supplier_rating = supplier.rating if supplier else None
+        resp.supplier_verification = supplier.verification_status.value if supplier else None
+        resp.supplier_subscription_plan = supplier.subscription_plan if supplier else "basic"
+        resp.supplier_badges = SubscriptionService.get_badges(db, supplier=supplier) if supplier else []
+        resp.visibility_weight = SubscriptionService.visibility_weight(db, supplier=supplier) if supplier else 100
         result.append(resp)
-    return result
+    payload = sorted(result, key=lambda item: (item.visibility_weight, item.is_boosted, item.is_featured, item.created_at), reverse=True)
+    _supplier_cache_set(cache_key, payload, 90)
+    return payload
 
 
 @public_router.get("/products/{product_id}", tags=["supplier-public"])
@@ -634,6 +679,130 @@ def public_create_order(
         "promo_code": data.promo_code,
     })
     return {"message": "Order placed", "order_id": str(order.id), "order_number": order.order_number}
+
+
+@public_router.get("/orders", tags=["supplier-public"])
+def public_get_my_orders(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Buyer/farmer gets their supplier orders."""
+    orders = SupplierOrderService.get_buyer_orders(db, user.id)
+    return [SupplierOrderResponse.model_validate(o) for o in orders]
+
+
+# ============================================================================
+# SUPPLIER TRANSPORT (1 endpoint)
+# ============================================================================
+
+@router.post("/orders/{order_id}/transport", tags=["supplier-transport"])
+def request_supplier_transport(
+    order_id: uuid.UUID,
+    pickup_address: str = Body(..., embed=True),
+    pickup_latitude: Optional[float] = Body(None, embed=True),
+    pickup_longitude: Optional[float] = Body(None, embed=True),
+    pickup_contact_name: Optional[str] = Body(None, embed=True),
+    pickup_contact_phone: Optional[str] = Body(None, embed=True),
+    delivery_address: str = Body(..., embed=True),
+    delivery_latitude: Optional[float] = Body(None, embed=True),
+    delivery_longitude: Optional[float] = Body(None, embed=True),
+    delivery_contact_name: Optional[str] = Body(None, embed=True),
+    delivery_contact_phone: Optional[str] = Body(None, embed=True),
+    cargo_weight_kg: float = Body(..., embed=True),
+    cargo_volume_m3: Optional[float] = Body(None, embed=True),
+    cargo_description: Optional[str] = Body(None, embed=True),
+    preferred_vehicle_type: Optional[str] = Body("van", embed=True),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Supplier requests platform transport for an order."""
+    try:
+        # Verify order belongs to supplier
+        order = db.query(SupplierOrder).filter(
+            SupplierOrder.id == order_id,
+            SupplierOrder.supplier_id == user.id
+        ).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        # Import transport service
+        from app.services.transport_rule_engine import TransportRuleEngine, TransportMode
+
+        # Prepare transport data
+        transport_data = {
+            "distance_km": 0.0,
+            "vehicle_type": preferred_vehicle_type or "van",
+            "cargo_weight_kg": cargo_weight_kg,
+        }
+
+        # Apply transport rule
+        rule_engine = TransportRuleEngine(db)
+        result = rule_engine.apply_rules(
+            order_id=order_id,
+            requested_by="SUPPLIER",
+            mode=TransportMode.PLATFORM_DELIVERY_SUPPLIER_REQUESTED,
+            transport_request_data=transport_data,
+        )
+
+        if not result.success:
+            raise HTTPException(status_code=400, detail=result.error_message or "Failed to process transport request")
+
+        # Create transport request
+        from app.models.transport import TransportRequest, TransportRequestStatus, TransportMode as DBTransportMode
+        from app.models.transport import PaymentAllocation, AllocationType
+
+        transport_request = TransportRequest(
+            order_id=order_id,
+            requested_by="SUPPLIER",
+            mode=DBTransportMode.PLATFORM_DELIVERY_SUPPLIER_REQUESTED,
+            pickup_address=pickup_address,
+            pickup_latitude=pickup_latitude,
+            pickup_longitude=pickup_longitude,
+            pickup_contact_name=pickup_contact_name,
+            pickup_contact_phone=pickup_contact_phone,
+            delivery_address=delivery_address,
+            delivery_latitude=delivery_latitude,
+            delivery_longitude=delivery_longitude,
+            delivery_contact_name=delivery_contact_name,
+            delivery_contact_phone=delivery_contact_phone,
+            cargo_weight_kg=cargo_weight_kg,
+            cargo_volume_m3=cargo_volume_m3,
+            cargo_description=cargo_description,
+            preferred_vehicle_type=preferred_vehicle_type,
+            status=TransportRequestStatus.PRICED,
+            created_by=user.id,
+        )
+        db.add(transport_request)
+        db.flush()
+
+        # Create payment allocation
+        for allocation in result.payment_allocations:
+            payment_allocation = PaymentAllocation(
+                order_id=order_id,
+                transport_request_id=transport_request.id,
+                allocation_type=AllocationType(allocation["allocation_type"]),
+                payer=allocation["payer"],
+                payee=allocation["payee"],
+                amount=allocation["amount"],
+                currency=allocation["currency"],
+                payment_method=allocation["payment_method"],
+            )
+            db.add(payment_allocation)
+
+        db.commit()
+
+        return {
+            "success": True,
+            "transport_fee_payer": result.transport_fee_payer,
+            "transport_fee": result.transport_fee,
+            "driver_assignment": result.driver_assignment,
+            "transport_request_id": str(transport_request.id),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Supplier transport request error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to request transport")
 
 
 # ============================================================================
@@ -760,6 +929,7 @@ def get_subscription(
 
 @router.post("/subscription", tags=["supplier-subscriptions"])
 def set_subscription(
+    supplier_id: uuid.UUID = Query(..., description="Supplier profile ID"),
     plan: str = Query(..., description="Subscription plan: basic, pro, enterprise"),
     billing_cycle: str = Query("monthly", description="Billing cycle: monthly, quarterly, yearly"),
     db: Session = Depends(get_db),
@@ -767,15 +937,29 @@ def set_subscription(
 ):
     """Admin sets a supplier's subscription plan."""
     try:
-        # For admin, we need supplier_id in request body or query param
-        # For now, this is a simplified version
-        supplier_id = user.id  # This should be from request body in production
         return SupplierSubscriptionService.set_subscription(db, supplier_id, plan, billing_cycle)
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Set subscription error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to set subscription")
+
+
+@router.post("/subscription/upgrade", tags=["supplier-subscriptions"])
+def upgrade_own_subscription(
+    plan: str = Body(..., embed=True),
+    billing_cycle: str = Body("monthly", embed=True),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPPLIER)),
+):
+    try:
+        profile = _get_supplier_profile(db, user)
+        return SupplierSubscriptionService.set_subscription(db, profile.id, plan, billing_cycle)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Upgrade subscription error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to upgrade subscription")
 
 
 @router.post("/subscription/cancel", tags=["supplier-subscriptions"])

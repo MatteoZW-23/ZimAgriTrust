@@ -1,51 +1,66 @@
 import React, { useState } from 'react';
-import { useAuthStore, Button, Input, Card } from '@agritrust/shared';
-import { login as apiLogin, register as apiRegister, getProfile } from '../api';
-import { Phone, Lock, User, MapPin, ChevronRight, ArrowLeft, AlertCircle } from 'lucide-react';
+import { useAuthStore } from '@agritrust/shared';
+import { getProfile, login as apiLogin, register as apiRegister } from '../api';
+import { AlertCircle, ArrowLeft, BadgeCheck, ChevronRight, Lock, Phone, ShoppingBasket, Sprout, Shield, User } from 'lucide-react';
+import logo from '../assets/logo.png';
 
 export const AuthScreen: React.FC = () => {
   const { login } = useAuthStore();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'super-admin'>('login');
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [mfaData, setMfaData] = useState<any>(null);
   const [formData, setFormData] = useState({
     phone: '',
     pin: '',
     fullName: '',
     role: 'farmer' as 'farmer' | 'buyer',
     province: '',
+    // Super admin fields
+    username: '',
+    email: '',
+    password: '',
+    adminPhone: '',
   });
+
+  const switchMode = (nextMode: 'login' | 'register' | 'super-admin') => {
+    setMode(nextMode);
+    setStep(1);
+    setError('');
+    setSuccess('');
+    setMfaData(null);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccess('');
     try {
       const data = await apiLogin(formData.phone, formData.pin);
       const token = data?.access_token || data?.token;
-      if (token) {
-        localStorage.setItem('zimagritrust_token', token);
-        try {
-          const profile = await getProfile();
-          login({
-            id: profile.id || data.user?.id || '1',
-            phone: profile.phone_number || formData.phone,
-            full_name: profile.full_name || data.user?.full_name || formData.phone,
-            role: profile.role || data.user?.role || 'farmer',
-            trust_score: profile.trust_score ?? data.user?.trust_score ?? 0,
-          }, token);
-        } catch {
-          login({
-            id: data.user?.id || '1',
-            phone: data.user?.phone_number || formData.phone,
-            full_name: data.user?.full_name || formData.phone,
-            role: data.user?.role || 'farmer',
-            trust_score: data.user?.trust_score ?? 0,
-          }, token);
-        }
-      } else {
-        throw new Error('No token received');
+      if (!token) throw new Error('No token received');
+
+      localStorage.setItem('zimagritrust_token', token);
+      try {
+        const profile = await getProfile();
+        login({
+          id: profile.id || data.user?.id || '1',
+          phone: profile.phone_number || formData.phone,
+          full_name: profile.full_name || data.user?.full_name || formData.phone,
+          role: profile.role || data.user?.role || 'farmer',
+          trust_score: profile.trust_score ?? data.user?.trust_score ?? 0,
+        }, token);
+      } catch {
+        login({
+          id: data.user?.id || '1',
+          phone: data.user?.phone_number || formData.phone,
+          full_name: data.user?.full_name || formData.phone,
+          role: data.user?.role || 'farmer',
+          trust_score: data.user?.trust_score ?? 0,
+        }, token);
       }
     } catch (err: any) {
       setError(err.message || 'Login failed. Check your phone number and PIN.');
@@ -58,6 +73,7 @@ export const AuthScreen: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccess('');
     try {
       const data = await apiRegister(formData.fullName, formData.phone, formData.role, formData.pin);
       const token = data?.access_token || data?.token;
@@ -72,8 +88,7 @@ export const AuthScreen: React.FC = () => {
       } else {
         setMode('login');
         setStep(1);
-        setError('');
-        alert('Registration successful! Please log in with your credentials.');
+        setSuccess('Registration complete. Sign in with your phone number and PIN.');
       }
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.');
@@ -82,153 +97,350 @@ export const AuthScreen: React.FC = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-earth-50 dark:bg-earth-900 flex items-center justify-center p-4 font-sans transition-colors duration-300">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <img src="/logo.png" alt="ZimAgriTrust" className="w-24 h-24 rounded-2xl mx-auto mb-4 object-contain" />
-          <h1 className="text-3xl font-black text-earth-800 dark:text-white tracking-tight">ZimAgri<span className="text-primary-600">Trust</span></h1>
-          <p className="text-earth-500 dark:text-earth-400 font-bold mt-1">Connect &bull; Trade &bull; Grow</p>
-        </div>
+  const handleSuperAdminRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      const response = await fetch('http://localhost:8080/api/v1/super-admin/register-initial', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+          phone_number: formData.adminPhone,
+        }),
+      });
 
-        <Card className="p-8 shadow-2xl shadow-earth-200/50 border-none">
-          <div className="flex gap-2 p-1 bg-earth-50 dark:bg-earth-700 rounded-2xl mb-8">
-            <button 
-              onClick={() => { setMode('login'); setStep(1); setError(''); }}
-              className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${mode === 'login' ? 'bg-white dark:bg-earth-600 text-primary-600 shadow-sm' : 'text-earth-400 hover:text-earth-600 dark:hover:text-earth-200'}`}
-            >
-              Login
-            </button>
-            <button 
-              onClick={() => { setMode('register'); setStep(1); setError(''); }}
-              className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${mode === 'register' ? 'bg-white dark:bg-earth-600 text-primary-600 shadow-sm' : 'text-earth-400 hover:text-earth-600 dark:hover:text-earth-200'}`}
-            >
-              Register
-            </button>
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Registration failed');
+      }
+
+      const data = await response.json();
+      setMfaData(data.mfa_setup);
+      setStep(2);
+      setSuccess('Super admin account created! Set up MFA to complete registration.');
+    } catch (err: any) {
+      setError(err.message || 'Super admin registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="auth-screen">
+      <div className="grid w-full max-w-6xl overflow-hidden rounded-[36px] border border-border bg-white/55 shadow-strong backdrop-blur-xl lg:grid-cols-[1.05fr_0.95fr]">
+        <section className="relative hidden min-h-[680px] overflow-hidden bg-gradient-to-br from-primary-900 via-primary-700 to-earth-800 p-10 text-white lg:flex lg:flex-col lg:justify-between">
+          <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle at 15% 18%, #d99006 0, transparent 26%), radial-gradient(circle at 90% 4%, #8cc66d 0, transparent 24%)' }} />
+          <div className="relative">
+            <div className="portal-logo-surface mb-8">
+              <img src={logo} alt="ZimAgriTrust" className="h-20 w-20 object-contain" />
+            </div>
+            <p className="mb-4 inline-flex rounded-full bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-secondary-200">
+              Farmer and buyer marketplace
+            </p>
+            <h1 className="font-display text-5xl font-black leading-tight">
+              Trade crops with escrow, trust scores, and direct market access.
+            </h1>
+            <p className="mt-5 max-w-xl text-lg font-medium leading-8 text-white/76">
+              Farmers can list produce and receive offers. Buyers can source verified crops, pay into escrow, and track every order from one clean portal.
+            </p>
           </div>
 
-          {error && (
-            <div className="flex items-center gap-3 p-4 bg-red-50 border-2 border-red-100 rounded-2xl mb-6 text-red-600">
-              <AlertCircle size={18} className="shrink-0" />
-              <span className="text-xs font-bold">{error}</span>
-            </div>
-          )}
-
-          {mode === 'login' ? (
-            <form onSubmit={handleLogin} className="space-y-6">
-              <Input 
-                label="Phone Number" 
-                placeholder="77 123 4567" 
-                icon={<Phone size={18} />}
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                required
-              />
-              <Input 
-                label="Security PIN" 
-                type="password" 
-                placeholder="••••" 
-                icon={<Lock size={18} />}
-                value={formData.pin}
-                onChange={(e) => setFormData({ ...formData, pin: e.target.value })}
-                required
-              />
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input type="checkbox" className="w-4 h-4 rounded border-2 border-earth-200 text-primary-600 focus:ring-primary-500" />
-                  <span className="text-xs font-bold text-earth-500 group-hover:text-earth-700">Remember me</span>
-                </label>
-                <button type="button" className="text-xs font-black text-primary-600 hover:text-primary-700">Forgot PIN?</button>
+          <div className="relative grid gap-4">
+            {([
+              [BadgeCheck, 'Server-validated role routing'],
+              [Lock, 'Secure PIN login and protected dashboards'],
+              [Sprout, 'Agriculture-first marketplace operations'],
+            ] as const).map(([Icon, label]) => (
+              <div key={label} className="flex items-center gap-3 rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+                <Icon className="h-5 w-5 text-secondary-200" />
+                <span className="font-bold">{label}</span>
               </div>
-              <Button fullWidth size="lg" loading={loading} type="submit">
-                Secure Login
-              </Button>
-            </form>
-          ) : (
-            <div className="space-y-6">
-              {step === 1 ? (
-                <>
-                  <div className="space-y-3">
-                    <label className="block text-xs font-black text-earth-400 uppercase tracking-wider">Account Type</label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <button 
-                        type="button"
-                        onClick={() => setFormData({ ...formData, role: 'farmer' })}
-                        className={`p-4 rounded-2xl border-2 transition-all text-center ${formData.role === 'farmer' ? 'border-primary-500 bg-primary-50/50' : 'border-earth-100 hover:border-earth-200'}`}
-                      >
-                        <div className="text-2xl mb-1">👨‍🌾</div>
-                        <div className="font-black text-xs text-earth-800">Farmer</div>
-                        <div className="text-[10px] text-earth-500 font-bold">Sell Crops</div>
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setFormData({ ...formData, role: 'buyer' })}
-                        className={`p-4 rounded-2xl border-2 transition-all text-center ${formData.role === 'buyer' ? 'border-primary-500 bg-primary-50/50' : 'border-earth-100 hover:border-earth-200'}`}
-                      >
-                        <div className="text-2xl mb-1">🛒</div>
-                        <div className="font-black text-xs text-earth-800">Buyer</div>
-                        <div className="text-[10px] text-earth-500 font-bold">Buy Crops</div>
-                      </button>
+            ))}
+          </div>
+        </section>
+
+        <main className="flex items-center justify-center p-5 sm:p-8">
+          <div className="auth-card max-w-lg border-0 shadow-none">
+            <div className="auth-brand">
+              <div className="portal-logo-surface logo">
+                <img src={logo} alt="ZimAgriTrust" className="h-16 w-16 object-contain" />
+              </div>
+              <h1>Zim<span className="text-primary-700">Agri</span>Trust</h1>
+              <p>Connect. Trade. Grow.</p>
+            </div>
+
+            <div className="auth-tabs">
+              <button onClick={() => switchMode('login')} className={`auth-tab ${mode === 'login' ? 'active' : ''}`}>
+                Login
+              </button>
+              <button onClick={() => switchMode('register')} className={`auth-tab ${mode === 'register' ? 'active' : ''}`}>
+                Register
+              </button>
+              <button onClick={() => switchMode('super-admin')} className={`auth-tab ${mode === 'super-admin' ? 'active' : ''}`}>
+                <Shield size={14} className="mr-1" /> Super Admin
+              </button>
+            </div>
+
+            {error && (
+              <div className="alert alert-error">
+                <AlertCircle size={16} className="shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+            {success && (
+              <div className="alert alert-success">
+                <BadgeCheck size={16} className="shrink-0" />
+                <span>{success}</span>
+              </div>
+            )}
+
+            {mode === 'login' && (
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="form-group">
+                  <label className="form-label">Phone Number</label>
+                  <div className="phone-row">
+                    <span className="phone-prefix">+263</span>
+                    <div className="relative flex-1">
+                      <Phone className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+                      <input
+                        type="tel"
+                        className="form-input pl-11"
+                        placeholder="77 123 4567"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        required
+                      />
                     </div>
                   </div>
-                  <Button fullWidth size="lg" onClick={() => setStep(2)}>
-                    Next Step <ChevronRight size={18} className="ml-2" />
-                  </Button>
-                </>
-              ) : (
-                <form onSubmit={handleRegister} className="space-y-5">
-                  <Input 
-                    label="Full Name" 
-                    placeholder="e.g. Matteo Mabira" 
-                    icon={<User size={18} />}
-                    value={formData.fullName}
-                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                    required
-                  />
-                  <Input 
-                    label="Phone Number" 
-                    placeholder="77 123 4567" 
-                    icon={<Phone size={18} />}
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    required
-                  />
-                  <Input 
-                    label="Province" 
-                    placeholder="Select Province" 
-                    icon={<MapPin size={18} />}
-                    value={formData.province}
-                    onChange={(e) => setFormData({ ...formData, province: e.target.value })}
-                    required
-                  />
-                  <Input 
-                    label="Create PIN" 
-                    type="password" 
-                    placeholder="4-6 digits" 
-                    icon={<Lock size={18} />}
-                    value={formData.pin}
-                    onChange={(e) => setFormData({ ...formData, pin: e.target.value })}
-                    required
-                  />
-                  <Button fullWidth size="lg" loading={loading} type="submit">
-                    Complete Registration
-                  </Button>
-                  <button 
-                    type="button" 
-                    onClick={() => setStep(1)}
-                    className="w-full flex items-center justify-center gap-2 text-xs font-black text-earth-400 hover:text-earth-600 py-2"
-                  >
-                    <ArrowLeft size={14} /> Back to role selection
-                  </button>
-                </form>
-              )}
-            </div>
-          )}
-        </Card>
-        
-        <p className="text-center mt-8 text-xs font-bold text-earth-400">
-          Secure Platform &bull; Encrypted Data &bull; Trusted by 10,000+ Farmers
-        </p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Security PIN</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+                    <input
+                      type="password"
+                      className="form-input pl-11"
+                      placeholder="4-6 digit PIN"
+                      value={formData.pin}
+                      onChange={(e) => setFormData({ ...formData, pin: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <label className="terms-check">
+                    <input type="checkbox" />
+                    <span>Remember me</span>
+                  </label>
+                  <button type="button" className="link-btn">Forgot PIN?</button>
+                </div>
+                <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading}>
+                  {loading ? 'Signing in...' : 'Secure Login'}
+                </button>
+              </form>
+            )}
+            
+            {mode === 'register' && (
+              <div className="space-y-4">
+                {step === 1 ? (
+                  <>
+                    <div className="space-y-2">
+                      <label className="form-label">Account Type</label>
+                      <div className="role-cards">
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, role: 'farmer' })}
+                          className={`role-card ${formData.role === 'farmer' ? 'selected farmer' : ''}`}
+                        >
+                          <Sprout className="h-8 w-8 text-primary-700" />
+                          <strong>Farmer</strong>
+                          <span>Sell crops</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, role: 'buyer' })}
+                          className={`role-card ${formData.role === 'buyer' ? 'selected buyer' : ''}`}
+                        >
+                          <ShoppingBasket className="h-8 w-8 text-secondary-700" />
+                          <strong>Buyer</strong>
+                          <span>Source crops</span>
+                        </button>
+                      </div>
+                    </div>
+                    <button className="btn btn-primary btn-full btn-lg" onClick={() => setStep(2)}>
+                      Continue <ChevronRight size={16} className="ml-1" />
+                    </button>
+                  </>
+                ) : (
+                  <form onSubmit={handleRegister} className="space-y-4">
+                    <div className="form-group">
+                      <label className="form-label">Full Name</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="e.g. Tawanda Moyo"
+                        value={formData.fullName}
+                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Phone Number</label>
+                      <div className="phone-row">
+                        <span className="phone-prefix">+263</span>
+                        <input
+                          type="tel"
+                          className="form-input"
+                          placeholder="77 123 4567"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Province</label>
+                      <select
+                        className="form-select"
+                        value={formData.province}
+                        onChange={(e) => setFormData({ ...formData, province: e.target.value })}
+                        required
+                      >
+                        <option value="">Select Province</option>
+                        {['Harare', 'Bulawayo', 'Manicaland', 'Mashonaland Central', 'Mashonaland East', 'Mashonaland West', 'Masvingo', 'Matabeleland North', 'Matabeleland South', 'Midlands'].map((province) => (
+                          <option key={province} value={province}>{province}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Create PIN</label>
+                      <input
+                        type="password"
+                        className="form-input"
+                        placeholder="4-6 digits"
+                        value={formData.pin}
+                        onChange={(e) => setFormData({ ...formData, pin: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading}>
+                      {loading ? 'Creating account...' : 'Complete Registration'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStep(1)}
+                      className="flex w-full items-center justify-center gap-2 py-2 text-xs font-bold text-dim hover:text-text"
+                    >
+                      <ArrowLeft size={14} /> Back to role selection
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
+            
+            {mode === 'super-admin' && (
+              <div className="space-y-4">
+                {step === 1 ? (
+                  <form onSubmit={handleSuperAdminRegister} className="space-y-4">
+                    <div className="form-group">
+                      <label className="form-label">Username</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="e.g. admin"
+                        value={formData.username}
+                        onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Email</label>
+                      <input
+                        type="email"
+                        className="form-input"
+                        placeholder="admin@zimagritrust.com"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Password</label>
+                      <input
+                        type="password"
+                        className="form-input"
+                        placeholder="Minimum 12 characters"
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        required
+                        minLength={12}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Phone Number (Optional)</label>
+                      <div className="phone-row">
+                        <span className="phone-prefix">+263</span>
+                        <input
+                          type="tel"
+                          className="form-input"
+                          placeholder="77 123 4567"
+                          value={formData.adminPhone}
+                          onChange={(e) => setFormData({ ...formData, adminPhone: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading}>
+                      {loading ? 'Creating account...' : 'Create Super Admin Account'}
+                    </button>
+                  </form>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <Shield className="mx-auto h-16 w-16 text-primary-700 mb-4" />
+                      <h3 className="text-xl font-bold">Set Up MFA</h3>
+                      <p className="text-sm text-muted">Scan the QR code with your authenticator app</p>
+                    </div>
+                    
+                    {mfaData && (
+                      <div className="bg-white p-6 rounded-xl border-2 border-border">
+                        <div className="flex justify-center mb-4">
+                          <img 
+                            src={`data:image/png;base64,${mfaData.qr_code_base64}`} 
+                            alt="MFA QR Code" 
+                            className="w-48 h-48"
+                          />
+                        </div>
+                        <div className="space-y-2 text-sm">
+                          <div className="bg-gray-50 p-3 rounded-lg">
+                            <p className="font-semibold mb-1">Manual Entry Secret:</p>
+                            <code className="text-xs break-all">{mfaData.secret}</code>
+                          </div>
+                          <p className="text-center text-muted">
+                            Use Google Authenticator, Authy, or any TOTP app
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <button 
+                      className="btn btn-primary btn-full btn-lg"
+                      onClick={() => switchMode('login')}
+                    >
+                      Complete & Login
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </main>
       </div>
     </div>
   );

@@ -88,9 +88,7 @@ async def create_broadcast(
         channels=payload.channels,
         scheduled_for=payload.scheduled_for,
         status=BroadcastStatus.PENDING,
-        created_by=None # actor.id is a UUID, but created_by expects int (AdminUser). 
-                        # This is the conflict I noted earlier. 
-                        # For now, I'll allow NULL or implement AdminUser login.
+        created_by=None,
     )
     
     # Try to link to AdminUser if exists

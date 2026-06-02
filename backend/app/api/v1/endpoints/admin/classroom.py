@@ -28,7 +28,7 @@ router = APIRouter()
 def create_course(
     course: CourseCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(UserRole.ADMIN))
+    current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.ACADEMY_ADMIN))
 ):
     """Create a new course"""
     new_course = Course(**course.model_dump())
@@ -41,7 +41,7 @@ def create_course(
 @router.get("/courses", response_model=List[CourseResponse])
 def list_courses(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(UserRole.ADMIN))
+    current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.ACADEMY_ADMIN))
 ):
     """List all courses with enrollment and resource counts"""
     courses = db.query(Course).options(
@@ -81,7 +81,7 @@ def list_courses(
 def get_course(
     course_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(UserRole.ADMIN))
+    current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.ACADEMY_ADMIN))
 ):
     """Get detailed course information with topics"""
     course = db.query(Course).options(
@@ -120,7 +120,7 @@ def update_course(
     course_id: uuid.UUID,
     course_update: CourseUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(UserRole.ADMIN))
+    current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.ACADEMY_ADMIN))
 ):
     """Update a course"""
     course = db.query(Course).filter(Course.id == course_id).first()
@@ -140,7 +140,7 @@ def update_course(
 def delete_course(
     course_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(UserRole.ADMIN))
+    current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.ACADEMY_ADMIN))
 ):
     """Delete a course"""
     course = db.query(Course).filter(Course.id == course_id).first()

@@ -670,9 +670,17 @@ class MFAManager:
             return False
         
         if method == MFAMethod.TOTP:
-            # TODO: Implement TOTP verification with pyotp
-            # For now, basic implementation
-            pass
+            # TOTP verification using pyotp
+            try:
+                import pyotp
+                totp = pyotp.TOTP(config.secret)
+                return totp.verify(code, valid_window=1)
+            except ImportError:
+                logger.warning("pyotp not installed, TOTP verification unavailable")
+                return False
+            except Exception as e:
+                logger.error(f"TOTP verification failed: {e}")
+                return False
         
         return False
 

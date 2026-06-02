@@ -13,36 +13,71 @@ import { Offers } from './components/Offers.tsx';
 import { MyOrders } from './components/MyOrders.tsx';
 import { SettingsPanel } from './components/SettingsPanel.tsx';
 import { BuyerRequests } from './components/BuyerRequests.tsx';
-import { Button } from './components/Button';
-import { Input } from './components/Input';
-import { Card } from './components/Card';
+import { SupplierMarketplace } from './components/SupplierMarketplace.tsx';
+import { SupplierProductDetail } from './components/SupplierProductDetail.tsx';
+import { SubscriptionPanel } from './components/SubscriptionPanel.tsx';
+import { SavedListings } from './components/SavedListings.tsx';
 
-const PlaceholderPanel = ({ title }) => (
-  <div className="flex flex-col items-center justify-center h-full py-20 text-center">
-    <div className="w-20 h-20 rounded-3xl bg-earth-100 dark:bg-earth-700 flex items-center justify-center text-earth-300 mb-6">
-      <span className="text-4xl">🏗️</span>
+const AccessDenied = ({ role, correctPortal, portalUrl }) => (
+  <div className="flex items-center justify-center h-screen bg-earth-50 dark:bg-earth-900">
+    <div className="text-center p-8 bg-white dark:bg-earth-800 rounded-2xl shadow-xl max-w-md">
+      <div className="text-6xl mb-4">🔒</div>
+      <h1 className="text-2xl font-black text-earth-800 dark:text-white mb-2">Access Denied</h1>
+      <p className="text-earth-600 dark:text-earth-400 mb-4">This portal is for Farmers and Buyers only.</p>
+      <p className="text-earth-500 dark:text-earth-500 text-sm mb-6">Your current role: <strong className="text-earth-800 dark:text-white">{role}</strong></p>
+      <a
+        href={portalUrl}
+        className="inline-block bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 px-6 rounded-xl transition-colors"
+      >
+        Go to {correctPortal}
+      </a>
     </div>
-    <h2 className="text-2xl font-black text-earth-800 dark:text-white">{title} View</h2>
-    <p className="text-earth-400 font-bold mt-2 max-w-sm">This module is currently being optimized for the new multi-platform architecture.</p>
   </div>
 );
 
 function App() {
   const { isAuthenticated, user } = useAuthStore();
   const [currentView, setCurrentView] = useState('dashboard');
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   if (!isAuthenticated) {
     return <AuthScreen />;
   }
 
+  // Role-based access control - redirect to correct portal
+  const role = user?.role?.toLowerCase();
+  const ADMIN_ROLES = ['admin', 'super_admin', 'system_admin', 'finance_admin', 'regional_admin', 'support_admin', 'branch_admin'];
+
+  if (role === 'supplier') {
+    return <AccessDenied role="Supplier" correctPortal="Supplier Portal" portalUrl={import.meta.env.VITE_SUPPLIER_URL || 'http://localhost:3004'} />;
+  }
+
+  if (role === 'agent') {
+    return <AccessDenied role="Agent" correctPortal="Agent Portal" portalUrl={import.meta.env.VITE_AGENT_URL || 'http://localhost:3001'} />;
+  }
+
+  if (role === 'driver') {
+    return <AccessDenied role="Driver" correctPortal="Driver Portal" portalUrl={import.meta.env.VITE_DRIVER_URL || 'http://localhost:3005'} />;
+  }
+
+  if (ADMIN_ROLES.includes(role)) {
+    return <AccessDenied role={role.toUpperCase()} correctPortal="Admin Dashboard" portalUrl={import.meta.env.VITE_ADMIN_URL || 'http://localhost:3000'} />;
+  }
+
   const renderView = () => {
+    if (currentView === 'supplier-marketplace' && selectedProductId) {
+      return <SupplierProductDetail productId={selectedProductId} onBack={() => setSelectedProductId(null)} />;
+    }
+
     switch (currentView) {
       case 'dashboard':
-        return user?.role === 'farmer' ? <FarmerDashboard /> : <BuyerDashboard />;
+        return user?.role === 'farmer' ? <FarmerDashboard onNavigate={setCurrentView as any} /> : <BuyerDashboard onNavigate={setCurrentView as any} />;
       case 'create-listing':
         return <CreateListing />;
       case 'marketplace':
         return <Marketplace />;
+      case 'supplier-marketplace':
+        return <SupplierMarketplace onProductSelect={setSelectedProductId} />;
       case 'my-listings':
         return <MyListings />;
       case 'offers':
@@ -52,17 +87,24 @@ function App() {
       case 'buyer-requests':
         return <BuyerRequests />;
       case 'saved-listings':
-        return <PlaceholderPanel title="Saved Listings" />;
+        return <SavedListings onNavigate={setCurrentView as any} />;
       case 'wallet':
         return <WalletPanel />;
+      case 'subscriptions':
+        return <SubscriptionPanel />;
       case 'profile':
         return <ProfilePanel />;
       case 'settings':
         return <SettingsPanel />;
       default:
-        return user?.role === 'farmer' ? <FarmerDashboard /> : <BuyerDashboard />;
+        return user?.role === 'farmer' ? <FarmerDashboard onNavigate={setCurrentView as any} /> : <BuyerDashboard onNavigate={setCurrentView as any} />;
     }
   };
+
+  // Dashboard components have their own layouts, don't wrap them
+  if (currentView === 'dashboard') {
+    return renderView();
+  }
 
   return (
     <DashboardLayout currentView={currentView} onViewChange={setCurrentView}>

@@ -3,6 +3,10 @@ import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
+const SECURE_OPTIONS = {
+  keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+};
+
 class SecurityService {
   constructor() {
     this.sessionTimeout = 30 * 60 * 1000; // 30 minutes
@@ -24,7 +28,6 @@ class SecurityService {
       // Set up biometric authentication if available
       await this.setupBiometrics();
       
-      console.log('Driver security service initialized');
       return true;
     } catch (error) {
       console.error('Failed to initialize driver security service:', error);
@@ -41,7 +44,7 @@ class SecurityService {
         // Generate new encryption key
         const key = await Crypto.getRandomBytesAsync(32);
         const keyBase64 = btoa(String.fromCharCode(...key));
-        await SecureStore.setItemAsync('driver_encryption_key', keyBase64);
+        await SecureStore.setItemAsync('driver_encryption_key', keyBase64, SECURE_OPTIONS);
         this.encryptionKey = keyBase64;
       } else {
         this.encryptionKey = storedKey;
@@ -59,11 +62,7 @@ class SecurityService {
         throw new Error('Encryption not initialized');
       }
       
-      const dataString = JSON.stringify(data);
-      // In a real implementation, use proper encryption like AES
-      // For demo purposes, we'll use base64 encoding
-      const encrypted = btoa(dataString);
-      return encrypted;
+      return JSON.stringify(data);
     } catch (error) {
       console.error('Encryption failed:', error);
       throw error;
@@ -77,10 +76,7 @@ class SecurityService {
         throw new Error('Encryption not initialized');
       }
       
-      // In a real implementation, use proper decryption
-      // For demo purposes, we'll use base64 decoding
-      const decrypted = atob(encryptedData);
-      return JSON.parse(decrypted);
+      return JSON.parse(encryptedData);
     } catch (error) {
       console.error('Decryption failed:', error);
       throw error;
@@ -91,7 +87,7 @@ class SecurityService {
   async secureStore(key, data) {
     try {
       const encrypted = await this.encrypt(data);
-      await SecureStore.setItemAsync(`driver_${key}`, encrypted);
+      await SecureStore.setItemAsync(`driver_${key}`, encrypted, SECURE_OPTIONS);
     } catch (error) {
       console.error(`Failed to securely store ${key}:`, error);
       throw error;
@@ -121,7 +117,7 @@ class SecurityService {
         if (compatible) {
           const enrolled = await LocalAuthentication.isEnrolledAsync();
           if (enrolled) {
-            await SecureStore.setItemAsync('driver_biometric_available', 'true');
+            await SecureStore.setItemAsync('driver_biometric_available', 'true', SECURE_OPTIONS);
           }
         }
       }
@@ -244,7 +240,6 @@ class SecurityService {
       // Start session timeout
       this.startSessionTimeout();
       
-      console.log('Driver secure session created');
       return true;
     } catch (error) {
       console.error('Failed to create driver session:', error);
@@ -290,7 +285,6 @@ class SecurityService {
     }
     
     this.sessionTimer = setTimeout(async () => {
-      console.log('Driver session timed out');
       await this.clearSession();
       this.emitEvent('session-expired');
     }, this.sessionTimeout);
@@ -324,7 +318,6 @@ class SecurityService {
       }
       
       await SecureStore.deleteItemAsync('driver_driver_session');
-      console.log('Driver session cleared');
     } catch (error) {
       console.error('Failed to clear driver session:', error);
     }

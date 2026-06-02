@@ -60,22 +60,22 @@ export default function Header({ onOpenAuth, isAuthenticated, onSignUp }) {
  ];
 
  return (
- <><header 
+ <><header
  className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
- scrolled 
- ? 'bg-white/95 backdrop-blur-md shadow-lg shadow-earth-200/50' 
+ scrolled
+ ? 'border-b border-earth-200/70 bg-white/90 shadow-soft backdrop-blur-xl'
  : 'bg-transparent'
  }`}
  ><div className="container-custom"><div className="flex items-center justify-between h-16 lg:h-20">{/* Logo */}
- <Link to="/" className="flex items-center gap-2 group" onClick={() => setMobileMenuOpen(false)}><div className={`w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden transition-colors ${
- scrolled ? 'bg-primary-600' : 'bg-white/20 backdrop-blur-sm'
- }`}><img 
- src={logo} 
- alt="ZimAgritrust Logo" 
- className="w-6 h-6 object-contain"
- /></div><span className={`font-display font-bold text-xl transition-colors ${
+ <Link to="/" className="flex items-center gap-3 group" onClick={() => setMobileMenuOpen(false)}><div className={`logo-surface transition-all ${
+ scrolled ? 'scale-95' : ''
+ }`}><img
+ src={logo}
+ alt="ZimAgritrust Logo"
+ className="brand-mark"
+ /></div><span className={`font-display font-extrabold text-xl tracking-tight transition-colors ${
  scrolled ? 'text-earth-900' : 'text-white'
- }`}>Zim<span className={scrolled ? 'text-primary-600' : 'text-primary-400'}>Agri</span>trust
+ }`}>Zim<span className={scrolled ? 'text-primary-700' : 'text-secondary-300'}>Agri</span>Trust
  </span></Link>
 {/* Desktop Navigation */}
  <nav className="hidden lg:flex items-center gap-1">{navItems.map((item) => (
@@ -83,63 +83,63 @@ export default function Header({ onOpenAuth, isAuthenticated, onSignUp }) {
  <Link
  key={item.label}
  to={item.to}
- className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
- scrolled 
- ? 'text-earth-600 hover:text-primary-600 hover:bg-primary-50' 
+ className={`px-4 py-2 rounded-2xl text-sm font-bold transition-colors ${
+ scrolled
+ ? 'text-earth-600 hover:text-primary-600 hover:bg-primary-50'
  : 'text-white/80 hover:text-white hover:bg-white/10'
  }`}
  >{item.label}
  </Link>) : (
- <a 
+ <a
  key={item.id}
- href={item.href} 
+ href={item.href}
  onClick={(e) => handleNavClick(e, item.id)}
- className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
- scrolled 
- ? 'text-earth-600 hover:text-primary-600 hover:bg-primary-50' 
+ className={`px-4 py-2 rounded-2xl text-sm font-bold transition-colors ${
+ scrolled
+ ? 'text-earth-600 hover:text-primary-600 hover:bg-primary-50'
  : 'text-white/80 hover:text-white hover:bg-white/10'
  }`}
  >{item.label}
  </a>)
  ))}
- 
+
  {/* More Dropdown */}
- <div className="relative group"><button className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
- scrolled 
- ? 'text-earth-600 hover:text-primary-600 hover:bg-primary-50' 
+ <div className="relative group"><button className={`px-4 py-2 rounded-2xl text-sm font-bold transition-colors flex items-center gap-1 ${
+ scrolled
+ ? 'text-earth-600 hover:text-primary-600 hover:bg-primary-50'
  : 'text-white/80 hover:text-white hover:bg-white/10'
  }`}>More
- <ChevronRight className="w-4 h-4 rotate-90" /></button><div className="absolute top-full left-0 mt-2 w-56 py-2 bg-white rounded-xl shadow-xl shadow-earth-200/50 border border-earth-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">{dropdownItems.map((item) => (
+ <ChevronRight className="w-4 h-4 rotate-90" /></button><div className="absolute top-full left-0 mt-3 w-60 rounded-3xl border border-earth-200/70 bg-white/95 p-2 opacity-0 shadow-card backdrop-blur-xl invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">{dropdownItems.map((item) => (
  <Link
  key={item.to}
  to={item.to}
- className="block px-4 py-2 text-sm text-earth-700 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+ className="block rounded-2xl px-4 py-2.5 text-sm font-bold text-earth-700 hover:text-primary-700 hover:bg-primary-50 transition-colors"
  >{item.label}
  </Link>))}
  </div></div></nav>
 {/* Desktop Actions */}
  <div className="hidden lg:flex items-center gap-3">{isAuthenticated ? (
- <button 
+ <button
  onClick={handleDashboardClick}
  className="btn btn-primary"
  >Dashboard
  <ChevronRight className="w-4 h-4" /></button>) : (
- <><button 
+ <><button
  onClick={onOpenAuth}
  className={`btn btn-ghost ${scrolled ? '' : 'text-white hover:text-white hover:bg-white/10'}`}
  >Log In
- </button><button 
+ </button><button
  onClick={onSignUp}
  className={`btn ${scrolled ? 'btn-primary' : 'bg-white text-primary-700 hover:bg-white/90'}`}
  >Get Started
  </button></>)}
  </div>
 {/* Mobile Menu Button */}
- <button 
+ <button
  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
- className={`lg:hidden p-2 rounded-lg transition-colors ${
- scrolled 
- ? 'text-earth-600 hover:bg-earth-100' 
+ className={`lg:hidden p-2 rounded-2xl transition-colors ${
+ scrolled
+ ? 'text-earth-600 hover:bg-earth-100'
  : 'text-white hover:bg-white/10'
  }`}
  >{mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -158,14 +158,14 @@ export default function Header({ onOpenAuth, isAuthenticated, onSignUp }) {
  exit={{ x: '100%' }}
  transition={{ type: 'tween', duration: 0.3 }}
  className="fixed top-0 right-0 bottom-0 w-full max-w-sm bg-white z-50 lg:hidden shadow-2xl"
- ><div className="flex items-center justify-between p-4 border-b border-earth-100"><Link to="/" className="flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}><div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center overflow-hidden"><img 
- src={logo} 
- alt="ZimAgritrust Logo" 
- className="w-6 h-6 object-contain"
- /></div><span className="font-display font-bold text-xl text-earth-900">Zim<span className="text-primary-500">Agri</span>trust
- </span></Link><button 
+ ><div className="flex items-center justify-between p-5 border-b border-earth-100"><Link to="/" className="flex items-center gap-3" onClick={() => setMobileMenuOpen(false)}><div className="logo-surface"><img
+ src={logo}
+ alt="ZimAgritrust Logo"
+ className="brand-mark"
+ /></div><span className="font-display font-bold text-xl text-earth-900">Zim<span className="text-primary-700">Agri</span>Trust
+ </span></Link><button
  onClick={() => setMobileMenuOpen(false)}
- className="p-2 rounded-lg text-earth-500 hover:text-earth-700 hover:bg-earth-100 transition-colors"
+ className="p-2 rounded-2xl text-earth-500 hover:text-earth-700 hover:bg-earth-100 transition-colors"
  ><X className="w-6 h-6" /></button></div>
 <nav className="p-4 space-y-1">{navItems.map((item) => (
  item.isLink ? (
@@ -173,14 +173,14 @@ export default function Header({ onOpenAuth, isAuthenticated, onSignUp }) {
  key={item.label}
  to={item.to}
  onClick={() => setMobileMenuOpen(false)}
- className="block px-4 py-3 rounded-lg text-earth-700 font-medium hover:bg-primary-50 hover:text-primary-600 transition-colors"
+ className="block px-4 py-3 rounded-2xl text-earth-800 font-bold hover:bg-primary-50 hover:text-primary-700 transition-colors"
  >{item.label}
  </Link>) : (
- <a 
+ <a
  key={item.id}
- href={item.href} 
+ href={item.href}
  onClick={(e) => handleNavClick(e, item.id)}
- className="block px-4 py-3 rounded-lg text-earth-700 font-medium hover:bg-primary-50 hover:text-primary-600 transition-colors"
+ className="block px-4 py-3 rounded-2xl text-earth-800 font-bold hover:bg-primary-50 hover:text-primary-700 transition-colors"
  >{item.label}
  </a>)
  ))}
@@ -189,12 +189,12 @@ export default function Header({ onOpenAuth, isAuthenticated, onSignUp }) {
  key={item.to}
  to={item.to}
  onClick={() => setMobileMenuOpen(false)}
- className="block px-4 py-3 rounded-lg text-earth-600 hover:bg-primary-50 hover:text-primary-600 transition-colors"
+ className="block px-4 py-3 rounded-2xl text-earth-600 hover:bg-primary-50 hover:text-primary-700 transition-colors"
  >{item.label}
  </Link>))}
  </div></nav>
 <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-earth-100 bg-white">{isAuthenticated ? (
- <button 
+ <button
  onClick={() => {
  setMobileMenuOpen(false);
  handleDashboardClick();
@@ -202,14 +202,14 @@ export default function Header({ onOpenAuth, isAuthenticated, onSignUp }) {
  className="btn btn-primary w-full justify-center"
  >Go to Dashboard
  <ChevronRight className="w-4 h-4" /></button>) : (
- <div className="flex gap-3"><button 
+ <div className="flex gap-3"><button
  onClick={() => {
  setMobileMenuOpen(false);
  onOpenAuth();
  }}
  className="btn btn-outline flex-1 justify-center"
  >Log In
- </button><button 
+ </button><button
  onClick={() => {
  setMobileMenuOpen(false);
  onSignUp();

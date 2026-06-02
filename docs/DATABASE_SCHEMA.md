@@ -1,4 +1,4 @@
-# ZimAgriTrust Database Schema Diagram
+﻿# ZimAgriTrust Database Schema Diagram
 
 ## Entity Relationship Diagram (Mermaid)
 
@@ -25,20 +25,13 @@ erDiagram
 
     %% Agent System
     agents ||--o{ agent_assignments : "receives"
-    agents ||--o{ agent_training : "has"
-    agents ||--o{ academy_exam_attempts : "takes"
-    agents ||--o{ academy_practical_assessments : "completes"
-    agents ||--o{ agent_shadowing_logs : "participates in"
-    agents ||--o{ agent_supervised_reviews : "is reviewed in"
     agent_assignments ||--o| listings : "assigned to"
     agent_assignments ||--o| orders : "assigned to"
     agent_assignments ||--o| disputes : "assigned to"
 
     %% Agent Onboarding
-    agent_applications ||--o{ agent_training_progress : "has"
     agent_applications ||--|| agent_contracts : "signs"
     agent_applications ||--o{ shadowing_logs : "has"
-    training_modules ||--o{ agent_training_progress : "used in"
 
     %% Marketplace - Listings
     listings ||--o{ offers : "receives"
@@ -111,10 +104,6 @@ erDiagram
     invitations ||--o| roles : "for"
     invitations ||--o| users : "created by"
 
-    %% Academy System
-    agent_training ||--o{ academy_modules : "uses"
-    academy_modules ||--o{ academy_exam_attempts : "tested in"
-    agent_training ||--o{ academy_practical_assessments : "assessed in"
 
     %% Classroom System
     courses ||--o{ course_topics : "contains"
@@ -180,12 +169,6 @@ erDiagram
 - **agents** - Agent profiles with specializations and performance tracking
 - **agent_assignments** - Agent assignments to listings, orders, disputes
 - **agent_applications** - Agent recruitment applications
-- **agent_training** - Academy training progress
-- **academy_modules** - Training course modules
-- **academy_exam_attempts** - Exam results
-- **academy_practical_assessments** - Practical test results
-- **agent_shadowing_logs** - Shadowing phase tracking
-- **agent_supervised_reviews** - Supervised work reviews
 
 ### Marketplace - Listings (6 tables)
 - **listings** - Agricultural product listings
@@ -239,11 +222,6 @@ erDiagram
 - **role_permissions** - Role-permission mapping
 - **invitations** - User invitations
 
-### Academy System (4 tables)
-- **agent_training** - Agent training records
-- **academy_modules** - Training modules
-- **academy_exam_attempts** - Exam attempts
-- **academy_practical_assessments** - Practical assessments
 
 ### Classroom System (8 tables)
 - **courses** - Classroom courses

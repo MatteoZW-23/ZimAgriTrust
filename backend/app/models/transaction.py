@@ -16,14 +16,41 @@ from app.models.listing import LogisticsType
 class OrderStatus(str, enum.Enum):
     PENDING = "PENDING"
     PAYMENT_INITIATED = "PAYMENT_INITIATED"  # Added: payment flow started
+    PROCESSING = "PROCESSING"
     ESCROW_HELD = "ESCROW_HELD"
+    AWAITING_PICKUP = "AWAITING_PICKUP"
+    IN_TRANSIT = "IN_TRANSIT"
+    AWAITING_DELIVERY_CONFIRMATION = "AWAITING_DELIVERY_CONFIRMATION"
+    SETTLEMENT_PENDING = "SETTLEMENT_PENDING"
     DELIVERED = "DELIVERED"
     COMPLETED = "COMPLETED"
     REFUNDED = "REFUNDED"
-    CANCELLED = "REFUNDED"   # alias — maps to REFUNDED in DB
+    CANCELLED = "CANCELLED"
     SETTLED = "SETTLED"      # Resolved via agent mediation
     DISPUTED = "DISPUTED"
     PAYMENT_FAILED = "PAYMENT_FAILED"  # Added: for failed payment attempts
+
+
+ORDER_STATUS_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
+    OrderStatus.PENDING: {OrderStatus.PAYMENT_INITIATED, OrderStatus.PROCESSING, OrderStatus.ESCROW_HELD, OrderStatus.PAYMENT_FAILED, OrderStatus.CANCELLED},
+    OrderStatus.PAYMENT_INITIATED: {OrderStatus.PROCESSING, OrderStatus.ESCROW_HELD, OrderStatus.PAYMENT_FAILED, OrderStatus.CANCELLED},
+    OrderStatus.PROCESSING: {OrderStatus.ESCROW_HELD, OrderStatus.AWAITING_PICKUP, OrderStatus.PAYMENT_FAILED, OrderStatus.CANCELLED},
+    OrderStatus.ESCROW_HELD: {OrderStatus.AWAITING_PICKUP, OrderStatus.IN_TRANSIT, OrderStatus.AWAITING_DELIVERY_CONFIRMATION, OrderStatus.SETTLEMENT_PENDING, OrderStatus.DELIVERED, OrderStatus.DISPUTED, OrderStatus.REFUNDED, OrderStatus.CANCELLED},
+    OrderStatus.AWAITING_PICKUP: {OrderStatus.IN_TRANSIT, OrderStatus.DISPUTED, OrderStatus.CANCELLED},
+    OrderStatus.IN_TRANSIT: {OrderStatus.AWAITING_DELIVERY_CONFIRMATION, OrderStatus.DISPUTED, OrderStatus.CANCELLED},
+    OrderStatus.AWAITING_DELIVERY_CONFIRMATION: {OrderStatus.SETTLEMENT_PENDING, OrderStatus.DISPUTED, OrderStatus.CANCELLED},
+    OrderStatus.SETTLEMENT_PENDING: {OrderStatus.COMPLETED, OrderStatus.SETTLED, OrderStatus.REFUNDED, OrderStatus.DISPUTED},
+    OrderStatus.DISPUTED: {OrderStatus.REFUNDED, OrderStatus.SETTLED, OrderStatus.COMPLETED},
+    OrderStatus.SETTLED: {OrderStatus.COMPLETED},
+    OrderStatus.DELIVERED: {OrderStatus.AWAITING_DELIVERY_CONFIRMATION, OrderStatus.SETTLEMENT_PENDING, OrderStatus.COMPLETED, OrderStatus.DISPUTED},
+    OrderStatus.COMPLETED: set(),
+    OrderStatus.REFUNDED: set(),
+    OrderStatus.PAYMENT_FAILED: set(),
+}
+
+
+def can_transition_order_status(current: OrderStatus, next_status: OrderStatus) -> bool:
+    return next_status in ORDER_STATUS_TRANSITIONS.get(current, set())
 
 
 class Order(Base):
@@ -34,14 +61,14 @@ class Order(Base):
     listing_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("listings.id"), nullable=False, index=True)
     buyer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     seller_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    
+
     order_number: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
     quantity: Mapped[float] = mapped_column(Float, nullable=False)
     total_amount: Mapped[float] = mapped_column(Float, nullable=False)
     platform_fee: Mapped[float] = mapped_column(Float, default=0.0)
     seller_payout: Mapped[float] = mapped_column(Float, nullable=False)
     currency: Mapped[str] = mapped_column(String(5), default="USD")
-    
+
     status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), default=OrderStatus.PENDING)
 
     # Payment tracking fields (referenced in payment_service.py)
@@ -60,17 +87,22 @@ class Order(Base):
     # Optional transport insurance (buyer-elected, flat $1.50 fee)
     transport_insurance_elected: Mapped[bool] = mapped_column(Boolean, default=False)
     transport_insurance_fee: Mapped[float] = mapped_column(Float, default=0.0)
-    
+
     # Post-Mediation Adjustments
     refunded_amount: Mapped[float] = mapped_column(Float, default=0.0) # For settlements
     adjustment_memo: Mapped[Optional[str]] = mapped_column(Text)
-    
+    delivered_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    settled_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    refunded_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
     # Agent Service Tracking
     fulfilled_by_agent_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("agents.id"), nullable=True)  # Agent who fulfilled order
     field_support_by_agent_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("agents.id"), nullable=True)  # Agent who provided field support
-    
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    
+
     # AI Fraud Detection
     fraud_risk_score: Mapped[float] = mapped_column(Float, default=0.0)
     fraud_risk_level: Mapped[Optional[str]] = mapped_column(String(20))  # low, medium, high
@@ -86,7 +118,8 @@ class Order(Base):
     driver_jobs = relationship("DriverJob", back_populates="order", cascade="all, delete-orphan")
     transport_request = relationship("TransportRequest", back_populates="order", uselist=False, cascade="all, delete-orphan")
     delivery = relationship("Delivery", back_populates="order", uselist=False, cascade="all, delete-orphan")
-    
+    escrow_account = relationship("EscrowAccount", back_populates="order", uselist=False, cascade="all, delete-orphan")
+
     @property
     def product(self) -> str:
         """Helper for frontend UI consistency"""
@@ -119,18 +152,51 @@ class TransactionType(str, enum.Enum):
     DEPOSIT = "DEPOSIT"
 
 
+class PaymentStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+class Payment(Base):
+    """External payment tracking for payment gateway integrations (Paynow, EcoCash, OneMoney, Banks)"""
+    __tablename__ = "payments"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    currency: Mapped[str] = mapped_column(String(5), default="USD")
+
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)  # ECOCASH, ONEMONEY, BANK, etc.
+    reference: Mapped[str] = mapped_column(String(100), nullable=False, unique=True, index=True)  # Internal reference
+    provider_reference: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Provider's payment ID/poll URL
+
+    status: Mapped[PaymentStatus] = mapped_column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
+
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # Relationships
+    user = relationship("User", back_populates="payments")
+
+
 class Transaction(Base):
     __tablename__ = "transactions"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    order_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("orders.id"))
+    order_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("orders.id"), index=True)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    
+
     type: Mapped[TransactionType] = mapped_column(Enum(TransactionType), nullable=False)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     currency: Mapped[str] = mapped_column(String(5), default="USD")
     status: Mapped[str] = mapped_column(String(20), default="completed") # pending, completed, failed
-    
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

@@ -117,6 +117,7 @@ export const getAgentEarningsBreakdown = () => request("/agent/earnings");
 
 // REMOVED: Practical Assessment test endpoints - Development-only, not for production
 // Agent practical tests should be managed through the Academy system
+export const getPracticalResults = () => Promise.resolve(null);
 
 // ── Shadowing (10 tasks with senior agent) ────────────────────────────────────
 export const getShadowingTasks = () => request("/agents/shadowing/tasks");

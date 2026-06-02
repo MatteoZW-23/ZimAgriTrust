@@ -1,4 +1,4 @@
-.PHONY: run test test-unit test-integration build clean deploy lint-imports spec-coverage spec-missing spec-categories ci-check retrain seed-training
+.PHONY: run test test-unit test-integration build clean deploy lint-imports spec-coverage spec-missing spec-categories ci-check retrain
 
 # ── Application lifecycle ──────────────────────────────────────────────────
 run:
@@ -45,6 +45,3 @@ clean:
 
 retrain:
 	sh scripts/retrain_models.sh
-
-seed-training:
-	python scripts/seed_agent_training.py

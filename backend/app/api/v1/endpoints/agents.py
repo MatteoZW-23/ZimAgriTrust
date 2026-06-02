@@ -58,26 +58,44 @@ def verify_agent_public(agent_code: str, db: Session = Depends(get_db)):
     Publicly verify an agent by their code. Used by farmers to scan QR codes on certificates.
     """
     from app.models.agent import Agent, AgentStatus
-    from app.models.academy import AgentTraining, CertificationLevel
-    
+    from app.models.onboarding import AgentTrainingProgress
+    from app.models.recruitment import AgentApplication
+
     agent = db.query(Agent).filter(Agent.agent_code == agent_code).first()
     if not agent:
         return {
             "is_valid": False,
             "message": "❌ Invalid Agent Code. This person is not a recognized ZimAgritrust representative."
         }
-    
-    training = db.query(AgentTraining).filter(AgentTraining.agent_id == agent.id).first()
-    
+
+    application = (
+        db.query(AgentApplication)
+        .filter(AgentApplication.user_id == agent.user_id)
+        .order_by(AgentApplication.created_at.desc())
+        .first()
+        if hasattr(AgentApplication, "created_at")
+        else db.query(AgentApplication)
+        .filter(AgentApplication.user_id == agent.user_id)
+        .first()
+    )
+    training = (
+        db.query(AgentTrainingProgress)
+        .filter(AgentTrainingProgress.application_id == application.id)
+        .order_by(AgentTrainingProgress.completed_at.desc().nullslast())
+        .first()
+        if application
+        else None
+    )
+
     status_msg = "ACTIVE" if agent.status == AgentStatus.ACTIVE else agent.status.value.upper()
-    is_certified = training and training.certification_level == CertificationLevel.CERTIFIED
-    
+    is_certified = training and training.certification_status in {"certified", "active"}
+
     return {
         "is_valid": True,
         "full_name": agent.user.full_name,
         "status": status_msg,
         "is_certified": is_certified,
-        "certified_since": training.certified_at if training else None,
+        "certified_since": training.certification_issued_at if training else None,
         "expires_at": training.certification_expires_at if training else None,
         "region": f"{agent.province}, {agent.district}",
         "specialization": agent.specialization,

@@ -5,7 +5,41 @@ from app.api.deps import get_db, get_current_user
 
 router = APIRouter()
 
-from app.models.user import SubscriptionTier, UserRole
+from app.models.user import UserRole
+
+@router.get("/listings")
+def get_market_listings(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """
+    Compatibility endpoint for marketplace listing discovery.
+    Mirrors active listings used by market-facing clients.
+    """
+    from app.models.listing import Listing, ListingStatus
+
+    listings = (
+        db.query(Listing)
+        .filter(Listing.status == ListingStatus.ACTIVE)
+        .order_by(Listing.created_at.desc())
+        .limit(200)
+        .all()
+    )
+
+    return [
+        {
+            "id": str(l.id),
+            "title": l.title,
+            "product_type": l.product_type,
+            "quantity": float(l.quantity) if l.quantity is not None else 0.0,
+            "quantity_unit": l.quantity_unit,
+            "price_per_unit": float(l.price_per_unit) if l.price_per_unit is not None else 0.0,
+            "location_province": l.location_province,
+            "status": l.status.value if hasattr(l.status, "value") else str(l.status),
+            "created_at": l.created_at.isoformat() if l.created_at else None,
+        }
+        for l in listings
+    ]
 
 @router.get("/news")
 def get_market_news(user = Depends(get_current_user)):
@@ -43,11 +77,7 @@ def get_regional_insights(
     db: Session = Depends(get_db),
     user = Depends(get_current_user)
 ):
-    """
-    Regional market updates. Restricted to PREMIUM.
-    """
-    if user.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.AGENT] and user.subscription_tier == SubscriptionTier.BASIC:
-        return {"error": "SUBSCRIPTION_REQUIRED", "message": "Regional analytics require a PREMIUM subscription."}
+    """Regional market updates. Subscribers receive deeper UI treatment, not gated access."""
 
     from sqlalchemy import func
     from app.models.listing import Listing, ListingStatus
@@ -91,7 +121,7 @@ def get_price_trends(
         date_str = order.created_at.date().isoformat()
         if date_str not in price_by_date:
             price_by_date[date_str] = []
-        price_by_date[date_str].append(order.total_price / order.quantity if order.quantity > 0 else 0)
+        price_by_date[date_str].append(order.total_amount / order.quantity if order.quantity > 0 else 0)
 
     # Calculate averages
     trends = []
@@ -171,11 +201,7 @@ def get_national_pulse(
     db: Session = Depends(get_db),
     user = Depends(get_current_user)
 ):
-    """
-    Exposes the National Agri-Pulse Economic Indicator. Restricted to PREMIUM.
-    """
-    if user.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.AGENT] and user.subscription_tier == SubscriptionTier.BASIC:
-        return {"error": "SUBSCRIPTION_REQUIRED", "message": "The National Pulse is a PREMIUM feature."}
+    """Exposes the National Agri-Pulse Economic Indicator without blocking core users."""
 
     from app.services.revenue_service import AdminRevenueService
     stats = AdminRevenueService.get_national_revenue_summary(db)
@@ -206,5 +232,3 @@ def get_agri_catalog(
     Returns the National Agricultural Database/Catalog.
     """
     return {"catalog": []}
-
-

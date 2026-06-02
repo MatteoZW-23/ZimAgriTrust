@@ -22,7 +22,6 @@ from typing import List, Optional, Dict
 from app.models.recruitment import AgentApplication, ApplicationStatus
 from app.models.user import User, UserRole
 from app.models.agent import Agent, AgentStatus, AgentSpecialization
-from app.models.academy import AgentTraining
 from app.models.onboarding import AgentContract, TrainingModule, AgentTrainingProgress, ShadowingLog
 from app.schemas.recruitment import AgentApplicationCreate
 from app.core.security import get_password_hash
@@ -105,6 +104,7 @@ class AgentOnboardingService:
         user = await AgentOnboardingService._provision_trainee_account(
             db, application, temp_pin
         )
+        application.user_id = user.id
 
         # Create trainee agent record
         agent = await AgentOnboardingService._create_trainee_agent(
@@ -112,7 +112,7 @@ class AgentOnboardingService:
         )
 
         # Initialize academy progress
-        await AgentOnboardingService._initialize_academy_progress(db, agent)
+        await AgentOnboardingService._initialize_academy_progress(db, application.id)
 
         # Notify applicant
         await AgentOnboardingService._send_documentation_notification(
@@ -213,13 +213,13 @@ class AgentOnboardingService:
         return agent
 
     @staticmethod
-    async def _initialize_academy_progress(db: Session, agent: Agent) -> AgentTraining:
+    async def _initialize_academy_progress(db: Session, application_id: uuid.UUID) -> AgentTrainingProgress:
         """Initialize academy training progress."""
-        training = db.query(AgentTraining).filter(
-            AgentTraining.agent_id == agent.id
+        training = db.query(AgentTrainingProgress).filter(
+            AgentTrainingProgress.application_id == application_id
         ).first()
         if not training:
-            training = AgentTraining(agent_id=agent.id)
+            training = AgentTrainingProgress(application_id=application_id)
             db.add(training)
         
         return training
@@ -572,13 +572,16 @@ class AgentOnboardingService:
         from app.models.audit_log import AuditLog
         audit = AuditLog(
             action="AGENT_CERTIFICATION",
-            resource_type="AGENT",
-            resource_id=str(agent.id),
+            entity_type="AGENT",
+            entity_id=str(agent.id),
             details={
                 "application_id": str(application_id),
                 "agent_code": agent.agent_code,
                 "province": application.province
-            }
+            },
+            checksum=hashlib.sha256(
+                f"AGENT_CERTIFICATION:{agent.id}:{application_id}:{agent.agent_code}".encode()
+            ).hexdigest(),
         )
         db.add(audit)
         

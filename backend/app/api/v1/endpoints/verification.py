@@ -408,13 +408,11 @@ async def approve_verification(
     db.commit()
 
     if user:
-        background_tasks.add_task(
-            NotificationService._notify_both_channels,
-            user.phone_number,
-            f"✅ *Identity Verified*\n\n"
-            f"Hello {user.full_name}, your ID documents have been reviewed and approved.\n\n"
-            f"🏆 Trust Score +15 — you now have full platform access.\n\n"
-            f"Thank you for verifying with ZimAgritrust!"
+        await NotificationService.dispatch_event(
+            db,
+            user,
+            "id_approved",
+            priority="important",
         )
 
     return {"status": "approved", "request_id": str(request_id)}
@@ -464,13 +462,12 @@ async def reject_verification(
     db.commit()
 
     if user:
-        background_tasks.add_task(
-            NotificationService._notify_both_channels,
-            user.phone_number,
-            f"❌ *Verification Rejected*\n\n"
-            f"Hello {user.full_name}, your ID verification was not approved.\n\n"
-            f"*Reason:* {note}\n\n"
-            f"Please resubmit with clearer documents. Reply 'verify' to try again."
+        await NotificationService.dispatch_event(
+            db,
+            user,
+            "id_rejected",
+            priority="important",
+            REASON=note,
         )
 
     return {"status": "rejected", "request_id": str(request_id)}

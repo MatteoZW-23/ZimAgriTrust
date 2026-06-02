@@ -52,12 +52,12 @@ def process_ecocash_callback(db: Session, request_id: str, status: str, merchant
             return False
 
         # ── IDEMPOTENCY GUARD ────────────────────────────────────────────────
-        # Check for an already-processed transaction with this provider request_id.
+        # Check for an already-processed order callback by payment reference.
         existing_tx = (
             db.execute(
-                select(Transaction).where(
-                    Transaction.reference == request_id,
-                    Transaction.status == "completed",
+                select(Order).where(
+                    Order.payment_reference == request_id,
+                    Order.status.in_([OrderStatus.ESCROW_HELD, OrderStatus.PROCESSING, OrderStatus.COMPLETED]),
                 )
             ).scalar_one_or_none()
         )
@@ -138,7 +138,6 @@ def process_ecocash_callback(db: Session, request_id: str, status: str, merchant
                 amount=order.total_amount,
                 currency=order.currency,
                 status="completed",
-                reference=request_id,
             )
             db.add(tx)
 
@@ -166,7 +165,6 @@ def process_ecocash_callback(db: Session, request_id: str, status: str, merchant
                     amount=order.total_amount,
                     currency=order.currency,
                     status="failed",
-                    reference=request_id,
                 )
                 db.add(tx)
                 db.commit()
