@@ -7,7 +7,7 @@ Super admins should NEVER be created via normal API endpoints - only through
 database seeding or by another super admin with co-approval.
 
 Usage:
-    python scripts/seed_super_admin.py
+    python backend/scripts/seed_super_admin.py
 
 Environment variables:
     SUPER_ADMIN_USERNAME - Username for the super admin (required)
@@ -66,13 +66,20 @@ def setup_mfa_for_super_admin(db: Session, super_admin: SuperAdmin) -> str:
     qr_filename = f"/tmp/mfa_qr_{super_admin.username}.png"
     img.save(qr_filename)
     
+    # Display QR code in terminal
+    qr_terminal = qrcode.QRCode()
+    qr_terminal.add_data(provisioning_uri)
+    qr_terminal.make(fit=True)
+    
     print(f"\n{'='*60}")
     print("MFA SETUP - SCAN QR CODE")
     print(f"{'='*60}")
-    print(f"\nQR Code saved to: {qr_filename}")
+    print(f"\nQR Code (scan with your authenticator app):")
+    qr_terminal.print_ascii()
     print(f"\nQR Code URI: {provisioning_uri}")
     print(f"\nManual entry secret: {secret}")
-    print(f"\n{'='*60}")
+    print(f"\nQR Code also saved to: {qr_filename}")
+    print(f"{'='*60}")
     
     # Store the secret in the database
     super_admin.hardware_mfa_secret = secret

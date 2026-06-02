@@ -100,8 +100,8 @@ class WhatsAppService:
         msg = (
             f"🔔 *New Trade Offer Received!*\n\n"
             f"Listing: {listing.product_type} ({listing.quantity}{listing.quantity_unit})\n"
-            f"Buyer Offer: ${offer.offered_price}/{listing.quantity_unit} for {offer.quantity}{listing.quantity_unit}\n\n"
-            f"Total: *${offer.quantity * offer.offered_price}*\n\n"
+            f"Buyer Offer: ${offer.offered_price_per_kg}/kg for {offer.offered_quantity_kg}kg\n\n"
+            f"Total: *${offer.offered_quantity_kg * offer.offered_price_per_kg}*\n\n"
             f"Reply with:\n"
             f"• 'accept {offer.id}' to sell now.\n"
             f"• 'reject {offer.id}' to decline.\n"
@@ -1076,17 +1076,17 @@ class WhatsAppService:
             if offer.status not in {OfferStatus.PENDING, OfferStatus.COUNTERED}:
                 await WhatsAppService.set_user_state(phone, "IDLE")
                 return f"⚠️ This offer is already {offer.status.value}."
-            offer.offered_price = new_price
+            offer.offered_price_per_kg = new_price
             offer.status = OfferStatus.COUNTERED
             db.commit()
             buyer = db.query(User).filter(User.id == offer.buyer_id).first()
             if buyer and buyer.phone_number:
                 await WhatsAppService.send_whatsapp_message(
                     buyer.phone_number,
-                    f"Counter offer received: ${new_price:.2f}/unit. Reply `offers` to review.",
+                    f"Counter offer received: ${new_price:.2f}/kg. Reply `offers` to review.",
                 )
             await WhatsAppService.set_user_state(phone, "IDLE")
-            return f"✅ *Counter Offer Sent*\n\nYour proposed price of ${new_price}/unit has been sent to the buyer. You will be notified of their decision."
+            return f"✅ *Counter Offer Sent*\n\nYour proposed price of ${new_price}/kg has been sent to the buyer. You will be notified of their decision."
         except ValueError:
             return "⚠️ Please send a valid number for the price (e.g., '0.45')."
 
@@ -1728,7 +1728,7 @@ class WhatsAppService:
         lines = ["📋 *My Offers:*\n"]
         for o in offers:
             status_icon = "✅" if o.status == OfferStatus.ACCEPTED else "❌" if o.status == OfferStatus.REJECTED else "⏳"
-            lines.append(f"{status_icon} Offer `{o.id}` — ${o.offered_price}/{o.listing.quantity_unit if o.listing else 'unit'} | {o.status.value.title()}")
+            lines.append(f"{status_icon} Offer `{o.id}` — ${o.offered_price_per_kg}/kg | {o.status.value.title()}")
         lines.append("\n• `accept [id]` / `reject [id]` / `counter [id] [price]`")
         return "\n".join(lines)
 
@@ -1806,8 +1806,9 @@ class WhatsAppService:
             listing_id=listing.id,
             buyer_id=user.id,
             seller_id=listing.seller_id,
-            offered_price=price,
-            quantity=listing.quantity,
+            offered_price_per_kg=price,
+            offered_quantity_kg=listing.quantity_kg if getattr(listing, "quantity_kg", None) is not None else listing.quantity,
+            currency=listing.currency,
             status=OfferStatus.PENDING
         )
         db.add(new_offer)

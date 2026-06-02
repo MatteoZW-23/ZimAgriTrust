@@ -9,12 +9,12 @@ function getCsrfToken(): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-export async function request(path, options = {}) {
+export async function request(path: string, options: any = {}) {
   let storedAuth = null;
-  // Read token from whichever session is active (academy takes priority if present)
-  try { storedAuth = JSON.parse(localStorage.getItem("zimagritrust_academy_auth")); } catch {}
+  // Read the active agent session first; keep the legacy academy key as a fallback.
+  try { storedAuth = JSON.parse(localStorage.getItem("zimagritrust_agent_auth")); } catch {}
   if (!storedAuth?.access_token) {
-    try { storedAuth = JSON.parse(localStorage.getItem("zimagritrust_agent_auth")); } catch {}
+    try { storedAuth = JSON.parse(localStorage.getItem("zimagritrust_academy_auth")); } catch {}
   }
   const token = storedAuth?.access_token;
   const csrfToken = getCsrfToken();
@@ -33,7 +33,7 @@ export async function request(path, options = {}) {
         : Array.isArray(data.detail) ? data.detail.map(e => `${e.loc?.join(".")}: ${e.msg}`).join(", ")
         : JSON.stringify(data.detail)
       : "Request failed";
-    const err = new Error(msg);
+    const err = new Error(msg) as Error & { status?: number };
     err.status = res.status;
     throw err;
   }
@@ -43,8 +43,6 @@ export async function request(path, options = {}) {
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const login = (phone_number, password) =>
   request("/agent/login", { method: "POST", body: JSON.stringify({ phone_number, password }) });
-export const academyLogin = (agent_code, pin) =>
-  request("/academy/login", { method: "POST", body: JSON.stringify({ agent_code, pin }) });
 export const verifyOtp = (phone_number, otp) =>
   request("/agent/verify-mfa", { method: "POST", body: JSON.stringify({ phone_number, otp }) });
 export const getProfile = () => request("/auth/me");
@@ -73,7 +71,21 @@ export const verifyListing = (listingId, approved) =>
 // ── Disputes (Mediation) ──────────────────────────────────────────────────────
 export const getMyDisputes = () => request("/disputes");
 export const submitDisputeRecommendation = (disputeId, payload) =>
-  request(`/disputes/${disputeId}/recommend`, { method: "POST", body: JSON.stringify(payload) });
+  payload?.outcome === "partial"
+    ? request(`/disputes/${disputeId}/propose-settlement`, {
+        method: "POST",
+        body: JSON.stringify({
+          discount_percent: Number(payload.discount_percent || 10),
+          memo: payload.note,
+        }),
+      })
+    : request(`/disputes/${disputeId}/resolve`, {
+        method: "POST",
+        body: JSON.stringify({
+          resolution: payload.note,
+          release_to_farmer: payload?.outcome === "release",
+        }),
+      });
 
 // ── Logistics Controls ────────────────────────────────────────────────────────
 export const getDeliveryStatus = (orderId) => request(`/logistics/orders/${orderId}/delivery`);
@@ -163,9 +175,9 @@ export const submitFinalExam = (answers) =>
 
 export async function getCertificate() {
   let storedAuth = null;
-  try { storedAuth = JSON.parse(localStorage.getItem("zimagritrust_academy_auth")); } catch {}
+  try { storedAuth = JSON.parse(localStorage.getItem("zimagritrust_agent_auth")); } catch {}
   if (!storedAuth?.access_token) {
-    try { storedAuth = JSON.parse(localStorage.getItem("zimagritrust_agent_auth")); } catch {}
+    try { storedAuth = JSON.parse(localStorage.getItem("zimagritrust_academy_auth")); } catch {}
   }
   const token = storedAuth?.access_token;
   const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";

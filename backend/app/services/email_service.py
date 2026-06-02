@@ -343,6 +343,36 @@ class EmailService:
     def list_templates(self) -> List[Tuple[int, str]]:
         return [(t.spec_id, t.key) for t in get_templates_by_channel(NotificationChannel.EMAIL)]
 
+    @classmethod
+    def send_email(
+        cls,
+        to: str,
+        subject: str,
+        html_body: str,
+        text_body: Optional[str] = None,
+        attachments: Optional[Iterable[EmailAttachment]] = None,
+    ) -> bool:
+        """
+        Lightweight direct-send helper for service flows that already have a
+        rendered subject/body and do not use the template registry.
+        """
+        service = email_service
+        msg = EmailMessage(
+            to=to,
+            subject=subject,
+            html_body=html_body,
+            text_body=text_body,
+            attachments=list(attachments or []),
+        )
+        ok = service._provider.send(msg)
+        logger.info(
+            "email.direct provider=%s to=%s ok=%s",
+            service._provider.name,
+            _mask_email(to),
+            ok,
+        )
+        return ok
+
 
 def _mask_email(addr: str) -> str:
     if "@" not in addr:

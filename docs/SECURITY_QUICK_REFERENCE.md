@@ -17,8 +17,15 @@ python -m alembic upgrade head
 # Seed roles
 python scripts/seed_security.py
 
-# Create super admin
-python scripts/create_super_admin.py
+# Create the first super admin from the repo root
+python backend/scripts/seed_super_admin.py
+
+# Or bootstrap it via the API when the database has zero super admins
+# POST /api/v1/super-admin/register-initial?username=...&email=...&password=...
+
+# After the first root super admin exists, create more via:
+# POST /api/v1/super-admin/accounts
+# (requires a logged-in ROOT_SUPER_ADMIN and dual-control MFA)
 ```
 
 ### 2. Start Server

@@ -3,7 +3,7 @@
  */
 const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 
-export async function request(path, options = {}) {
+export async function request(path: string, options: any = {}) {
   const token = localStorage.getItem("zimagritrust_token");
   const headers = {
     ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
@@ -25,7 +25,7 @@ export async function request(path, options = {}) {
         ? data.detail.map((e) => `${e.loc?.join(".")}: ${e.msg}`).join(", ")
         : JSON.stringify(data.detail)
       : "Request failed";
-    const err = new Error(msg);
+    const err = new Error(msg) as Error & { status?: number };
     err.status = res.status;
     throw err;
   }
@@ -33,8 +33,8 @@ export async function request(path, options = {}) {
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-export const login = (phone_number, password) =>
-  request("/suppliers/login", { method: "POST", body: JSON.stringify({ phone_number, password }) });
+export const login = (email, password) =>
+  request("/auth/supplier/login", { method: "POST", body: JSON.stringify({ email, password }) });
 export const getProfile = () => request("/suppliers/profile");
 export const updateProfile = (data) => request("/suppliers/profile", { method: "PUT", body: JSON.stringify(data) });
 export const getApplicationStatus = () => request("/suppliers/application/status");
@@ -58,6 +58,7 @@ export const getOrders = (status) => request(`/suppliers/orders${status ? `?stat
 export const getOrder = (id) => request(`/suppliers/orders/${id}`);
 export const confirmOrder = (id) => request(`/suppliers/orders/${id}/confirm`, { method: "PUT" });
 export const shipOrder = (id, tracking_number, shipping_method) => request(`/suppliers/orders/${id}/ship`, { method: "PUT", body: JSON.stringify({ tracking_number, shipping_method }) });
+export const deliverOrder = (id) => request(`/suppliers/orders/${id}/deliver`, { method: "PUT" });
 export const cancelOrder = (id, reason) => request(`/suppliers/orders/${id}/cancel`, { method: "PUT", body: JSON.stringify({ reason }) });
 export const addTracking = (id, tracking_number, shipping_method) => request(`/suppliers/orders/${id}/tracking`, { method: "POST", body: JSON.stringify({ tracking_number, shipping_method }) });
 export const exportOrders = () => request("/suppliers/orders/export");
@@ -97,6 +98,22 @@ export const getEnterpriseFeatureAccess = async () => {
   return {
     team_accounts: !!teamAccounts?.has_access,
     advanced_analytics: !!analytics?.has_access,
+  };
+};
+export const getSupplierFeatureAccess = async () => {
+  const [promotions, analytics, advancedAnalytics, teamAccounts, priorityListings] = await Promise.all([
+    checkFeatureEntitlement("promotions").catch(() => ({ has_access: false })),
+    checkFeatureEntitlement("analytics").catch(() => ({ has_access: false })),
+    checkFeatureEntitlement("advanced_analytics").catch(() => ({ has_access: false })),
+    checkFeatureEntitlement("team_accounts").catch(() => ({ has_access: false })),
+    checkFeatureEntitlement("priority_listings").catch(() => ({ has_access: false })),
+  ]);
+  return {
+    promotions: !!promotions?.has_access,
+    analytics: !!analytics?.has_access,
+    advanced_analytics: !!advancedAnalytics?.has_access,
+    team_accounts: !!teamAccounts?.has_access,
+    priority_listings: !!priorityListings?.has_access,
   };
 };
 

@@ -58,13 +58,27 @@ def create_offer(db: Session, buyer: User, listing: Listing, payload: OfferCreat
     if listing.seller_id == buyer.id:
         raise HTTPException(status_code=400, detail="Cannot bid on own listing")
 
+    offered_price = payload.offered_price_per_kg
+    if offered_price is None:
+        offered_price = listing.price_per_kg if getattr(listing, "price_per_kg", None) is not None else listing.price_per_unit
+
+    offered_quantity = payload.offered_quantity_kg
+    if offered_quantity is None:
+        offered_quantity = listing.quantity_kg if getattr(listing, "quantity_kg", None) is not None else listing.quantity
+
+    available_quantity = listing.quantity_kg if getattr(listing, "quantity_kg", None) else listing.quantity
+    if offered_quantity and available_quantity and offered_quantity > available_quantity:
+        raise HTTPException(status_code=400, detail="Offered quantity exceeds available stock")
+
+    payload_data = payload.model_dump(exclude={"offered_price_per_kg", "offered_quantity_kg"})
+
     offer = Offer(
         listing_id=listing.id,
         buyer_id=buyer.id,
         seller_id=listing.seller_id,
-        offered_price_per_kg=listing.price_per_kg if getattr(listing, "price_per_kg", None) is not None else listing.price_per_unit,
-        offered_quantity_kg=listing.quantity_kg if getattr(listing, "quantity_kg", None) is not None else listing.quantity,
-        **payload.model_dump(),
+        offered_price_per_kg=offered_price,
+        offered_quantity_kg=offered_quantity,
+        **payload_data,
         status=OfferStatus.PENDING
     )
     db.add(offer)
@@ -164,7 +178,7 @@ def counter_offer(db: Session, offer: Offer, counter_price: float, actor: User) 
 
     # Update logic: Flip the initiator
     offer.status = OfferStatus.COUNTERED
-    offer.offered_price = counter_price
+    offer.offered_price_per_kg = counter_price
 
     # In a real system, we might track 'last_actor_id' to know who needs to respond next.
     db.commit()

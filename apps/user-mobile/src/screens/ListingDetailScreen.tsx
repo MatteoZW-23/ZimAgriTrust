@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, TextInput, Dimensions } from 'react-native';
 import { Bookmark, Flag, MapPin, ShieldCheck, Star, Tag, Wheat, X, ChevronLeft, ChevronRight, DollarSign } from 'lucide-react-native';
-import { getListingDetails, reportListing, saveListing, makeOffer } from '../api';
+import { getListingDetails, reportListing, saveListing, placeOffer } from '../api';
 import { theme } from '../styles';
 import { formatCropName, formatGrade, formatLocation, formatMoney } from '../utils/formatters';
 
@@ -14,6 +14,7 @@ export default function ListingDetailScreen({ navigation, route }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [offerAmount, setOfferAmount] = useState('');
+  const [offerQuantity, setOfferQuantity] = useState(String(Number(initialListing?.quantity || 0) || 1));
   const [submittingOffer, setSubmittingOffer] = useState(false);
 
   useEffect(() => {
@@ -67,17 +68,28 @@ export default function ListingDetailScreen({ navigation, route }) {
 
   const handleMakeOffer = async () => {
     const amount = parseFloat(offerAmount);
+    const quantity = parseFloat(offerQuantity);
     if (!amount || amount <= 0) {
       Alert.alert('Invalid Amount', 'Please enter a valid offer amount.');
+      return;
+    }
+    if (!quantity || quantity <= 0) {
+      Alert.alert('Invalid Quantity', 'Please enter a valid offer quantity.');
       return;
     }
 
     setSubmittingOffer(true);
     try {
-      await makeOffer(token, listing.id, amount);
+      await placeOffer(token, listing.id, {
+        quantity,
+        price_per_unit: amount,
+        logistics_type: 'PLATFORM',
+        buyer_message: `Buyer offered ${quantity} ${listing.quantity_unit || 'kg'} at ${amount} ${listing.currency || 'USD'} per ${listing.quantity_unit || 'kg'}.`,
+      });
       Alert.alert('Offer Sent', 'Your offer has been submitted successfully.');
       setShowOfferModal(false);
       setOfferAmount('');
+      setOfferQuantity(String(Number(listing.quantity || 0) || 1));
     } catch (err) {
       Alert.alert('Offer Failed', err.message || 'Could not submit offer.');
     } finally {
@@ -221,6 +233,18 @@ export default function ListingDetailScreen({ navigation, route }) {
                 placeholderTextColor="#94a3b8"
                 value={offerAmount}
                 onChangeText={setOfferAmount}
+                keyboardType="decimal-pad"
+              />
+            </View>
+
+            <Text style={[styles.inputLabel, { marginTop: 16 }]}>Quantity ({listing.quantity_unit || 'kg'})</Text>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={styles.offerInput}
+                placeholder="0"
+                placeholderTextColor="#94a3b8"
+                value={offerQuantity}
+                onChangeText={setOfferQuantity}
                 keyboardType="decimal-pad"
               />
             </View>

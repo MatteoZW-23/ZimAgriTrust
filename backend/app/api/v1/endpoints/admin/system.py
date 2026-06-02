@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from app.api.deps import get_db, require_roles
 from app.models.user import User, UserRole
 from app.models.system_audit import SystemAudit
@@ -19,7 +20,7 @@ def system_health_check(
     import socket
     db_status = "OPERATIONAL"
     try:
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
     except Exception:
         db_status = "ERROR"
         

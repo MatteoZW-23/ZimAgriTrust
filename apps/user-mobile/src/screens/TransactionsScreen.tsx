@@ -13,7 +13,6 @@ import { appStyles, theme } from "../styles";
 
 export function TransactionsScreen({ token, profile }) {
   const [transactions, setTransactions] = useState([]);
-  const [codes, setCodes] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
@@ -36,12 +35,9 @@ export function TransactionsScreen({ token, profile }) {
   }
 
   async function handleConfirm(txId) {
-    const code = codes[txId];
-    if (!code) return setNotice("Enter completion code first.");
-    
     setSubmitting(true);
     try {
-      await confirmDelivery(token, txId, code);
+      await confirmDelivery(token, txId, null);
       setNotice(`Transaction #${txId} completed.`);
       refresh();
     } catch (error) {
@@ -173,16 +169,10 @@ export function TransactionsScreen({ token, profile }) {
 
                 {!isFarmer && canConfirm && (
                   <View style={{ marginTop: 16, borderTopWidth: 1, borderTopColor: "#eee", paddingTop: 16 }}>
-                    <Text style={appStyles.metricLabel}>Enter Code to Release Funds to Farmer</Text>
+                    <Text style={appStyles.metricLabel}>Confirm crop delivery to release escrow to the farmer</Text>
                     <View style={appStyles.rowSpaced}>
-                      <TextInput 
-                        style={[appStyles.inputSmall, { flex: 1 }]} 
-                        placeholder="Security Code"
-                        value={codes[transaction.id] || ""}
-                        onChangeText={(v) => setCodes(c => ({ ...c, [transaction.id]: v }))}
-                      />
                       <TouchableOpacity 
-                        style={[appStyles.button, { marginBottom: 0, paddingVertical: 10, marginLeft: 8 }]} 
+                        style={[appStyles.button, { marginBottom: 0, paddingVertical: 10 }]} 
                         onPress={() => handleConfirm(transaction.id)}
                         disabled={submitting}
                       >

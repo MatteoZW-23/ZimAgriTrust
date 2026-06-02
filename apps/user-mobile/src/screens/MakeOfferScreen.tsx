@@ -36,24 +36,17 @@ export default function MakeOfferScreen({ navigation, route }) {
     }
     setSubmitting(true);
     try {
-      const offerData = await placeOffer(token, listing.id, {
+      await placeOffer(token, listing.id, {
         quantity: parseFloat(qty),
         price_per_unit: parseFloat(price),
         logistics_type: delivery === 'seller' ? 'PLATFORM' : 'SELF_COLLECT',
-        message: `Offer for ${qty}kg at $${price}/kg`,
+        buyer_message: `Offer for ${qty}kg at $${price}/kg`,
       });
-      navigation.navigate('Payment', {
-        order: {
-          id: offerData.order_id || offerData.id,
-          order_number: offerData.order_number,
-          total_amount: total,
-          currency: listing.currency || 'USD',
-          quantity: parseFloat(qty),
-          product: listingTitle,
-          buyer_phone: null,
-        },
-        token,
-      });
+      Alert.alert(
+        'Offer Sent',
+        'Your negotiated crop offer has been submitted. Escrow funding only happens after the farmer accepts it.',
+        [{ text: 'OK', onPress: () => navigation.navigate('MyOffers', { token, role: 'buyer' }) }],
+      );
     } catch (err) {
       Alert.alert('Offer Failed', err.message || 'Could not submit offer. Please try again.');
     } finally {

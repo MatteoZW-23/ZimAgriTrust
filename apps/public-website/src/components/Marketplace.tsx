@@ -18,8 +18,8 @@ export default function Marketplace({ isAuthenticated, onOpenAuth }) {
  const fetchListings = async () => {
  setLoading(true);
  try {
- const kind = category === 'all' ? '' : (category === 'inputs' ? 'input' : 'crop');
- const res = await fetch(`${API}/browse/search?type=${kind}&q=${search}`);
+ const kind = category === 'all' ? 'all' : (category === 'inputs' ? 'inputs' : 'crops');
+ const res = await fetch(`${API}/browse/search?kind=${kind}&q=${encodeURIComponent(search)}`);
  const data = await res.json();
  setListings(Array.isArray(data) ? data : data.results || []);
  } catch (err) {

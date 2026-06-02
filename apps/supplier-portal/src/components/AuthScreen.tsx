@@ -1,17 +1,22 @@
 import React, { useState } from 'react';
 import { login, submitApplication } from '../api.ts';
 import { useAuthStore } from '../store.ts';
-import { CheckCircle2, Loader2, Lock, Phone, ShieldCheck, Store, Truck } from 'lucide-react';
+import { CheckCircle2, Loader2, Lock, Mail, ShieldCheck, Store, Truck } from 'lucide-react';
 import logo from '../assets/logo.png';
 
 export function AuthScreen() {
   const [mode, setMode] = useState('login');
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const { login: authLogin } = useAuthStore();
+  const highlights = [
+    { Icon: Store, label: 'Verified supplier storefront' },
+    { Icon: ShieldCheck, label: 'Escrow-backed orders and payouts' },
+    { Icon: Truck, label: 'Logistics-ready order fulfilment' },
+  ];
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -19,7 +24,7 @@ export function AuthScreen() {
     setError('');
     setSuccess('');
     try {
-      const data = await login(phone, password);
+      const data = await login(email.trim(), password);
       authLogin(data.user, data.access_token);
     } catch (err) {
       setError(err.message || 'Login failed');
@@ -40,12 +45,15 @@ export function AuthScreen() {
         registration_number: formData.get('registration_number'),
         tax_id: formData.get('tax_id'),
         business_type: formData.get('business_type'),
-        years_in_operation: parseInt(formData.get('years_in_operation')) || 0,
+        years_in_operation: parseInt(String(formData.get('years_in_operation') || '')) || 0,
         physical_address: formData.get('physical_address'),
         contact_person: formData.get('contact_person'),
         phone: formData.get('phone'),
         email: formData.get('email'),
-        product_categories: formData.get('product_categories')?.split(',').map(s => s.trim()) || [],
+        product_categories: String(formData.get('product_categories') || '')
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean),
         full_name: formData.get('full_name'),
         password: formData.get('password'),
       };
@@ -79,11 +87,7 @@ export function AuthScreen() {
           </p>
         </div>
         <div className="relative grid gap-4">
-          {[
-            [Store, 'Verified supplier storefront'],
-            [ShieldCheck, 'Escrow-backed orders and payouts'],
-            [Truck, 'Logistics-ready order fulfilment'],
-          ].map(([Icon, label]) => (
+          {highlights.map(({ Icon, label }) => (
             <div key={label} className="flex items-center gap-3 rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur">
               <Icon className="h-5 w-5 text-secondary-200" />
               <span className="font-bold">{label}</span>
@@ -117,17 +121,17 @@ export function AuthScreen() {
         {mode === 'login' ? (
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-earth-700 font-bold mb-2 text-sm">Phone Number</label>
+              <label className="block text-earth-700 font-bold mb-2 text-sm">Email</label>
               <div className="relative">
-                <Phone className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-earth-400" />
-                <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="supplier-input pl-11" placeholder="+263..." required />
+                <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-earth-400" />
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="supplier-input pl-11" placeholder="name@company.com" required />
               </div>
             </div>
             <div>
-              <label className="block text-earth-700 font-bold mb-2 text-sm">PIN / Password</label>
+              <label className="block text-earth-700 font-bold mb-2 text-sm">Password</label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-earth-400" />
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="supplier-input pl-11" placeholder="PIN or password" required />
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="supplier-input pl-11" placeholder="Password" required />
               </div>
             </div>
             <button

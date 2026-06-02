@@ -56,7 +56,7 @@ export function TransportManagementPanel({ token }) {
  setLoading(true);
  try {
  const data = await getTransportRequests(token);
- setRequests(data.requests || []);
+ setRequests(data.requests || data.items || []);
  } catch (err) {
  console.error('Failed to load transport requests:', err);
  } finally {
@@ -68,7 +68,7 @@ export function TransportManagementPanel({ token }) {
  setLoading(true);
  try {
  const data = await getNegotiations(token);
- setNegotiations(data.negotiations || []);
+ setNegotiations(data.negotiations || data.items || []);
  } catch (err) {
  console.error('Failed to load negotiations:', err);
  } finally {
@@ -80,7 +80,7 @@ export function TransportManagementPanel({ token }) {
  setLoading(true);
  try {
  const data = await getDriverAssignments(token);
- setAssignments(data.assignments || []);
+ setAssignments(data.assignments || data.items || []);
  } catch (err) {
  console.error('Failed to load driver assignments:', err);
  } finally {
@@ -92,7 +92,7 @@ export function TransportManagementPanel({ token }) {
  setLoading(true);
  try {
  const data = await getTransportDisputes(token);
- setDisputes(data.disputes || []);
+ setDisputes(data.disputes || data.items || []);
  } catch (err) {
  console.error('Failed to load transport disputes:', err);
  } finally {

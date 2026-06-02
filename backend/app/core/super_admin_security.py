@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import os
 import secrets
 import struct
 import time
@@ -153,9 +154,21 @@ def super_admin_ip_allowed(client_ip: str, account_whitelist: Optional[list[str]
     Allow if (a) global SUPER_ADMIN_IP_WHITELIST is empty AND no per-account
     whitelist set (dev mode), OR (b) IP appears in either list.
     Loopback always allowed when global whitelist empty.
+    
+    SECURITY: In production, IP whitelist is REQUIRED unless explicitly disabled.
     """
     global_wl = settings.super_admin_ip_whitelist_list
     account_wl = account_whitelist or []
+
+    # Production safety check
+    app_env = os.getenv("APP_ENV", "development")
+    if app_env == "production" and not global_wl and not account_wl:
+        # In production, require IP whitelist configuration
+        logger.error(
+            "SECURITY | Super admin access attempted without IP whitelist in production | ip=%s",
+            client_ip
+        )
+        return False
 
     if not global_wl and not account_wl:
         return True  # disabled — typical dev environment

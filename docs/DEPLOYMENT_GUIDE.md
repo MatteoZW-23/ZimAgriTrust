@@ -133,7 +133,7 @@ python scripts/seed_security.py
 #### 1.5 Create Super Admin Account
 
 ```python
-# Create script: scripts/create_super_admin.py
+# Create script: backend/scripts/seed_super_admin.py
 import sys
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
@@ -202,7 +202,7 @@ if __name__ == "__main__":
 
 Run it:
 ```bash
-python scripts/create_super_admin.py
+python backend/scripts/seed_super_admin.py
 ```
 
 ### Phase 2: Integration with API (Day 2)

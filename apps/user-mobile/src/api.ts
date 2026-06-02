@@ -184,10 +184,9 @@ export async function acceptOffer(token, listingId, offerId) {
 }
 
 export async function confirmDelivery(token, transactionId, deliveryCode) {
-  return jsonFetch(`/transactions/${transactionId}/confirm-delivery`, {
+  return jsonFetch(`/logistics/orders/${transactionId}/delivery/confirm-receipt`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ delivery_code: deliveryCode }),
   });
 }
 

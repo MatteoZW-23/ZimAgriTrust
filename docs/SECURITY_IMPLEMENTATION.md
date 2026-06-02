@@ -471,7 +471,7 @@ python scripts/seed_roles.py
 ### 5. Create Super Admin
 
 ```bash
-python scripts/create_super_admin.py --email admin@zimagritrust.co.zw --password "SecurePassword123!"
+python backend/scripts/seed_super_admin.py
 ```
 
 ---

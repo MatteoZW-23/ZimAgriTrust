@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getProducts, createProduct, updateProduct, deleteProduct, boostProduct } from '../api.ts';
 import { Plus, Edit, Trash2, Zap, Search, Filter } from 'lucide-react';
 
-export function ProductManagement() {
+export function ProductManagement({ featureAccess }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -51,6 +51,10 @@ export function ProductManagement() {
   };
 
   const handleBoost = async (id) => {
+    if (!featureAccess?.priority_listings) {
+      alert('Priority listing boosts require a Pro or Enterprise supplier subscription.');
+      return;
+    }
     if (!confirm('Boost this product for 7 days? Fee: $5 (input) or $10 (machinery)')) return;
     try {
       await boostProduct(id, 7);
@@ -149,7 +153,11 @@ export function ProductManagement() {
                     <button onClick={() => { setEditingProduct(product); setShowModal(true); }} className="p-2 hover:bg-earth-100 rounded-lg">
                       <Edit className="w-4 h-4 text-earth-600" />
                     </button>
-                    <button onClick={() => handleBoost(product.id)} className="p-2 hover:bg-yellow-100 rounded-lg" title="Boost">
+                    <button
+                      onClick={() => handleBoost(product.id)}
+                      className={`p-2 rounded-lg ${featureAccess?.priority_listings ? 'hover:bg-yellow-100' : 'opacity-40 cursor-not-allowed bg-earth-100'}`}
+                      title={featureAccess?.priority_listings ? 'Boost' : 'Boosting requires Pro or Enterprise'}
+                    >
                       <Zap className="w-4 h-4 text-yellow-600" />
                     </button>
                     <button onClick={() => handleDelete(product.id)} className="p-2 hover:bg-red-100 rounded-lg">

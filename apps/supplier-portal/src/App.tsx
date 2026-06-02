@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from './store.ts';
-import { getApplicationStatus, getProfile } from './api.ts';
+import { getApplicationStatus, getProfile, getSupplierFeatureAccess } from './api.ts';
 import { AuthScreen } from './components/AuthScreen.tsx';
 import { DashboardLayout } from './components/DashboardLayout.tsx';
 import { SupplierDashboard } from './components/SupplierDashboard.tsx';
@@ -19,6 +19,13 @@ function App() {
   const { isAuthenticated, user, setUser } = useAuthStore();
   const [currentView, setCurrentView] = useState('dashboard');
   const [applicationStatus, setApplicationStatus] = useState(null);
+  const [featureAccess, setFeatureAccess] = useState({
+    promotions: false,
+    analytics: false,
+    advanced_analytics: false,
+    team_accounts: false,
+    priority_listings: false,
+  });
 
   useEffect(() => {
     if (isAuthenticated && !user) {
@@ -33,6 +40,15 @@ function App() {
       getApplicationStatus()
         .then(data => setApplicationStatus(data))
         .catch(() => setApplicationStatus(null));
+      getSupplierFeatureAccess()
+        .then((data) => setFeatureAccess((prev) => ({ ...prev, ...data })))
+        .catch(() => setFeatureAccess({
+          promotions: false,
+          analytics: false,
+          advanced_analytics: false,
+          team_accounts: false,
+          priority_listings: false,
+        }));
     }
   }, [isAuthenticated, user]);
 
@@ -57,7 +73,7 @@ function App() {
       case 'dashboard':
         return <SupplierDashboard applicationStatus={applicationStatus} />;
       case 'products':
-        return <ProductManagement />;
+        return <ProductManagement featureAccess={featureAccess} />;
       case 'orders':
         return <OrderManagement />;
       case 'inventory':
@@ -65,11 +81,11 @@ function App() {
       case 'wallet':
         return <WalletManagement />;
       case 'analytics':
-        return <Analytics />;
+        return <Analytics featureAccess={featureAccess} />;
       case 'profile':
         return <ProfileManagement />;
       case 'discounts':
-        return <DiscountsManagement />;
+        return <DiscountsManagement featureAccess={featureAccess} />;
       case 'payouts':
         return <PayoutsManagement />;
       case 'reviews':
@@ -82,7 +98,7 @@ function App() {
   };
 
   return (
-    <DashboardLayout currentView={currentView} onViewChange={setCurrentView}>
+    <DashboardLayout currentView={currentView} onViewChange={setCurrentView} featureAccess={featureAccess}>
       {renderView()}
     </DashboardLayout>
   );

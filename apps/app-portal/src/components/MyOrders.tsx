@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useOrderStore, useAuthStore, Button } from '@agritrust/shared';
-import { Truck, MapPin, Package, Info, AlertTriangle } from 'lucide-react';
-import { getMySupplierOrders } from '../api';
+import { Truck, MapPin, Package, Info, AlertTriangle, Star } from 'lucide-react';
+import { confirmSupplierOrderReceipt, createSupplierReview, getMySupplierOrders, raiseDispute, submitOrderReview } from '../api';
 
 export const MyOrders: React.FC = () => {
   const { user } = useAuthStore();
@@ -9,6 +9,9 @@ export const MyOrders: React.FC = () => {
   const [supplierOrders, setSupplierOrders] = useState<any[]>([]);
   const [supplierLoading, setSupplierLoading] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [reviewingOrder, setReviewingOrder] = useState<any | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
 
   useEffect(() => {
     fetchOrders();
@@ -36,6 +39,45 @@ export const MyOrders: React.FC = () => {
   const handleConfirmDelivery = useCallback((orderId: string) => {
     confirmDelivery(orderId);
   }, [confirmDelivery]);
+
+  const handleConfirmSupplierReceipt = useCallback(async (orderId: string) => {
+    try {
+      await confirmSupplierOrderReceipt(orderId);
+      await loadSupplierOrders();
+    } catch (error) {
+      console.error('Failed to confirm supplier receipt:', error);
+    }
+  }, [loadSupplierOrders]);
+
+  const handleSubmitOrderReview = useCallback(async () => {
+    if (!reviewingOrder) return;
+    try {
+      if ('payment_status' in reviewingOrder) {
+        await createSupplierReview(reviewingOrder.id, reviewRating, reviewComment.trim() || undefined);
+        await loadSupplierOrders();
+      } else {
+        await submitOrderReview(reviewingOrder.id, reviewRating, reviewComment.trim() || undefined);
+        await fetchOrders();
+      }
+      setReviewingOrder(null);
+      setReviewRating(5);
+      setReviewComment('');
+    } catch (error) {
+      console.error('Failed to submit order review:', error);
+    }
+  }, [fetchOrders, loadSupplierOrders, reviewComment, reviewRating, reviewingOrder]);
+
+  const handleRaiseDispute = useCallback(async (orderId: string) => {
+    const reason = window.prompt('Describe the delivery or product problem for this order.');
+    if (!reason?.trim()) return;
+    try {
+      await raiseDispute(orderId, reason.trim());
+      await fetchOrders();
+      await loadSupplierOrders();
+    } catch (error) {
+      console.error('Failed to raise dispute:', error);
+    }
+  }, [fetchOrders, loadSupplierOrders]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -115,12 +157,41 @@ export const MyOrders: React.FC = () => {
 
                   <div className="flex gap-3">
                     {user?.role === 'buyer' && order.status === 'delivered' && (
-                      <Button size="sm" onClick={() => handleConfirmDelivery(order.id)} className="bg-blue-600 hover:bg-blue-700">
-                        Confirm Receipt
+                      'payment_status' in order ? (
+                        <Button size="sm" onClick={() => handleConfirmSupplierReceipt(order.id)} className="bg-blue-600 hover:bg-blue-700">
+                          Confirm Receipt
+                        </Button>
+                      ) : (
+                        <Button size="sm" onClick={() => handleConfirmDelivery(order.id)} className="bg-blue-600 hover:bg-blue-700">
+                          Confirm Receipt
+                        </Button>
+                      )
+                    )}
+                    {user?.role === 'buyer' && 'payment_status' in order && order.payment_status === 'paid' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setReviewingOrder(order)}
+                        className="border-amber-300 text-amber-700 hover:bg-amber-50"
+                      >
+                        Review Supplier
+                      </Button>
+                    )}
+                    {user?.role === 'buyer' && !('payment_status' in order) && ['completed', 'settled'].includes(String(order.status).toLowerCase()) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setReviewingOrder(order)}
+                        className="border-amber-300 text-amber-700 hover:bg-amber-50"
+                      >
+                        Review Farmer
                       </Button>
                     )}
                     <Button variant="outline" size="sm" className="border-gray-300 dark:border-gray-600">Track Delivery</Button>
-                    <button className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-500 hover:text-red-600 transition-all">
+                    <button
+                      onClick={() => handleRaiseDispute(order.id)}
+                      className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-500 hover:text-red-600 transition-all"
+                    >
                       <AlertTriangle size={18} />
                     </button>
                   </div>
@@ -130,6 +201,49 @@ export const MyOrders: React.FC = () => {
           )}
         </div>
       </div>
+
+      {reviewingOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+              {'payment_status' in reviewingOrder ? 'Review Supplier Order' : 'Review Crop Trade'} #{reviewingOrder.order_number?.slice(0, 8)}
+            </h3>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              {'payment_status' in reviewingOrder
+                ? 'Share your experience so supplier rating, trust, and visibility reflect real performance.'
+                : 'Share your experience so farmer trust, ratings, and marketplace visibility reflect real crop trading performance.'}
+            </p>
+            <div className="mt-5 flex gap-2">
+              {[1, 2, 3, 4, 5].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setReviewRating(value)}
+                  className="rounded-lg p-2 transition hover:bg-amber-50"
+                >
+                  <Star size={24} className={value <= reviewRating ? 'fill-amber-400 text-amber-400' : 'text-gray-300'} />
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={reviewComment}
+              onChange={(e) => setReviewComment(e.target.value)}
+              className="mt-4 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              rows={4}
+              maxLength={500}
+              placeholder="Optional comments about the supplier, delivery quality, and product condition."
+            />
+            <div className="mt-6 flex gap-3">
+              <Button variant="outline" size="sm" onClick={() => setReviewingOrder(null)} className="border-gray-300">
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleSubmitOrderReview} className="bg-amber-500 hover:bg-amber-600">
+                Submit Review
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

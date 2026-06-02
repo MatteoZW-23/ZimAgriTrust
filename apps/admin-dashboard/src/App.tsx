@@ -27,6 +27,7 @@ import DisputeResolutionPanel from './components/DisputeResolutionPanel';
 import { AgentPerformancePanel } from './components/AgentPerformancePanel';
 import MessagingPanel from './components/MessagingPanel';
 import SupportConcierge from './components/SupportConcierge';
+import SupportTicketsPanel from './components/SupportTicketsPanel';
 import AgentRecruitmentPanel from './components/AgentRecruitmentPanel';
 import AgentPostExamReview from './components/AgentPostExamReview';
 import WalletPanel from './components/WalletPanel';
@@ -342,6 +343,7 @@ function App() {
  roles: ['SUPER_ADMIN', 'SUPPORT_ADMIN'],
  children: [
  { view: 'disputes', icon: 'fa-gavel', label: 'Dispute Resolution', roles: ['SUPER_ADMIN', 'SUPPORT_ADMIN'] },
+ { view: 'support-tickets', icon: 'fa-ticket', label: 'Support Tickets', roles: ['SUPER_ADMIN', 'SUPPORT_ADMIN'] },
  { view: 'messages', icon: 'fa-comment-dots', label: 'Messaging', roles: ['SUPER_ADMIN', 'SUPPORT_ADMIN'] },
  { view: 'broadcast', icon: 'fa-bullhorn', label: 'Announcements', roles: ['SUPER_ADMIN', 'SUPPORT_ADMIN', 'REGIONAL_ADMIN'] },
  ]},
@@ -510,6 +512,7 @@ function App() {
  {currentView === 'transactions-admin' && <EscrowRevenuePanel token={token} onEscrowAction={handleGovernance} />}
  {currentView === 'subscriptions' && <SubscriptionRevenuePanel />}
  {currentView === 'disputes' && <DisputeResolutionPanel disputes={disputes} onResolve={handleResolveDispute} />}
+ {currentView === 'support-tickets' && <SupportTicketsPanel profile={profile} token={token} />}
  {currentView === 'network' && <AgentPerformancePanel agents={agents} onRefresh={loadAllData} profile={profile} />}
  {currentView === 'transport' && <TransportManagementPanel token={token} />}
  {currentView === 'recruitment' && <AgentRecruitmentPanel token={token} />}

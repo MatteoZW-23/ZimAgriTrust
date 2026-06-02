@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createDiscount, listDiscounts, getDiscount, updateDiscount, deleteDiscount, validateDiscount } from '../api.ts';
 import { Plus, Edit, Trash2, Tag, Percent, DollarSign, Calendar, CheckCircle, XCircle } from 'lucide-react';
 
-export function DiscountsManagement() {
+export function DiscountsManagement({ featureAccess }) {
   const [discounts, setDiscounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -22,8 +22,12 @@ export function DiscountsManagement() {
   const [validationResult, setValidationResult] = useState(null);
 
   useEffect(() => {
+    if (!featureAccess?.promotions) {
+      setLoading(false);
+      return;
+    }
     loadDiscounts();
-  }, []);
+  }, [featureAccess]);
 
   const loadDiscounts = async () => {
     try {
@@ -118,6 +122,17 @@ export function DiscountsManagement() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  if (!featureAccess?.promotions) {
+    return (
+      <div className="bg-white rounded-2xl shadow-lg p-8">
+        <h2 className="text-2xl font-black text-earth-800">Discounts & Promotions</h2>
+        <p className="mt-3 text-earth-600 font-bold">
+          Promotional discounts are available on Pro and Enterprise supplier subscriptions.
+        </p>
       </div>
     );
   }

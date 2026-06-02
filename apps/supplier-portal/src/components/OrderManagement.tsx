@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getOrders, confirmOrder, shipOrder, cancelOrder, addTracking, requestSupplierTransport } from '../api.ts';
+import { getOrders, confirmOrder, shipOrder, deliverOrder, cancelOrder, addTracking, requestSupplierTransport, syncOrderStatus } from '../api.ts';
 import { CheckCircle, Truck, X, Search, Download, FileText, MapPin } from 'lucide-react';
 
 export function OrderManagement() {
@@ -29,6 +29,7 @@ export function OrderManagement() {
     preferred_vehicle_type: 'van',
   });
   const [transportLoading, setTransportLoading] = useState(false);
+  const [syncingOrderId, setSyncingOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     loadOrders();
@@ -72,6 +73,31 @@ export function OrderManagement() {
       loadOrders();
     } catch (err) {
       alert('Error cancelling order: ' + err.message);
+    }
+  };
+
+  const handleDeliver = async (orderId) => {
+    try {
+      await deliverOrder(orderId);
+      alert('Order marked delivered and supplier settlement released.');
+      loadOrders();
+    } catch (err) {
+      alert('Error completing delivery: ' + err.message);
+    }
+  };
+
+  const handleSyncLogistics = async (orderId) => {
+    setSyncingOrderId(orderId);
+    try {
+      const result = await syncOrderStatus(orderId);
+      if (result?.settlement_released) {
+        alert('Delivery confirmed from logistics and supplier wallet has been credited.');
+      }
+      loadOrders();
+    } catch (err) {
+      alert('Error syncing logistics: ' + err.message);
+    } finally {
+      setSyncingOrderId(null);
     }
   };
 
@@ -162,6 +188,25 @@ export function OrderManagement() {
                         </button>
                         <button onClick={() => { setSelectedOrder(order); setShowTrackingModal(true); }} className="p-2 hover:bg-orange-100 rounded-lg" title="Ship (External)">
                           <Truck className="w-4 h-4 text-orange-600" />
+                        </button>
+                      </>
+                    )}
+                    {order.status === 'shipped' && (
+                      <>
+                        <button
+                          onClick={() => handleSyncLogistics(order.id)}
+                          disabled={syncingOrderId === order.id}
+                          className="p-2 hover:bg-indigo-100 rounded-lg disabled:opacity-50"
+                          title="Sync Logistics Status"
+                        >
+                          <Search className="w-4 h-4 text-indigo-600" />
+                        </button>
+                        <button
+                          onClick={() => handleDeliver(order.id)}
+                          className="p-2 hover:bg-green-100 rounded-lg"
+                          title="Mark Delivered"
+                        >
+                          <CheckCircle className="w-4 h-4 text-green-600" />
                         </button>
                       </>
                     )}

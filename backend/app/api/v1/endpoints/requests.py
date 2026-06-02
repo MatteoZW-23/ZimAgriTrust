@@ -1,7 +1,9 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi import status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import ProgrammingError
+import logging
 
 from app.api.deps import get_db, require_roles
 from app.models.listing import BuyerRequest, FarmerResponse
@@ -11,6 +13,7 @@ from app.schemas.transaction import OrderResponse
 from app.services.marketplace_service import marketplace_core
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("", response_model=BuyerRequestResponse)
@@ -34,9 +37,13 @@ def list_requests(db: Session = Depends(get_db)) -> list[BuyerRequest]:
     """
     try:
         return db.query(BuyerRequest).filter(BuyerRequest.status == "open").all()
-    except ProgrammingError:
+    except ProgrammingError as exc:
         db.rollback()
-        return []
+        logger.exception("Failed to list buyer requests")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Buyer request service is temporarily unavailable",
+        ) from exc
 
 
 @router.get("/me", response_model=list[BuyerRequestResponse])
@@ -49,9 +56,13 @@ def list_my_requests(
         query = query.filter(BuyerRequest.buyer_id == buyer.id)
     try:
         return query.order_by(BuyerRequest.created_at.desc()).all()
-    except ProgrammingError:
+    except ProgrammingError as exc:
         db.rollback()
-        return []
+        logger.exception("Failed to list current buyer requests")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Buyer request service is temporarily unavailable",
+        ) from exc
 
 
 @router.delete("/{request_id}")

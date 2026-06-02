@@ -57,12 +57,14 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
   }, [status, token]);
 
   const handleUpdateStatus = async (newStatus) => {
+    if (newStatus === 'picked_up' || newStatus === 'delivered') {
+      setShowProofModal(true);
+      return;
+    }
+
     setUpdating(true);
     try {
-      if (newStatus === 'picked_up') {
-        // If it's pickup, we ideally want a photo, but we can also just update status
-        await updateDeliveryStatus(token, delivery.id, 'PICKUP_DONE');
-      } else if (newStatus === 'in_transit') {
+      if (newStatus === 'in_transit') {
         await updateDeliveryStatus(token, delivery.id, 'IN_TRANSIT');
         LocationTracker.startTracking(token);
       } else {
@@ -70,10 +72,6 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
       }
       
       setStatus(newStatus);
-      
-      if (newStatus === 'delivered') {
-        setShowProofModal(true); // Open proof modal automatically
-      }
     } catch (err) {
       Alert.alert('Error', err.message || 'Failed to update status');
     } finally {
@@ -170,7 +168,7 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
         setStatus('picked_up');
       } else {
         await confirmDelivery(token, delivery.id, photoBase64, signatureBase64);
-        setStatus('completed');
+        setStatus('delivered');
       }
       
       setShowProofModal(false);

@@ -4,6 +4,8 @@ Handles supplier registration, products, orders, wallet, and analytics.
 """
 from __future__ import annotations
 
+import asyncio
+import logging
 import random
 import string
 import uuid
@@ -48,6 +50,7 @@ BOOST_FEE_MACHINERY = 10.0
 WITHDRAWAL_MIN = 50.0
 WITHDRAWAL_FEE_PERCENT = 0.01
 WITHDRAWAL_FEE_CAP = 10.0
+logger = logging.getLogger(__name__)
 
 
 def _generate_sku(prefix: str = "SP") -> str:
@@ -58,6 +61,18 @@ def _generate_sku(prefix: str = "SP") -> str:
 def _generate_order_number() -> str:
     rand = "".join(random.choices(string.digits, k=8))
     return f"SO-{rand}"
+
+
+def _dispatch_supplier_notification(db: Session, user: Optional[User], event_key: str, priority: str = "important", **template_vars) -> None:
+    """Best-effort notification dispatch for supplier order lifecycle."""
+    if not user:
+        return
+    try:
+        from app.services.notification_service import NotificationService
+
+        asyncio.run(NotificationService.dispatch_event(db, user, event_key, priority=priority, **template_vars))
+    except Exception as exc:
+        logger.warning("Supplier notification failed for %s: %s", event_key, exc)
 
 
 # ============================================================================
@@ -681,6 +696,26 @@ class SupplierOrderService:
 
         db.commit()
 
+        buyer_user = db.query(User).filter(User.id == buyer_id).first()
+        for order in orders_created:
+            first_item = order.items[0] if order.items else None
+            supplier_user = db.query(User).filter(User.id == order.supplier.user_id).first()
+            _dispatch_supplier_notification(
+                db,
+                supplier_user,
+                "supplier_order_received",
+                ORDER_NUMBER=order.order_number,
+                PRODUCT_NAME=first_item.product_name if first_item else "Products",
+                QUANTITY=first_item.quantity if first_item else len(order.items),
+            )
+            _dispatch_supplier_notification(
+                db,
+                buyer_user,
+                "payment_confirmed",
+                AMOUNT=f"${order.total_amount:.2f}",
+                REF=order.order_number,
+            )
+
         if len(orders_created) == 1:
             db.refresh(orders_created[0])
             return orders_created[0]
@@ -691,6 +726,33 @@ class SupplierOrderService:
     def get_buyer_orders(db: Session, buyer_id: uuid.UUID) -> list[SupplierOrder]:
         """Get all supplier orders for a buyer/farmer."""
         return db.query(SupplierOrder).filter(SupplierOrder.buyer_id == buyer_id).order_by(SupplierOrder.created_at.desc()).all()
+
+    @staticmethod
+    def buyer_confirm_receipt(db: Session, order_id: uuid.UUID, buyer_id: uuid.UUID) -> SupplierOrder:
+        """Buyer confirms receipt of a supplier order and releases settlement if still pending."""
+        from app.models.logistics import DeliveryStatus, OrderDelivery
+
+        order = db.query(SupplierOrder).filter(
+            SupplierOrder.id == order_id,
+            SupplierOrder.buyer_id == buyer_id,
+        ).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        if order.status not in (SupplierOrderStatus.SHIPPED, SupplierOrderStatus.DELIVERED):
+            raise HTTPException(status_code=400, detail="Order is not ready for buyer confirmation")
+
+        if order.logistics_delivery_id:
+            delivery = db.query(OrderDelivery).filter(OrderDelivery.id == order.logistics_delivery_id).first()
+            if delivery and delivery.status == DeliveryStatus.DELIVERED:
+                delivery.confirmed_at = datetime.now(timezone.utc)
+                delivery.status = DeliveryStatus.CONFIRMED
+                db.flush()
+
+        if order.payment_status != SupplierPaymentStatus.PAID:
+            return SupplierOrderService.mark_delivered(db, order.id, order.supplier_id)
+
+        return order
 
     @staticmethod
     def list_orders(db: Session, supplier_id: uuid.UUID, status_filter: Optional[str] = None) -> list[SupplierOrder]:
@@ -753,6 +815,13 @@ class SupplierOrderService:
             order.shipping_method = method
         db.commit()
         db.refresh(order)
+        _dispatch_supplier_notification(
+            db,
+            order.buyer,
+            "supplier_order_shipped",
+            ORDER_NUMBER=order.order_number,
+            TRACKING_NUMBER=order.tracking_number or "Pending",
+        )
         return order
 
     @staticmethod
@@ -903,6 +972,15 @@ class SupplierOrderService:
             )
         db.commit()
         db.refresh(order)
+        supplier_user = db.query(User).filter(User.id == profile.user_id).first()
+        _dispatch_supplier_notification(db, order.buyer, "supplier_order_delivered", ORDER_NUMBER=order.order_number)
+        _dispatch_supplier_notification(
+            db,
+            supplier_user,
+            "supplier_payment_received",
+            AMOUNT=f"{net:.2f}",
+            ORDER_NUMBER=order.order_number,
+        )
         return order
 
 
@@ -1297,6 +1375,13 @@ class SupplierReviewService:
         
         # Update supplier rating
         SupplierReviewService._update_supplier_rating(db, supplier_id)
+
+        if review.rating >= 4:
+            from app.services.verification_service import VerificationService
+
+            supplier_user = db.query(User).filter(User.id == order.supplier.user_id).first() if order.supplier else None
+            if supplier_user:
+                VerificationService.record_positive_rating(db, supplier_user, UserRole.BUYER)
         
         return review
 
@@ -1604,16 +1689,69 @@ class SupplierLogisticsService:
         }
         
         new_status = status_mapping.get(delivery.status, order.status)
-        
-        if new_status != order.status:
+        previous_status = order.status
+        settled_statuses = {
+            DeliveryStatus.DELIVERED,
+            DeliveryStatus.CONFIRMED,
+            DeliveryStatus.AUTO_CONFIRMED,
+        }
+
+        if delivery.status in settled_statuses:
+            if order.status != SupplierOrderStatus.DELIVERED or order.payment_status != SupplierPaymentStatus.PAID:
+                settled_order = SupplierOrderService.mark_delivered(db, order.id, order.supplier_id)
+                return {
+                    "order_status": settled_order.status.value,
+                    "delivery_status": delivery.status.value,
+                    "payment_status": settled_order.payment_status.value,
+                    "synced": True,
+                    "settlement_released": True,
+                }
+        elif new_status != order.status:
             order.status = new_status
             db.commit()
-        
+            db.refresh(order)
+
         return {
             "order_status": order.status.value,
             "delivery_status": delivery.status.value,
-            "synced": new_status != order.status,
+            "payment_status": order.payment_status.value,
+            "synced": previous_status != order.status,
+            "settlement_released": False,
         }
+
+    @staticmethod
+    def auto_confirm_expired(db: Session) -> int:
+        """Auto-confirm supplier deliveries past their inspection deadline and release settlement."""
+        from app.models.logistics import DeliveryStatus, OrderDelivery
+
+        now = datetime.now(timezone.utc)
+        expired = (
+            db.query(OrderDelivery, SupplierOrder)
+            .join(SupplierOrder, SupplierOrder.logistics_delivery_id == OrderDelivery.id)
+            .filter(
+                OrderDelivery.status == DeliveryStatus.DELIVERED,
+                OrderDelivery.inspection_deadline.isnot(None),
+                OrderDelivery.inspection_deadline <= now,
+            )
+            .all()
+        )
+
+        count = 0
+        for delivery, order in expired:
+            try:
+                delivery.confirmed_at = now
+                delivery.status = DeliveryStatus.AUTO_CONFIRMED
+                db.flush()
+                if order.payment_status != SupplierPaymentStatus.PAID:
+                    SupplierOrderService.mark_delivered(db, order.id, order.supplier_id)
+                count += 1
+            except Exception as exc:
+                logger.error("Supplier auto-confirm failed for order %s: %s", order.id, exc)
+                db.rollback()
+
+        if count:
+            logger.info("Supplier auto-confirmed %d deliveries", count)
+        return count
 
 
 # ============================================================================
@@ -1659,7 +1797,7 @@ class SupplierPayoutService:
 
         withdrawal.status = "processing"
         withdrawal.description = f"Payout submitted via {withdrawal.withdrawal_method}"
-        withdrawal.reference = f"PAYOUT-{withdrawal.id[:8].upper()}"
+        withdrawal.reference = f"PAYOUT-{str(withdrawal.id)[:8].upper()}"
         
         db.commit()
 

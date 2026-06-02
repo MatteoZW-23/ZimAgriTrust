@@ -28,7 +28,7 @@ export function SupplierProductDetail({ productId, onBack }: SupplierProductDeta
   const [checkoutData, setCheckoutData] = useState({
     delivery_address: '',
     delivery_phone: '',
-    delivery_method: 'driver', // Using driver delivery instead of shipping
+    delivery_method: 'platform_driver',
     buyer_notes: '',
   });
   const [orderLoading, setOrderLoading] = useState(false);
@@ -65,7 +65,7 @@ export function SupplierProductDetail({ productId, onBack }: SupplierProductDeta
         items: [{ product_id: productId, quantity }],
         delivery_address: checkoutData.delivery_address,
         delivery_phone: checkoutData.delivery_phone,
-        shipping_method: checkoutData.delivery_method, // Driver delivery
+        shipping_method: checkoutData.delivery_method,
         buyer_notes: checkoutData.buyer_notes,
       });
       setMessage({ type: 'success', text: 'Order placed successfully.' });
@@ -91,8 +91,6 @@ export function SupplierProductDetail({ productId, onBack }: SupplierProductDeta
   }
 
   const total = (product.price || 0) * quantity;
-  const platformFee = total * 0.03;
-  const grandTotal = total + platformFee;
 
   return (
     <div className="space-y-6">
@@ -181,12 +179,12 @@ export function SupplierProductDetail({ productId, onBack }: SupplierProductDeta
                 <span className="font-bold">${total.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-earth-600">Platform fee (3%)</span>
-                <span className="font-bold">${platformFee.toFixed(2)}</span>
+                <span className="text-earth-600">Escrow protection</span>
+                <span className="font-bold text-green-600">Included</span>
               </div>
               <div className="border-t border-earth-200 pt-3 flex justify-between">
                 <span className="font-black text-earth-800">Total</span>
-                <span className="font-black text-2xl text-green-600">${grandTotal.toFixed(2)}</span>
+                <span className="font-black text-2xl text-green-600">${total.toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -202,12 +200,12 @@ export function SupplierProductDetail({ productId, onBack }: SupplierProductDeta
                 <span className="font-bold">${total.toFixed(2)}</span>
               </div>
               <div className="flex justify-between mb-2">
-                <span className="text-earth-600">Platform fee (3%)</span>
-                <span className="font-bold">${platformFee.toFixed(2)}</span>
+                <span className="text-earth-600">Escrow protection</span>
+                <span className="font-bold text-green-600">Included</span>
               </div>
               <div className="border-t border-earth-200 pt-2 flex justify-between">
                 <span className="font-black text-earth-800">Total</span>
-                <span className="font-black text-xl text-green-600">${grandTotal.toFixed(2)}</span>
+                <span className="font-black text-xl text-green-600">${total.toFixed(2)}</span>
               </div>
             </div>
 
@@ -240,8 +238,8 @@ export function SupplierProductDetail({ productId, onBack }: SupplierProductDeta
                 onChange={(e) => setCheckoutData({ ...checkoutData, delivery_method: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg border-2 border-earth-200 focus:border-primary-500 focus:outline-none"
               >
-                <option value="driver">Driver Delivery (ZimAgriTrust)</option>
-                <option value="pickup">Self Pickup</option>
+                <option value="platform_driver">Driver Delivery (ZimAgriTrust)</option>
+                <option value="buyer_pickup">Buyer Pickup</option>
               </select>
             </div>
 
@@ -268,7 +266,7 @@ export function SupplierProductDetail({ productId, onBack }: SupplierProductDeta
                 disabled={orderLoading}
                 className="flex-1 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 text-white font-bold py-3 px-6 rounded-xl"
               >
-                {orderLoading ? 'Placing Order...' : `Pay $${grandTotal.toFixed(2)}`}
+                {orderLoading ? 'Placing Order...' : `Pay $${total.toFixed(2)}`}
               </button>
             </div>
           </form>

@@ -6,31 +6,24 @@ import logo from '../assets/logo.png';
 
 export const AuthScreen: React.FC = () => {
   const { login } = useAuthStore();
-  const [mode, setMode] = useState<'login' | 'register' | 'super-admin'>('login');
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [mfaData, setMfaData] = useState<any>(null);
   const [formData, setFormData] = useState({
     phone: '',
     pin: '',
     fullName: '',
     role: 'farmer' as 'farmer' | 'buyer',
     province: '',
-    // Super admin fields
-    username: '',
-    email: '',
-    password: '',
-    adminPhone: '',
   });
 
-  const switchMode = (nextMode: 'login' | 'register' | 'super-admin') => {
+  const switchMode = (nextMode: 'login' | 'register') => {
     setMode(nextMode);
     setStep(1);
     setError('');
     setSuccess('');
-    setMfaData(null);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -97,41 +90,6 @@ export const AuthScreen: React.FC = () => {
     }
   };
 
-  const handleSuperAdminRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setSuccess('');
-    try {
-      const response = await fetch('http://localhost:8080/api/v1/super-admin/register-initial', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: formData.username,
-          email: formData.email,
-          password: formData.password,
-          phone_number: formData.adminPhone,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Registration failed');
-      }
-
-      const data = await response.json();
-      setMfaData(data.mfa_setup);
-      setStep(2);
-      setSuccess('Super admin account created! Set up MFA to complete registration.');
-    } catch (err: any) {
-      setError(err.message || 'Super admin registration failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="auth-screen">
       <div className="grid w-full max-w-6xl overflow-hidden rounded-[36px] border border-border bg-white/55 shadow-strong backdrop-blur-xl lg:grid-cols-[1.05fr_0.95fr]">
@@ -182,9 +140,6 @@ export const AuthScreen: React.FC = () => {
               </button>
               <button onClick={() => switchMode('register')} className={`auth-tab ${mode === 'register' ? 'active' : ''}`}>
                 Register
-              </button>
-              <button onClick={() => switchMode('super-admin')} className={`auth-tab ${mode === 'super-admin' ? 'active' : ''}`}>
-                <Shield size={14} className="mr-1" /> Super Admin
               </button>
             </div>
 
@@ -341,101 +296,6 @@ export const AuthScreen: React.FC = () => {
                       <ArrowLeft size={14} /> Back to role selection
                     </button>
                   </form>
-                )}
-              </div>
-            )}
-            
-            {mode === 'super-admin' && (
-              <div className="space-y-4">
-                {step === 1 ? (
-                  <form onSubmit={handleSuperAdminRegister} className="space-y-4">
-                    <div className="form-group">
-                      <label className="form-label">Username</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="e.g. admin"
-                        value={formData.username}
-                        onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Email</label>
-                      <input
-                        type="email"
-                        className="form-input"
-                        placeholder="admin@zimagritrust.com"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Password</label>
-                      <input
-                        type="password"
-                        className="form-input"
-                        placeholder="Minimum 12 characters"
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        required
-                        minLength={12}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Phone Number (Optional)</label>
-                      <div className="phone-row">
-                        <span className="phone-prefix">+263</span>
-                        <input
-                          type="tel"
-                          className="form-input"
-                          placeholder="77 123 4567"
-                          value={formData.adminPhone}
-                          onChange={(e) => setFormData({ ...formData, adminPhone: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                    <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading}>
-                      {loading ? 'Creating account...' : 'Create Super Admin Account'}
-                    </button>
-                  </form>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="text-center">
-                      <Shield className="mx-auto h-16 w-16 text-primary-700 mb-4" />
-                      <h3 className="text-xl font-bold">Set Up MFA</h3>
-                      <p className="text-sm text-muted">Scan the QR code with your authenticator app</p>
-                    </div>
-                    
-                    {mfaData && (
-                      <div className="bg-white p-6 rounded-xl border-2 border-border">
-                        <div className="flex justify-center mb-4">
-                          <img 
-                            src={`data:image/png;base64,${mfaData.qr_code_base64}`} 
-                            alt="MFA QR Code" 
-                            className="w-48 h-48"
-                          />
-                        </div>
-                        <div className="space-y-2 text-sm">
-                          <div className="bg-gray-50 p-3 rounded-lg">
-                            <p className="font-semibold mb-1">Manual Entry Secret:</p>
-                            <code className="text-xs break-all">{mfaData.secret}</code>
-                          </div>
-                          <p className="text-center text-muted">
-                            Use Google Authenticator, Authy, or any TOTP app
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    <button 
-                      className="btn btn-primary btn-full btn-lg"
-                      onClick={() => switchMode('login')}
-                    >
-                      Complete & Login
-                    </button>
-                  </div>
                 )}
               </div>
             )}

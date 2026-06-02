@@ -50,9 +50,9 @@ export const useOrderStore = create<OrderState>((set: (partial: Partial<OrderSta
   confirmDelivery: async (id: string) => {
     set({ loading: true, error: null });
     try {
-      await apiClient.post(`/transactions/${id}/confirm-delivery`);
+      await apiClient.post(`/logistics/orders/${id}/delivery/confirm-receipt`);
       set((state) => ({
-        orders: state.orders.map((o) => (o.id === id ? { ...o, status: 'delivered' } : o)),
+        orders: state.orders.map((o) => (o.id === id ? { ...o, status: 'completed', delivery_status: 'confirmed' } : o)),
         loading: false,
       }));
     } catch (error: any) {

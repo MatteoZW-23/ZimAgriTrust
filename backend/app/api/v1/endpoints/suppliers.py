@@ -414,6 +414,22 @@ def ship_order(
     return {"message": "Order shipped", "order_id": str(order.id), "tracking": order.tracking_number}
 
 
+@router.put("/orders/{order_id}/deliver", tags=["supplier-orders"])
+def deliver_order(
+    order_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPPLIER)),
+):
+    profile = _get_supplier_profile(db, user)
+    order = SupplierOrderService.mark_delivered(db, order_id, profile.id)
+    return {
+        "message": "Order delivered and settlement released",
+        "order_id": str(order.id),
+        "status": order.status.value,
+        "payment_status": order.payment_status.value,
+    }
+
+
 @router.put("/orders/{order_id}/cancel", tags=["supplier-orders"])
 def cancel_order(
     order_id: uuid.UUID,
@@ -689,6 +705,22 @@ def public_get_my_orders(
     """Buyer/farmer gets their supplier orders."""
     orders = SupplierOrderService.get_buyer_orders(db, user.id)
     return [SupplierOrderResponse.model_validate(o) for o in orders]
+
+
+@public_router.post("/orders/{order_id}/confirm-receipt", tags=["supplier-public"])
+def public_confirm_supplier_order_receipt(
+    order_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Buyer confirms supplier order receipt and releases settlement if still pending."""
+    order = SupplierOrderService.buyer_confirm_receipt(db, order_id, user.id)
+    return {
+        "message": "Receipt confirmed",
+        "order_id": str(order.id),
+        "status": order.status.value,
+        "payment_status": order.payment_status.value,
+    }
 
 
 # ============================================================================

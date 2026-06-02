@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 
-export function DashboardLayout({ currentView, onViewChange, children }) {
+export function DashboardLayout({ currentView, onViewChange, children, featureAccess }) {
   const { user, logout } = useAuthStore();
 
   const navItems = [
@@ -15,13 +15,13 @@ export function DashboardLayout({ currentView, onViewChange, children }) {
     { id: 'orders', label: 'Orders', icon: ShoppingCart },
     { id: 'inventory', label: 'Inventory', icon: Box },
     { id: 'wallet', label: 'Wallet', icon: Wallet },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3, enabled: featureAccess?.analytics || featureAccess?.advanced_analytics },
     { id: 'reviews', label: 'Reviews', icon: Star },
-    { id: 'discounts', label: 'Discounts', icon: Tag },
+    { id: 'discounts', label: 'Discounts', icon: Tag, enabled: featureAccess?.promotions },
     { id: 'payouts', label: 'Payouts', icon: DollarSign },
     { id: 'subscription', label: 'Subscription', icon: CreditCard },
     { id: 'profile', label: 'Profile', icon: User },
-  ];
+  ].filter((item) => item.enabled !== false);
 
   const handleLogout = async () => {
     try {

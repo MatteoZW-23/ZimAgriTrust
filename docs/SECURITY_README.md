@@ -43,7 +43,7 @@ EOF
 cd backend
 python -m alembic upgrade head
 python scripts/seed_security.py
-python scripts/create_super_admin.py
+python backend/scripts/seed_super_admin.py
 ```
 
 ### 4. Test

@@ -207,6 +207,7 @@ def process_auto_settlement(self):
     try:
         from app.models.transaction import Order, OrderStatus
         from app.services.escrow_service import process_auto_settlement
+        from app.services.supplier_service import SupplierLogisticsService
         from datetime import timedelta, timezone
         
         logger.info("Processing auto-settlement for eligible orders")
@@ -228,10 +229,13 @@ def process_auto_settlement(self):
                 logger.error(f"Failed to auto-settle order {order.id}: {e}")
                 failed_count += 1
                 failed_order_ids.append(str(order.id))
+
+        supplier_auto_confirmed = SupplierLogisticsService.auto_confirm_expired(self.db)
         
         return {
             "status": "completed",
             "processed_count": processed_count,
+            "supplier_auto_confirmed": supplier_auto_confirmed,
             "failed_count": failed_count,
             "failed_order_ids": failed_order_ids[:20],
             "total_eligible": len(delivered_orders),

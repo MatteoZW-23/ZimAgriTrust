@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getSalesAnalytics, getBestsellers, getInventoryAnalytics, getReports } from '../api.ts';
 import { BarChart3, TrendingUp, Package, DollarSign, Award } from 'lucide-react';
 
-export function Analytics() {
+export function Analytics({ featureAccess }) {
   const [salesData, setSalesData] = useState(null);
   const [bestsellers, setBestsellers] = useState([]);
   const [inventoryData, setInventoryData] = useState(null);
@@ -10,8 +10,12 @@ export function Analytics() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!(featureAccess?.analytics || featureAccess?.advanced_analytics)) {
+      setLoading(false);
+      return;
+    }
     loadData();
-  }, []);
+  }, [featureAccess]);
 
   const loadData = async () => {
     try {
@@ -34,6 +38,17 @@ export function Analytics() {
 
   if (loading) {
     return <div className="text-center py-12">Loading analytics...</div>;
+  }
+
+  if (!(featureAccess?.analytics || featureAccess?.advanced_analytics)) {
+    return (
+      <div className="bg-white rounded-2xl shadow-lg p-8">
+        <h2 className="text-2xl font-black text-earth-800">Analytics & Reports</h2>
+        <p className="mt-3 text-earth-600 font-bold">
+          Analytics are available on Pro and Enterprise supplier subscriptions.
+        </p>
+      </div>
+    );
   }
 
   return (

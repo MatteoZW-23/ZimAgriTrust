@@ -93,8 +93,8 @@ def get_all_activities(
         ],
         "offers": [
             {
-                "id": str(o.id), "product": o.listing.product_type, "qty": o.quantity,
-                "offered_price": o.offered_price, "buyer": o.buyer.full_name, "status": str(o.status)
+                "id": str(o.id), "product": o.listing.product_type, "qty": o.offered_quantity_kg,
+                "offered_price": o.offered_price_per_kg, "buyer": o.buyer.full_name, "status": str(o.status)
             } for o in offers
         ],
         "deals": [

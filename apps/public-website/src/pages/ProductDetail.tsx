@@ -1,221 +1,336 @@
-import React, { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Package, Star, MapPin, CheckCircle, ShoppingCart, Truck, Shield, Heart } from "lucide-react";
+import { ArrowLeft, CheckCircle, Heart, MapPin, Package, Shield, ShoppingCart, Star } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 
 export default function ProductDetail() {
- const { productId } = useParams();
- const [product, setProduct] = useState<any>(null);
- const [supplier, setSupplier] = useState<any>(null);
- const [loading, setLoading] = useState(true);
- const [quantity, setQuantity] = useState(1);
- const [selectedImage, setSelectedImage] = useState(0);
- const [showCheckout, setShowCheckout] = useState(false);
- const [checkoutData, setCheckoutData] = useState({
-   delivery_address: '',
-   delivery_phone: '',
-    shipping_method: 'driver',
-   buyer_notes: '',
- });
- const [orderLoading, setOrderLoading] = useState(false);
+  const { productId } = useParams();
+  const [product, setProduct] = useState<any>(null);
+  const [party, setParty] = useState<any>(null);
+  const [sourceType, setSourceType] = useState<"supplier" | "crop" | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [quantity, setQuantity] = useState(1);
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [checkoutData, setCheckoutData] = useState({
+    delivery_address: "",
+    delivery_phone: "",
+    shipping_method: "platform_driver",
+    buyer_notes: "",
+  });
+  const [orderLoading, setOrderLoading] = useState(false);
 
- useEffect(() => {
- fetchProductDetail();
- }, [productId]);
+  useEffect(() => {
+    void fetchDetail();
+  }, [productId]);
 
- const fetchProductDetail = async () => {
- try {
- const response = await fetch(`${API}/suppliers/public/products/${productId}`);
- const data = await response.json();
- setProduct(data);
- if (data.supplier) {
- setSupplier(data.supplier);
- }
- } catch {
-  setProduct(null);
- } finally {
- setLoading(false);
- }
- };
+  const fetchDetail = async () => {
+    setLoading(true);
+    try {
+      const supplierResponse = await fetch(`${API}/suppliers/public/products/${productId}`);
+      if (supplierResponse.ok) {
+        const data = await supplierResponse.json();
+        setProduct({
+          ...data,
+          name: data.name,
+          price: Number(data.price || 0),
+          quantity_available: Number(data.quantity_available || 0),
+        });
+        setParty(data?.supplier || null);
+        setSourceType("supplier");
+        return;
+      }
 
- const getCategoryLabel = (cat: string) => {
- const labels = {
- seeds: "Seeds",
- fertilizer: "Fertilizer",
- pesticides: "Pesticides",
- herbicides: "Herbicides",
- fungicides: "Fungicides",
- animal_feed: "Animal Feed",
- tractor: "Tractors",
- sprayer: "Sprayers",
- irrigation: "Irrigation",
- tiller: "Tillers",
- harvester: "Harvesters",
- tools: "Tools",
- };
- return labels[cat] || cat;
- };
-
- const getProductType = () => {
- const machineryCategories = ["tractor", "sprayer", "irrigation", "tiller", "harvester", "tools"];
- return machineryCategories.includes(product?.category) ? "machinery" : "input";
- };
-
- const handleBuyNow = () => {
-  if (quantity > (product?.quantity_available || 0)) {
-    alert('Insufficient stock');
-    return;
-  }
-  setShowCheckout(true);
- };
-
- const handlePlaceOrder = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setOrderLoading(true);
-  try {
-    const response = await fetch(`${API}/suppliers/public/orders`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        items: [{ product_id: productId, quantity }],
-        delivery_address: checkoutData.delivery_address,
-        delivery_phone: checkoutData.delivery_phone,
-        shipping_method: checkoutData.shipping_method,
-        buyer_notes: checkoutData.buyer_notes,
-      }),
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Order failed');
+      const cropResponse = await fetch(`${API}/public/listings/${productId}`);
+      if (!cropResponse.ok) throw new Error("Listing not found");
+      const crop = await cropResponse.json();
+      setProduct({
+        ...crop,
+        name: crop.product_type || crop.crop || crop.title || "Crop Listing",
+        price: Number(crop.price_per_unit || 0),
+        quantity_available: Number(crop.quantity || 0),
+        category: String(crop.product_type || "crop").toLowerCase(),
+        supplier_verification: crop.seller_verified ? "approved" : "pending",
+        supplier_rating: Number(crop.seller_trust_score || 0) / 20,
+      });
+      setParty({
+        business_name: crop.seller_name || "Verified Farmer",
+      });
+      setSourceType("crop");
+    } catch {
+      setProduct(null);
+      setParty(null);
+      setSourceType(null);
+    } finally {
+      setLoading(false);
     }
-    alert('Order placed successfully! Please log in to view your order.');
-    setShowCheckout(false);
-  } catch (err) {
-    alert('Error placing order: ' + (err as Error).message);
-  } finally {
-    setOrderLoading(false);
+  };
+
+  const getCategoryLabel = (cat: string) => {
+    const labels: Record<string, string> = {
+      maize: "Maize",
+      soybeans: "Soybeans",
+      wheat: "Wheat",
+      groundnuts: "Groundnuts",
+      sunflower: "Sunflower",
+      sorghum: "Sorghum",
+      seeds: "Seeds",
+      fertilizer: "Fertilizer",
+      pesticides: "Pesticides",
+      herbicides: "Herbicides",
+      fungicides: "Fungicides",
+      animal_feed: "Animal Feed",
+      tractor: "Tractors",
+      sprayer: "Sprayers",
+      irrigation: "Irrigation",
+      tiller: "Tillers",
+      harvester: "Harvesters",
+      tools: "Tools",
+      crop: "Crop",
+    };
+    return labels[String(cat || "").toLowerCase()] || cat || "Product";
+  };
+
+  const isCrop = sourceType === "crop";
+  const isSupplierProduct = sourceType === "supplier";
+  const isMachinery = isSupplierProduct && ["tractor", "sprayer", "irrigation", "tiller", "harvester", "tools"].includes(String(product?.category || "").toLowerCase());
+  const orderSubtotal = Number(product?.price || 0) * quantity;
+
+  const handlePlaceOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isSupplierProduct) return;
+    setOrderLoading(true);
+    try {
+      const response = await fetch(`${API}/suppliers/public/orders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          items: [{ product_id: productId, quantity }],
+          delivery_address: checkoutData.delivery_address,
+          delivery_phone: checkoutData.delivery_phone,
+          shipping_method: checkoutData.shipping_method,
+          buyer_notes: checkoutData.buyer_notes,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        if (response.status === 401) throw new Error("Please log in to place a supplier order.");
+        throw new Error(error.detail || "Order failed");
+      }
+
+      alert("Order placed successfully. You can track it from your portal orders.");
+      setShowCheckout(false);
+    } catch (err) {
+      alert(`Error placing order: ${(err as Error).message}`);
+    } finally {
+      setOrderLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-earth-50">
+        <div className="text-center">
+          <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-green-600 border-t-transparent" />
+          <p className="mt-4 text-gray-600">Loading details...</p>
+        </div>
+      </div>
+    );
   }
- };
 
- if (loading) {
- return (
- <div className="min-h-screen bg-earth-50 flex items-center justify-center"><div className="text-center"><div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-green-600 border-t-transparent"></div><p className="mt-4 text-gray-600">Loading product details...</p></div></div>);
- }
+  if (!product) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-earth-50">
+        <div className="text-center">
+          <Package size={48} className="mx-auto mb-4 text-gray-300" />
+          <p className="text-lg text-gray-600">Item not found.</p>
+          <Link to="/marketplace" className="mt-4 inline-block text-green-600 hover:text-green-700">Back to Marketplace</Link>
+        </div>
+      </div>
+    );
+  }
 
- if (!product) {
- return (
- <div className="min-h-screen bg-earth-50 flex items-center justify-center"><div className="text-center"><Package size={48} className="text-gray-300 mx-auto mb-4" /><p className="text-gray-600 text-lg">Product not found.</p><Link to="/marketplace" className="text-green-600 hover:text-green-700 mt-4 inline-block">Back to Marketplace
- </Link></div></div>);
- }
+  return (
+    <div className="min-h-screen bg-earth-50">
+      <div className="border-b border-gray-200 bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+          <Link to="/marketplace" className="inline-flex items-center gap-2 text-gray-600 transition hover:text-gray-900">
+            <ArrowLeft size={18} />
+            Back to Marketplace
+          </Link>
+        </div>
+      </div>
 
- const productType = getProductType();
- const isMachinery = productType === "machinery";
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-2">
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5 }}>
+            <div className="overflow-hidden rounded-2xl bg-white shadow-lg">
+              <div className="flex aspect-square items-center justify-center bg-gray-100 text-5xl font-bold text-green-700">
+                {String(product.name || "PR").slice(0, 2).toUpperCase()}
+              </div>
+            </div>
+          </motion.div>
 
- return (
- <div className="min-h-screen bg-earth-50">{/* Header */}
- <div className="bg-white border-b border-gray-200"><div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4"><Link
- to="/marketplace"
- className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition"
- ><ArrowLeft size={18} />Back to Marketplace
- </Link></div></div>
-{/* Product Detail */}
- <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"><div className="grid grid-cols-1 lg:grid-cols-2 gap-12">{/* Product Images */}
- <motion.div
- initial={{ opacity: 0, x: -20 }}
- animate={{ opacity: 1, x: 0 }}
- transition={{ duration: 0.5 }}
- ><div className="bg-white rounded-2xl shadow-lg overflow-hidden"><div className="aspect-square bg-gray-100 flex items-center justify-center">{isMachinery ? (
- <div className="text-8xl"></div>) : (
- <div className="text-8xl"></div>)}
- </div><div className="p-4 grid grid-cols-4 gap-2">{[0, 1, 2, 3].map((i) => (
- <button
- key={i}
- onClick={() => setSelectedImage(i)}
- className={`aspect-square rounded-lg bg-gray-100 flex items-center justify-center transition ${
- selectedImage === i ? "ring-2 ring-green-500" : ""
- }`}
- >{isMachinery ? (
- <div className="text-2xl"></div>) : (
- <div className="text-2xl"></div>)}
- </button>))}
- </div></div></motion.div>
-{/* Product Info */}
- <motion.div
- initial={{ opacity: 0, x: 20 }}
- animate={{ opacity: 1, x: 0 }}
- transition={{ duration: 0.5, delay: 0.2 }}
- ><div className="bg-white rounded-2xl shadow-lg p-8"><div className="flex items-start justify-between mb-4"><div><span className="inline-block px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full mb-2">{getCategoryLabel(product.category)}
- </span><h1 className="text-3xl font-bold text-gray-900 mb-2">{product.name}</h1><div className="flex items-center gap-2 text-gray-600">{supplier && (
- <><Link
- to={`/suppliers/${supplier.id}`}
- className="hover:text-green-600 font-medium"
- >{supplier.business_name}
- </Link><span>•</span></>)}
- <div className="flex items-center gap-1"><Star size={16} className="fill-yellow-400 text-yellow-400" /><span className="font-medium">{product.supplier_rating?.toFixed(1) || "N/A"}</span>{product.supplier_rating && (
- <span className="text-gray-400">({Math.floor(product.supplier_rating * 50)} reviews)</span>)}
- </div></div></div>{product.supplier_verification === "approved" && (
- <div className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full"><CheckCircle size={16} />Verified
- </div>)}
- </div>
-<p className="text-4xl font-bold text-green-600 mb-6">${product.price?.toFixed(2)}
- <span className="text-lg text-gray-500 font-normal">{isMachinery ? "" : "/unit"}
- </span></p>
-<div className="space-y-4 mb-6">{product.quantity_available !== undefined && (
- <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"><span className="text-gray-600">Availability:</span><span className={`font-medium ${product.quantity_available > 0 ? "text-green-600" : "text-red-600"}`}>{product.quantity_available > 0 ? `${product.quantity_available} in stock` : "Out of stock"}
- </span></div>)}
- {!isMachinery && (
- <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"><span className="text-gray-600">Quantity:</span><div className="flex items-center gap-3"><button
- onClick={() => setQuantity(Math.max(1, quantity - 1))}
- className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition"
- >-
- </button><span className="w-12 text-center font-medium">{quantity}</span><button
- onClick={() => setQuantity(quantity + 1)}
- className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition"
- >+
- </button></div></div>)}
- </div>
-<div className="space-y-3 mb-6"><button className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"><ShoppingCart size={20} />{isMachinery ? "Contact Supplier" : "Add to Cart"}
- </button>{!isMachinery && (
- <button onClick={handleBuyNow} className="w-full bg-gray-900 hover:bg-gray-800 text-white font-medium py-3 px-6 rounded-lg transition-colors">Buy Now
- </button>)}
- <button className="w-full border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"><Heart size={20} />Add to Wishlist
- </button></div>
-<div className="flex items-center gap-6 text-sm text-gray-600 border-t border-gray-200 pt-6"><div className="flex items-center gap-2"><Truck size={18} className="text-green-600" /><span>Free delivery on orders over $100</span></div><div className="flex items-center gap-2"><Shield size={18} className="text-green-600" /><span>Secure payment</span></div></div></div></motion.div></div>
-{/* Product Details */}
- <motion.div
- initial={{ opacity: 0, y: 20 }}
- animate={{ opacity: 1, y: 0 }}
- transition={{ duration: 0.5, delay: 0.4 }}
- className="mt-12"
- ><div className="bg-white rounded-2xl shadow-lg p-8"><h2 className="text-2xl font-bold text-gray-900 mb-6">Product Details</h2><p className="text-gray-600 mb-6">{product.description || "Quality agricultural product from verified supplier."}</p>
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="p-4 bg-gray-50 rounded-lg"><p className="text-sm text-gray-600 mb-1">Category</p><p className="font-medium">{getCategoryLabel(product.category)}</p></div><div className="p-4 bg-gray-50 rounded-lg"><p className="text-sm text-gray-600 mb-1">Product Type</p><p className="font-medium">{product.product_type || "Standard"}</p></div><div className="p-4 bg-gray-50 rounded-lg"><p className="text-sm text-gray-600 mb-1">Brand</p><p className="font-medium">{product.brand || "Generic"}</p></div><div className="p-4 bg-gray-50 rounded-lg"><p className="text-sm text-gray-600 mb-1">SKU</p><p className="font-medium">{product.sku || "N/A"}</p></div></div></div></motion.div>
-{/* Supplier Information */}
- {supplier && (
- <motion.div
- initial={{ opacity: 0, y: 20 }}
- animate={{ opacity: 1, y: 0 }}
- transition={{ duration: 0.5, delay: 0.6 }}
- className="mt-8"
- ><div className="bg-white rounded-2xl shadow-lg p-8"><h2 className="text-2xl font-bold text-gray-900 mb-6">Supplier Information</h2><div className="flex items-start gap-6"><div className="w-16 h-16 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0"><Package size={32} className="text-green-600" /></div><div className="flex-1"><div className="flex items-start justify-between mb-4"><div><Link
- to={`/suppliers/${supplier.id}`}
- className="text-xl font-bold text-gray-900 hover:text-green-600 transition"
- >{supplier.business_name}
- </Link><div className="flex items-center gap-2 text-gray-600 mt-1"><MapPin size={16} />{supplier.location || "Zimbabwe"}
- </div></div><div className="flex items-center gap-2"><div className="flex items-center gap-1 px-3 py-1 bg-yellow-100 text-yellow-700 text-sm font-medium rounded-full"><Star size={14} className="fill-yellow-500 text-yellow-500" />{supplier.rating?.toFixed(1) || "N/A"}
- </div>{supplier.verification_status === "approved" && (
- <div className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full"><CheckCircle size={14} />Verified
- </div>)}
- </div></div>
-<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"><div><p className="text-sm text-gray-600">Products</p><p className="font-medium">{supplier.total_products || "N/A"}</p></div><div><p className="text-sm text-gray-600">Orders</p><p className="font-medium">{supplier.total_orders || "N/A"}</p></div><div><p className="text-sm text-gray-600">Member Since</p><p className="font-medium">{supplier.joined_date ? new Date(supplier.joined_date).getFullYear() : "N/A"}</p></div><div><p className="text-sm text-gray-600">Response Time</p><p className="font-medium">~2 hours</p></div></div>
-<div className="flex gap-3"><Link
- to={`/suppliers/${supplier.id}`}
- className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors text-center"
- >View Supplier Profile
- </Link><button className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors">Contact Supplier
- </button></div></div></div></div></motion.div>
- )}
- </div></div>);
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.2 }}>
+            <div className="rounded-2xl bg-white p-8 shadow-lg">
+              <div className="mb-4 flex items-start justify-between">
+                <div>
+                  <span className="mb-2 inline-block rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700">
+                    {getCategoryLabel(product.category)}
+                  </span>
+                  <h1 className="mb-2 text-3xl font-bold text-gray-900">{product.name}</h1>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    {party && <span className="font-medium">{party.business_name}</span>}
+                    <span>•</span>
+                    <div className="flex items-center gap-1">
+                      <Star size={16} className="fill-yellow-400 text-yellow-400" />
+                      <span className="font-medium">{(Number(product.supplier_rating || 0)).toFixed(1)}</span>
+                    </div>
+                  </div>
+                </div>
+                {product.supplier_verification === "approved" && (
+                  <div className="flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700">
+                    <CheckCircle size={16} />
+                    Verified
+                  </div>
+                )}
+              </div>
+
+              <p className="mb-6 text-4xl font-bold text-green-600">
+                ${Number(product.price || 0).toFixed(2)}
+                <span className="text-lg font-normal text-gray-500">/{isMachinery ? "item" : "unit"}</span>
+              </p>
+
+              <div className="mb-6 space-y-4">
+                <div className="flex items-center justify-between rounded-lg bg-gray-50 p-4">
+                  <span className="text-gray-600">Availability:</span>
+                  <span className={`font-medium ${(product.quantity_available || 0) > 0 ? "text-green-600" : "text-red-600"}`}>
+                    {(product.quantity_available || 0) > 0 ? `${product.quantity_available} in stock` : "Out of stock"}
+                  </span>
+                </div>
+                {!isMachinery && (
+                  <div className="flex items-center justify-between rounded-lg bg-gray-50 p-4">
+                    <span className="text-gray-600">Quantity:</span>
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 transition hover:bg-gray-100">-</button>
+                      <span className="w-12 text-center font-medium">{quantity}</span>
+                      <button onClick={() => setQuantity(quantity + 1)} className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 transition hover:bg-gray-100">+</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="mb-6 rounded-xl border border-green-200 bg-green-50 p-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <Shield size={20} className="text-green-600" />
+                  <span className="font-semibold text-green-900">Escrow Protection</span>
+                </div>
+                <p className="text-sm text-green-700">
+                  {isCrop
+                    ? "Farmer crop trades settle through escrow after negotiation, delivery completion, and buyer confirmation."
+                    : "Supplier checkout totals are protected in escrow. Platform fees settle after delivery instead of being added as surprise buyer charges."}
+                </p>
+              </div>
+
+              <div className="mb-6 space-y-3">
+                {isSupplierProduct ? (
+                  <>
+                    <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-6 py-3 font-medium text-white transition-colors hover:bg-green-700">
+                      <ShoppingCart size={20} />
+                      {isMachinery ? "Contact Supplier" : "Add to Cart"}
+                    </button>
+                    {!isMachinery && (
+                      <button onClick={() => setShowCheckout(true)} className="w-full rounded-lg bg-gray-900 px-6 py-3 font-medium text-white transition-colors hover:bg-gray-800">
+                        Buy Now
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <Link to="/dashboard" className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-6 py-3 font-medium text-white transition-colors hover:bg-green-700">
+                    <ShoppingCart size={20} />
+                    Sign In to Trade This Crop
+                  </Link>
+                )}
+                <button className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 px-6 py-3 font-medium text-gray-700 transition-colors hover:bg-gray-50">
+                  <Heart size={20} />
+                  Save Listing
+                </button>
+              </div>
+
+              <div className="space-y-3 border-t border-gray-100 pt-6 text-sm">
+                <div className="flex items-center gap-2 text-gray-600">
+                  <MapPin size={16} />
+                  {product.location || product.location_label || product.location_district || product.location_province || "Zimbabwe"}
+                </div>
+                <div className="flex items-center gap-2 text-gray-600">
+                  <Package size={16} />
+                  {product.description || "Quality agricultural product available for verified trade."}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 rounded-2xl bg-white p-8 shadow-lg">
+              <h3 className="mb-6 text-xl font-bold text-gray-900">Listing Details</h3>
+              <div className="space-y-4">
+                <div className="flex justify-between border-b border-gray-100 pb-3">
+                  <span className="text-gray-600">Category</span>
+                  <span className="font-medium">{getCategoryLabel(product.category)}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-3">
+                  <span className="text-gray-600">{isCrop ? "Commodity" : "Product Type"}</span>
+                  <span className="font-medium">{product.product_type || product.name || "Standard"}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-3">
+                  <span className="text-gray-600">Availability</span>
+                  <span className="font-medium">{product.quantity_available || "In stock"}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-3">
+                  <span className="text-gray-600">Location</span>
+                  <span className="font-medium">{product.location || product.location_district || product.location_province || "Zimbabwe"}</span>
+                </div>
+                {party && (
+                  <div className="flex justify-between border-b border-gray-100 pb-3">
+                    <span className="text-gray-600">{isCrop ? "Farmer" : "Supplier"}</span>
+                    <span className="font-medium">{party.business_name}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+
+      {showCheckout && isSupplierProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="text-2xl font-bold text-gray-900">Secure Checkout</h3>
+            <p className="mt-2 text-sm text-gray-600">Escrow holds your payment until delivery is completed.</p>
+            <form className="mt-6 space-y-4" onSubmit={handlePlaceOrder}>
+              <input value={checkoutData.delivery_address} onChange={(e) => setCheckoutData((prev) => ({ ...prev, delivery_address: e.target.value }))} required placeholder="Delivery address" className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-green-500 focus:outline-none" />
+              <input value={checkoutData.delivery_phone} onChange={(e) => setCheckoutData((prev) => ({ ...prev, delivery_phone: e.target.value }))} required placeholder="Delivery phone number" className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-green-500 focus:outline-none" />
+              <select value={checkoutData.shipping_method} onChange={(e) => setCheckoutData((prev) => ({ ...prev, shipping_method: e.target.value }))} className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-green-500 focus:outline-none">
+                <option value="platform_driver">Platform Driver</option>
+                <option value="buyer_pickup">Buyer Pickup</option>
+              </select>
+              <textarea value={checkoutData.buyer_notes} onChange={(e) => setCheckoutData((prev) => ({ ...prev, buyer_notes: e.target.value }))} placeholder="Notes for supplier" className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-green-500 focus:outline-none" rows={4} />
+              <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-700">
+                <div className="flex justify-between"><span>Subtotal</span><span>${orderSubtotal.toFixed(2)}</span></div>
+                <div className="mt-2 flex justify-between"><span>Escrow protection</span><span className="text-green-600">Included</span></div>
+                <div className="mt-3 flex justify-between border-t border-gray-200 pt-3 text-base font-bold"><span>Total held in escrow</span><span>${orderSubtotal.toFixed(2)}</span></div>
+              </div>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setShowCheckout(false)} className="flex-1 rounded-xl border border-gray-300 px-4 py-3 font-semibold text-gray-700 transition hover:bg-gray-50">Cancel</button>
+                <button type="submit" disabled={orderLoading} className="flex-1 rounded-xl bg-green-600 px-4 py-3 font-semibold text-white transition hover:bg-green-700 disabled:opacity-60">
+                  {orderLoading ? "Placing Order..." : "Place Order"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

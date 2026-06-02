@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Card, Button, Input } from '@agritrust/shared';
 import { useThemeStore } from '../utils/themeStore';
 import { Settings, Bell, Lock, Shield, Eye, Sun, Moon, CheckCircle2, ChevronRight } from 'lucide-react';
-import { changeUserPin, createTicket, getUserSettings, updateUserSettings } from '../api';
+import { changeUserPin, createTicket, getTickets, getUserSettings, replyToTicket, updateTicket, updateUserSettings } from '../api';
 
 type Prefs = {
   push_notifications: boolean;
@@ -12,6 +12,17 @@ type Prefs = {
   phone_visibility: boolean;
   marketplace_discovery: boolean;
   language: string;
+};
+
+type SupportTicket = {
+  id: string;
+  subject: string;
+  description: string;
+  status: 'open' | 'assigned' | 'in_progress' | 'resolved' | 'closed';
+  resolution_note?: string | null;
+  satisfaction_rating?: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 const defaultPrefs: Prefs = {
@@ -64,12 +75,21 @@ export const SettingsPanel: React.FC = () => {
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [ticketReplyDrafts, setTicketReplyDrafts] = useState<Record<string, string>>({});
+
+  const loadTickets = useCallback(() => {
+    getTickets()
+      .then((data) => setTickets(Array.isArray(data) ? data : []))
+      .catch(() => setTickets([]));
+  }, []);
 
   useEffect(() => {
     getUserSettings()
       .then((data) => setPrefs((prev) => ({ ...prev, ...data })))
       .catch(() => {});
-  }, []);
+    loadTickets();
+  }, [loadTickets]);
 
   const savePrefs = useCallback(async (updates: Partial<Prefs>, key: string) => {
     setSavingKey(key);
@@ -350,12 +370,113 @@ export const SettingsPanel: React.FC = () => {
                     await createTicket(ticketSubject.trim(), ticketDescription.trim());
                     setTicketSubject('');
                     setTicketDescription('');
+                    loadTickets();
                     setStatus('Support ticket created');
                   }}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
                   Submit Ticket
                 </Button>
+
+                {tickets.length > 0 && (
+                  <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-white">My Tickets</h4>
+                    {tickets.map((ticket) => (
+                      <div key={ticket.id} className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-900/40 space-y-3">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                          <div>
+                            <p className="font-bold text-sm text-gray-900 dark:text-white">{ticket.subject}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              {ticket.created_at ? new Date(ticket.created_at).toLocaleString() : 'Recently created'}
+                            </p>
+                          </div>
+                          <span className={`px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider self-start ${
+                            ticket.status === 'resolved'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : ticket.status === 'closed'
+                              ? 'bg-gray-200 text-gray-700'
+                              : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {ticket.status.replace('_', ' ')}
+                          </span>
+                        </div>
+
+                        <p className="text-sm text-gray-700 dark:text-gray-300">{ticket.description}</p>
+
+                        {ticket.resolution_note && (
+                          <div className="rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-3">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Updates</p>
+                            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{ticket.resolution_note}</p>
+                          </div>
+                        )}
+
+                        {ticket.status !== 'closed' && (
+                          <div className="space-y-2">
+                            <Input
+                              label="Reply"
+                              value={ticketReplyDrafts[ticket.id] || ''}
+                              onChange={(e: any) => setTicketReplyDrafts((prev) => ({ ...prev, [ticket.id]: e.target.value }))}
+                              placeholder="Add more detail or respond to support"
+                            />
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                onClick={async () => {
+                                  const message = (ticketReplyDrafts[ticket.id] || '').trim();
+                                  if (!message) return;
+                                  await replyToTicket(ticket.id, message);
+                                  setTicketReplyDrafts((prev) => ({ ...prev, [ticket.id]: '' }));
+                                  loadTickets();
+                                  setStatus('Ticket updated');
+                                }}
+                                className="bg-blue-600 hover:bg-blue-700"
+                              >
+                                Reply
+                              </Button>
+                              {(ticket.status === 'resolved' || ticket.status === 'assigned' || ticket.status === 'in_progress') && (
+                                <Button
+                                  variant="outline"
+                                  onClick={async () => {
+                                    await updateTicket(ticket.id, { status: 'closed' });
+                                    loadTickets();
+                                    setStatus('Ticket closed');
+                                  }}
+                                >
+                                  Close Ticket
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {ticket.status === 'resolved' && !ticket.satisfaction_rating && (
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Rate your support experience</p>
+                            <div className="flex flex-wrap gap-2">
+                              {[1, 2, 3, 4, 5].map((rating) => (
+                                <button
+                                  key={rating}
+                                  type="button"
+                                  onClick={async () => {
+                                    await updateTicket(ticket.id, { satisfaction_rating: rating, status: 'closed' });
+                                    loadTickets();
+                                    setStatus('Support rating submitted');
+                                  }}
+                                  className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-sm font-bold text-gray-700 dark:text-gray-200"
+                                >
+                                  {rating}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {ticket.satisfaction_rating ? (
+                          <p className="text-xs font-semibold text-emerald-600">Rated {ticket.satisfaction_rating}/5</p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

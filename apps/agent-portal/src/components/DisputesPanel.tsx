@@ -4,7 +4,7 @@ import { getMyDisputes, submitDisputeRecommendation } from "../api.ts";
 export default function DisputesPanel() {
   const [disputes, setDisputes] = useState(null);
   const [selected, setSelected] = useState(null);
-  const [rec, setRec] = useState({ outcome: "refund", note: "" });
+  const [rec, setRec] = useState({ outcome: "refund", note: "", discount_percent: "10" });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
   
@@ -26,7 +26,7 @@ export default function DisputesPanel() {
     }
   };
   
-  const sc = s => ({ open: "badge-yellow", investigating: "badge-yellow", resolved: "badge-green", escalated: "badge-red" }[s] || "badge-gray");
+  const sc = s => ({ open: "badge-yellow", investigating: "badge-yellow", resolved: "badge-green", escalated: "badge-red", proposed_offer: "badge-yellow", resolved_refund: "badge-green", resolved_release: "badge-green" }[String(s || "").toLowerCase()] || "badge-gray");
   
   return (
     <div>
@@ -45,7 +45,7 @@ export default function DisputesPanel() {
                 <td>{d.reason || d.description || "—"}</td>
                 <td><span className={`badge ${sc(d.status)}`}>{d.status}</span></td>
                 <td style={{ fontSize: 11 }}>{new Date(d.created_at).toLocaleDateString()}</td>
-                <td>{d.status !== "resolved" && <button className="btn btn-sm btn-primary" onClick={() => setSelected(d)}>Mediate</button>}</td>
+                <td>{!String(d.status || "").toLowerCase().startsWith("resolved") && <button className="btn btn-sm btn-primary" onClick={() => setSelected(d)}>Mediate</button>}</td>
               </tr>
             ))}
           </tbody>
@@ -62,8 +62,20 @@ export default function DisputesPanel() {
                   <option value="refund">Full Refund to Buyer</option>
                   <option value="release">Release Payment to Farmer</option>
                   <option value="partial">Partial Settlement</option>
-                  <option value="escalate">Escalate to Admin</option>
                 </select></div>
+              {rec.outcome === "partial" && (
+                <div className="form-group">
+                  <label className="form-label">Discount Percent</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={rec.discount_percent}
+                    onChange={e => setRec(r => ({ ...r, discount_percent: e.target.value }))}
+                  />
+                </div>
+              )}
               <div className="form-group"><label className="form-label">Investigation Notes</label>
                 <textarea className="form-textarea" rows={4} value={rec.note} onChange={e => setRec(r => ({ ...r, note: e.target.value }))} required placeholder="Describe your findings..." /></div>
               <button className="btn btn-primary btn-full" type="submit" disabled={loading}>Submit Recommendation</button>

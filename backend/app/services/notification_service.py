@@ -153,6 +153,30 @@ NOTIFICATION_TEMPLATES = {
         "whatsapp": "✅ Delivered!",
         "email": "<h2>Delivered</h2><p>Rate your experience.</p>"
     },
+    "supplier_order_received": {
+        "title": "New Supplier Order",
+        "sms": "New supplier order #{ORDER_NUMBER} for {PRODUCT_NAME} (Qty: {QUANTITY}).",
+        "whatsapp": "📦 New supplier order #{ORDER_NUMBER}\n\nProduct: {PRODUCT_NAME}\nQuantity: {QUANTITY}",
+        "email": "<h2>New Supplier Order</h2><p>Order #{ORDER_NUMBER}</p><p>{PRODUCT_NAME} × {QUANTITY}</p>"
+    },
+    "supplier_order_shipped": {
+        "title": "Supplier Order Shipped",
+        "sms": "Supplier order #{ORDER_NUMBER} shipped. Tracking: {TRACKING_NUMBER}.",
+        "whatsapp": "🚚 Supplier order #{ORDER_NUMBER} shipped\n\nTracking: {TRACKING_NUMBER}",
+        "email": "<h2>Supplier Order Shipped</h2><p>Order #{ORDER_NUMBER}</p><p>Tracking: {TRACKING_NUMBER}</p>"
+    },
+    "supplier_order_delivered": {
+        "title": "Supplier Order Delivered",
+        "sms": "Supplier order #{ORDER_NUMBER} delivered.",
+        "whatsapp": "✅ Supplier order #{ORDER_NUMBER} delivered.",
+        "email": "<h2>Supplier Order Delivered</h2><p>Order #{ORDER_NUMBER} has been delivered.</p>"
+    },
+    "supplier_payment_received": {
+        "title": "Supplier Payment Received",
+        "sms": "${AMOUNT} received for supplier order #{ORDER_NUMBER}.",
+        "whatsapp": "💰 ${AMOUNT} received for supplier order #{ORDER_NUMBER}.",
+        "email": "<h2>Supplier Payment Received</h2><p>${AMOUNT} received for order #{ORDER_NUMBER}.</p>"
+    },
     
     # Verification & KYC
     "id_approved": {
@@ -257,10 +281,10 @@ class NotificationService:
     def _channels_for_priority(priority: str) -> list[str]:
         level = (priority or "important").lower()
         if level == "critical":
-            return ["in_app", "whatsapp", "sms", "email"]
+            return ["whatsapp", "sms", "email"]
         if level == "informational":
-            return ["in_app"]
-        return ["in_app", "email"]
+            return ["email"]
+        return ["email", "sms"]
 
     @staticmethod
     async def dispatch_event(
@@ -331,10 +355,6 @@ class NotificationService:
                 status="sent" if em_ok else "failed",
             ))
 
-        # In-app channel placeholder for current architecture.
-        # This keeps flows explicit even before a persisted in-app center is wired.
-        if "in_app" in channels:
-            results["channels"]["in_app"] = True
         db.commit()
 
         return results
@@ -365,8 +385,7 @@ class NotificationService:
         """Send email"""
         try:
             from app.services.email_service import EmailService
-            await EmailService.send_email(email, subject, body)
-            return True
+            return EmailService.send_email(email, subject, body)
         except Exception as e:
             logger.error(f"Email failed to {email}: {e}")
             return False
@@ -388,8 +407,8 @@ class NotificationService:
         """Send notification via all channels"""
         
         if template_key not in NOTIFICATION_TEMPLATES:
-            logger.warning(f"Unknown template: {template_key}")
-            return {}
+            logger.error(f"Unknown template: {template_key}")
+            raise ValueError(f"Unknown notification template: {template_key}")
         
         template = NOTIFICATION_TEMPLATES[template_key]
         results = {}

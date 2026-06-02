@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, date
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, AliasChoices
 from typing import Optional, List
 
 from app.models.listing import ListingStatus, OfferStatus, Sector, LogisticsType
@@ -29,7 +29,9 @@ class ListingCreate(BaseModel):
 class OfferCreate(BaseModel):
     currency: str = Field(default="USD")
     logistics_type: LogisticsType = Field(default=LogisticsType.PLATFORM)
-    buyer_message: Optional[str] = Field(default=None, max_length=500)
+    buyer_message: Optional[str] = Field(default=None, max_length=500, validation_alias=AliasChoices("buyer_message", "message"))
+    offered_quantity_kg: Optional[float] = Field(default=None, gt=0, validation_alias=AliasChoices("offered_quantity_kg", "quantity"))
+    offered_price_per_kg: Optional[float] = Field(default=None, gt=0, validation_alias=AliasChoices("offered_price_per_kg", "price_per_unit", "offered_price"))
 
 
 class CounterOfferRequest(BaseModel):

@@ -77,9 +77,29 @@ def super_admin_login(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    return super_admin_service.login_step_1(
+    # Rate limiting check
+    client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
+    from app.services.cache_service import cache_service
+    rate_limit_key = f"super_admin_login_rate:{client_ip}"
+    attempts = cache_service.get(rate_limit_key)
+    if attempts and int(attempts) >= 10:
+        logger.warning("SECURITY | Super admin login rate limit exceeded | ip=%s", client_ip)
+        raise HTTPException(
+            status_code=429,
+            detail="Too many login attempts. Please try again later."
+        )
+    
+    result = super_admin_service.login_step_1(
         db, request=request, username=body.username, password=body.password
     )
+    
+    # Increment rate limit counter on successful password verification (even if MFA fails later)
+    if not cache_service.get(rate_limit_key):
+        cache_service.set(rate_limit_key, 1, expire=300)  # 5 minutes window
+    else:
+        cache_service.set(rate_limit_key, int(attempts) + 1, expire=300)
+    
+    return result
 
 
 @router.post("/verify-mfa", response_model=SuperAdminTokenResponse)
@@ -147,16 +167,13 @@ def create_super_admin_account(
 
 @router.post("/register-initial")
 async def register_initial_super_admin(
-    username: str = Query(...),
-    email: str = Query(...),
-    password: str = Query(...),
-    phone_number: str = Query(None),
+    body: SuperAdminCreateRequest,
     db: Session = Depends(get_db),
 ):
     """
     Register the initial super admin account with automatic MFA setup.
     This endpoint is only allowed when no super admins exist in the database.
-    Returns MFA setup information including QR code data.
+    Returns MFA setup QR code (secret is stored securely, not exposed).
     """
     # Check if any super admins already exist
     existing_count = db.query(SuperAdmin).count()
@@ -168,7 +185,7 @@ async def register_initial_super_admin(
     
     # Check for duplicate username/email
     existing = db.query(SuperAdmin).filter(
-        (SuperAdmin.username == username) | (SuperAdmin.email == email)
+        (SuperAdmin.username == body.username) | (SuperAdmin.email == body.email)
     ).first()
     if existing:
         raise HTTPException(
@@ -179,11 +196,11 @@ async def register_initial_super_admin(
     # Create super admin account
     super_admin = super_admin_service.seed_super_admin(
         db,
-        username=username,
-        email=email,
-        password=password,
-        phone_number=phone_number,
-        ip_whitelist=[],
+        username=body.username,
+        email=body.email,
+        password=body.password,
+        phone_number=body.phone_number,
+        ip_whitelist=body.ip_whitelist or [],
     )
     
     # Generate MFA secret
@@ -194,7 +211,7 @@ async def register_initial_super_admin(
     
     secret = pyotp.random_base32(32)
     totp = pyotp.TOTP(secret, interval=30)
-    account_name = email or phone_number
+    account_name = body.email or body.phone_number
     provisioning_uri = totp.provisioning_uri(
         name=account_name,
         issuer_name="ZimAgriTrust",
@@ -209,7 +226,7 @@ async def register_initial_super_admin(
     img.save(buffer, format="PNG")
     qr_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
     
-    # Store MFA secret
+    # Store MFA secret (NEVER expose in response)
     super_admin.hardware_mfa_secret = secret
     db.commit()
     
@@ -219,9 +236,9 @@ async def register_initial_super_admin(
         "email": super_admin.email,
         "phone_number": super_admin.phone_number,
         "mfa_setup": {
-            "secret": secret,
             "provisioning_uri": provisioning_uri,
             "qr_code_base64": qr_base64,
+            "instruction": "Scan this QR code with your authenticator app. The secret is stored securely in the database."
         }
     }
 

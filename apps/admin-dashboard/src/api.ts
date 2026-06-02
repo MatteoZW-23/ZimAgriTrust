@@ -152,13 +152,6 @@ export function verifyMFA(code) {
   });
 }
 
-export function loginPin(phone_number, password) {
-  return request("/auth/login-pin", {
-    method: "POST",
-    body: JSON.stringify({ phone_number, password }),
-  });
-}
-
 export function verifyLogin2FA(phone_number, otp) {
   return request("/admin/verify-mfa", {
     method: "POST",
@@ -602,6 +595,35 @@ export const forceEscrowRefund = async (orderId, reason, token) => {
 export const fetchUsers = async (token) => {
   return request("/admin/users", {
     headers: { Authorization: `Bearer ${token}` }
+  });
+};
+
+export const fetchTickets = async (token) => {
+  return request("/tickets", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+};
+
+export const assignTicket = async (token, ticketId, assigneeId) => {
+  return request(`/tickets/${ticketId}/assign?assignee_id=${encodeURIComponent(assigneeId)}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+};
+
+export const replyToTicket = async (token, ticketId, message) => {
+  return request(`/tickets/${ticketId}/reply`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ message })
+  });
+};
+
+export const updateTicket = async (token, ticketId, payload) => {
+  return request(`/tickets/${ticketId}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
   });
 };
 

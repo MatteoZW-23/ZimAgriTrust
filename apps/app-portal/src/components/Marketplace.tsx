@@ -1,11 +1,17 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useListingStore, Card, Input, Button } from '@agritrust/shared';
+import { useListingStore, useAuthStore, Button } from '@agritrust/shared';
 import { Search, Filter, MapPin, Tag, ShoppingCart, Heart } from 'lucide-react';
+import { placeOffer } from '../api';
 
 export const Marketplace: React.FC = () => {
+  const { user } = useAuthStore();
   const { listings, loading, fetchListings } = useListingStore();
   const [search, setSearch] = useState('');
   const [province, setProvince] = useState('');
+  const [selectedListing, setSelectedListing] = useState<any | null>(null);
+  const [offerQuantity, setOfferQuantity] = useState('');
+  const [offerPrice, setOfferPrice] = useState('');
+  const [submittingOffer, setSubmittingOffer] = useState(false);
 
   useEffect(() => {
     fetchListings();
@@ -18,6 +24,31 @@ export const Marketplace: React.FC = () => {
     ),
     [listings, search, province]
   );
+
+  const openListing = useCallback((listing: any) => {
+    setSelectedListing(listing);
+    setOfferQuantity(String(Number(listing.quantity || 0)));
+    setOfferPrice(String(Number(listing.price_per_unit || 0)));
+  }, []);
+
+  const handleOfferSubmit = useCallback(async () => {
+    if (!selectedListing) return;
+    setSubmittingOffer(true);
+    try {
+      await placeOffer(selectedListing.id, {
+        quantity: Number(offerQuantity || 0),
+        price_per_unit: Number(offerPrice || 0),
+        logistics_type: 'PLATFORM',
+        buyer_message: `Portal offer for ${offerQuantity} ${selectedListing.quantity_unit || 'kg'} at ${offerPrice} ${selectedListing.currency || 'USD'} per ${selectedListing.quantity_unit || 'kg'}.`,
+      });
+      setSelectedListing(null);
+      await fetchListings();
+    } catch (error) {
+      console.error('Offer submission failed:', error);
+    } finally {
+      setSubmittingOffer(false);
+    }
+  }, [fetchListings, offerPrice, offerQuantity, selectedListing]);
 
   const renderListingCard = useCallback((l: any) => (
     <div key={l.id} className="group relative overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm hover:shadow-xl transition-all duration-300">
@@ -59,12 +90,17 @@ export const Marketplace: React.FC = () => {
           <Tag size={14} />
           <span className="text-xs font-medium">{l.quantity} kg available</span>
         </div>
-        <Button fullWidth size="sm" className="bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-blue-600 hover:text-white transition-all">
+        <Button
+          fullWidth
+          size="sm"
+          onClick={() => openListing(l)}
+          className="bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-blue-600 hover:text-white transition-all"
+        >
           View Details
         </Button>
       </div>
     </div>
-  ), []);
+  ), [openListing]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -125,6 +161,77 @@ export const Marketplace: React.FC = () => {
           </div>
         )}
       </div>
+
+      {selectedListing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{selectedListing.crop_type || selectedListing.product_type}</h3>
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  {selectedListing.location || selectedListing.location_district || selectedListing.location_province || 'Zimbabwe'} • {selectedListing.quantity} {selectedListing.quantity_unit || 'kg'} available
+                </p>
+              </div>
+              <button onClick={() => setSelectedListing(null)} className="text-sm font-semibold text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white">
+                Close
+              </button>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div className="rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Listing details</p>
+                <div className="mt-4 space-y-3 text-sm text-gray-700 dark:text-gray-300">
+                  <div className="flex justify-between"><span>Grade</span><span className="font-semibold">{selectedListing.grade || 'Standard'}</span></div>
+                  <div className="flex justify-between"><span>Asking price</span><span className="font-semibold">${Number(selectedListing.price_per_unit || 0).toFixed(2)}/{selectedListing.quantity_unit || 'kg'}</span></div>
+                  <div className="flex justify-between"><span>Seller trust</span><span className="font-semibold">{selectedListing.seller_trust_score || 0}/100</span></div>
+                </div>
+              </div>
+
+              {user?.role === 'buyer' ? (
+                <div className="rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
+                  <p className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Make crop offer</p>
+                  <div className="mt-4 space-y-4">
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Quantity ({selectedListing.quantity_unit || 'kg'})</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={offerQuantity}
+                        onChange={(e) => setOfferQuantity(e.target.value)}
+                        className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Offer price per {selectedListing.quantity_unit || 'kg'}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={offerPrice}
+                        onChange={(e) => setOfferPrice(e.target.value)}
+                        className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </label>
+                    <p className="rounded-xl bg-green-50 px-4 py-3 text-sm text-green-800 dark:bg-green-900/20 dark:text-green-300">
+                      Escrow is only funded after the farmer accepts your offer.
+                    </p>
+                    <Button onClick={handleOfferSubmit} disabled={submittingOffer} className="bg-blue-600 hover:bg-blue-700">
+                      {submittingOffer ? 'Submitting...' : 'Submit Offer'}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
+                  <p className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Trade status</p>
+                  <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
+                    Buyers can negotiate price and quantity here. Once you accept an offer, escrow funding and delivery setup begin automatically.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

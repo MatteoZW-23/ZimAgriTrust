@@ -122,8 +122,13 @@ export const acceptBidResponse = (responseId: string) => request(`/procurement/r
 
 // ── Orders / Transactions ─────────────────────────────────────────────────────
 export const getMyOrders = () => request("/transactions");
+export const getMySupplierOrders = () => request("/suppliers/public/orders");
+export const confirmSupplierOrderReceipt = (orderId: string) =>
+  request(`/suppliers/public/orders/${orderId}/confirm-receipt`, { method: "POST" });
 export const raiseDispute = (id: string, reason: string) =>
-  request("/disputes", { method: "POST", body: JSON.stringify({ transaction_id: id, reason }) });
+  request("/disputes", { method: "POST", body: JSON.stringify({ order_id: id, type: "quality", description: reason }) });
+export const submitOrderReview = (orderId: string, rating: number, comment?: string) =>
+  request(`/transactions/${orderId}/review`, { method: "POST", body: JSON.stringify({ rating, comment }) });
 
 // ── Wallet & Deposits ─────────────────────────────────────────────────────────
 export const getWalletBalance = () => request("/wallet/balance");
@@ -173,8 +178,16 @@ export const cancelSubscription = () => request("/subscriptions/cancel", { metho
 // Support Tickets (standalone, beyond disputes)
 export const createTicket = (subject: string, description: string) =>
   request("/tickets", { method: "POST", body: JSON.stringify({ subject, description }) });
+export const getTickets = () => request("/tickets");
+export const getTicket = (ticketId: string) => request(`/tickets/${ticketId}`);
 export const assignTicket = (ticketId: string, assigneeId: string) =>
   request(`/tickets/${ticketId}/assign?assignee_id=${encodeURIComponent(assigneeId)}`, { method: "POST" });
+export const replyToTicket = (ticketId: string, message: string) =>
+  request(`/tickets/${ticketId}/reply`, { method: "POST", body: JSON.stringify({ message }) });
+export const updateTicket = (
+  ticketId: string,
+  data: { status?: string; resolution_note?: string; satisfaction_rating?: number },
+) => request(`/tickets/${ticketId}`, { method: "PATCH", body: JSON.stringify(data) });
 
 // ── Transport Payment System ───────────────────────────────────────────────────
 export const requestTransport = (data: Record<string, any>) =>
@@ -223,4 +236,8 @@ export const getSupplierProductDetail = (productId: string) =>
   request(`/suppliers/public/products/${productId}`);
 export const createSupplierOrder = (data: Record<string, any>) =>
   request("/suppliers/public/orders", { method: "POST", body: JSON.stringify(data) });
-export const getMySupplierOrders = () => request("/suppliers/public/orders");
+export const createSupplierReview = (orderId: string, rating: number, comment?: string) =>
+  request("/suppliers/reviews", {
+    method: "POST",
+    body: JSON.stringify({ order_id: orderId, rating, comment }),
+  });
