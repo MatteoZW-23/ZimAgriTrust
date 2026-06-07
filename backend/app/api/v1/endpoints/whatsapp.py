@@ -91,6 +91,11 @@ class MobilePaymentRequest(BaseModel):
     reference: str
     provider: str = "ecocash"
 
+class PaymentReceiptRequest(BaseModel):
+    transaction_id: str
+    amount: float
+    recipient: str
+
 class LocationShareRequest(BaseModel):
     latitude: float
     longitude: float
@@ -350,8 +355,21 @@ async def initiate_mobile_payment(request: MobilePaymentRequest, db: Session = D
 
 
 @router.post("/payment/receipt")
-async def send_payment_receipt(transaction_id: str, amount: float, recipient: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def send_payment_receipt(
+    receipt: Optional[PaymentReceiptRequest] = Body(default=None),
+    transaction_id: Optional[str] = None,
+    amount: Optional[float] = None,
+    recipient: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Send payment receipt to user"""
+    if receipt is not None:
+        transaction_id = receipt.transaction_id
+        amount = receipt.amount
+        recipient = receipt.recipient
+    if not transaction_id or amount is None or not recipient:
+        raise HTTPException(status_code=422, detail="transaction_id, amount, and recipient are required")
     await whatsapp_service.send_payment_receipt(db, current_user.phone_number, transaction_id, amount, recipient, datetime.now(timezone.utc))
     return {"success": True, "message": "Receipt sent"}
 

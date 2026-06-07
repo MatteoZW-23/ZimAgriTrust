@@ -83,7 +83,7 @@ def unified_search(
             })
 
     if kind in ("all", "inputs"):
-        iq = db.query(InputListing).filter(cast(InputListing.status, String) == InputListingStatus.ACTIVE.value)
+        iq = db.query(InputListing).filter(cast(InputListing.status, String) == InputListingStatus.active.value)
         iq = iq.filter(
             (InputListing.expiry_date.is_(None)) | (InputListing.expiry_date > datetime.now(timezone.utc))
         )

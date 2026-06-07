@@ -36,6 +36,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 
+def _enum_values(enum_cls):
+    return [member.value for member in enum_cls]
+
+
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
@@ -130,7 +134,7 @@ class InputListing(Base):
     registration_number: Mapped[Optional[str]] = mapped_column(String(80))
 
     status: Mapped[InputListingStatus] = mapped_column(
-        Enum(InputListingStatus), default=InputListingStatus.pending_verification, nullable=False, index=True
+        Enum(InputListingStatus, values_callable=_enum_values), default=InputListingStatus.pending_verification, nullable=False, index=True
     )
     verified_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
     verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
@@ -163,7 +167,7 @@ class InputOffer(Base):
     note: Mapped[Optional[str]] = mapped_column(Text)
 
     status: Mapped[InputOfferStatus] = mapped_column(
-        Enum(InputOfferStatus), default=InputOfferStatus.pending, nullable=False, index=True
+        Enum(InputOfferStatus, values_callable=_enum_values), default=InputOfferStatus.pending, nullable=False, index=True
     )
     decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     decision_notes: Mapped[Optional[str]] = mapped_column(Text)
@@ -193,7 +197,7 @@ class InputOrder(Base):
     currency: Mapped[str] = mapped_column(String(5), default="USD")
 
     status: Mapped[InputOrderStatus] = mapped_column(
-        Enum(InputOrderStatus), default=InputOrderStatus.pending, nullable=False, index=True
+        Enum(InputOrderStatus, values_callable=_enum_values), default=InputOrderStatus.pending, nullable=False, index=True
     )
 
     is_bulk: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -217,12 +221,12 @@ class InputReport(Base):
     listing_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("input_listings.id"), nullable=False, index=True)
     reporter_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
 
-    reason: Mapped[InputReportReason] = mapped_column(Enum(InputReportReason), nullable=False)
+    reason: Mapped[InputReportReason] = mapped_column(Enum(InputReportReason, values_callable=_enum_values), nullable=False)
     details: Mapped[Optional[str]] = mapped_column(Text)
     evidence_urls: Mapped[Optional[list]] = mapped_column(JSON, default=list)
 
     status: Mapped[InputReportStatus] = mapped_column(
-        Enum(InputReportStatus), default=InputReportStatus.open, nullable=False, index=True
+        Enum(InputReportStatus, values_callable=_enum_values), default=InputReportStatus.open, nullable=False, index=True
     )
     resolved_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
     resolution_notes: Mapped[Optional[str]] = mapped_column(Text)

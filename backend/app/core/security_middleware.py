@@ -78,7 +78,9 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                 pass
 
         # 4. Content-Type validation for mutating API endpoints
-        if method in ("POST", "PUT", "PATCH", "DELETE") and path.startswith("/api/"):
+        content_length_value = request.headers.get("Content-Length")
+        has_request_body = bool(content_length_value and content_length_value != "0")
+        if method in ("POST", "PUT", "PATCH", "DELETE") and path.startswith("/api/") and has_request_body:
             ct = request.headers.get("Content-Type", "").lower()
             if not ct.startswith("multipart/"):
                 allowed = {"application/json", "application/x-www-form-urlencoded", "text/plain"}

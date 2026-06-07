@@ -217,15 +217,25 @@ def farmer_respond_to_request(db: Session, farmer: User, request: BuyerRequest, 
 def accept_farmer_response(db: Session, response: FarmerResponse) -> Order:
     response.status = "accepted"
     response.request.status = "filled"
+    delivery_location = response.request.delivery_location or "Zimbabwe"
+    location_parts = [part.strip() for part in delivery_location.split(",") if part.strip()]
+    location_province = location_parts[-1] if location_parts else "Zimbabwe"
+    location_district = location_parts[0] if len(location_parts) > 1 else None
 
     # Create Virtual Listing
     virtual_listing = Listing(
         seller_id=response.farmer_id,
-        sector=Sector.MIXED_FARMING,
+        sector=Sector(response.request.sector) if response.request.sector else Sector.MIXED_FARMING,
         product_type=response.request.product_type,
+        title=f"{response.request.product_type} request fulfillment",
+        description=f"Fulfillment for buyer request {response.request_id}",
         quantity=response.supply_quantity,
+        quantity_unit=response.request.quantity_unit or "units",
         price_per_unit=response.bid_price,
         currency=response.currency,
+        location=delivery_location,
+        location_province=location_province,
+        location_district=location_district,
         status=ListingStatus.SOLD,
         notes=f"Buyer Request {response.request_id} Fulfillment"
     )

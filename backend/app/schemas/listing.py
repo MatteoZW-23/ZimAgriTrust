@@ -15,9 +15,9 @@ class ListingCreate(BaseModel):
     quantity_unit: str = Field(default="kg")
     price_per_unit: float = Field(gt=0)
     currency: str = Field(default="USD")
-    location_province: Optional[str] = Field(default=None, max_length=50)
-    location_district: Optional[str] = Field(default=None, max_length=50)
-    pickup_address: Optional[str] = Field(default=None)
+    location_province: Optional[str] = Field(default=None, max_length=50, validation_alias=AliasChoices("location_province", "province"))
+    location_district: Optional[str] = Field(default=None, max_length=50, validation_alias=AliasChoices("location_district", "district"))
+    pickup_address: Optional[str] = Field(default=None, validation_alias=AliasChoices("pickup_address", "location"))
     
     # New Quality Fields
     is_perishable: bool = Field(default=False)

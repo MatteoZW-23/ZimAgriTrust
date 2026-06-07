@@ -57,7 +57,7 @@ class Order(Base):
     __tablename__ = "orders"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    offer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("offers.id"), nullable=False, index=True)
+    offer_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("offers.id"), nullable=True, index=True)
     listing_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("listings.id"), nullable=False, index=True)
     buyer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     seller_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
@@ -193,11 +193,18 @@ class Transaction(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
 
     type: Mapped[TransactionType] = mapped_column(Enum(TransactionType), nullable=False)
+    transaction_type: Mapped[str] = mapped_column(String(50), nullable=False)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     currency: Mapped[str] = mapped_column(String(5), default="USD")
     status: Mapped[str] = mapped_column(String(20), default="completed") # pending, completed, failed
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not getattr(self, "transaction_type", None) and getattr(self, "type", None):
+            value = getattr(self.type, "value", self.type)
+            self.transaction_type = str(value)
 
 
 class TransportSurvey(Base):

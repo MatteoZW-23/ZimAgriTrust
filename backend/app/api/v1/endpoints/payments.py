@@ -606,8 +606,12 @@ def create_payout_method(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    method_type = PayoutMethodType(payload.method_type.lower())
-    provider = PayoutMethodProvider(payload.provider.lower())
+    provider_value = payload.provider.lower()
+    method_value = payload.method_type.lower()
+    if method_value in {"mobile_money", "mobile"}:
+        method_value = provider_value
+    method_type = PayoutMethodType(method_value)
+    provider = PayoutMethodProvider(provider_value)
     if method_type in (PayoutMethodType.BANK_ACCOUNT, PayoutMethodType.BANK_TRANSFER) and not (payload.bank_name and payload.account_number and payload.branch_code):
         raise HTTPException(status_code=400, detail="Bank account requires bank_name, account_name, account_number, and branch_code")
     if method_type in (PayoutMethodType.ECOCASH, PayoutMethodType.ONEMONEY, PayoutMethodType.INNBUCKS, PayoutMethodType.OMARI) and not payload.account_number:

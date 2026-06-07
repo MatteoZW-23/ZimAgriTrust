@@ -7,13 +7,17 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, List
 
+from sqlalchemy import String, cast, or_
 from sqlalchemy.orm import Session
 
 from app.models.input_marketplace import (
     InputCategory,
     InputListing,
     InputOffer,
+    InputListingStatus,
+    InputOfferStatus,
     InputOrder,
+    InputOrderStatus,
     InputPriceAlert,
     InputReport,
     InputReportReason,
@@ -133,34 +137,80 @@ def get_listing(db: Session, listing_id: uuid.UUID) -> Optional[InputListing]:
     return db.query(InputListing).filter(InputListing.id == listing_id).first()
 
 
+def search_listings(
+    db: Session,
+    q: Optional[str] = None,
+    category_id: Optional[int] = None,
+    brand: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    verified_only: bool = False,
+    province: Optional[str] = None,
+    seller_id: Optional[uuid.UUID] = None,
+    include_expired: bool = False,
+    limit: int = 50,
+    offset: int = 0,
+) -> List[InputListing]:
+    """Search input listings with filters used by the API endpoint."""
+    query = db.query(InputListing)
+
+    if not include_expired:
+        query = query.filter(cast(InputListing.status, String) != InputListingStatus.removed.value)
+
+    if q:
+        term = f"%{q.strip()}%"
+        if term != "%%":
+            query = query.filter(
+                or_(
+                    InputListing.product_name.ilike(term),
+                    InputListing.brand.ilike(term),
+                    InputListing.description.ilike(term),
+                )
+            )
+
+    if category_id:
+        query = query.filter(InputListing.category_id == category_id)
+
+    if brand:
+        query = query.filter(InputListing.brand.ilike(f"%{brand.strip()}%"))
+
+    if province:
+        query = query.filter(InputListing.province.ilike(f"%{province.strip()}%"))
+
+    if seller_id:
+        query = query.filter(InputListing.seller_id == seller_id)
+
+    if min_price is not None:
+        query = query.filter(InputListing.price_per_unit >= min_price)
+
+    if max_price is not None:
+        query = query.filter(InputListing.price_per_unit <= max_price)
+
+    if verified_only:
+        query = query.filter(InputListing.verified_at.isnot(None))
+
+    return query.order_by(InputListing.created_at.desc()).offset(offset).limit(limit).all()
+
+
 def list_listings(
     db: Session,
-    category_id: Optional[uuid.UUID] = None,
+    category_id: Optional[int] = None,
     location_district: Optional[str] = None,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     active_only: bool = True,
     limit: int = 100,
 ) -> List[InputListing]:
-    """List input listings with filters."""
-    query = db.query(InputListing)
-    
-    if active_only:
-        query = query.filter(InputListing.is_active == True)
-    
-    if category_id:
-        query = query.filter(InputListing.category_id == category_id)
-    
-    if location_district:
-        query = query.filter(InputListing.location_district == location_district)
-    
-    if min_price:
-        query = query.filter(InputListing.price_per_unit >= min_price)
-    
-    if max_price:
-        query = query.filter(InputListing.price_per_unit <= max_price)
-    
-    return query.order_by(InputListing.created_at.desc()).limit(limit).all()
+    """Backward-compatible listing helper."""
+    return search_listings(
+        db,
+        category_id=category_id,
+        province=location_district,
+        min_price=min_price,
+        max_price=max_price,
+        include_expired=not active_only,
+        limit=limit,
+    )
 
 
 # Offers
@@ -171,14 +221,21 @@ def create_offer(
     offered_price_per_unit: float,
     quantity: float,
     message: Optional[str] = None,
+    note: Optional[str] = None,
 ) -> InputOffer:
     """Create an offer on an input listing."""
+    listing = db.query(InputListing).filter(InputListing.id == listing_id).first()
+    if not listing:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Input listing not found")
     offer = InputOffer(
         buyer_id=buyer.id,
         listing_id=listing_id,
         offered_price_per_unit=offered_price_per_unit,
         quantity=quantity,
-        message=message,
+        total_amount=round(float(offered_price_per_unit) * float(quantity), 2),
+        currency=listing.currency,
+        note=note if note is not None else message,
         status="pending",
     )
     db.add(offer)
@@ -237,6 +294,113 @@ def create_order(
     db.add(order)
     db.commit()
     db.refresh(order)
+    return order
+
+
+def accept_offer(
+    db: Session,
+    seller: User,
+    offer_id: uuid.UUID,
+    delivery_address: Optional[str] = None,
+) -> InputOrder:
+    offer = db.query(InputOffer).filter(InputOffer.id == offer_id).first()
+    listing = db.query(InputListing).filter(InputListing.id == offer.listing_id).first() if offer else None
+    if not offer or not listing or listing.seller_id != seller.id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Offer not found")
+    if str(offer.status) not in {"pending", "InputOfferStatus.pending"}:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Offer is not pending")
+
+    subtotal = round(float(offer.total_amount), 2)
+    platform_fee = round(subtotal * 0.05, 2)
+    escrow_fee = 0.0
+    total = round(subtotal + escrow_fee, 2)
+    seller_payout = round(subtotal - platform_fee, 2)
+
+    offer.status = InputOfferStatus.accepted
+    offer.decided_at = datetime.now(timezone.utc)
+    order = InputOrder(
+        offer_id=offer.id,
+        listing_id=offer.listing_id,
+        seller_id=listing.seller_id,
+        buyer_id=offer.buyer_id,
+        order_number=f"INP-{uuid.uuid4().hex[:8].upper()}",
+        quantity=offer.quantity,
+        unit_price=offer.offered_price_per_unit,
+        subtotal=subtotal,
+        platform_fee=platform_fee,
+        escrow_fee=escrow_fee,
+        total_amount=total,
+        seller_payout=seller_payout,
+        currency=offer.currency,
+        status=InputOrderStatus.pending,
+        delivery_address=delivery_address,
+    )
+    db.add(order)
+    db.flush()
+    return order
+
+
+def reject_offer(
+    db: Session,
+    seller: User,
+    offer_id: uuid.UUID,
+    reason: Optional[str] = None,
+) -> InputOffer:
+    offer = db.query(InputOffer).filter(InputOffer.id == offer_id).first()
+    listing = db.query(InputListing).filter(InputListing.id == offer.listing_id).first() if offer else None
+    if not offer or not listing or listing.seller_id != seller.id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Offer not found")
+    offer.status = InputOfferStatus.rejected
+    offer.decided_at = datetime.now(timezone.utc)
+    offer.decision_notes = reason
+    return offer
+
+
+def withdraw_offer(db: Session, buyer: User, offer_id: uuid.UUID) -> InputOffer:
+    offer = db.query(InputOffer).filter(InputOffer.id == offer_id, InputOffer.buyer_id == buyer.id).first()
+    if not offer:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Offer not found")
+    offer.status = InputOfferStatus.withdrawn
+    offer.decided_at = datetime.now(timezone.utc)
+    return offer
+
+
+def mark_shipped(
+    db: Session,
+    seller: User,
+    order_id: uuid.UUID,
+    tracking_number: Optional[str] = None,
+) -> InputOrder:
+    order = db.query(InputOrder).filter(InputOrder.id == order_id, InputOrder.seller_id == seller.id).first()
+    if not order:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Order not found")
+    order.status = InputOrderStatus.shipped
+    order.tracking_number = tracking_number
+    order.shipped_at = datetime.now(timezone.utc)
+    return order
+
+
+def confirm_delivery(
+    db: Session,
+    buyer: User,
+    order_id: uuid.UUID,
+    rating: Optional[int] = None,
+    review: Optional[str] = None,
+) -> InputOrder:
+    order = db.query(InputOrder).filter(InputOrder.id == order_id, InputOrder.buyer_id == buyer.id).first()
+    if not order:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Order not found")
+    order.status = InputOrderStatus.completed
+    order.delivered_at = order.delivered_at or datetime.now(timezone.utc)
+    order.confirmed_at = datetime.now(timezone.utc)
+    order.review_rating = rating
+    order.review_text = review
     return order
 
 

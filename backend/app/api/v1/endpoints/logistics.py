@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
 from sqlalchemy import desc
@@ -128,6 +128,13 @@ class SetMethodPayload(BaseModel):
     pickup_address: Optional[str] = None
     delivery_address: Optional[str] = None
     pickup_scheduled_at: Optional[datetime] = None
+
+    @field_validator("method", mode="before")
+    @classmethod
+    def normalize_method(cls, value):
+        if value == "PLATFORM":
+            return DeliveryMethod.THIRD_PARTY
+        return value
 
 
 class AssignAgentPayload(BaseModel):

@@ -9,7 +9,7 @@ from app.models.transaction import OrderStatus, TransactionType
 class OrderResponse(BaseModel):
     id: uuid.UUID
     order_number: str
-    offer_id: uuid.UUID
+    offer_id: Optional[uuid.UUID] = None
     listing_id: uuid.UUID
     buyer_id: uuid.UUID
     seller_id: uuid.UUID

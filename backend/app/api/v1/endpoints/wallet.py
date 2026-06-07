@@ -4,6 +4,7 @@ Thin delegation layer on top of the existing wallet_service and payment_service.
 """
 from __future__ import annotations
 import logging
+import uuid
 
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -13,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_current_user
 from app.models.user import User
 from app.services.wallet_service import wallet_service
+from app.api.v1.endpoints import payments as payment_endpoints
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -159,6 +161,60 @@ def wallet_history(
         ]
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/payout-methods", response_model=list[payment_endpoints.PayoutMethodResponse])
+def list_payout_methods(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return payment_endpoints.list_payout_methods(db=db, current_user=current_user)
+
+
+@router.post("/payout-methods", response_model=payment_endpoints.PayoutMethodResponse, status_code=status.HTTP_201_CREATED)
+def create_payout_method(
+    payload: payment_endpoints.PayoutMethodCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return payment_endpoints.create_payout_method(payload=payload, db=db, current_user=current_user)
+
+
+@router.patch("/payout-methods/{method_id}", response_model=payment_endpoints.PayoutMethodResponse)
+def update_payout_method(
+    method_id: uuid.UUID,
+    payload: payment_endpoints.PayoutMethodUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return payment_endpoints.update_payout_method(method_id=method_id, payload=payload, db=db, current_user=current_user)
+
+
+@router.delete("/payout-methods/{method_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_payout_method(
+    method_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return payment_endpoints.delete_payout_method(method_id=method_id, db=db, current_user=current_user)
+
+
+@router.post("/payout-methods/{method_id}/verify", response_model=payment_endpoints.PayoutMethodResponse)
+def verify_payout_method(
+    method_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return payment_endpoints.verify_payout_method(method_id=method_id, db=db, current_user=current_user)
+
+
+@router.post("/payout-methods/{method_id}/default", response_model=payment_endpoints.PayoutMethodResponse)
+def set_default_payout_method(
+    method_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return payment_endpoints.set_default_payout_method(method_id=method_id, db=db, current_user=current_user)
 
 
 @router.get("/summary", summary="Wallet summary with earnings breakdown")
