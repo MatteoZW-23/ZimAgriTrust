@@ -24,6 +24,18 @@ logger = logging.getLogger(__name__)
 INSPECTION_WINDOW_HOURS = 24
 
 
+def _ensure_order_fulfillment_agent(db: Session, order_id: uuid.UUID) -> None:
+    """
+    Ensure there is a field agent assignment for non-self-collect orders.
+    """
+    try:
+        from app.services.agent_assignment import AgentAssignmentService
+
+        AgentAssignmentService(db).assign_agent_to_order(order_id)
+    except Exception as exc:
+        logger.warning("Could not create order-fulfillment assignment for order %s: %s", order_id, exc)
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _get_delivery(db: Session, order_id: uuid.UUID) -> OrderDelivery:
@@ -84,6 +96,9 @@ def set_delivery_method(
     delivery.delivery_address = delivery_address
     delivery.pickup_scheduled_at = pickup_scheduled_at
     _transition(delivery, DeliveryStatus.PICKUP_SCHEDULED, db)
+
+    if method != DeliveryMethod.BUYER_COLLECTS:
+        _ensure_order_fulfillment_agent(db, order_id)
 
     _notify_method_confirmed(db, order_id, method)
     return delivery

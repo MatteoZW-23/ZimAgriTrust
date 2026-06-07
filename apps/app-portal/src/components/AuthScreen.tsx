@@ -32,7 +32,9 @@ export const AuthScreen: React.FC = () => {
     setError('');
     setSuccess('');
     try {
-      const data = await apiLogin(formData.phone, formData.pin);
+      // Format phone number with country code
+      const phoneNumber = formData.phone.startsWith('+') ? formData.phone : `+263${formData.phone}`;
+      const data = await apiLogin(phoneNumber, formData.pin);
       const token = data?.access_token || data?.token;
       if (!token) throw new Error('No token received');
 
@@ -41,16 +43,16 @@ export const AuthScreen: React.FC = () => {
         const profile = await getProfile();
         login({
           id: profile.id || data.user?.id || '1',
-          phone: profile.phone_number || formData.phone,
-          full_name: profile.full_name || data.user?.full_name || formData.phone,
+          phone: profile.phone_number || phoneNumber,
+          full_name: profile.full_name || data.user?.full_name || phoneNumber,
           role: profile.role || data.user?.role || 'farmer',
           trust_score: profile.trust_score ?? data.user?.trust_score ?? 0,
         }, token);
       } catch {
         login({
           id: data.user?.id || '1',
-          phone: data.user?.phone_number || formData.phone,
-          full_name: data.user?.full_name || formData.phone,
+          phone: data.user?.phone_number || phoneNumber,
+          full_name: data.user?.full_name || phoneNumber,
           role: data.user?.role || 'farmer',
           trust_score: data.user?.trust_score ?? 0,
         }, token);
@@ -68,12 +70,14 @@ export const AuthScreen: React.FC = () => {
     setError('');
     setSuccess('');
     try {
-      const data = await apiRegister(formData.fullName, formData.phone, formData.role, formData.pin);
+      // Format phone number with country code
+      const phoneNumber = formData.phone.startsWith('+') ? formData.phone : `+263${formData.phone}`;
+      const data = await apiRegister(formData.fullName, phoneNumber, formData.role, formData.pin);
       const token = data?.access_token || data?.token;
       if (token) {
         login({
           id: data.user?.id || '1',
-          phone: formData.phone,
+          phone: phoneNumber,
           full_name: formData.fullName,
           role: formData.role,
           trust_score: data.user?.trust_score ?? 0,

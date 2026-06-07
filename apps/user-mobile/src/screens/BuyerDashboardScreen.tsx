@@ -780,7 +780,7 @@ function ActionCard({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.colors.gray50,
   },
 
   content: {
@@ -789,19 +789,19 @@ const styles = StyleSheet.create({
 
   hero: {
     backgroundColor: '#0F172A',
-    borderBottomLeftRadius: 40,
-    borderBottomRightRadius: 40,
+    borderBottomLeftRadius: 48,
+    borderBottomRightRadius: 48,
     padding: 32,
     paddingTop: 60,
-    paddingBottom: 40,
+    paddingBottom: 46,
     shadowColor: '#0F172A',
     shadowOffset: {
       width: 0,
-      height: 6,
+      height: 14,
     },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 8,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -833,17 +833,18 @@ const styles = StyleSheet.create({
 
   title: {
     color: '#FFFFFF',
-    fontSize: 32,
-    lineHeight: 38,
+    fontSize: 34,
+    lineHeight: 40,
     fontWeight: '900',
     marginBottom: 12,
+    letterSpacing: -0.8,
   },
 
   subtitle: {
     color: '#94A3B8',
     fontSize: 15,
-    lineHeight: 22,
-    fontWeight: '500',
+    lineHeight: 24,
+    fontWeight: '600',
     maxWidth: '85%',
   },
 
@@ -852,29 +853,31 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    marginTop: -20,
+    marginTop: -24,
   },
 
   metricCard: {
     width: '48%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 12,
-    shadowColor: '#000',
+    borderRadius: 28,
+    padding: 22,
+    marginBottom: 14,
+    shadowColor: '#0F172A',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 12,
     },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#EAF0F6',
   },
 
   metricIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -882,9 +885,10 @@ const styles = StyleSheet.create({
 
   metricValue: {
     color: '#0F172A',
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '900',
     marginBottom: 4,
+    letterSpacing: -0.6,
   },
 
   metricLabel: {
@@ -895,7 +899,7 @@ const styles = StyleSheet.create({
   },
 
   actionSection: {
-    marginTop: 32,
+    marginTop: 36,
   },
 
   sectionTitle: {
@@ -910,20 +914,20 @@ const styles = StyleSheet.create({
   },
 
   actionCard: {
-    width: 130,
-    height: 130,
-    borderRadius: 28,
-    padding: 16,
+    width: 138,
+    height: 138,
+    borderRadius: 30,
+    padding: 18,
     justifyContent: 'space-between',
     marginRight: 12,
-    shadowColor: '#000',
+    shadowColor: '#0F172A',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 12,
     },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    elevation: 8,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -935,9 +939,9 @@ const styles = StyleSheet.create({
   },
 
   actionIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor:
       'rgba(255,255,255,0.2)',
     justifyContent: 'center',
@@ -952,7 +956,7 @@ const styles = StyleSheet.create({
   },
 
   section: {
-    marginTop: 36,
+    marginTop: 40,
     paddingHorizontal: 24,
   },
 
@@ -971,17 +975,17 @@ const styles = StyleSheet.create({
 
   orderList: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 28,
-    shadowColor: '#000',
+    borderRadius: 32,
+    shadowColor: '#0F172A',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 12,
     },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 5,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: '#EAF0F6',
   },
 
   rowCard: {
@@ -991,9 +995,9 @@ const styles = StyleSheet.create({
   },
 
   rowIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 18,
     backgroundColor: '#ECFDF5',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1056,17 +1060,19 @@ const styles = StyleSheet.create({
   listingCard: {
     width: 160,
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 24,
     overflow: 'hidden',
     marginRight: 12,
-    shadowColor: '#000',
+    shadowColor: '#0F172A',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 10,
     },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#EAF0F6',
   },
 
   listingImagePlaceholder: {
@@ -1124,19 +1130,21 @@ const styles = StyleSheet.create({
 
   stateCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 28,
+    borderRadius: 32,
     padding: 40,
     marginHorizontal: 24,
     marginTop: 24,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: '#0F172A',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 12,
     },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#EAF0F6',
   },
 
   errorText: {
@@ -1149,9 +1157,14 @@ const styles = StyleSheet.create({
 
   primaryBtn: {
     backgroundColor: '#0EA5E9',
-    borderRadius: 16,
+    borderRadius: 18,
     paddingHorizontal: 24,
-    paddingVertical: 14,
+    paddingVertical: 15,
+    shadowColor: '#0EA5E9',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 6,
   },
 
   primaryText: {

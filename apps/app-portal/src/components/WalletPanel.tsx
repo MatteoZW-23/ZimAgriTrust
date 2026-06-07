@@ -5,8 +5,8 @@ import { Wallet, ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, X, AlertCi
 
 type PayoutMethod = {
   id: string;
-  method_type: 'ecocash' | 'onemoney' | 'bank_account';
-  provider: 'ecocash' | 'onemoney' | 'bank';
+  method_type: 'ecocash' | 'onemoney' | 'innbucks' | 'omari' | 'bank_account' | 'bank_transfer';
+  provider: 'ecocash' | 'onemoney' | 'innbucks' | 'omari' | 'bank' | 'bank_transfer';
   account_name: string;
   account_number?: string | null;
   bank_name?: string | null;
@@ -41,6 +41,8 @@ export const WalletPanel: React.FC = () => {
     branch_code: '',
     is_default: false,
   });
+
+  const mobileMoneyTypes = ['ecocash', 'onemoney', 'innbucks', 'omari'];
 
   const loadWallet = useCallback(async () => {
     setFetching(true);
@@ -247,10 +249,17 @@ export const WalletPanel: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Method Type</label>
-                  <select className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" value={methodForm.method_type} onChange={(e) => setMethodForm({ ...methodForm, method_type: e.target.value, provider: e.target.value === 'bank_account' ? 'bank' : e.target.value })}>
+                  <select className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" value={methodForm.method_type} onChange={(e) => {
+                    const nextType = e.target.value;
+                    const nextProvider = nextType === 'bank_account' ? 'bank' : nextType;
+                    setMethodForm({ ...methodForm, method_type: nextType, provider: nextProvider });
+                  }}>
                     <option value="ecocash">EcoCash</option>
                     <option value="onemoney">OneMoney</option>
+                    <option value="innbucks">Innbucks</option>
+                    <option value="omari">Omari</option>
                     <option value="bank_account">Bank Account</option>
+                    <option value="bank_transfer">Bank Transfer</option>
                   </select>
                 </div>
                 <div>
@@ -258,12 +267,15 @@ export const WalletPanel: React.FC = () => {
                   <select className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" value={methodForm.provider} onChange={(e) => setMethodForm({ ...methodForm, provider: e.target.value })}>
                     <option value="ecocash">EcoCash</option>
                     <option value="onemoney">OneMoney</option>
+                    <option value="innbucks">Innbucks</option>
+                    <option value="omari">Omari</option>
                     <option value="bank">Bank</option>
+                    <option value="bank_transfer">Bank Transfer</option>
                   </select>
                 </div>
               </div>
-              {(methodForm.method_type === 'ecocash' || methodForm.method_type === 'onemoney') && <Input label="Mobile Number" value={methodForm.account_number} onChange={(e) => setMethodForm({ ...methodForm, account_number: e.target.value })} />}
-              {methodForm.method_type === 'bank_account' && (
+              {mobileMoneyTypes.includes(methodForm.method_type) && <Input label="Mobile Number" value={methodForm.account_number} onChange={(e) => setMethodForm({ ...methodForm, account_number: e.target.value })} />}
+              {(methodForm.method_type === 'bank_account' || methodForm.method_type === 'bank_transfer') && (
                 <>
                   <Input label="Bank Name" value={methodForm.bank_name} onChange={(e) => setMethodForm({ ...methodForm, bank_name: e.target.value })} />
                   <Input label="Account Number" value={methodForm.account_number} onChange={(e) => setMethodForm({ ...methodForm, account_number: e.target.value })} />
@@ -287,7 +299,7 @@ export const WalletPanel: React.FC = () => {
             <div className="space-y-5">
               <Input label="Amount (USD)" type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
               <div className="grid grid-cols-2 gap-3">
-                {['ecocash', 'onemoney', 'bank_transfer', 'innbucks', 'zipit'].map((m) => (
+                {['ecocash', 'onemoney', 'innbucks', 'omari', 'bank_transfer', 'zipit'].map((m) => (
                   <button key={m} type="button" onClick={() => setMethod(m)} className={`p-4 rounded-xl border-2 transition-all text-left ${method === m ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/30' : 'border-gray-200 dark:border-gray-700'}`}>
                     <p className="font-bold text-xs text-gray-900 dark:text-white uppercase">{m}</p>
                   </button>

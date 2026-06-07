@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useAuthStore, useListingStore, useOrderStore, useWalletStore, Card } from '@agritrust/shared';
 import {
   ShoppingCart, Truck, Wallet, Heart, Search, MapPin, Tag, ShieldCheck, TrendingUp,
+  Bot,
   LayoutDashboard, Store, Package, PlusCircle, Crown, BarChart3, Award, Settings, User,
   ChevronLeft, ChevronRight, Menu, Bell, Activity, Clock, CheckCircle, LogOut,
   Layers, Box, ChevronDown, Lock, ArrowUpRight, ArrowDownRight, MessageSquare,
@@ -10,7 +11,7 @@ import {
 } from 'lucide-react';
 import { getMySubscription } from '../api';
 
-type DashboardView = 'dashboard' | 'create-listing' | 'marketplace' | 'my-listings' | 'offers' | 'my-orders' | 'wallet' | 'subscriptions' | 'profile' | 'settings' | 'buyer-requests' | 'saved-listings' | 'supplier-marketplace';
+type DashboardView = 'dashboard' | 'create-listing' | 'marketplace' | 'my-listings' | 'offers' | 'my-orders' | 'wallet' | 'ai-assistant' | 'subscriptions' | 'profile' | 'settings' | 'buyer-requests' | 'saved-listings' | 'supplier-marketplace';
 
 interface MenuItem {
   id: string;
@@ -132,6 +133,12 @@ export const BuyerDashboard: React.FC<{ onNavigate?: (view: DashboardView) => vo
       view: 'wallet',
     },
     {
+      id: 'ai-assistant',
+      label: 'Buyer AI',
+      icon: Bot,
+      view: 'ai-assistant',
+    },
+    {
       id: 'analytics',
       label: 'Analytics',
       icon: BarChart3,
@@ -145,7 +152,8 @@ export const BuyerDashboard: React.FC<{ onNavigate?: (view: DashboardView) => vo
       id: 'notifications',
       label: 'Notifications',
       icon: Bell,
-      badge: 3,
+      view: 'settings',
+      badge: activeOrders || undefined,
     },
     {
       id: 'profile',
@@ -416,14 +424,68 @@ export const BuyerDashboard: React.FC<{ onNavigate?: (view: DashboardView) => vo
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setNotificationsOpen(!notificationsOpen)}
-            className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            aria-label="Notifications"
-          >
-            <Bell size={20} className="text-gray-600 dark:text-gray-400" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => {
+                setNotificationsOpen(!notificationsOpen);
+                setProfileMenuOpen(false);
+              }}
+              className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-label="Notifications"
+              aria-expanded={notificationsOpen}
+            >
+              <Bell size={20} className="text-gray-600 dark:text-gray-400" />
+              {activeOrders > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>}
+            </button>
+
+            {notificationsOpen && (
+              <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 py-2 z-50">
+                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+                  <p className="text-sm font-bold text-gray-900 dark:text-white">Notifications</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Recent procurement and delivery activity</p>
+                </div>
+                <button
+                  onClick={() => {
+                    handleNavigate('my-orders');
+                    setNotificationsOpen(false);
+                  }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-start gap-3"
+                >
+                  <Clock size={18} className="text-amber-500 mt-0.5 shrink-0" />
+                  <span>
+                    <span className="block text-sm font-semibold text-gray-900 dark:text-white">{activeOrders} active order{activeOrders === 1 ? '' : 's'}</span>
+                    <span className="block text-xs text-gray-500 dark:text-gray-400 mt-1">Track escrow, fulfilment, and delivery updates.</span>
+                  </span>
+                </button>
+                <button
+                  onClick={() => {
+                    handleNavigate('my-orders');
+                    setNotificationsOpen(false);
+                  }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-start gap-3"
+                >
+                  <Truck size={18} className="text-blue-600 mt-0.5 shrink-0" />
+                  <span>
+                    <span className="block text-sm font-semibold text-gray-900 dark:text-white">{pendingDeliveries} delivery update{pendingDeliveries === 1 ? '' : 's'}</span>
+                    <span className="block text-xs text-gray-500 dark:text-gray-400 mt-1">Review purchases currently moving through logistics.</span>
+                  </span>
+                </button>
+                <button
+                  onClick={() => {
+                    handleNavigate('settings');
+                    setNotificationsOpen(false);
+                  }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-start gap-3 border-t border-gray-200 dark:border-gray-800"
+                >
+                  <Settings size={18} className="text-blue-600 mt-0.5 shrink-0" />
+                  <span>
+                    <span className="block text-sm font-semibold text-gray-900 dark:text-white">Notification preferences</span>
+                    <span className="block text-xs text-gray-500 dark:text-gray-400 mt-1">Manage push, SMS, and email alerts.</span>
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
 
           <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
             <Wallet size={16} className="text-gray-600 dark:text-gray-400" />
@@ -475,7 +537,7 @@ export const BuyerDashboard: React.FC<{ onNavigate?: (view: DashboardView) => vo
         </div>
       </div>
     </header>
-  ), [toggleSidebar, toggleMobileDrawer, searchQuery, balance, user?.full_name, notificationsOpen, profileMenuOpen, handleNavigate]);
+  ), [toggleSidebar, toggleMobileDrawer, searchQuery, balance, user?.full_name, notificationsOpen, profileMenuOpen, handleNavigate, activeOrders, pendingDeliveries]);
 
   const renderWelcomeHeader = useCallback(() => (
     <div className="mb-8">

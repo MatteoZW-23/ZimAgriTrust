@@ -293,25 +293,25 @@ function Field({ label, icon, note, ...inputProps }: FieldProps & TextInputProps
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
+  container: { flex: 1, backgroundColor: theme.colors.gray50 },
   scroll: { padding: 20, paddingBottom: 60 },
 
   saveBtn: {
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: theme.colors.sky,
-    justifyContent: 'center', alignItems: 'center',
+    justifyContent: 'center', alignItems: 'center', shadowColor: '#0EA5E9', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 12, elevation: 5,
   },
 
   tabs: {
     flexDirection: 'row', backgroundColor: '#FFF',
-    borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
+    borderBottomWidth: 1, borderBottomColor: '#E2E8F0',
   },
   tab: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6, paddingVertical: 14, borderBottomWidth: 2, borderBottomColor: 'transparent',
   },
   tabActive: { borderBottomColor: theme.colors.sky },
-  tabText: { fontSize: 14, fontWeight: '700', color: '#999' },
+  tabText: { fontSize: 14, fontWeight: '800', color: '#94A3B8' },
   tabTextActive: { color: theme.colors.sky },
 
   avatarSection: { alignItems: 'center', marginBottom: 28, marginTop: 8 },
@@ -326,36 +326,36 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.sky, width: 32, height: 32, borderRadius: 16,
     justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#FFF',
   },
-  avatarHint: { fontSize: 12, color: '#999', marginTop: 8, fontWeight: '600' },
+  avatarHint: { fontSize: 12, color: '#94A3B8', marginTop: 8, fontWeight: '700' },
 
   fieldGroup: { marginBottom: 18 },
   fieldLabel: {
-    fontSize: 11, fontWeight: '800', color: '#BBB',
+    fontSize: 11, fontWeight: '900', color: '#94A3B8',
     textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8,
   },
   fieldWrap: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF',
-    borderRadius: 14, borderWidth: 1.5, borderColor: '#E8E8E8',
+    borderRadius: 16, borderWidth: 1.5, borderColor: '#E2E8F0',
     paddingHorizontal: 14, height: 52,
   },
-  fieldDisabled: { backgroundColor: '#F8F9FA', borderColor: '#F0F0F0' },
+  fieldDisabled: { backgroundColor: '#F8FAFC', borderColor: '#EEF2F7' },
   fieldIcon: { marginRight: 10 },
-  fieldInput: { flex: 1, fontSize: 15, fontWeight: '600', color: theme.colors.dark },
-  fieldNote: { fontSize: 11, color: '#BBB', marginTop: 5, marginLeft: 4 },
+  fieldInput: { flex: 1, fontSize: 15, fontWeight: '700', color: theme.colors.ink },
+  fieldNote: { fontSize: 11, color: '#94A3B8', marginTop: 5, marginLeft: 4 },
 
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
   chip: {
     paddingHorizontal: 16, paddingVertical: 9, borderRadius: 20,
-    borderWidth: 1.5, borderColor: '#E0E0E0', backgroundColor: '#FFF',
+    borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#FFF',
   },
   chipActive: { borderColor: theme.colors.sky, backgroundColor: '#E1F5FE' },
-  chipText: { fontSize: 13, fontWeight: '700', color: '#666' },
+  chipText: { fontSize: 13, fontWeight: '800', color: '#64748B' },
   chipTextActive: { color: theme.colors.sky },
 
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
     backgroundColor: theme.colors.sky, height: 56, borderRadius: 18,
-    marginTop: 12, ...theme.shadows.sm,
+    marginTop: 12, ...theme.shadows.md,
   },
   primaryBtnDisabled: { opacity: 0.7 },
   primaryBtnText: { color: '#FFF', fontSize: 16, fontWeight: '800' },

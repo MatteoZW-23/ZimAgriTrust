@@ -53,6 +53,7 @@ import TransactionsScreen from './screens/TransactionsScreen';
 import TransportNegotiationScreen from './screens/TransportNegotiationScreen';
 import TransportSelectionScreen from './screens/TransportSelectionScreen';
 import RegistrationScreen from './screens/RegistrationScreen';
+import AIAssistantScreen from './screens/AIAssistantScreen';
 
 let Stack = null;
 if (Platform.OS !== 'web') {
@@ -65,7 +66,7 @@ const Tab = createBottomTabNavigator();
 function WebTabBar({ activeTab, onChangeTab, role, token, profile, onLogout }) {
   const accent = role === 'farmer' ? theme.colors.green : theme.colors.sky;
   const webNavigation = {
-    navigate: (screen) => onChangeTab(['Dashboard', 'Market', 'Listings', 'Offers', 'Orders', 'Profile'].includes(screen) ? screen : 'Profile'),
+    navigate: (screen) => onChangeTab(['Dashboard', 'Market', 'Listings', 'Offers', 'Orders', 'Profile', 'AIAssistant'].includes(screen) ? screen : 'Profile'),
     goBack: () => onChangeTab('Dashboard'),
   };
   
@@ -86,7 +87,7 @@ function WebTabBar({ activeTab, onChangeTab, role, token, profile, onLogout }) {
     { key: 'Profile', icon: IconUser, label: 'Profile' },
   ];
 
-  const screens = {
+  const screens: Record<string, React.ReactNode> = {
     Dashboard: role === 'farmer'
       ? <FarmerDashboardScreen route={{ params: { role, token, profile } }} navigation={webNavigation} />
       : <BuyerDashboardScreen route={{ params: { role, token, profile } }} navigation={webNavigation} />,
@@ -95,11 +96,12 @@ function WebTabBar({ activeTab, onChangeTab, role, token, profile, onLogout }) {
     Offers: <MyOffersScreen route={{ params: { token } }} navigation={webNavigation} />,
     Orders: <MyOrdersScreen route={{ params: { role, token } }} navigation={webNavigation} />,
     Profile: <ProfileScreen route={{ params: { role, token, profile, onLogout } }} navigation={webNavigation} />,
+    AIAssistant: <AIAssistantScreen route={{ params: { role, token, profile } }} navigation={webNavigation} />,
   };
 
   return (
     <View style={{ flex: 1 }}>
-      <View style={{ flex: 1 }}>{screens[activeTab]}</View>
+      <View style={{ flex: 1 }}>{screens[String(activeTab)] || screens.Dashboard}</View>
       <View style={styles.webTabBar}>
         {tabs.map(t => {
           const IconComp = t.icon;
@@ -374,6 +376,7 @@ export default function AppShell() {
         <Stack.Screen name="Transactions" component={TransactionsScreen} />
         <Stack.Screen name="TransportNegotiation" component={TransportNegotiationScreen} />
         <Stack.Screen name="TransportSelection" component={TransportSelectionScreen} />
+        <Stack.Screen name="AIAssistant" component={AIAssistantScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -381,22 +384,21 @@ export default function AppShell() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    height: 80,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#EEEEEE',
-    paddingBottom: 25,
-    paddingTop: 10,
+    height: 84,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderTopWidth: 0,
+    paddingBottom: 20,
+    paddingTop: 12,
     position: 'absolute',
-    bottom: 25,
-    left: 20,
-    right: 20,
-    borderRadius: 25,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    bottom: 18,
+    left: 16,
+    right: 16,
+    borderRadius: 30,
+    elevation: 18,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
   },
   addBtn: {
     width: 56,
@@ -411,14 +413,27 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 10,
   },
-  splash: { flex: 1, backgroundColor: theme.colors.green, justifyContent: 'center', alignItems: 'center' },
-  splashLogoContainer: { width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', marginBottom: 24, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)' },
+  splash: { flex: 1, backgroundColor: theme.colors.ink, justifyContent: 'center', alignItems: 'center' },
+  splashLogoContainer: { width: 140, height: 140, borderRadius: 42, backgroundColor: 'rgba(255,255,255,0.08)', justifyContent: 'center', alignItems: 'center', marginBottom: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   splashLogo: { fontSize: 52 },
-  splashBrand: { fontSize: 28, fontWeight: '800', color: '#FFF', letterSpacing: 3, textTransform: 'uppercase' },
-  splashMarket: { fontSize: 16, fontWeight: '600', color: theme.colors.gold, letterSpacing: 2, textTransform: 'uppercase', marginTop: 8 },
+  splashBrand: { fontSize: 28, fontWeight: '900', color: '#FFF', letterSpacing: 2.2, textTransform: 'uppercase' },
+  splashMarket: { fontSize: 16, fontWeight: '700', color: theme.colors.gold, letterSpacing: 1.4, textTransform: 'uppercase', marginTop: 8 },
   onboardBox: { position: 'absolute', bottom: 100, paddingHorizontal: 40, alignItems: 'center' },
   onboardText: { color: '#FFF', fontSize: 16, textAlign: 'center', marginBottom: 40, lineHeight: 24, fontWeight: '500', letterSpacing: 0.5 },
-  webTabBar: { flexDirection: 'row', backgroundColor: '#FFF', borderTopWidth: 1, borderTopColor: '#EEE', paddingVertical: 10, paddingBottom: 20 },
-  webTab: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  webTabLabel: { fontSize: 11, fontWeight: '700', color: '#999' },
+  webTabBar: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    marginHorizontal: 16,
+    marginBottom: 14,
+    borderRadius: 26,
+    paddingVertical: 12,
+    paddingBottom: 18,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 10,
+  },
+  webTab: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6 },
+  webTabLabel: { fontSize: 11, fontWeight: '800', color: '#94A3B8' },
 });

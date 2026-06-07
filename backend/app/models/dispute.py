@@ -27,7 +27,9 @@ class Dispute(Base):
     raised_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     resolved_by_agent_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("agents.id"), nullable=True, index=True)  # Agent who resolved dispute
     
-    type: Mapped[str] = mapped_column(String(30))
+    type: Mapped[str] = mapped_column("dispute_type", String(30))
+    category: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    title: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     description: Mapped[str] = mapped_column(Text)
     status: Mapped[DisputeStatus] = mapped_column(
         Enum(DisputeStatus, name="coredisputestatus"), default=DisputeStatus.OPEN

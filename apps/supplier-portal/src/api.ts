@@ -77,6 +77,17 @@ export const getSalesAnalytics = () => request("/suppliers/analytics/sales");
 export const getBestsellers = () => request("/suppliers/analytics/bestsellers");
 export const getInventoryAnalytics = () => request("/suppliers/analytics/inventory");
 export const getReports = () => request("/suppliers/reports");
+export const chatWithSupplierAi = (message: string, context: Record<string, any> = {}) =>
+  request("/ai/assistants/supplier/chat", { method: "POST", body: JSON.stringify({ message, context }) });
+export const getSupplierAiRecommendations = (context: Record<string, any> = {}) =>
+  request("/ai/recommendations", { method: "POST", body: JSON.stringify({ assistant_role: "supplier", context }) });
+export const getSupplierAiMarketIntelligence = (product: string | null = null, province: string | null = null) =>
+  request("/ai/market-intelligence", { method: "POST", body: JSON.stringify({ product, province }) });
+export const getSupplierAiPriceDemandPrediction = (product = "Horticulture", province: string | null = null, daysAhead = 30) =>
+  request("/ai/predictions/price-demand", {
+    method: "POST",
+    body: JSON.stringify({ product, province, days_ahead: daysAhead }),
+  });
 
 // ── Reviews ──────────────────────────────────────────────────────────────────
 export const getReviews = (limit = 50, offset = 0) => request(`/suppliers/reviews?limit=${limit}&offset=${offset}`);

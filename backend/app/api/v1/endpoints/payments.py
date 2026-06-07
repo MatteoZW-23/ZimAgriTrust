@@ -31,6 +31,7 @@ def list_payment_methods():
             {"code": "ecocash", "name": "EcoCash", "enabled": True},
             {"code": "onemoney", "name": "OneMoney", "enabled": True},
             {"code": "innbucks", "name": "Innbucks", "enabled": True},
+            {"code": "omari", "name": "Omari", "enabled": True},
             {"code": "zipit", "name": "ZIPIT", "enabled": True},
             {"code": "bank_transfer", "name": "Bank Transfer", "enabled": True},
         ]
@@ -607,9 +608,9 @@ def create_payout_method(
 ):
     method_type = PayoutMethodType(payload.method_type.lower())
     provider = PayoutMethodProvider(payload.provider.lower())
-    if method_type == PayoutMethodType.BANK_ACCOUNT and not (payload.bank_name and payload.account_number and payload.branch_code):
+    if method_type in (PayoutMethodType.BANK_ACCOUNT, PayoutMethodType.BANK_TRANSFER) and not (payload.bank_name and payload.account_number and payload.branch_code):
         raise HTTPException(status_code=400, detail="Bank account requires bank_name, account_name, account_number, and branch_code")
-    if method_type in (PayoutMethodType.ECOCASH, PayoutMethodType.ONEMONEY) and not payload.account_number:
+    if method_type in (PayoutMethodType.ECOCASH, PayoutMethodType.ONEMONEY, PayoutMethodType.INNBUCKS, PayoutMethodType.OMARI) and not payload.account_number:
         raise HTTPException(status_code=400, detail="Mobile money payout methods require account_number")
     if payload.is_default:
         db.query(UserPayoutMethod).filter(UserPayoutMethod.user_id == current_user.id).update({"is_default": False})

@@ -46,6 +46,7 @@ import BroadcastScreen from './components/BroadcastScreen';
 import SupplierManagementPanel from './components/SupplierManagementPanel';
 import AcademyManagement from './components/AcademyManagement';
 import SubscriptionRevenuePanel from './components/SubscriptionRevenuePanel';
+import AIAssistantPanel from './components/AIAssistantPanel';
 
 // ── Health Check Panel (live backend health) ────────────────────────────────────
 const HEALTH_API = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
@@ -361,6 +362,7 @@ function App() {
  { type: 'group', key: 'governance', icon: 'fa-shield-halved', label: 'System',
  roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN'],
  children: [
+ { view: 'ai-command', icon: 'fa-robot', label: 'AI Command Center', roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN'] },
  { view: 'system-config', icon: 'fa-gears', label: 'System Config', roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN'] },
  { view: 'command-center', icon: 'fa-terminal', label: 'Command Center', roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN'] },
  { view: 'audit-logs', icon: 'fa-shield-halved', label: 'Audit Logs', roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN'] },
@@ -519,6 +521,7 @@ function App() {
  {currentView === 'academy' && <AcademyManagement token={token} />}
  {currentView === 'post-exam' && <AgentPostExamReview token={token} />}
  {currentView === 'command-center' && <AdminCommandCenter token={token} />}
+ {currentView === 'ai-command' && <AIAssistantPanel token={token} profile={profile} />}
  {currentView === 'admin-invitations' && <AdminInvitationsPanel />}
  {currentView === 'audit-logs' && <AuditLogScreen token={token} />}
  {currentView === 'broadcast' && <BroadcastScreen token={token} />}

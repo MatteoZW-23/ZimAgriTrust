@@ -20,7 +20,11 @@ def create_dispute(db: Session, payload: DisputeCreate, actor: User) -> Dispute:
     if actor.role not in {UserRole.ADMIN, UserRole.AGENT} and actor.id not in {order.buyer_id, order.seller_id}:
         raise HTTPException(status_code=403, detail="Forbidden")
     
-    dispute = Dispute(**payload.model_dump())
+    dispute_data = payload.model_dump()
+    dispute_data["raised_by"] = actor.id
+    dispute_data["category"] = dispute_data.get("type", "general")
+    dispute_data["title"] = f"Dispute - {dispute_data.get('type', 'General')}"
+    dispute = Dispute(**dispute_data)
     db.add(dispute)
     order.status = OrderStatus.DISPUTED
     from app.services.escrow_account_service import EscrowAccountService

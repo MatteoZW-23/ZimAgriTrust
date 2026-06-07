@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuthStore } from '../store.ts';
 import { 
   LayoutDashboard, Package, ShoppingCart, Box, Wallet, BarChart3, User, LogOut,
-  Star, Tag, DollarSign, CreditCard, ShieldCheck
+  Star, Tag, DollarSign, CreditCard, ShieldCheck, Bot
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 
@@ -16,6 +16,7 @@ export function DashboardLayout({ currentView, onViewChange, children, featureAc
     { id: 'inventory', label: 'Inventory', icon: Box },
     { id: 'wallet', label: 'Wallet', icon: Wallet },
     { id: 'analytics', label: 'Analytics', icon: BarChart3, enabled: featureAccess?.analytics || featureAccess?.advanced_analytics },
+    { id: 'ai-assistant', label: 'Supplier AI', icon: Bot },
     { id: 'reviews', label: 'Reviews', icon: Star },
     { id: 'discounts', label: 'Discounts', icon: Tag, enabled: featureAccess?.promotions },
     { id: 'payouts', label: 'Payouts', icon: DollarSign },

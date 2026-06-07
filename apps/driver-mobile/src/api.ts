@@ -201,6 +201,12 @@ export function updatePrivacySettings(token, payload) {
   });
 }
 
+export function exportDriverData(token) {
+  return jsonFetch('/auth/data-export', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export function deleteDriverData(token) {
   return jsonFetch('/drivers/me/data', {
     method: 'DELETE',

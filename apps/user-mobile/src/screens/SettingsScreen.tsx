@@ -91,21 +91,21 @@ function Toggle({ label, value, onValueChange }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F6F0DE' },
+  container: { flex: 1, backgroundColor: theme.colors.gray50 },
   content: { padding: 20, paddingTop: 56, paddingBottom: 120 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F6F0DE' },
-  title: { color: '#111827', fontSize: 32, fontWeight: '900' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.gray50 },
+  title: { color: '#111827', fontSize: 34, fontWeight: '900', letterSpacing: -0.8 },
   subtitle: { color: '#64748b', fontSize: 14, lineHeight: 21, marginTop: 8, marginBottom: 20 },
-  section: { backgroundColor: '#fff', borderRadius: 22, padding: 18, borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 14 },
+  section: { backgroundColor: '#fff', borderRadius: 26, padding: 20, borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 16, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.06, shadowRadius: 18, elevation: 4 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   sectionTitle: { color: '#111827', fontSize: 16, fontWeight: '900' },
-  toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
+  toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
   toggleText: { color: '#334155', fontSize: 15, fontWeight: '800' },
-  lang: { padding: 14, borderRadius: 14, backgroundColor: '#f8fafc', marginTop: 8, borderWidth: 1, borderColor: '#e2e8f0' },
+  lang: { padding: 15, borderRadius: 16, backgroundColor: '#ffffff', marginTop: 10, borderWidth: 1, borderColor: '#e2e8f0' },
   langActive: { backgroundColor: theme.colors.green, borderColor: theme.colors.green },
   langText: { color: '#334155', fontWeight: '900' },
   langTextActive: { color: '#fff' },
-  rowButton: { padding: 14, borderRadius: 14, backgroundColor: '#f8fafc', marginTop: 8, borderWidth: 1, borderColor: '#e2e8f0' },
+  rowButton: { padding: 15, borderRadius: 16, backgroundColor: '#ffffff', marginTop: 10, borderWidth: 1, borderColor: '#e2e8f0' },
   rowText: { color: '#334155', fontWeight: '900' },
   saving: { color: '#64748b', textAlign: 'center', fontWeight: '800' },
 });

@@ -46,6 +46,8 @@ from app.db.base import Base
 class DepositChannel(str, enum.Enum):
     ECOCASH = "ecocash"
     ONEMONEY = "onemoney"
+    INNBUCKS = "innbucks"
+    OMARI = "omari"
     BANK_TRANSFER = "bank_transfer"
     CASH_AGENT = "cash_agent"  # agent-assisted in-person deposit
 

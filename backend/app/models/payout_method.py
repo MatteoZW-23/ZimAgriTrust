@@ -14,13 +14,19 @@ from app.db.base import Base
 class PayoutMethodType(str, enum.Enum):
     ECOCASH = "ecocash"
     ONEMONEY = "onemoney"
+    INNBUCKS = "innbucks"
+    OMARI = "omari"
     BANK_ACCOUNT = "bank_account"
+    BANK_TRANSFER = "bank_transfer"
 
 
 class PayoutMethodProvider(str, enum.Enum):
     ECOCASH = "ecocash"
     ONEMONEY = "onemoney"
+    INNBUCKS = "innbucks"
+    OMARI = "omari"
     BANK = "bank"
+    BANK_TRANSFER = "bank_transfer"
 
 
 class PayoutMethodStatus(str, enum.Enum):

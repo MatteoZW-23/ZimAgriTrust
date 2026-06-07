@@ -487,16 +487,16 @@ function VehicleRow({ icon, bg, label, value }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
+  container: { flex: 1, backgroundColor: theme.colors.gray50 },
   scrollContent: { paddingBottom: 120 },
 
-  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-  headerTitle: { fontSize: 28, fontWeight: '900', color: theme.colors.dark },
+  header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
+  headerTitle: { fontSize: 30, fontWeight: '900', color: theme.colors.ink, letterSpacing: -0.8 },
 
   heroCard: {
-    marginHorizontal: 20, backgroundColor: '#FFF', borderRadius: 24,
-    padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
-    borderWidth: 1, borderColor: '#F0F0F0',
+    marginHorizontal: 20, backgroundColor: '#FFF', borderRadius: 28,
+    padding: 22, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 18, elevation: 4,
+    borderWidth: 1, borderColor: '#E2E8F0',
   },
   avatarRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   avatar: {
@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
     borderWidth: 3, borderColor: 'rgba(41,182,246,0.2)',
   },
   avatarInfo: { flex: 1, marginLeft: 16 },
-  name: { fontSize: 20, fontWeight: '900', color: theme.colors.dark },
+  name: { fontSize: 22, fontWeight: '900', color: theme.colors.ink, letterSpacing: -0.4 },
   roleBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: '#F0FDF4', alignSelf: 'flex-start',
@@ -513,26 +513,26 @@ const styles = StyleSheet.create({
   },
   roleText: { fontSize: 10, fontWeight: '800', color: '#4CAF50', letterSpacing: 0.5 },
   phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
-  phoneText: { fontSize: 13, color: '#999', fontWeight: '500' },
+  phoneText: { fontSize: 13, color: '#64748B', fontWeight: '600' },
 
-  statsGrid: { flexDirection: 'row', backgroundColor: '#F8F9FA', borderRadius: 16, padding: 14 },
+  statsGrid: { flexDirection: 'row', backgroundColor: '#F8FAFC', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
   statBox: { flex: 1, alignItems: 'center', gap: 4 },
-  statVal: { fontSize: 18, fontWeight: '900', color: theme.colors.dark },
-  statLabel: { fontSize: 11, fontWeight: '600', color: '#999' },
-  statDivider: { width: 1, backgroundColor: '#E8E8E8' },
+  statVal: { fontSize: 18, fontWeight: '900', color: theme.colors.ink },
+  statLabel: { fontSize: 11, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.4 },
+  statDivider: { width: 1, backgroundColor: '#E2E8F0' },
 
   section: { marginHorizontal: 20, marginTop: 24 },
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { fontSize: 12, fontWeight: '800', color: '#BBB', textTransform: 'uppercase', letterSpacing: 1 },
+  sectionTitle: { fontSize: 12, fontWeight: '900', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1 },
   seeAllText: { fontSize: 13, fontWeight: '700', color: theme.colors.sky },
 
   completionCard: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF',
-    borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#F0F0F0',
+    borderRadius: 24, padding: 22, borderWidth: 1, borderColor: '#E2E8F0', ...theme.shadows.sm,
   },
   completionText: { flex: 1, marginLeft: 20 },
-  completionHeading: { fontSize: 16, fontWeight: '800', color: theme.colors.dark },
-  completionSub: { fontSize: 12, color: '#999', marginTop: 4, lineHeight: 18 },
+  completionHeading: { fontSize: 16, fontWeight: '900', color: theme.colors.ink },
+  completionSub: { fontSize: 12, color: '#64748B', marginTop: 4, lineHeight: 18 },
   completeBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: theme.colors.sky, alignSelf: 'flex-start',
@@ -540,31 +540,31 @@ const styles = StyleSheet.create({
   },
   completeBtnText: { color: '#FFF', fontSize: 12, fontWeight: '800' },
 
-  vehicleCard: { backgroundColor: '#FFF', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#F0F0F0' },
+  vehicleCard: { backgroundColor: '#FFF', borderRadius: 24, padding: 18, borderWidth: 1, borderColor: '#E2E8F0', ...theme.shadows.sm },
   vehicleRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 8 },
   vIcon: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  vLabel: { fontSize: 11, color: '#999', fontWeight: '600' },
-  vVal: { fontSize: 15, fontWeight: '700', color: theme.colors.dark, marginTop: 1 },
-  vDivider: { height: 1, backgroundColor: '#F5F5F5', marginLeft: 50 },
+  vLabel: { fontSize: 11, color: '#94A3B8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+  vVal: { fontSize: 15, fontWeight: '800', color: theme.colors.ink, marginTop: 1 },
+  vDivider: { height: 1, backgroundColor: '#EEF2F7', marginLeft: 50 },
 
   docRow: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF',
-    padding: 14, borderRadius: 14, marginBottom: 8, borderWidth: 1, borderColor: '#F5F5F5',
+    padding: 15, borderRadius: 18, marginBottom: 10, borderWidth: 1, borderColor: '#E2E8F0', ...theme.shadows.xs,
   },
   docIcon: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
   docInfo: { flex: 1 },
-  docLabel: { fontSize: 14, fontWeight: '700', color: theme.colors.dark },
+  docLabel: { fontSize: 14, fontWeight: '800', color: theme.colors.ink },
   docStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
   docStatus: { fontSize: 11, fontWeight: '600' },
-  uploadDate: { fontSize: 10, color: '#999', marginTop: 2 },
+  uploadDate: { fontSize: 10, color: '#94A3B8', marginTop: 2 },
   uploadBadge: {
     width: 32, height: 32, borderRadius: 16, backgroundColor: '#F0F9FF',
     justifyContent: 'center', alignItems: 'center',
   },
 
   timelineCard: {
-    backgroundColor: '#FFF', borderRadius: 20, padding: 20,
-    borderWidth: 1, borderColor: '#F0F0F0',
+    backgroundColor: '#FFF', borderRadius: 24, padding: 22,
+    borderWidth: 1, borderColor: '#E2E8F0', ...theme.shadows.sm,
   },
   timelineItem: { flexDirection: 'row', marginBottom: 16 },
   timelineLeft: { alignItems: 'center', width: 24, marginRight: 12 },
@@ -573,10 +573,10 @@ const styles = StyleSheet.create({
   },
   timelineDotComplete: { backgroundColor: '#4CAF50' },
   timelineDotPending: { backgroundColor: '#FFFBEB', borderWidth: 2, borderColor: '#F59E0B' },
-  timelineLine: { width: 2, flex: 1, backgroundColor: '#E0E0E0', marginTop: 4 },
+  timelineLine: { width: 2, flex: 1, backgroundColor: '#DCE6F2', marginTop: 4 },
   timelineContent: { flex: 1, paddingBottom: 16 },
-  timelineEvent: { fontSize: 14, fontWeight: '700', color: theme.colors.dark },
-  timelineDate: { fontSize: 11, color: '#999', marginTop: 2 },
+  timelineEvent: { fontSize: 14, fontWeight: '800', color: theme.colors.ink },
+  timelineDate: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
 
   badgesRow: { flexDirection: 'row', gap: 10 },
   badgeItem: {

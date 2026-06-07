@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuthStore, Button, Input } from '@agritrust/shared';
-import { getProfile, getVerificationStatus, updateProfile as apiUpdateProfile } from '../api';
-import { Phone, MapPin, ShieldCheck, Mail, Edit3, Shield, Save, X, Loader2, Calendar } from 'lucide-react';
+import { getProfile, getVerificationStatus, submitVerification, updateProfile as apiUpdateProfile } from '../api';
+import { Phone, MapPin, ShieldCheck, Mail, Edit3, Shield, Save, X, Loader2, Calendar, Upload } from 'lucide-react';
 
 export const ProfilePanel: React.FC = () => {
   const { user, updateUser } = useAuthStore();
@@ -11,6 +11,12 @@ export const ProfilePanel: React.FC = () => {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editData, setEditData] = useState({ full_name: '', email: '', region: '' });
+  const [nationalIdNumber, setNationalIdNumber] = useState('');
+  const [frontFile, setFrontFile] = useState<File | null>(null);
+  const [backFile, setBackFile] = useState<File | null>(null);
+  const [selfieFile, setSelfieFile] = useState<File | null>(null);
+  const [verificationMessage, setVerificationMessage] = useState('');
+  const [submittingVerification, setSubmittingVerification] = useState(false);
   const hasLoaded = useRef(false);
 
   const loadProfile = useCallback(async () => {
@@ -52,6 +58,33 @@ export const ProfilePanel: React.FC = () => {
     } catch { /* silent */ }
     setSaving(false);
   }, [editData, updateUser]);
+
+  const handleVerificationSubmit = useCallback(async () => {
+    if (!frontFile) {
+      setVerificationMessage('Upload the front of your National ID first');
+      return;
+    }
+    setSubmittingVerification(true);
+    setVerificationMessage('');
+    try {
+      const data = new FormData();
+      data.append('front', frontFile);
+      if (backFile) data.append('back', backFile);
+      if (selfieFile) data.append('selfie', selfieFile);
+      if (nationalIdNumber.trim()) data.append('national_id_number', nationalIdNumber.trim());
+      const result = await submitVerification(data);
+      setVerificationMessage(result?.message || 'Verification submitted');
+      const nextStatus = await getVerificationStatus();
+      setVerification(nextStatus);
+      setFrontFile(null);
+      setBackFile(null);
+      setSelfieFile(null);
+    } catch (err: any) {
+      setVerificationMessage(err?.message || 'Unable to submit verification');
+    } finally {
+      setSubmittingVerification(false);
+    }
+  }, [backFile, frontFile, nationalIdNumber, selfieFile]);
 
   const displayName = profile?.full_name || user?.full_name || 'User';
   const displayPhone = profile?.phone_number || profile?.phone || user?.phone || '—';
@@ -195,6 +228,42 @@ export const ProfilePanel: React.FC = () => {
                       <span className="text-xs font-bold uppercase tracking-wider">{step.label}</span>
                     </div>
                   ))}
+                </div>
+                <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-4 space-y-4">
+                  <div>
+                    <p className="text-sm font-bold">Submit ID Verification</p>
+                    <p className="text-xs font-medium text-gray-400 mt-1">Upload National ID photos for agent/admin review.</p>
+                  </div>
+                  <Input
+                    label="National ID Number"
+                    value={nationalIdNumber}
+                    onChange={(e: any) => setNationalIdNumber(e.target.value)}
+                    placeholder="Optional"
+                  />
+                  <div className="grid sm:grid-cols-3 gap-3">
+                    {[
+                      { label: 'ID Front', file: frontFile, setFile: setFrontFile, required: true },
+                      { label: 'ID Back', file: backFile, setFile: setBackFile, required: false },
+                      { label: 'Selfie With ID', file: selfieFile, setFile: setSelfieFile, required: false },
+                    ].map((item) => (
+                      <label key={item.label} className="rounded-xl border border-white/10 bg-white/[0.03] p-3 cursor-pointer hover:bg-white/[0.06] transition-colors">
+                        <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
+                          <Upload size={14} /> {item.label}{item.required ? ' *' : ''}
+                        </span>
+                        <span className="mt-2 block truncate text-xs text-gray-400">{item.file?.name || 'Choose file'}</span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,application/pdf"
+                          className="sr-only"
+                          onChange={(e) => item.setFile(e.target.files?.[0] || null)}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  {verificationMessage && <p className="text-xs font-semibold text-emerald-300">{verificationMessage}</p>}
+                  <Button loading={submittingVerification} onClick={handleVerificationSubmit} className="bg-emerald-600 hover:bg-emerald-700">
+                    Submit Verification
+                  </Button>
                 </div>
               </div>
             </div>

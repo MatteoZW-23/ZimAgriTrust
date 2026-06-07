@@ -245,7 +245,8 @@ class BuyerRequest(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     buyer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     
-    product_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    sector: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    product_type: Mapped[str] = mapped_column(String(120), nullable=False)
     quantity_required: Mapped[float] = mapped_column(Float, nullable=False)
     quantity_unit: Mapped[str] = mapped_column(String(20), default="kg")
     target_price: Mapped[float] = mapped_column(Float, nullable=False)

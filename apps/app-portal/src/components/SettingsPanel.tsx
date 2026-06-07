@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { Card, Button, Input } from '@agritrust/shared';
+import { Button, Input } from '@agritrust/shared';
 import { useThemeStore } from '../utils/themeStore';
 import { Settings, Bell, Lock, Shield, Eye, Sun, Moon, CheckCircle2, ChevronRight } from 'lucide-react';
-import { changeUserPin, createTicket, getTickets, getUserSettings, replyToTicket, updateTicket, updateUserSettings } from '../api';
+import { changeUserPin, createTicket, deactivateAccount, deleteAccount, getTickets, getUserSettings, logout, replyToTicket, updateTicket, updateUserSettings } from '../api';
 
 type Prefs = {
   push_notifications: boolean;
@@ -75,6 +75,7 @@ export const SettingsPanel: React.FC = () => {
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState('');
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [ticketReplyDrafts, setTicketReplyDrafts] = useState<Record<string, string>>({});
 
@@ -95,10 +96,13 @@ export const SettingsPanel: React.FC = () => {
     setSavingKey(key);
     setStatus('');
     try {
+      console.log('Saving settings:', updates);
       const next = await updateUserSettings(updates);
+      console.log('Settings saved response:', next);
       setPrefs((prev) => ({ ...prev, ...next }));
       setStatus('Saved');
     } catch (err: any) {
+      console.error('Error saving settings:', err);
       setStatus(err?.message || 'Unable to save settings');
     } finally {
       setSavingKey(null);
@@ -193,12 +197,15 @@ export const SettingsPanel: React.FC = () => {
                           }
                           setSavingKey('pin');
                           try {
+                            console.log('Changing PIN...');
                             await changeUserPin(currentPin, newPin);
+                            console.log('PIN changed successfully');
                             setCurrentPin('');
                             setNewPin('');
                             setConfirmPin('');
                             setStatus('Security PIN updated');
                           } catch (err: any) {
+                            console.error('Error changing PIN:', err);
                             setStatus(err?.message || 'Unable to update PIN');
                           } finally {
                             setSavingKey(null);
@@ -353,6 +360,62 @@ export const SettingsPanel: React.FC = () => {
                         <ChevronRight size={16} className="text-gray-400 ml-1" />
                       </div>
                     </div>
+                    <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/20 p-4 space-y-4">
+                      <div>
+                        <p className="font-bold text-sm text-red-800 dark:text-red-200">Account closure</p>
+                        <p className="text-xs font-medium text-red-700/80 dark:text-red-300/80 mt-1">
+                          Deactivate temporarily disables login. Delete anonymizes personal details and closes the account.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          loading={savingKey === 'deactivate'}
+                          onClick={async () => {
+                            setSavingKey('deactivate');
+                            setStatus('');
+                            try {
+                              await deactivateAccount();
+                              await logout();
+                              window.location.reload();
+                            } catch (err: any) {
+                              setStatus(err?.message || 'Unable to deactivate account');
+                            } finally {
+                              setSavingKey(null);
+                            }
+                          }}
+                          className="border-red-300 text-red-700 hover:bg-red-100"
+                        >
+                          Deactivate Account
+                        </Button>
+                      </div>
+                      <Input
+                        label="Type DELETE to permanently close account"
+                        value={deleteConfirm}
+                        onChange={(e: any) => setDeleteConfirm(e.target.value)}
+                        placeholder="DELETE"
+                      />
+                      <Button
+                        loading={savingKey === 'delete-account'}
+                        disabled={deleteConfirm !== 'DELETE'}
+                        onClick={async () => {
+                          setSavingKey('delete-account');
+                          setStatus('');
+                          try {
+                            await deleteAccount();
+                            await logout();
+                            window.location.reload();
+                          } catch (err: any) {
+                            setStatus(err?.message || 'Unable to delete account');
+                          } finally {
+                            setSavingKey(null);
+                          }
+                        }}
+                        className="bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                      >
+                        Delete Account Permanently
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -367,11 +430,18 @@ export const SettingsPanel: React.FC = () => {
                 <Button
                   onClick={async () => {
                     if (!ticketSubject.trim() || !ticketDescription.trim()) return;
-                    await createTicket(ticketSubject.trim(), ticketDescription.trim());
-                    setTicketSubject('');
-                    setTicketDescription('');
-                    loadTickets();
-                    setStatus('Support ticket created');
+                    try {
+                      console.log('Creating ticket...');
+                      await createTicket(ticketSubject.trim(), ticketDescription.trim());
+                      console.log('Ticket created successfully');
+                      setTicketSubject('');
+                      setTicketDescription('');
+                      loadTickets();
+                      setStatus('Support ticket created');
+                    } catch (err: any) {
+                      console.error('Error creating ticket:', err);
+                      setStatus(err?.message || 'Unable to create ticket');
+                    }
                   }}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
@@ -423,10 +493,17 @@ export const SettingsPanel: React.FC = () => {
                                 onClick={async () => {
                                   const message = (ticketReplyDrafts[ticket.id] || '').trim();
                                   if (!message) return;
-                                  await replyToTicket(ticket.id, message);
-                                  setTicketReplyDrafts((prev) => ({ ...prev, [ticket.id]: '' }));
-                                  loadTickets();
-                                  setStatus('Ticket updated');
+                                  try {
+                                    console.log('Replying to ticket:', ticket.id);
+                                    await replyToTicket(ticket.id, message);
+                                    console.log('Ticket reply sent successfully');
+                                    setTicketReplyDrafts((prev) => ({ ...prev, [ticket.id]: '' }));
+                                    loadTickets();
+                                    setStatus('Ticket updated');
+                                  } catch (err: any) {
+                                    console.error('Error replying to ticket:', err);
+                                    setStatus(err?.message || 'Unable to reply to ticket');
+                                  }
                                 }}
                                 className="bg-blue-600 hover:bg-blue-700"
                               >
@@ -436,9 +513,16 @@ export const SettingsPanel: React.FC = () => {
                                 <Button
                                   variant="outline"
                                   onClick={async () => {
-                                    await updateTicket(ticket.id, { status: 'closed' });
-                                    loadTickets();
-                                    setStatus('Ticket closed');
+                                    try {
+                                      console.log('Closing ticket:', ticket.id);
+                                      await updateTicket(ticket.id, { status: 'closed' });
+                                      console.log('Ticket closed successfully');
+                                      loadTickets();
+                                      setStatus('Ticket closed');
+                                    } catch (err: any) {
+                                      console.error('Error closing ticket:', err);
+                                      setStatus(err?.message || 'Unable to close ticket');
+                                    }
                                   }}
                                 >
                                   Close Ticket

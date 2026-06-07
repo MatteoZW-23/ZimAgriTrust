@@ -21,6 +21,7 @@ class ProviderType(str, Enum):
     ONEMONEY = "onemoney"
     ZIPIT = "zipit"
     INNBUCKS = "innbucks"
+    OMARI = "omari"
     VISA = "visa"
     MASTERCARD = "mastercard"
     BANK_TRANSFER = "bank_transfer"
@@ -117,22 +118,70 @@ class EcoCashProvider(PaymentProvider):
         self.webhook_secret = config.get("webhook_secret")
 
     async def initiate_payment(self, request: PaymentRequest) -> PaymentResponse:
-        """Initiate EcoCash payment via USSD push"""
-        return PaymentResponse(
-            success=False,
-            transaction_id=request.reference,
-            status="PROVIDER_NOT_CONFIGURED",
-            message="EcoCash API credentials and live integration are not configured",
-        )
+        """Initiate EcoCash payment via Paynow API integration"""
+        import requests
+        from app.core.config import settings
+
+        if not settings.PAYNOW_API_KEY or not settings.PAYNOW_INTEGRATION_ID:
+            return PaymentResponse(
+                success=False,
+                transaction_id=request.reference,
+                status="PROVIDER_NOT_CONFIGURED",
+                message="EcoCash API credentials (PAYNOW_API_KEY, PAYNOW_INTEGRATION_ID) are not configured",
+            )
+
+        try:
+            payload = {
+                "id": settings.PAYNOW_INTEGRATION_ID,
+                "amount": request.amount,
+                "currency": request.currency,
+                "reference": request.reference,
+                "phone": request.phone_number,
+                "method": "ecocash",
+            }
+
+            response = requests.post(
+                settings.PAYNOW_API_URL,
+                json=payload,
+                headers={"Authorization": f"Bearer {settings.PAYNOW_API_KEY}"},
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                return PaymentResponse(
+                    success=True,
+                    transaction_id=request.reference,
+                    provider_reference=data.get("poll_url"),
+                    status="PENDING",
+                    message="EcoCash payment initiated via Paynow",
+                    raw_response=data,
+                )
+            else:
+                return PaymentResponse(
+                    success=False,
+                    transaction_id=request.reference,
+                    status="FAILED",
+                    message=f"EcoCash API error: {response.status_code}",
+                    raw_response=response.json() if response.content else {},
+                )
+        except Exception as e:
+            logger.error(f"EcoCash payment initiation error: {e}")
+            return PaymentResponse(
+                success=False,
+                transaction_id=request.reference,
+                status="ERROR",
+                message=f"EcoCash payment initiation failed: {str(e)}",
+            )
 
     async def verify_webhook(self, payload: WebhookPayload) -> bool:
         """Verify EcoCash webhook signature"""
         import hmac
         import hashlib
-        
+
         if not self.webhook_secret or not payload.signature:
             return False
-        
+
         # Create signature from raw payload
         raw_data = str(payload.raw_payload).encode('utf-8')
         expected_signature = hmac.new(
@@ -140,17 +189,53 @@ class EcoCashProvider(PaymentProvider):
             raw_data,
             hashlib.sha256
         ).hexdigest()
-        
+
         return hmac.compare_digest(payload.signature, expected_signature)
 
     async def check_status(self, transaction_id: str) -> PaymentResponse:
-        """Check EcoCash transaction status"""
-        return PaymentResponse(
-            success=False,
-            transaction_id=transaction_id,
-            status="PROVIDER_NOT_CONFIGURED",
-            message="EcoCash API status lookup is not configured",
-        )
+        """Check EcoCash transaction status via Paynow API"""
+        import requests
+        from app.core.config import settings
+
+        if not settings.PAYNOW_API_KEY:
+            return PaymentResponse(
+                success=False,
+                transaction_id=transaction_id,
+                status="PROVIDER_NOT_CONFIGURED",
+                message="EcoCash API credentials (PAYNOW_API_KEY) are not configured",
+            )
+
+        try:
+            response = requests.get(
+                f"{settings.PAYNOW_API_URL}/status/{transaction_id}",
+                headers={"Authorization": f"Bearer {settings.PAYNOW_API_KEY}"},
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                return PaymentResponse(
+                    success=True,
+                    transaction_id=transaction_id,
+                    status=data.get("status", "UNKNOWN"),
+                    message="EcoCash status checked via Paynow",
+                    raw_response=data,
+                )
+            else:
+                return PaymentResponse(
+                    success=False,
+                    transaction_id=transaction_id,
+                    status="ERROR",
+                    message=f"EcoCash status check error: {response.status_code}",
+                )
+        except Exception as e:
+            logger.error(f"EcoCash status check error: {e}")
+            return PaymentResponse(
+                success=False,
+                transaction_id=transaction_id,
+                status="ERROR",
+                message=f"EcoCash status check failed: {str(e)}",
+            )
 
     async def refund(self, transaction_id: str, amount: float) -> PaymentResponse:
         """Process EcoCash refund"""
@@ -177,13 +262,61 @@ class OneMoneyProvider(PaymentProvider):
         self.merchant_code = config.get("merchant_code")
 
     async def initiate_payment(self, request: PaymentRequest) -> PaymentResponse:
-        """Initiate OneMoney payment"""
-        return PaymentResponse(
-            success=False,
-            transaction_id=request.reference,
-            status="PROVIDER_NOT_CONFIGURED",
-            message="OneMoney API credentials and live integration are not configured",
-        )
+        """Initiate OneMoney payment via Paynow API integration"""
+        import requests
+        from app.core.config import settings
+
+        if not settings.PAYNOW_API_KEY or not settings.PAYNOW_INTEGRATION_ID:
+            return PaymentResponse(
+                success=False,
+                transaction_id=request.reference,
+                status="PROVIDER_NOT_CONFIGURED",
+                message="OneMoney API credentials (PAYNOW_API_KEY, PAYNOW_INTEGRATION_ID) are not configured",
+            )
+
+        try:
+            payload = {
+                "id": settings.PAYNOW_INTEGRATION_ID,
+                "amount": request.amount,
+                "currency": request.currency,
+                "reference": request.reference,
+                "phone": request.phone_number,
+                "method": "onemoney",
+            }
+
+            response = requests.post(
+                settings.PAYNOW_API_URL,
+                json=payload,
+                headers={"Authorization": f"Bearer {settings.PAYNOW_API_KEY}"},
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                return PaymentResponse(
+                    success=True,
+                    transaction_id=request.reference,
+                    provider_reference=data.get("poll_url"),
+                    status="PENDING",
+                    message="OneMoney payment initiated via Paynow",
+                    raw_response=data,
+                )
+            else:
+                return PaymentResponse(
+                    success=False,
+                    transaction_id=request.reference,
+                    status="FAILED",
+                    message=f"OneMoney API error: {response.status_code}",
+                    raw_response=response.json() if response.content else {},
+                )
+        except Exception as e:
+            logger.error(f"OneMoney payment initiation error: {e}")
+            return PaymentResponse(
+                success=False,
+                transaction_id=request.reference,
+                status="ERROR",
+                message=f"OneMoney payment initiation failed: {str(e)}",
+            )
 
     async def verify_webhook(self, payload: WebhookPayload) -> bool:
         """Verify OneMoney webhook"""
@@ -191,13 +324,49 @@ class OneMoneyProvider(PaymentProvider):
         return True
 
     async def check_status(self, transaction_id: str) -> PaymentResponse:
-        """Check OneMoney transaction status"""
-        return PaymentResponse(
-            success=False,
-            transaction_id=transaction_id,
-            status="PROVIDER_NOT_CONFIGURED",
-            message="OneMoney API status lookup is not configured",
-        )
+        """Check OneMoney transaction status via Paynow API"""
+        import requests
+        from app.core.config import settings
+
+        if not settings.PAYNOW_API_KEY:
+            return PaymentResponse(
+                success=False,
+                transaction_id=transaction_id,
+                status="PROVIDER_NOT_CONFIGURED",
+                message="OneMoney API credentials (PAYNOW_API_KEY) are not configured",
+            )
+
+        try:
+            response = requests.get(
+                f"{settings.PAYNOW_API_URL}/status/{transaction_id}",
+                headers={"Authorization": f"Bearer {settings.PAYNOW_API_KEY}"},
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                return PaymentResponse(
+                    success=True,
+                    transaction_id=transaction_id,
+                    status=data.get("status", "UNKNOWN"),
+                    message="OneMoney status checked via Paynow",
+                    raw_response=data,
+                )
+            else:
+                return PaymentResponse(
+                    success=False,
+                    transaction_id=transaction_id,
+                    status="ERROR",
+                    message=f"OneMoney status check error: {response.status_code}",
+                )
+        except Exception as e:
+            logger.error(f"OneMoney status check error: {e}")
+            return PaymentResponse(
+                success=False,
+                transaction_id=transaction_id,
+                status="ERROR",
+                message=f"OneMoney status check failed: {str(e)}",
+            )
 
     async def refund(self, transaction_id: str, amount: float) -> PaymentResponse:
         """Process OneMoney refund"""

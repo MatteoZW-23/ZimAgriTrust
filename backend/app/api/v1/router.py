@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from app.core.config import settings
-from app.api.v1.endpoints import admin, audit, auth, disputes, listings, market, payments, transactions, ussd, agents, logistics, transport, whatsapp, trades, recruitment, onboarding, requests, public, drivers, verification, portal_auth, agent_portal, super_admin, admin_approvals, deposits, inputs, browse, wallet, users, offers, suppliers, security_auth, agent_classroom, fintech, admin_fintech, subscriptions, governance, tickets
+from app.api.v1.endpoints import admin, audit, auth, disputes, listings, market, payments, transactions, ussd, agents, logistics, transport, whatsapp, trades, recruitment, onboarding, requests, public, drivers, verification, portal_auth, agent_portal, super_admin, admin_approvals, deposits, inputs, browse, wallet, users, offers, suppliers, security_auth, agent_classroom, fintech, admin_fintech, subscriptions, governance, tickets, ai
 from app.api.v1.endpoints.admin import certification
 
 api_router = APIRouter()
@@ -54,3 +54,4 @@ api_router.include_router(fintech.router, prefix="/fintech", tags=["fintech"])
 api_router.include_router(admin_fintech.router, prefix="/admin/fintech", tags=["admin-fintech"])
 api_router.include_router(governance.router, prefix="/governance", tags=["governance"])
 api_router.include_router(tickets.router, prefix="/tickets", tags=["tickets"])
+api_router.include_router(ai.router, prefix="/ai", tags=["ai-assistants"])

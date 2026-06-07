@@ -10,7 +10,7 @@ from math import asin, cos, radians, sin, sqrt
 import numpy as np
 from app.models.agent import Agent, AgentAssignment, AgentStatus, AgentSpecialization
 from app.models.listing import Listing
-from app.models.transaction import Transaction
+from app.models.transaction import Order
 from app.models.dispute import Dispute
 
 class AgentAssignmentService:
@@ -65,8 +65,8 @@ class AgentAssignmentService:
             return None
         
         # Get transaction details for location
-        transaction = dispute.transaction
-        listing = transaction.listing
+        order = dispute.order
+        listing = order.listing
         
         # Find agent specialized in dispute resolution
         best_agent = self._find_best_agent(
@@ -86,6 +86,56 @@ class AgentAssignmentService:
             )
         
         return None
+
+    def assign_agent_to_order(self, order_id, priority: int = 2) -> Optional[Dict]:
+        """
+        Assign an agent to support order fulfillment and delivery witnessing.
+        """
+        order = self.db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            return None
+
+        existing = (
+            self.db.query(AgentAssignment)
+            .filter(
+                AgentAssignment.order_id == order.id,
+                AgentAssignment.assignment_type == "order_fulfillment",
+            )
+            .first()
+        )
+        if existing:
+            return {
+                "assignment_id": existing.id,
+                "agent_id": existing.agent_id,
+                "type": existing.assignment_type,
+                "priority": existing.priority,
+                "deadline": existing.deadline,
+                "status": existing.status,
+                "bounty": existing.bounty_amount,
+                "route_optimization": self._get_optimized_route(existing.agent_id, order.listing_id),
+            }
+
+        location_parts = [
+            getattr(order.seller, "district", None),
+            getattr(order.buyer, "district", None),
+        ]
+        location = " / ".join([part for part in location_parts if part]) or "delivery zone"
+
+        best_agent = self._find_best_agent(
+            location=location,
+            specialization=AgentSpecialization.FIELD_SUPPORT,
+            priority=priority,
+        )
+        if not best_agent:
+            return None
+
+        return self._create_assignment(
+            agent_id=best_agent.id,
+            assignment_type="order_fulfillment",
+            order_id=order.id,
+            priority=priority,
+            deadline=self._calculate_deadline(priority),
+        )
     
     def _find_best_agent(self, location: str, specialization: AgentSpecialization, 
                          priority: int, urgent: bool = False) -> Optional[Agent]:
@@ -208,7 +258,7 @@ class AgentAssignmentService:
         return AgentSpecialization.GRAIN_INSPECTOR
     
     def _create_assignment(self, agent_id: int, assignment_type: str, 
-                          listing_id: int = None, transaction_id: int = None,
+                          listing_id: int = None, order_id=None,
                           dispute_id: int = None, priority: int = 1,
                           deadline: datetime = None) -> Dict:
         """Create a new agent assignment"""
@@ -216,7 +266,7 @@ class AgentAssignmentService:
             agent_id=agent_id,
             assignment_type=assignment_type,
             listing_id=listing_id,
-            transaction_id=transaction_id,
+            order_id=order_id,
             dispute_id=dispute_id,
             priority=priority,
             status="assigned",
@@ -331,7 +381,12 @@ class AgentAssignmentService:
         """Send assignment notification to agent."""
         from app.services.notification_service import NotificationService
         
-        task_type = "verification" if assignment.listing_id else "dispute"
+        if assignment.listing_id:
+            task_type = "verification"
+        elif assignment.order_id:
+            task_type = "order fulfillment"
+        else:
+            task_type = "dispute"
         location = f"{agent.district}, {agent.province}"
         
         NotificationService.notify_agent_assignment(

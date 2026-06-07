@@ -41,45 +41,45 @@ from app.db.base import Base
 # ---------------------------------------------------------------------------
 
 class InputListingStatus(str, enum.Enum):
-    PENDING_VERIFICATION = "pending_verification"
-    ACTIVE = "active"
-    REJECTED = "rejected"
-    SOLD_OUT = "sold_out"
-    EXPIRED = "expired"
-    REMOVED = "removed"
+    pending_verification = "pending_verification"
+    active = "active"
+    rejected = "rejected"
+    sold_out = "sold_out"
+    expired = "expired"
+    removed = "removed"
 
 
 class InputOfferStatus(str, enum.Enum):
-    PENDING = "pending"
-    ACCEPTED = "accepted"
-    REJECTED = "rejected"
-    EXPIRED = "expired"
-    WITHDRAWN = "withdrawn"
+    pending = "pending"
+    accepted = "accepted"
+    rejected = "rejected"
+    expired = "expired"
+    withdrawn = "withdrawn"
 
 
 class InputOrderStatus(str, enum.Enum):
-    PENDING = "pending"
-    ESCROW_HELD = "escrow_held"
-    SHIPPED = "shipped"
-    DELIVERED = "delivered"
-    COMPLETED = "completed"
-    DISPUTED = "disputed"
-    REFUNDED = "refunded"
+    pending = "pending"
+    escrow_held = "escrow_held"
+    shipped = "shipped"
+    delivered = "delivered"
+    completed = "completed"
+    disputed = "disputed"
+    refunded = "refunded"
 
 
 class InputReportReason(str, enum.Enum):
-    FAKE = "fake"
-    EXPIRED = "expired"
-    MISLABELLED = "mislabelled"
-    UNREGISTERED = "unregistered"
-    OTHER = "other"
+    fake = "fake"
+    expired = "expired"
+    mislabelled = "mislabelled"
+    unregistered = "unregistered"
+    other = "other"
 
 
 class InputReportStatus(str, enum.Enum):
-    OPEN = "open"
-    INVESTIGATING = "investigating"
-    UPHELD = "upheld"
-    DISMISSED = "dismissed"
+    open = "open"
+    investigating = "investigating"
+    upheld = "upheld"
+    dismissed = "dismissed"
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +130,7 @@ class InputListing(Base):
     registration_number: Mapped[Optional[str]] = mapped_column(String(80))
 
     status: Mapped[InputListingStatus] = mapped_column(
-        Enum(InputListingStatus), default=InputListingStatus.PENDING_VERIFICATION, nullable=False, index=True
+        Enum(InputListingStatus), default=InputListingStatus.pending_verification, nullable=False, index=True
     )
     verified_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
     verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
@@ -163,7 +163,7 @@ class InputOffer(Base):
     note: Mapped[Optional[str]] = mapped_column(Text)
 
     status: Mapped[InputOfferStatus] = mapped_column(
-        Enum(InputOfferStatus), default=InputOfferStatus.PENDING, nullable=False, index=True
+        Enum(InputOfferStatus), default=InputOfferStatus.pending, nullable=False, index=True
     )
     decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     decision_notes: Mapped[Optional[str]] = mapped_column(Text)
@@ -193,7 +193,7 @@ class InputOrder(Base):
     currency: Mapped[str] = mapped_column(String(5), default="USD")
 
     status: Mapped[InputOrderStatus] = mapped_column(
-        Enum(InputOrderStatus), default=InputOrderStatus.PENDING, nullable=False, index=True
+        Enum(InputOrderStatus), default=InputOrderStatus.pending, nullable=False, index=True
     )
 
     is_bulk: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -222,7 +222,7 @@ class InputReport(Base):
     evidence_urls: Mapped[Optional[list]] = mapped_column(JSON, default=list)
 
     status: Mapped[InputReportStatus] = mapped_column(
-        Enum(InputReportStatus), default=InputReportStatus.OPEN, nullable=False, index=True
+        Enum(InputReportStatus), default=InputReportStatus.open, nullable=False, index=True
     )
     resolved_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
     resolution_notes: Mapped[Optional[str]] = mapped_column(Text)

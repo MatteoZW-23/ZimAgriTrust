@@ -17,6 +17,7 @@ import { SupplierMarketplace } from './components/SupplierMarketplace.tsx';
 import { SupplierProductDetail } from './components/SupplierProductDetail.tsx';
 import { SubscriptionPanel } from './components/SubscriptionPanel.tsx';
 import { SavedListings } from './components/SavedListings.tsx';
+import { AIAssistantPanel } from './components/AIAssistantPanel.tsx';
 
 const AccessDenied = ({ role, correctPortal, portalUrl }) => (
   <div className="flex items-center justify-center h-screen bg-earth-50 dark:bg-earth-900">
@@ -90,6 +91,8 @@ function App() {
         return <SavedListings onNavigate={setCurrentView as any} />;
       case 'wallet':
         return <WalletPanel />;
+      case 'ai-assistant':
+        return <AIAssistantPanel />;
       case 'subscriptions':
         return <SubscriptionPanel />;
       case 'profile':

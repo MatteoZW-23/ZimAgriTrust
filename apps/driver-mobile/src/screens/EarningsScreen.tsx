@@ -399,68 +399,68 @@ export default function EarningsScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
+  container: { flex: 1, backgroundColor: theme.colors.gray50 },
   scrollContent: { paddingBottom: 120 },
   loadingState: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { color: '#999', marginTop: 12, fontWeight: '600', fontSize: 14 },
+  loadingText: { color: '#64748B', marginTop: 12, fontWeight: '700', fontSize: 14 },
 
-  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-  title: { fontSize: 28, fontWeight: '900', color: theme.colors.dark },
+  header: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 10 },
+  title: { fontSize: 30, fontWeight: '900', color: theme.colors.ink, letterSpacing: -0.8 },
 
   balanceCard: {
     marginHorizontal: 20, backgroundColor: theme.colors.sky,
-    borderRadius: 24, padding: 24, ...theme.shadows.lg,
+    borderRadius: 28, padding: 26, ...theme.shadows.lg,
   },
   balanceTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  balanceLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600' },
+  balanceLabel: { color: 'rgba(255,255,255,0.78)', fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   balanceAmount: { color: '#FFF', fontSize: 36, fontWeight: '900', marginTop: 4 },
   withdrawBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 16, paddingVertical: 11, borderRadius: 16,
   },
   withdrawBtnDisabled: { opacity: 0.5 },
   withdrawBtnText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
   balanceStats: {
-    flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 16, padding: 14,
+    flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 18, padding: 14,
   },
   balanceStat: { flex: 1, alignItems: 'center' },
   bStatVal: { color: '#FFF', fontSize: 16, fontWeight: '900' },
-  bStatLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600', marginTop: 2 },
+  bStatLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '700', marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.4 },
   bStatDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.2)' },
 
   section: { marginHorizontal: 20, marginTop: 24 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { fontSize: 13, fontWeight: '800', color: '#BBB', textTransform: 'uppercase', letterSpacing: 1 },
+  sectionTitle: { fontSize: 13, fontWeight: '900', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1 },
   sectionSub: { fontSize: 13, fontWeight: '700', color: theme.colors.sky },
   seeAll: { fontSize: 13, fontWeight: '700', color: theme.colors.sky },
 
   chartCard: {
-    backgroundColor: '#FFF', borderRadius: 20, padding: 20,
-    ...theme.shadows.xs, borderWidth: 1, borderColor: '#F0F0F0',
+    backgroundColor: '#FFF', borderRadius: 24, padding: 20,
+    ...theme.shadows.sm, borderWidth: 1, borderColor: '#E2E8F0',
   },
   chartContainer: { flexDirection: 'row', justifyContent: 'space-between', height: 130, alignItems: 'flex-end' },
   chartCol: { flex: 1, alignItems: 'center' },
-  chartVal: { fontSize: 8, fontWeight: '700', color: '#999', marginBottom: 4 },
-  chartBarBg: { width: 22, height: 80, backgroundColor: '#F5F5F5', borderRadius: 11, justifyContent: 'flex-end', overflow: 'hidden' },
+  chartVal: { fontSize: 8, fontWeight: '700', color: '#94A3B8', marginBottom: 4 },
+  chartBarBg: { width: 22, height: 80, backgroundColor: '#EEF2F7', borderRadius: 11, justifyContent: 'flex-end', overflow: 'hidden' },
   chartBar: { width: '100%', borderRadius: 11, minHeight: 4 },
   chartBarDefault: { backgroundColor: '#E0E8F0' },
   chartBarToday: { backgroundColor: theme.colors.sky },
-  chartDay: { fontSize: 10, fontWeight: '600', color: '#BBB', marginTop: 5 },
+  chartDay: { fontSize: 10, fontWeight: '700', color: '#94A3B8', marginTop: 5 },
   chartDayToday: { color: theme.colors.sky, fontWeight: '800' },
 
   statsRow: { flexDirection: 'row', marginHorizontal: 20, marginTop: 20, gap: 10 },
-  statCard: { flex: 1, borderRadius: 16, padding: 14, alignItems: 'center', gap: 6 },
-  statNum: { fontSize: 15, fontWeight: '900', color: theme.colors.dark },
-  statLabel: { fontSize: 10, fontWeight: '700', color: '#999' },
+  statCard: { flex: 1, borderRadius: 18, padding: 14, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFF' },
+  statNum: { fontSize: 15, fontWeight: '900', color: theme.colors.ink },
+  statLabel: { fontSize: 10, fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.4 },
 
   txRow: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF',
-    padding: 14, borderRadius: 16, marginBottom: 8, borderWidth: 1, borderColor: '#F5F5F5',
+    padding: 15, borderRadius: 18, marginBottom: 10, borderWidth: 1, borderColor: '#E2E8F0', ...theme.shadows.xs,
   },
   txIcon: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   txInfo: { flex: 1, marginLeft: 12 },
-  txRoute: { fontSize: 14, fontWeight: '700', color: theme.colors.dark },
-  txDate: { fontSize: 11, color: '#BBB', fontWeight: '500', marginTop: 2 },
+  txRoute: { fontSize: 14, fontWeight: '800', color: theme.colors.ink },
+  txDate: { fontSize: 11, color: '#94A3B8', fontWeight: '600', marginTop: 2 },
   txRight: { alignItems: 'flex-end', gap: 4 },
   txAmount: { fontSize: 15, fontWeight: '900', color: '#4CAF50' },
   txAmountOut: { color: '#F59E0B' },
@@ -473,7 +473,7 @@ const styles = StyleSheet.create({
 
   paymentRow: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF',
-    padding: 16, borderRadius: 18, borderWidth: 1, borderColor: '#F0F0F0', gap: 12,
+    padding: 16, borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0', gap: 12, ...theme.shadows.xs,
   },
   paymentIcon: {
     width: 44, height: 44, borderRadius: 22,

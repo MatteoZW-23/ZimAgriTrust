@@ -120,6 +120,8 @@ class OfferResponse(BaseModel):
     listing_id: uuid.UUID
     buyer_id: uuid.UUID
     seller_id: uuid.UUID
+    offered_price_per_kg: float
+    offered_quantity_kg: float
     currency: str
     logistics_type: LogisticsType
     status: OfferStatus
@@ -246,10 +248,11 @@ class TradeSessionResponse(BaseModel):
 
 
 class BuyerRequestCreate(BaseModel):
-    product_type: str = Field(min_length=2, max_length=50)
+    sector: Optional[Sector] = Field(default=None)
+    product_type: str = Field(min_length=2, max_length=120)
     quantity_required: float = Field(gt=0)
     quantity_unit: str = Field(default="kg")
-    target_price: float = Field(gt=0)
+    target_price: float = Field(default=0, ge=0)
     currency: str = Field(default="USD")
     delivery_location: Optional[str] = Field(default=None, max_length=100)
     deadline: Optional[datetime] = Field(default=None)
@@ -277,6 +280,7 @@ class FarmerResponseResponse(BaseModel):
 class BuyerRequestResponse(BaseModel):
     id: uuid.UUID
     buyer_id: uuid.UUID
+    sector: Optional[str] = None
     product_type: str
     quantity_required: float
     quantity_unit: str

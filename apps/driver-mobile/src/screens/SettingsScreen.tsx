@@ -211,21 +211,21 @@ function NavRow({ icon, iconBg, label, desc, onPress }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
+  container: { flex: 1, backgroundColor: theme.colors.gray50 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scroll: { padding: 20, paddingBottom: 60 },
 
   sectionLabel: {
-    fontSize: 11, fontWeight: '800', color: '#BBB',
+    fontSize: 11, fontWeight: '900', color: '#94A3B8',
     textTransform: 'uppercase', letterSpacing: 1,
     marginBottom: 10, marginTop: 24, marginLeft: 4,
   },
   card: {
-    backgroundColor: '#FFF', borderRadius: 20,
-    paddingHorizontal: 16, borderWidth: 1, borderColor: '#F0F0F0',
-    ...theme.shadows.xs,
+    backgroundColor: '#FFF', borderRadius: 24,
+    paddingHorizontal: 18, borderWidth: 1, borderColor: '#E2E8F0',
+    ...theme.shadows.sm,
   },
-  divider: { height: 1, backgroundColor: '#F5F5F5', marginLeft: 64 },
+  divider: { height: 1, backgroundColor: '#EEF2F7', marginLeft: 64 },
 
   row: {
     flexDirection: 'row', alignItems: 'center',
@@ -233,16 +233,16 @@ const styles = StyleSheet.create({
   },
   rowLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   iconBox: {
-    width: 40, height: 40, borderRadius: 12,
+    width: 42, height: 42, borderRadius: 14,
     justifyContent: 'center', alignItems: 'center', marginRight: 14,
   },
   iconBoxEmpty: { width: 40, marginRight: 14 },
   rowText: { flex: 1, paddingRight: 8 },
-  rowLabel: { fontSize: 15, fontWeight: '700', color: theme.colors.dark },
-  rowDesc: { fontSize: 12, color: '#999', marginTop: 2 },
+  rowLabel: { fontSize: 15, fontWeight: '800', color: theme.colors.ink },
+  rowDesc: { fontSize: 12, color: '#64748B', marginTop: 2, lineHeight: 18 },
 
   version: {
-    textAlign: 'center', fontSize: 12, color: '#DDD',
-    fontWeight: '600', marginTop: 32,
+    textAlign: 'center', fontSize: 12, color: '#CBD5E1',
+    fontWeight: '700', marginTop: 32,
   },
 });

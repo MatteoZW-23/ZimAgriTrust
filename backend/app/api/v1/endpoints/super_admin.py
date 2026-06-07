@@ -72,7 +72,7 @@ async def super_admin_login_options(request: Request):
 
 
 @router.post("/login", response_model=SuperAdminPreMfaResponse)
-def super_admin_login(
+async def super_admin_login(
     body: SuperAdminLoginRequest,
     request: Request,
     db: Session = Depends(get_db),
@@ -81,7 +81,7 @@ def super_admin_login(
     client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
     from app.services.cache_service import cache_service
     rate_limit_key = f"super_admin_login_rate:{client_ip}"
-    attempts = cache_service.get(rate_limit_key)
+    attempts = await cache_service.get(rate_limit_key)
     if attempts and int(attempts) >= 10:
         logger.warning("SECURITY | Super admin login rate limit exceeded | ip=%s", client_ip)
         raise HTTPException(
@@ -94,10 +94,10 @@ def super_admin_login(
     )
     
     # Increment rate limit counter on successful password verification (even if MFA fails later)
-    if not cache_service.get(rate_limit_key):
-        cache_service.set(rate_limit_key, 1, expire=300)  # 5 minutes window
+    if not await cache_service.get(rate_limit_key):
+        await cache_service.set(rate_limit_key, 1, expire=300)  # 5 minutes window
     else:
-        cache_service.set(rate_limit_key, int(attempts) + 1, expire=300)
+        await cache_service.set(rate_limit_key, int(attempts) + 1, expire=300)
     
     return result
 

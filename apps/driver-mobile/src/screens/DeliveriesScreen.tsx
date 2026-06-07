@@ -217,36 +217,36 @@ export default function DeliveriesScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
+  container: { flex: 1, backgroundColor: theme.colors.gray50 },
 
   header: {
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4,
+    paddingHorizontal: 20, paddingTop: 18, paddingBottom: 6,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end',
   },
-  title: { fontSize: 28, fontWeight: '900', color: theme.colors.dark },
-  subtitle: { fontSize: 13, color: '#999', fontWeight: '600', marginBottom: 4 },
+  title: { fontSize: 30, fontWeight: '900', color: theme.colors.ink, letterSpacing: -0.8 },
+  subtitle: { fontSize: 13, color: '#64748B', fontWeight: '700', marginBottom: 4 },
 
   activeBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    marginHorizontal: 20, marginTop: 12, backgroundColor: theme.colors.sky,
-    borderRadius: 16, padding: 16, ...theme.shadows.md,
+    marginHorizontal: 20, marginTop: 14, backgroundColor: theme.colors.sky,
+    borderRadius: 24, padding: 18, ...theme.shadows.lg,
   },
   activePulse: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#4CAF50' },
   activeBannerText: { flex: 1 },
-  activeTitle: { color: '#FFF', fontSize: 13, fontWeight: '800' },
-  activeSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '500', marginTop: 2 },
+  activeTitle: { color: '#FFF', fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 },
+  activeSub: { color: 'rgba(255,255,255,0.82)', fontSize: 12, fontWeight: '700', marginTop: 4 },
 
-  filterRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 8, marginTop: 16, marginBottom: 12 },
+  filterRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 8, marginTop: 18, marginBottom: 14 },
   filterChip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-    backgroundColor: '#FFF', borderWidth: 1, borderColor: '#F0F0F0',
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20,
+    backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E2E8F0',
   },
-  filterActive: { backgroundColor: '#E1F5FE', borderColor: theme.colors.sky },
-  filterText: { fontSize: 13, fontWeight: '700', color: '#999' },
+  filterActive: { backgroundColor: '#EAF6FF', borderColor: theme.colors.sky },
+  filterText: { fontSize: 13, fontWeight: '800', color: '#64748B' },
   filterTextActive: { color: theme.colors.sky },
   filterBadge: {
-    backgroundColor: '#F0F0F0', minWidth: 20, height: 20,
+    backgroundColor: '#F1F5F9', minWidth: 20, height: 20,
     borderRadius: 10, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4,
   },
   filterBadgeActive: { backgroundColor: '#FFF' },
@@ -255,49 +255,50 @@ const styles = StyleSheet.create({
   listContent: { paddingBottom: 120, paddingHorizontal: 20, paddingTop: 4 },
 
   card: {
-    backgroundColor: '#FFF', borderRadius: 20, padding: 18, marginBottom: 12,
-    borderWidth: 1, borderColor: '#F0F0F0', ...theme.shadows.xs,
+    backgroundColor: '#FFF', borderRadius: 26, padding: 20, marginBottom: 14,
+    borderWidth: 1, borderColor: '#E2E8F0', ...theme.shadows.md,
   },
   cardActive: { borderColor: '#BBDEFB', borderWidth: 2 },
 
   cardTop: { flexDirection: 'row', marginBottom: 14 },
   routeCol: { flex: 1 },
   routeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  routeConnector: { width: 2, height: 10, backgroundColor: '#E8E8E8', marginLeft: 3, marginVertical: 3 },
+  routeConnector: { width: 2, height: 10, backgroundColor: '#DCE6F2', marginLeft: 3, marginVertical: 3 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  locationText: { fontSize: 14, fontWeight: '700', color: theme.colors.dark, flex: 1 },
+  locationText: { fontSize: 14, fontWeight: '800', color: theme.colors.ink, flex: 1 },
   cardRight: { alignItems: 'flex-end', gap: 6 },
   statusBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10,
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12,
   },
   statusText: { fontSize: 11, fontWeight: '800' },
-  priceText: { fontSize: 18, fontWeight: '900', color: theme.colors.sky },
+  priceText: { fontSize: 20, fontWeight: '900', color: theme.colors.sky },
 
   progressSection: { marginBottom: 12 },
-  progressBg: { height: 5, backgroundColor: '#F0F0F0', borderRadius: 3, overflow: 'hidden' },
+  progressBg: { height: 6, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3 },
   progressMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 },
-  progressLabel: { fontSize: 10, fontWeight: '600', color: '#BBB' },
+  progressLabel: { fontSize: 10, fontWeight: '700', color: '#94A3B8' },
 
   cardFooter: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F5F5F5',
+    paddingTop: 12, borderTopWidth: 1, borderTopColor: '#EEF2F7',
   },
   metaChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#F8F9FA', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8,
+    backgroundColor: '#F8FAFC', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0',
   },
-  metaText: { fontSize: 11, fontWeight: '700', color: '#666' },
+  metaText: { fontSize: 11, fontWeight: '800', color: '#475569' },
 
   loadingState: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { color: '#999', marginTop: 12, fontWeight: '600', fontSize: 14 },
+  loadingText: { color: '#64748B', marginTop: 12, fontWeight: '700', fontSize: 14 },
 
-  emptyState: { alignItems: 'center', paddingTop: 60 },
+  emptyState: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 24 },
   emptyIcon: {
-    width: 88, height: 88, borderRadius: 44, backgroundColor: '#F5F5F5',
+    width: 88, height: 88, borderRadius: 44, backgroundColor: '#FFFFFF',
     justifyContent: 'center', alignItems: 'center', marginBottom: 16,
+    borderWidth: 1, borderColor: '#E2E8F0',
   },
-  emptyTitle: { fontSize: 18, fontWeight: '800', color: '#999' },
-  emptyText: { fontSize: 13, color: '#CCC', marginTop: 8, textAlign: 'center', lineHeight: 20 },
+  emptyTitle: { fontSize: 18, fontWeight: '900', color: '#475569' },
+  emptyText: { fontSize: 13, color: '#94A3B8', marginTop: 8, textAlign: 'center', lineHeight: 20 },
 });

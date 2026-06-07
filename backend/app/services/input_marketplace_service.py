@@ -84,7 +84,6 @@ def create_listing(
     quantity: float,
     unit: str,
     price_per_unit: float,
-    location_district: str,
     **kwargs
 ) -> InputListing:
     """Create a new input listing."""
@@ -96,7 +95,6 @@ def create_listing(
         quantity=quantity,
         unit=unit,
         price_per_unit=price_per_unit,
-        location_district=location_district,
         **kwargs
     )
     db.add(listing)

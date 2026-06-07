@@ -37,7 +37,7 @@ def public_prices(db: Session = Depends(get_db)):
     from app.models.listing import Listing, ListingStatus
     from app.models.transaction import Order, OrderStatus
     from datetime import datetime, timedelta, timezone
-    
+
     # Get price history from completed orders
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     orders = db.query(Order).filter(
@@ -81,19 +81,55 @@ def public_news():
 
 
 @router.get("/weather")
-def public_weather():
+async def public_weather(region: str = Query(default="harare")):
     """
-    Current weather for 5 major Zimbabwe farming regions.
+    Current weather for Zimbabwe farming regions (F#79).
+    Uses weather_service with OpenWeatherMap integration.
     """
-    return {"weather": []}
+    from app.services.weather_service import weather_service
+
+    weather_data = await weather_service.get_weather(region)
+    return {"weather": [weather_data]}
 
 
 @router.get("/calendar")
-def public_calendar():
+async def public_calendar(season: str = Query(default=None)):
     """
-    Seasonal planting/harvest calendar for the current month.
+    Seasonal planting/harvest calendar (F#80).
+    Uses planting_calendar_service with Zimbabwe crop data.
     """
-    return {"calendar": []}
+    from app.services.planting_calendar_service import planting_calendar_service
+
+    if season:
+        calendar_data = planting_calendar_service.get_season_calendar(season)
+        return {"calendar": calendar_data, "season": season}
+    else:
+        calendar_data = await planting_calendar_service.get_current_month_calendar()
+        return {"calendar": calendar_data}
+
+
+@router.get("/fertilizer-calc")
+def public_fertilizer_calculator(
+    crop: str = Query(..., description="Crop type (maize, soybeans, wheat, tobacco, vegetables, potatoes, groundnuts)"),
+    area_hectares: float = Query(..., gt=0, description="Area in hectares"),
+    soil_type: str = Query(default="loamy", description="Soil type (sandy, loamy, clay, red_soil)"),
+):
+    """
+    Fertilizer calculator (F#81).
+    Calculates fertilizer requirements based on crop, area, and soil type.
+    """
+    from app.services.fertilizer_calculator_service import fertilizer_calculator_service
+
+    try:
+        result = fertilizer_calculator_service.calculate_fertilizer(
+            crop=crop,
+            area_hectares=area_hectares,
+            soil_type=soil_type,
+        )
+        return result
+    except ValueError as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/stats")
@@ -111,7 +147,7 @@ def public_stats(db: Session = Depends(get_db)):
     suppliers = db.query(User).filter(User.role == UserRole.SUPPLIER).count()
     active_listings = db.query(Listing).filter(Listing.status == ListingStatus.ACTIVE).count()
     total_transactions = db.query(Transaction).count()
-    
+
     payload = {
         "stats": {
             "users": total_users,
@@ -218,6 +254,7 @@ def _serialize_listing(listing, detail: bool = False) -> dict:
 
     base = {
         "id":               str(listing.id),
+        "sector":           getattr(listing, "sector", None),
         "product_type":     listing.product_type,
         "grade":            listing.grade,
         "quantity":         listing.quantity,
@@ -228,6 +265,8 @@ def _serialize_listing(listing, detail: bool = False) -> dict:
         "location_district": listing.location_district,
         "is_location_verified": listing.is_location_verified,
         "created_at":       listing.created_at.isoformat() if listing.created_at else None,
+        "images":           getattr(listing, "images", []) or [],
+        "photos":           getattr(listing, "images", []) or [],
     }
 
     # Seller public info (trust score, verification — no PII)

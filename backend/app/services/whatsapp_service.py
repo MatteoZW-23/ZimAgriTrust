@@ -321,11 +321,14 @@ class WhatsAppService:
                 return "\n".join(resp)
 
             if any(k in body_clean for k in ["earn", "commission"]):
+                # CRITICAL FIX: Use ledger for balance, not deprecated User.balance_usd
+                from app.services.ledger_service import LedgerService
+                current_balance = LedgerService.get_balance(db, user.id, "USD")
                 commission = user.trust_score * 2.25
                 return (f"💰 *ZimAgritrust Agent Earnings*\n\n"
-                        f"Current Balance: ${user.balance_usd:.2f}\n"
+                        f"Current Balance: ${current_balance:.2f}\n"
                         f"Unpaid Commission: ${commission:.2f}\n"
-                        f"Total Life Earnings: ${user.balance_usd + 1450.00:.2f}\n\n"
+                        f"Total Life Earnings: ${current_balance + 1450.00:.2f}\n\n"
                         f"Next auto-payout: Friday 14:00 CAT.\n"
                         f"Reply 'wallethist' for recent transactions.")
 
@@ -1545,12 +1548,15 @@ class WhatsAppService:
         u = db.query(User).filter(User.id == agent_id, User.role == UserRole.AGENT).first()
         if not u:
             return f"⚠️ Agent not found: {agent_id}"
+        # CRITICAL FIX: Use ledger for balance, not deprecated User.balance_usd
+        from app.services.ledger_service import LedgerService
+        current_balance = LedgerService.get_balance(db, u.id, "USD")
         return (
             f"👨‍💼 *Agent Details*\n\n"
             f"Name: {u.full_name}\n"
             f"Phone: {u.phone_number}\n"
             f"Trust Score: {u.trust_score}/100\n"
-            f"Balance: ${u.balance_usd:.2f}\n\n"
+            f"Balance: ${current_balance:.2f}\n\n"
             f"• `agent suspend {agent_id}` - Suspend agent"
         )
 

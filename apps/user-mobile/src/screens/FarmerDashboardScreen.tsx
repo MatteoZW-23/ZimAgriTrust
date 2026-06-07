@@ -256,61 +256,62 @@ function ActionCard({ icon: Icon, color, label, onPress }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: theme.colors.gray50 },
   content: { paddingBottom: 120 },
 
   hero: {
     backgroundColor: '#064E3B',
-    borderBottomLeftRadius: 40, borderBottomRightRadius: 40,
-    padding: 32, paddingTop: 60, paddingBottom: 40,
-    shadowColor: '#064E3B', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10,
+    borderBottomLeftRadius: 48, borderBottomRightRadius: 48,
+    padding: 32, paddingTop: 60, paddingBottom: 46,
+    shadowColor: '#064E3B', shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.14, shadowRadius: 24, elevation: 12,
     position: 'relative', overflow: 'hidden'
   },
   heroGlow: { position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: '#10B981', opacity: 0.2, transform: [{ scale: 1.5 }] },
   heroContent: { position: 'relative', zIndex: 2 },
   kicker: { color: '#34D399', fontSize: 12, fontWeight: '900', letterSpacing: 1.5, marginBottom: 8 },
-  title: { color: '#FFFFFF', fontSize: 32, lineHeight: 38, fontWeight: '900', marginBottom: 12 },
-  subtitle: { color: '#A7F3D0', fontSize: 15, lineHeight: 22, fontWeight: '500', maxWidth: '85%' },
+  title: { color: '#FFFFFF', fontSize: 34, lineHeight: 40, fontWeight: '900', marginBottom: 12, letterSpacing: -0.8 },
+  subtitle: { color: '#A7F3D0', fontSize: 15, lineHeight: 24, fontWeight: '600', maxWidth: '85%' },
 
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20, marginTop: -20, gap: 12 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20, marginTop: -24, gap: 14 },
   metricCard: {
-    width: (width - 52) / 2, backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 4,
+    width: (width - 54) / 2, backgroundColor: '#FFFFFF', borderRadius: 28, padding: 22,
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 5,
+    borderWidth: 1, borderColor: '#EAF0F6',
   },
-  metricIconWrap: { width: 44, height: 44, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  metricValue: { color: '#0F172A', fontSize: 26, fontWeight: '900', marginBottom: 4 },
+  metricIconWrap: { width: 48, height: 48, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  metricValue: { color: '#0F172A', fontSize: 28, fontWeight: '900', marginBottom: 4, letterSpacing: -0.6 },
   metricLabel: { color: '#64748B', fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
 
-  actionSection: { marginTop: 32 },
-  chartSection: { marginTop: 32, paddingHorizontal: 24 },
+  actionSection: { marginTop: 36 },
+  chartSection: { marginTop: 36, paddingHorizontal: 24 },
   sectionTitle: { color: '#0F172A', fontSize: 18, fontWeight: '900', marginBottom: 16 },
   chartCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 24,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.04, shadowRadius: 20, elevation: 3,
-    borderWidth: 1, borderColor: '#F1F5F9', padding: 16,
+    backgroundColor: '#FFFFFF', borderRadius: 28,
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.08, shadowRadius: 22, elevation: 5,
+    borderWidth: 1, borderColor: '#EAF0F6', padding: 18,
   },
   chart: { borderRadius: 16 },
   actionRow: { paddingHorizontal: 24, gap: 12 },
   actionCard: {
-    width: 130, height: 130, borderRadius: 28, padding: 16, justifyContent: 'space-between',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 6,
+    width: 138, height: 138, borderRadius: 30, padding: 18, justifyContent: 'space-between',
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.16, shadowRadius: 18, elevation: 8,
     position: 'relative', overflow: 'hidden'
   },
   actionIconFloat: { position: 'absolute', top: -10, right: -10 },
-  actionIconContainer: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  actionIconContainer: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   actionText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800', lineHeight: 20 },
 
-  section: { marginTop: 36, paddingHorizontal: 24 },
+  section: { marginTop: 40, paddingHorizontal: 24 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   seeAll: { color: '#10B981', fontSize: 14, fontWeight: '800' },
 
   orderList: {
-    backgroundColor: '#FFFFFF', borderRadius: 28,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.04, shadowRadius: 20, elevation: 3,
-    borderWidth: 1, borderColor: '#F1F5F9'
+    backgroundColor: '#FFFFFF', borderRadius: 32,
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 5,
+    borderWidth: 1, borderColor: '#EAF0F6'
   },
   rowCard: { padding: 20, flexDirection: 'row', alignItems: 'center' },
-  rowIconWrap: { width: 44, height: 44, borderRadius: 16, backgroundColor: '#ECFDF5', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+  rowIconWrap: { width: 48, height: 48, borderRadius: 18, backgroundColor: '#ECFDF5', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
   rowInfo: { flex: 1 },
   rowTitle: { color: '#0F172A', fontSize: 16, fontWeight: '800', marginBottom: 4 },
   rowSub: { color: '#64748B', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -321,8 +322,8 @@ const styles = StyleSheet.create({
   emptyCard: { padding: 32, alignItems: 'center' },
   emptyText: { color: '#94A3B8', fontWeight: '500', lineHeight: 22, textAlign: 'center' },
 
-  stateCard: { backgroundColor: '#FFFFFF', borderRadius: 28, padding: 40, marginHorizontal: 24, marginTop: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.04, shadowRadius: 20, elevation: 3 },
+  stateCard: { backgroundColor: '#FFFFFF', borderRadius: 32, padding: 40, marginHorizontal: 24, marginTop: 24, alignItems: 'center', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 5, borderWidth: 1, borderColor: '#EAF0F6' },
   errorText: { color: '#EF4444', textAlign: 'center', fontWeight: '800', marginBottom: 20, fontSize: 16 },
-  primaryBtn: { backgroundColor: '#10B981', borderRadius: 16, paddingHorizontal: 24, paddingVertical: 14 },
+  primaryBtn: { backgroundColor: '#10B981', borderRadius: 18, paddingHorizontal: 24, paddingVertical: 15, shadowColor: '#10B981', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 6 },
   primaryText: { color: '#FFFFFF', fontWeight: '800', fontSize: 15 },
 });

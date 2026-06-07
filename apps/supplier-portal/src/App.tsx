@@ -14,6 +14,7 @@ import { DiscountsManagement } from './components/DiscountsManagement.tsx';
 import { PayoutsManagement } from './components/PayoutsManagement.tsx';
 import { ReviewsManagement } from './components/ReviewsManagement.tsx';
 import { SubscriptionManagement } from './components/SubscriptionManagement.tsx';
+import { SupplierAIAssistant } from './components/SupplierAIAssistant.tsx';
 
 function App() {
   const { isAuthenticated, user, setUser } = useAuthStore();
@@ -82,6 +83,8 @@ function App() {
         return <WalletManagement />;
       case 'analytics':
         return <Analytics featureAccess={featureAccess} />;
+      case 'ai-assistant':
+        return <SupplierAIAssistant />;
       case 'profile':
         return <ProfileManagement />;
       case 'discounts':

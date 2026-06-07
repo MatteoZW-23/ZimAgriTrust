@@ -268,21 +268,22 @@ function estimateTime(km) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
+  container: { flex: 1, backgroundColor: theme.colors.gray50 },
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 14,
+    paddingHorizontal: 20, paddingVertical: 16,
   },
   backBtn: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#F0F0F0', justifyContent: 'center', alignItems: 'center',
+    backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1, borderColor: '#E2E8F0',
   },
-  topTitle: { fontSize: 18, fontWeight: '800', color: theme.colors.dark },
-  scrollContent: { paddingBottom: 40 },
+  topTitle: { fontSize: 19, fontWeight: '900', color: theme.colors.ink },
+  scrollContent: { paddingBottom: 44 },
 
   paymentCard: {
     marginHorizontal: 20, backgroundColor: theme.colors.sky,
-    borderRadius: 24, padding: 28, alignItems: 'center', ...theme.shadows.lg,
+    borderRadius: 30, padding: 30, alignItems: 'center', ...theme.shadows.lg,
   },
   paymentLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600', marginTop: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
   paymentAmount: { color: '#FFF', fontSize: 52, fontWeight: '900', marginTop: 4, letterSpacing: -1 },
@@ -295,38 +296,38 @@ const styles = StyleSheet.create({
 
   routeCard: {
     marginHorizontal: 20, marginTop: 20, backgroundColor: '#FFF',
-    borderRadius: 20, padding: 20, ...theme.shadows.xs, borderWidth: 1, borderColor: '#F0F0F0',
+    borderRadius: 24, padding: 22, ...theme.shadows.md, borderWidth: 1, borderColor: '#E2E8F0',
   },
-  cardLabel: { fontSize: 11, fontWeight: '800', color: '#BBB', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 },
+  cardLabel: { fontSize: 11, fontWeight: '900', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 },
   routeRow: { flexDirection: 'row' },
   routeIcons: { alignItems: 'center', marginRight: 16, paddingTop: 4 },
   routeDot: { width: 12, height: 12, borderRadius: 6 },
-  routeLine: { width: 2, height: 28, backgroundColor: '#E0E0E0', marginVertical: 4 },
+  routeLine: { width: 2, height: 28, backgroundColor: '#DCE6F2', marginVertical: 4 },
   routeDetails: { flex: 1 },
   routeStop: {},
-  routeStopLabel: { fontSize: 10, fontWeight: '700', color: '#BBB', letterSpacing: 1 },
-  routeLocation: { fontSize: 16, fontWeight: '700', color: theme.colors.dark, marginTop: 3 },
+  routeStopLabel: { fontSize: 10, fontWeight: '800', color: '#94A3B8', letterSpacing: 1 },
+  routeLocation: { fontSize: 16, fontWeight: '800', color: theme.colors.ink, marginTop: 4 },
 
   sectionCard: {
     marginHorizontal: 20, marginTop: 16, backgroundColor: '#FFF',
-    borderRadius: 20, padding: 20, ...theme.shadows.xs, borderWidth: 1, borderColor: '#F0F0F0',
+    borderRadius: 24, padding: 22, ...theme.shadows.md, borderWidth: 1, borderColor: '#E2E8F0',
   },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
-  sectionTitle: { fontSize: 15, fontWeight: '800', color: theme.colors.dark },
+  sectionTitle: { fontSize: 15, fontWeight: '900', color: theme.colors.ink },
   contactRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
   contactItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  contactText: { fontSize: 13, fontWeight: '600', color: '#666' },
+  contactText: { fontSize: 13, fontWeight: '700', color: '#475569' },
   contactPhone: { color: theme.colors.sky },
-  addressBox: { backgroundColor: '#F8F9FA', borderRadius: 12, padding: 14, marginBottom: 12 },
-  addressLabel: { fontSize: 10, fontWeight: '700', color: '#999', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  addressText: { fontSize: 14, fontWeight: '600', color: theme.colors.dark, lineHeight: 20 },
-  instructionsBox: { backgroundColor: '#FFF7ED', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#FFEDD5' },
+  addressBox: { backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' },
+  addressLabel: { fontSize: 10, fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 },
+  addressText: { fontSize: 14, fontWeight: '700', color: theme.colors.ink, lineHeight: 20 },
+  instructionsBox: { backgroundColor: '#FFF7ED', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#FFEDD5' },
   instructionsLabel: { fontSize: 10, fontWeight: '700', color: '#C2410C', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
   instructionsText: { fontSize: 13, fontWeight: '600', color: '#9A3412', lineHeight: 18 },
 
   earningsCard: {
     marginHorizontal: 20, marginTop: 16, backgroundColor: '#F0FDF4',
-    borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#BBF7D0',
+    borderRadius: 24, padding: 22, borderWidth: 1, borderColor: '#BBF7D0',
   },
   earningsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
   earningsLabel: { fontSize: 13, fontWeight: '600', color: '#374151' },
@@ -341,24 +342,24 @@ const styles = StyleSheet.create({
     marginHorizontal: 16, marginTop: 16, gap: 10,
   },
   detailCard: {
-    width: '47%', backgroundColor: '#FFF', borderRadius: 16, padding: 16,
-    ...theme.shadows.xs, borderWidth: 1, borderColor: '#F0F0F0', flexGrow: 1,
+    width: '47%', backgroundColor: '#FFF', borderRadius: 20, padding: 18,
+    ...theme.shadows.sm, borderWidth: 1, borderColor: '#E2E8F0', flexGrow: 1,
   },
   detailIconWrap: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-  detailLabel: { fontSize: 11, color: '#999', fontWeight: '600' },
-  detailValue: { fontSize: 16, fontWeight: '800', color: theme.colors.dark, marginTop: 3 },
+  detailLabel: { fontSize: 11, color: '#94A3B8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+  detailValue: { fontSize: 16, fontWeight: '900', color: theme.colors.ink, marginTop: 5 },
 
   infoBox: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     marginHorizontal: 20, marginTop: 16, backgroundColor: '#E1F5FE',
-    borderRadius: 14, padding: 14,
+    borderRadius: 18, padding: 16,
   },
   infoText: { flex: 1, fontSize: 13, color: '#0369a1', fontWeight: '600', lineHeight: 18 },
 
   acceptBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
     marginHorizontal: 20, marginTop: 24, backgroundColor: theme.colors.sky,
-    paddingVertical: 18, borderRadius: 16, ...theme.shadows.md,
+    paddingVertical: 18, borderRadius: 18, ...theme.shadows.lg,
   },
   acceptBtnLoading: { opacity: 0.7 },
   acceptText: { color: '#FFF', fontSize: 17, fontWeight: '800', letterSpacing: 0.3 },
@@ -373,5 +374,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6, marginTop: 16, paddingVertical: 12,
   },
-  backLinkText: { fontSize: 13, fontWeight: '600', color: '#999' },
+  backLinkText: { fontSize: 13, fontWeight: '700', color: '#94A3B8' },
 });

@@ -92,7 +92,7 @@ class Settings(BaseSettings):
 
     REDIS_URL: str = "redis://redis:6379/0"
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004"
-    ALLOWED_HOSTS: str = "localhost,127.0.0.1,host.docker.internal"
+    ALLOWED_HOSTS: str = "localhost,127.0.0.1,host.docker.internal,backend,backend:8000,agric-backend-1,agric-backend-1:8000"
     FORCE_HTTPS: bool = False
 
     # ============================================================================
@@ -364,6 +364,13 @@ class Settings(BaseSettings):
     INPUT_SELLER_MIN_TRUST_SCORE: int = 40
     INPUT_BULK_ORDER_MIN_USD: float = 500.0
     INPUT_EXPIRY_WARNING_DAYS: int = 7
+
+    # --- FARMING TOOLS CONFIGURATION ---
+    OPENWEATHERMAP_API_KEY: str = ""
+    WEATHER_CACHE_TTL_SECONDS: int = 1800  # 30 minutes
+    WEATHER_API_TIMEOUT_SECONDS: int = 10
+    FARMING_TIPS_CACHE_TTL_SECONDS: int = 3600  # 1 hour
+    PLANTING_CALENDAR_CACHE_TTL_SECONDS: int = 86400  # 24 hours
 
     # --- EMERGENCY SHUTDOWN ---
     PLATFORM_SHUTDOWN: bool = False  # toggled by super-admin emergency endpoint

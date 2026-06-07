@@ -351,7 +351,7 @@ export async function deleteAccount(token) {
 }
 
 export async function changePin(token, currentPin, newPin) {
-  return jsonFetch('/auth/pin/change', {
+  return jsonFetch('/auth/change-pin', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ current_pin: currentPin, new_pin: newPin }),
@@ -761,6 +761,38 @@ export async function updateLocation(token, latitude, longitude) {
 export async function getRecommendations(token, type = 'listings') {
   return jsonFetch(`/recommendations/${type}`, {
     headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function chatWithAiAssistant(token: string, assistantRole: string, message: string, context: Record<string, any> = {}) {
+  return jsonFetch(`/ai/assistants/${assistantRole}/chat`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ message, context }),
+  });
+}
+
+export async function getAiRecommendations(token: string, assistantRole: string | null = null, context: Record<string, any> = {}) {
+  return jsonFetch('/ai/recommendations', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ assistant_role: assistantRole, context }),
+  });
+}
+
+export async function getAiMarketIntelligence(token: string, product: string | null = null, province: string | null = null) {
+  return jsonFetch('/ai/market-intelligence', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ product, province }),
+  });
+}
+
+export async function getAiPriceDemandPrediction(token: string, product: string, province: string | null = null, daysAhead = 30) {
+  return jsonFetch('/ai/predictions/price-demand', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ product, province, days_ahead: daysAhead }),
   });
 }
 

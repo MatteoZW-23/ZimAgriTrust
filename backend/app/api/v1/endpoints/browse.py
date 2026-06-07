@@ -8,11 +8,12 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import String, cast
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.models.input_marketplace import InputListing, InputListingStatus
-from app.models.listing import Listing, ListingStatus
+from app.models.listing import BuyerRequest, Listing, ListingStatus
 from app.services.subscription_service import SubscriptionService
 
 router = APIRouter()
@@ -20,7 +21,7 @@ router = APIRouter()
 
 @router.get("/search")
 def unified_search(
-    kind: str = Query("all", pattern="^(all|crops|inputs)$"),
+    kind: str = Query("all", pattern="^(all|crops|inputs|requests)$"),
     q: Optional[str] = None,
     province: Optional[str] = None,
     min_price: Optional[float] = None,
@@ -35,12 +36,12 @@ def unified_search(
     """
     Returns:
       {
-        "results": [ { kind: "crop" | "input", ...normalised... }, ... ],
-        "counts":  { "crops": N, "inputs": M }
+        "results": [ { kind: "crop" | "input" | "request", ...normalised... }, ... ],
+        "counts":  { "crops": N, "inputs": M, "requests": R }
       }
     """
     items: list[dict] = []
-    counts = {"crops": 0, "inputs": 0}
+    counts = {"crops": 0, "inputs": 0, "requests": 0}
 
     if kind in ("all", "crops"):
         cq = db.query(Listing).filter(Listing.status == ListingStatus.ACTIVE)
@@ -48,7 +49,7 @@ def unified_search(
             like = f"%{q}%"
             cq = cq.filter(Listing.product_type.ilike(like))
         if province:
-            cq = cq.filter(Listing.province == province)
+            cq = cq.filter(Listing.location_province == province)
         if min_price is not None:
             cq = cq.filter(Listing.price_per_unit >= min_price)
         if max_price is not None:
@@ -66,9 +67,10 @@ def unified_search(
                 "price_per_unit": float(l.price_per_unit or 0),
                 "currency": l.currency,
                 "quantity": float(l.quantity or 0),
-                "unit": getattr(l, "unit", "kg"),
-                "location": getattr(l, "location", None),
-                "province": l.province,
+                "unit": getattr(l, "quantity_unit", "kg"),
+                "location": ", ".join([part for part in [l.location_district, l.location_province] if part]) or getattr(l, "pickup_address", None),
+                "province": l.location_province,
+                "district": l.location_district,
                 "photos": getattr(l, "photos", None) or [],
                 "verified": bool(getattr(l, "verified_at", None)),
                 "expiry_date": None,
@@ -81,7 +83,7 @@ def unified_search(
             })
 
     if kind in ("all", "inputs"):
-        iq = db.query(InputListing).filter(InputListing.status == InputListingStatus.ACTIVE)
+        iq = db.query(InputListing).filter(cast(InputListing.status, String) == InputListingStatus.ACTIVE.value)
         iq = iq.filter(
             (InputListing.expiry_date.is_(None)) | (InputListing.expiry_date > datetime.now(timezone.utc))
         )
@@ -137,6 +139,36 @@ def unified_search(
                 "badges": badges,
                 "visibility_weight": weight,
                 "created_at": l.created_at,
+            })
+
+    if kind in ("all", "requests"):
+        rq = db.query(BuyerRequest).filter(BuyerRequest.status == "open")
+        if q:
+            like = f"%{q}%"
+            rq = rq.filter(BuyerRequest.product_type.ilike(like))
+        if province:
+            like = f"%{province}%"
+            rq = rq.filter(BuyerRequest.delivery_location.ilike(like))
+        requests = rq.order_by(BuyerRequest.created_at.desc()).offset(offset).limit(limit).all()
+        counts["requests"] = len(requests)
+        for r in requests:
+            items.append({
+                "kind": "request",
+                "id": str(r.id),
+                "name": r.product_type,
+                "sector": r.sector,
+                "price_per_unit": float(r.target_price or 0),
+                "currency": r.currency,
+                "quantity": float(r.quantity_required or 0),
+                "unit": r.quantity_unit or "units",
+                "location": r.delivery_location or "Zimbabwe",
+                "province": None,
+                "photos": [],
+                "verified": False,
+                "boosted": False,
+                "visibility_weight": 100,
+                "trust_score": 0,
+                "created_at": r.created_at,
             })
 
     items.sort(

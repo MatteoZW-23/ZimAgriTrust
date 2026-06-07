@@ -1,18 +1,54 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useOfferStore, useAuthStore, Button, Modal, Input } from '@agritrust/shared';
+import { useAuthStore, Button, Modal, Input } from '@agritrust/shared';
 import { Handshake, Check, X, MessageSquare, Clock, CornerUpLeft } from 'lucide-react';
+import { acceptOffer, counterOffer, getOffersMade, getOffersReceived, rejectOffer } from '../api';
+
+type Offer = {
+  id: string;
+  listing_id: string;
+  status: string;
+  created_at: string;
+  offered_price_per_kg: number;
+  offered_quantity_kg: number;
+  currency?: string;
+};
+
+const normalizeOffer = (offer: any): Offer => ({
+  ...offer,
+  status: String(offer.status || 'PENDING').toUpperCase(),
+  offered_price_per_kg: Number(offer.offered_price_per_kg ?? offer.offered_price_per_unit ?? offer.price ?? 0),
+  offered_quantity_kg: Number(offer.offered_quantity_kg ?? offer.quantity ?? 0),
+  created_at: offer.created_at || new Date().toISOString(),
+});
 
 export const Offers: React.FC = () => {
   const { user } = useAuthStore();
-  const { offersReceived, offersMade, fetchOffersReceived, fetchOffersMade, acceptOffer, rejectOffer, counterOffer, loading } = useOfferStore();
+  const [offersReceived, setOffersReceived] = useState<Offer[]>([]);
+  const [offersMade, setOffersMade] = useState<Offer[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [tab, setTab] = useState<'received' | 'made'>(user?.role === 'farmer' ? 'received' : 'made');
-  const [counterTarget, setCounterTarget] = useState<any>(null);
+  const [counterTarget, setCounterTarget] = useState<Offer | null>(null);
   const [counterPrice, setCounterPrice] = useState('');
 
-  useEffect(() => {
-    if (user?.role === 'farmer') fetchOffersReceived();
-    if (user?.role === 'buyer') fetchOffersMade();
-  }, [user, fetchOffersReceived, fetchOffersMade]);
+  const loadOffers = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [received, made] = await Promise.all([
+        user?.role === 'farmer' ? getOffersReceived() : Promise.resolve([]),
+        getOffersMade(),
+      ]);
+      setOffersReceived((received || []).map(normalizeOffer));
+      setOffersMade((made || []).map(normalizeOffer));
+    } catch (err: any) {
+      setError(err.message || 'Failed to load offers');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.role]);
+
+  useEffect(() => { loadOffers(); }, [loadOffers]);
 
   const offers = useMemo(() => tab === 'received' ? offersReceived : offersMade, [tab, offersReceived, offersMade]);
 
@@ -21,15 +57,18 @@ export const Offers: React.FC = () => {
     await counterOffer(counterTarget.id, Number(counterPrice));
     setCounterTarget(null);
     setCounterPrice('');
-  }, [counterTarget, counterPrice, counterOffer]);
+    loadOffers();
+  }, [counterTarget, counterPrice, loadOffers]);
 
-  const handleAccept = useCallback((offerId: string) => {
-    acceptOffer(offerId);
-  }, [acceptOffer]);
+  const handleAccept = useCallback(async (offerId: string) => {
+    await acceptOffer(offerId);
+    loadOffers();
+  }, [loadOffers]);
 
-  const handleReject = useCallback((offerId: string) => {
-    rejectOffer(offerId);
-  }, [rejectOffer]);
+  const handleReject = useCallback(async (offerId: string) => {
+    await rejectOffer(offerId);
+    loadOffers();
+  }, [loadOffers]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -42,14 +81,14 @@ export const Offers: React.FC = () => {
 
           <div className="flex gap-2 p-1 mt-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl w-fit">
             {user?.role === 'farmer' && (
-              <button 
+              <button
                 onClick={() => setTab('received')}
                 className={`px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all ${tab === 'received' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
               >
                 Received
               </button>
             )}
-            <button 
+            <button
               onClick={() => setTab('made')}
               className={`px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all ${tab === 'made' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
             >
@@ -59,6 +98,12 @@ export const Offers: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 gap-4">
+          {error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+              {error}
+            </div>
+          )}
+
           {loading && offers.length === 0 ? (
             [...Array(3)].map((_, i) => (
               <div key={i} className="h-32 bg-gray-200 dark:bg-gray-800 rounded-2xl animate-pulse"></div>
@@ -83,19 +128,19 @@ export const Offers: React.FC = () => {
                       <div>
                         <h4 className="text-lg font-bold text-gray-900 dark:text-white">Offer for Listing #{offer.listing_id.substring(0, 8)}</h4>
                         <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">
-                          {new Date(offer.created_at).toLocaleDateString()} • {offer.quantity} kg requested
+                          {new Date(offer.created_at).toLocaleDateString()} • {offer.offered_quantity_kg} kg requested
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-12">
-                      <div className="text-center">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8">
+                      <div className="text-left sm:text-center">
                         <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Offer Price</p>
-                        <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">${Number((offer as any).price || (offer as any).offered_price_per_unit || 0).toFixed(2)}</p>
+                        <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">${offer.offered_price_per_kg.toFixed(2)}</p>
                       </div>
-                      
-                      <div className="flex items-center gap-2">
-                        {tab === 'received' && offer.status === 'pending' ? (
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {tab === 'received' && offer.status === 'PENDING' ? (
                           <>
                             <Button size="sm" variant="outline" onClick={() => handleReject(offer.id)} className="border-gray-300 dark:border-gray-600">
                               <X size={16} className="mr-2" /> Reject
@@ -103,17 +148,17 @@ export const Offers: React.FC = () => {
                             <Button size="sm" onClick={() => handleAccept(offer.id)} className="bg-blue-600 hover:bg-blue-700">
                               <Check size={16} className="mr-2" /> Accept
                             </Button>
-                            <Button size="sm" variant="ghost" onClick={() => { setCounterTarget(offer); setCounterPrice(String(Number(offer.price || 0))); }} className="text-gray-600 dark:text-gray-400">
+                            <Button size="sm" variant="ghost" onClick={() => { setCounterTarget(offer); setCounterPrice(String(offer.offered_price_per_kg)); }} className="text-gray-600 dark:text-gray-400">
                               <CornerUpLeft size={16} className="mr-2" /> Counter
                             </Button>
                           </>
                         ) : (
                           <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
                             <Clock size={14} className="text-gray-500 dark:text-gray-400" />
-                            <span className="text-xs font-bold uppercase text-gray-700 dark:text-gray-300 tracking-wider">{offer.status}</span>
+                            <span className="text-xs font-bold uppercase text-gray-700 dark:text-gray-300 tracking-wider">{offer.status.toLowerCase()}</span>
                           </div>
                         )}
-                        <button className="p-3 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-blue-600 transition-all">
+                        <button type="button" className="p-3 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-blue-600 transition-all">
                           <MessageSquare size={18} />
                         </button>
                       </div>
@@ -137,7 +182,7 @@ export const Offers: React.FC = () => {
           }
         >
           <Input
-            label="Counter Price per kg"
+            label="Counter Price"
             type="number"
             step="0.01"
             value={counterPrice}

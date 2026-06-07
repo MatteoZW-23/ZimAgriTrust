@@ -168,6 +168,7 @@ class SettingsUpdatePayload(BaseModel):
     email_notifications: Optional[bool] = None
     job_alerts: Optional[bool] = None
     earnings_alerts: Optional[bool] = None
+    new_job_sound: Optional[bool] = None
 
 
 class PrivacyUpdatePayload(BaseModel):
@@ -532,7 +533,7 @@ def get_settings(
         "phone_visibility": True,
         "data_sharing_consent": True
     }
-    return {**defaults, **prefs.get("driver_settings", {})}
+    return {**defaults, **prefs.get("driver_settings", {}), **prefs.get("driver_privacy", {})}
 
 
 @router.get("/settings")

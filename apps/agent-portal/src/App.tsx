@@ -14,6 +14,8 @@ import PerformancePanel from "./components/PerformancePanel";
 import PracticalAssessmentPanel from "./components/PracticalAssessmentPanel";
 import ShadowingPanel from "./components/ShadowingPanel";
 import SupervisedPanel from "./components/SupervisedPanel";
+import AgentAIAssistant from "./components/AgentAIAssistant";
+import AcademyApp from "./components/AcademyApp";
 
 const AUTH_KEY = "zimagritrust_agent_auth";
 const USER_KEY = "zimagritrust_agent_user";
@@ -27,6 +29,7 @@ const NAV = [
   { id: "listings", icon: "fa-list", label: "Listing Review" },
   { id: "disputes", icon: "fa-flag", label: "Disputes" },
   { id: "delivery", icon: "fa-truck", label: "Delivery" },
+  { id: "ai-assistant", icon: "fa-robot", label: "Agent AI" },
   { id: "practical", icon: "fa-clipboard-check", label: "Practical Assessment" },
   { id: "shadowing", icon: "fa-eye", label: "Shadowing" },
   { id: "supervised", icon: "fa-user-graduate", label: "Supervised" },
@@ -56,6 +59,14 @@ export default function App() {
     localStorage.removeItem(AUTH_KEY); localStorage.removeItem(USER_KEY);
   };
 
+  const handleAcademyGraduate = () => {
+    setShowAcademy(false);
+    setAuth(null);
+    setUser(null);
+    localStorage.removeItem(AUTH_KEY);
+    localStorage.removeItem(USER_KEY);
+  };
+
   // Pre-auth: public application wizard at /apply or ?apply=1
   const url = typeof window !== "undefined" ? window.location : { pathname: "", search: "" };
   const wantsApply = url.pathname.startsWith("/apply") || url.search.includes("apply=1");
@@ -68,13 +79,31 @@ export default function App() {
     );
   }
 
+  if (!auth && showAcademy) {
+    return <AcademyApp onGraduate={handleAcademyGraduate} onCancel={() => setShowAcademy(false)} />;
+  }
+
+  const cameFromAcademy = localStorage.getItem(NEEDS_ACADEMY_KEY) === "graduated";
+  if (!auth && cameFromAcademy) {
+    return (
+      <div className="auth-screen">
+        <div className="auth-card" style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>Academy Complete</div>
+          <h2 style={{ color: "var(--text)", marginBottom: 8 }}>Academy Complete!</h2>
+          <p style={{ color: "var(--text-dim)", marginBottom: 24 }}>You are now a Certified ZimAgritrust Field Agent. Log in below to access the full Agent Portal.</p>
+          <AuthScreen onLogin={(d) => { localStorage.removeItem(NEEDS_ACADEMY_KEY); handleLogin(d); }} />
+        </div>
+      </div>
+    );
+  }
+
   // If Academy session is active (or user chose Academy), show standalone Academy
   if (!auth) return (
     <>
       <AuthScreen onLogin={handleLogin} />
       <div style={{ position: "fixed", bottom: 16, left: 0, right: 0, textAlign: "center", fontSize: 13, color: "#94a3b8" }}>
         <span
-          onClick={() => { window.location.href = "https://academy.zimagritrust.com"; }}
+          onClick={() => setShowAcademy(true)}
           style={{ color: "#10b981", fontWeight: 700, cursor: "pointer", marginRight: 16 }}
         >
           <i className="fas fa-graduation-cap" style={{ marginRight: 4 }}></i> Enter Academy (Trainees)
@@ -85,26 +114,11 @@ export default function App() {
     </>
   );
 
-  // Trainees (status === "trainee") must complete the Academy before accessing the portal
+  // Trainees must complete the Academy before accessing the portal.
   const agentStatus = (user?.agent_status || user?.status || "").toLowerCase();
   if (auth && agentStatus === "trainee") {
-    window.location.href = "https://academy.zimagritrust.com";
-    return null;
-  }
-
-  // Graduated trainees: show a portal login prompt (their status is now "active")
-  const cameFromAcademy = localStorage.getItem(NEEDS_ACADEMY_KEY) === "graduated";
-  if (!auth && cameFromAcademy) {
-    return (
-      <div className="auth-screen">
-        <div className="auth-card" style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 56, marginBottom: 16 }}>🎓</div>
-          <h2 style={{ color: "var(--text)", marginBottom: 8 }}>Academy Complete!</h2>
-          <p style={{ color: "var(--text-dim)", marginBottom: 24 }}>You are now a Certified ZimAgritrust Field Agent. Log in below to access the full Agent Portal.</p>
-          <AuthScreen onLogin={(d) => { localStorage.removeItem(NEEDS_ACADEMY_KEY); handleLogin(d); }} />
-        </div>
-      </div>
-    );
+    localStorage.setItem("zimagritrust_academy_auth", JSON.stringify(auth));
+    return <AcademyApp onGraduate={handleAcademyGraduate} onCancel={handleLogout} />;
   }
 
   const role = (user?.role || "").toLowerCase();
@@ -122,6 +136,7 @@ export default function App() {
       case "listings": return <ListingReviewPanel />;
       case "disputes": return <DisputesPanel />;
       case "delivery": return <DeliveryPanel />;
+      case "ai-assistant": return <AgentAIAssistant user={user} />;
       case "practical": return <PracticalAssessmentPanel />;
       case "shadowing": return <ShadowingPanel user={user} />;
       case "supervised": return <SupervisedPanel />;

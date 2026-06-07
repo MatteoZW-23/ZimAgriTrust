@@ -41,16 +41,16 @@ export default function SupportScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F6F0DE' },
+  container: { flex: 1, backgroundColor: theme.colors.gray50 },
   content: { padding: 20, paddingTop: 56, paddingBottom: 120 },
-  title: { color: '#111827', fontSize: 32, fontWeight: '900', marginTop: 12 },
+  title: { color: '#111827', fontSize: 34, fontWeight: '900', marginTop: 14, letterSpacing: -0.8 },
   subtitle: { color: '#64748b', fontSize: 14, lineHeight: 21, marginTop: 8, marginBottom: 20 },
-  card: { backgroundColor: '#fff', borderRadius: 22, padding: 18, borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 16 },
+  card: { backgroundColor: '#fff', borderRadius: 26, padding: 20, borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 18, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.06, shadowRadius: 18, elevation: 4 },
   faq: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
   question: { color: '#111827', fontSize: 16, fontWeight: '900' },
   answer: { color: '#64748b', fontSize: 14, lineHeight: 21, marginTop: 6, fontWeight: '600' },
-  button: { backgroundColor: theme.colors.green, borderRadius: 16, paddingVertical: 15, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginBottom: 12 },
+  button: { backgroundColor: theme.colors.green, borderRadius: 18, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginBottom: 12, shadowColor: '#16A34A', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 6 },
   buttonText: { color: '#fff', fontWeight: '900', fontSize: 15 },
-  secondary: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#bbf7d0' },
+  secondary: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#bbf7d0', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.04, shadowRadius: 16, elevation: 2 },
   secondaryText: { color: theme.colors.green, fontWeight: '900', fontSize: 15 },
 });

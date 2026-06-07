@@ -11,11 +11,38 @@ interface ApiError extends Error {
   status: number;
 }
 
+function getStoredToken(): string | null {
+  if (typeof localStorage === "undefined") return null;
+  return localStorage.getItem("zimagritrust_token");
+}
+
+function getCsrfCookie(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function createIdempotencyKey(path: string): string {
+  const random =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `${path.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "")}-${random}`;
+}
+
 export async function request(path: string, options: RequestInit & { headers?: Record<string, string> } = {}): Promise<any> {
+  const optionHeaders = options.headers || {};
+  const token = getStoredToken();
+  const csrfToken = getCsrfCookie();
+  const method = (options.method || "GET").toUpperCase();
+  const needsIdempotencyKey = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
   const headers: Record<string, string> = Object.assign(
     {},
     options.body instanceof FormData ? {} : { "Content-Type": "application/json" },
-    options.headers || {},
+    token ? { Authorization: `Bearer ${token}` } : {},
+    csrfToken ? { "X-CSRF-Token": csrfToken } : {},
+    needsIdempotencyKey ? { "Idempotency-Key": createIdempotencyKey(path) } : {},
+    optionHeaders,
   );
   const res = await fetch(`${API}${path}`, {
     ...options,
@@ -49,10 +76,12 @@ export const verifyRegOtp = (phone_number: string, otp: string) =>
 export const getProfile = () => request("/auth/me");
 export const updateProfile = (data: Record<string, any>) => request("/auth/profile", { method: "PATCH", body: JSON.stringify(data) });
 export const logout = () => request("/auth/logout", { method: "POST" }).catch(() => {});
+export const deactivateAccount = () => request("/auth/deactivate", { method: "POST" });
+export const deleteAccount = () => request("/auth/account", { method: "DELETE" });
 export const getUserSettings = () => request("/users/settings");
 export const updateUserSettings = (data: Record<string, any>) => request("/users/settings", { method: "PUT", body: JSON.stringify(data) });
 export const changeUserPin = (current_pin: string, new_pin: string) =>
-  request("/users/pin/change", { method: "POST", body: JSON.stringify({ current_pin, new_pin }) });
+  request("/auth/change-pin", { method: "POST", body: JSON.stringify({ current_pin, new_pin }) });
 
 // ── Listings & Browse ─────────────────────────────────────────────────────────
 export const getMyListings = () => request("/listings/me");
@@ -76,6 +105,8 @@ export const createListing = (data: Record<string, any>) => {
   };
   return request("/listings", { method: "POST", body: JSON.stringify(payload) });
 };
+export const addListingPhotos = (listingId: string, urls: string[]) =>
+  request(`/listings/${listingId}/photos`, { method: "POST", body: JSON.stringify({ urls }) });
 export const updateListing = (id: string, data: Record<string, any>) => request(`/listings/${id}`, { method: "PATCH", body: JSON.stringify(data) });
 export const deleteListing = (id: string) => request(`/listings/${id}`, { method: "DELETE" });
 export const getSavedListings = () => request("/listings/me/saved");
@@ -106,6 +137,8 @@ export const confirmDelivery = (id: string) => request(`/logistics/orders/${id}/
 export const placeOffer = (listingId: string, data: Record<string, any>) =>
   request(`/listings/${listingId}/offers`, { method: "POST", body: JSON.stringify(data) });
 export const getMyOffers = () => request("/offers/me");
+export const getOffersReceived = () => request("/offers/received");
+export const getOffersMade = () => request("/offers/made");
 export const getListingOffers = (listingId: string) => request(`/listings/${listingId}/offers`);
 export const acceptOffer = (offerId: string) => request(`/offers/${offerId}/accept`, { method: "POST" });
 export const rejectOffer = (offerId: string) => request(`/offers/${offerId}/reject`, { method: "POST" });
@@ -164,6 +197,18 @@ export const detectCropDisease = (formData: FormData) => request("/ml/detect-dis
 // ── Market Prices ─────────────────────────────────────────────────────────────
 export const getMarketPrices = () =>
   request("/market/prices/current").catch(() => request("/market/summary"));
+
+export const chatWithPortalAi = (assistantRole: "farmer" | "buyer", message: string, context: Record<string, any> = {}) =>
+  request(`/ai/assistants/${assistantRole}/chat`, { method: "POST", body: JSON.stringify({ message, context }) });
+export const getPortalAiRecommendations = (assistantRole: "farmer" | "buyer", context: Record<string, any> = {}) =>
+  request("/ai/recommendations", { method: "POST", body: JSON.stringify({ assistant_role: assistantRole, context }) });
+export const getPortalAiMarketIntelligence = (product: string | null = null, province: string | null = null) =>
+  request("/ai/market-intelligence", { method: "POST", body: JSON.stringify({ product, province }) });
+export const getPortalAiPriceDemandPrediction = (product = "Horticulture", province: string | null = null, daysAhead = 30) =>
+  request("/ai/predictions/price-demand", {
+    method: "POST",
+    body: JSON.stringify({ product, province, days_ahead: daysAhead }),
+  });
 
 export const getTrustScore = () => request("/auth/me").then((d) => d?.trust_score ?? 0);
 

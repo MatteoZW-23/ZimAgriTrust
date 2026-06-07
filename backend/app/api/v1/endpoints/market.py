@@ -103,16 +103,24 @@ def get_price_trends(
     """
     Historical price trends from completed platform orders (last 30 days).
     """
-    from app.models.listing import Listing, ListingStatus
+    from app.models.listing import Listing
     from app.models.transaction import Order, OrderStatus
     from datetime import datetime, timezone, timedelta
-    from sqlalchemy import func
+    from sqlalchemy import String, cast, or_
 
     # Get price history from completed orders
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     orders = db.query(Order).filter(
         Order.status == OrderStatus.COMPLETED,
         Order.created_at >= thirty_days_ago
+    ).join(Listing, Order.listing_id == Listing.id).filter(
+        or_(
+            Listing.product_type.ilike(f"%{crop}%"),
+            Listing.product_subtype.ilike(f"%{crop}%"),
+            cast(Listing.sector, String).ilike(f"%{crop}%"),
+            Listing.crop.ilike(f"%{crop}%"),
+            Listing.crop_type.ilike(f"%{crop}%"),
+        )
     ).all()
 
     # Group by date and calculate average price
@@ -132,31 +140,46 @@ def get_price_trends(
     return trends
 
 
-@router.get("/demand/{crop}")
+@router.get("/demand/{product}")
 def get_crop_demand(
-    crop: str,
+    product: str,
     db: Session = Depends(get_db),
     user = Depends(get_current_user)
 ):
     """
-    Calculates the Buy-to-Sell Ratio (Demand Index) for a specific crop.
+    Calculates the Buy-to-Sell Ratio (Demand Index) for any agriculture product or sector.
     """
     from app.models.listing import Listing, Offer, ListingStatus
-    from sqlalchemy import func
-    
+    from sqlalchemy import String, cast, func, or_
+
+    product_match = or_(
+        Listing.product_type.ilike(f"%{product}%"),
+        Listing.product_subtype.ilike(f"%{product}%"),
+        cast(Listing.sector, String).ilike(f"%{product}%"),
+        Listing.crop.ilike(f"%{product}%"),
+        Listing.crop_type.ilike(f"%{product}%"),
+    )
+
     supply = db.query(func.sum(Listing.quantity)).filter(
-        Listing.product_type.ilike(f"%{crop}%"),
+        product_match,
         Listing.status == ListingStatus.ACTIVE
     ).scalar() or 0
-    
-    demand = db.query(func.sum(Offer.quantity)).join(Listing).filter(
-        Listing.product_type.ilike(f"%{crop}%")
+
+    demand = db.query(func.sum(Offer.offered_quantity_kg)).join(Listing).filter(
+        product_match
     ).scalar() or 0
-    
+
     index = (demand / supply * 10) if supply > 0 else 0.0
     status = "HIGH" if index > 7 else "MODERATE" if index > 3 else "LOW"
-    
-    return {"crop": crop, "demand_index": round(index, 1), "status": status, "total_supply": supply, "total_demand": demand}
+
+    return {
+        "crop": product,
+        "product": product,
+        "demand_index": round(index, 1),
+        "status": status,
+        "total_supply": supply,
+        "total_demand": demand,
+    }
 
 
 @router.get("/risk/{target_user_id}")

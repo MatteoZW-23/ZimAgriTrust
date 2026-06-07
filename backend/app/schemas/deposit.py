@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # ---------- Payment methods ----------
 
 class PaymentMethodCreate(BaseModel):
-    channel: str = Field(pattern="^(ecocash|onemoney|bank_transfer|cash_agent)$")
+    channel: str = Field(pattern="^(ecocash|onemoney|innbucks|omari|bank_transfer|cash_agent)$")
     label: str
     last4: Optional[str] = None
     token: Optional[str] = None
@@ -33,7 +33,7 @@ class PaymentMethodOut(BaseModel):
 # ---------- Deposit intents ----------
 
 class MobileMoneyDepositIn(BaseModel):
-    channel: str = Field(pattern="^(ecocash|onemoney)$")
+    channel: str = Field(pattern="^(ecocash|onemoney|innbucks|omari)$")
     amount: float = Field(gt=0)
     msisdn: str
     payment_method_id: Optional[UUID] = None

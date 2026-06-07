@@ -43,6 +43,9 @@ def create_listing(db: Session, seller: User, payload: ListingCreate) -> Listing
     else:
         data.setdefault("quantity_kg", qty)
         data.setdefault("price_per_kg", float(data.get("price_per_unit") or 0))
+    # Map province/district to location_province/location_district for database
+    data.setdefault("location_province", data.get("province"))
+    data.setdefault("location_district", data.get("district"))
     data.setdefault("location", data.get("pickup_address") or data.get("location_district") or data.get("location_province"))
     data.setdefault("title", f"{data.get('product_type', 'Produce').title()} listing")
     data.setdefault("description", data.get("storage_requirements") or f"{data.get('product_type', 'Produce')} available")
@@ -163,7 +166,7 @@ def accept_offer(
     return order
 
 def reject_offer(db: Session, offer: Offer) -> Offer:
-    offer.status = OfferStatus.REJECTED
+    offer.status = OfferStatus.DECLINED
     db.commit()
     db.refresh(offer)
     return offer
@@ -186,9 +189,12 @@ def counter_offer(db: Session, offer: Offer, counter_price: float, actor: User) 
     return offer
 
 def create_buyer_request(db: Session, buyer: User, payload: BuyerRequestCreate) -> BuyerRequest:
+    data = payload.model_dump()
+    if data.get("sector") is not None:
+        data["sector"] = getattr(data["sector"], "value", data["sector"])
     request = BuyerRequest(
         buyer_id=buyer.id,
-        **payload.model_dump()
+        **data
     )
     db.add(request)
     db.commit()

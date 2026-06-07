@@ -46,6 +46,8 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.ledger = SqlAlchemyLedgerAdapter(session)
         self.trust = SqlAlchemyTrustRepository(session)
         self.trust_history = SqlAlchemyTrustHistoryReader(session)
+        self.disputes = SqlAlchemyDisputeRepository(session)
+        self.dispute_reader = SqlAlchemyDisputeReader(session)
 
     def __enter__(self) -> "SqlAlchemyUnitOfWork":
         return self

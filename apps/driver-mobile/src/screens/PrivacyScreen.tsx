@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Switch, TouchableOpacity,
-  ScrollView, SafeAreaView, ActivityIndicator, Alert,
+  ScrollView, SafeAreaView, ActivityIndicator, Alert, Platform, Share,
 } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { 
@@ -10,7 +10,7 @@ import {
   Info as IconInfo, ChevronRight as IconChevronRight
 } from 'lucide-react-native';
 import { theme } from '../styles';
-import { getDriverSettings, updatePrivacySettings, deleteDriverData } from '../api';
+import { getDriverSettings, updatePrivacySettings, deleteDriverData, exportDriverData } from '../api';
 
 export default function PrivacyScreen({ route, navigation }) {
   const { token } = route.params || {};
@@ -73,6 +73,26 @@ export default function PrivacyScreen({ route, navigation }) {
         }
       ]
     );
+  };
+
+  const handleRequestDataArchive = async () => {
+    try {
+      const data = await exportDriverData(token);
+      const text = JSON.stringify(data, null, 2);
+      if (Platform.OS === 'web') {
+        const blob = new Blob([text], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'zimagritrust-driver-data.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+      await Share.share({ title: 'ZimAgriTrust driver data export', message: text });
+    } catch (err) {
+      Alert.alert('Export failed', 'Could not prepare your data archive. Please try again.');
+    }
   };
 
   if (loading) {
@@ -141,7 +161,7 @@ export default function PrivacyScreen({ route, navigation }) {
         <Animated.View entering={FadeInUp.duration(600).delay(300).springify()} style={styles.section}>
           <Text style={styles.sectionTitle}>Account Data</Text>
           <View style={styles.card}>
-            <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.menuItem} onPress={handleRequestDataArchive} activeOpacity={0.7}>
               <View style={styles.menuLeft}>
                 <View style={[styles.menuIconWrap, { backgroundColor: '#F3F4F6' }]}>
                   <IconDownload size={20} color="#4B5563" />
@@ -190,7 +210,7 @@ function PrivacyRow({ icon, iconBg, label, description, value, onToggle }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FAFAFA' },
+  container: { flex: 1, backgroundColor: theme.colors.gray50 },
   loading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollContent: { padding: 24, paddingBottom: 60 },
   
@@ -200,25 +220,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', marginBottom: 16,
     shadowColor: '#0EA5E9', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8
   },
-  title: { fontSize: 28, fontWeight: '900', color: '#111827', letterSpacing: -0.5 },
-  subtitle: { fontSize: 15, color: '#6B7280', marginTop: 6, fontWeight: '500' },
+  title: { fontSize: 30, fontWeight: '900', color: '#111827', letterSpacing: -0.7 },
+  subtitle: { fontSize: 15, color: '#6B7280', marginTop: 6, fontWeight: '600' },
 
   section: { marginBottom: 32 },
   sectionTitle: { fontSize: 13, fontWeight: '800', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 12, marginLeft: 8 },
   
   card: { 
-    backgroundColor: '#FFFFFF', borderRadius: 24, paddingHorizontal: 20, 
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 16, elevation: 2,
-    borderWidth: 1, borderColor: '#F3F4F6'
+    backgroundColor: '#FFFFFF', borderRadius: 26, paddingHorizontal: 20,
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.06, shadowRadius: 18, elevation: 4,
+    borderWidth: 1, borderColor: '#E2E8F0'
   },
   
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 20 },
   rowLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   iconBox: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-  rowLabel: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 3 },
+  rowLabel: { fontSize: 16, fontWeight: '800', color: '#111827', marginBottom: 3 },
   rowDesc: { fontSize: 13, color: '#6B7280', lineHeight: 18 },
   
-  divider: { height: 1, backgroundColor: '#F3F4F6', marginLeft: 60 },
+  divider: { height: 1, backgroundColor: '#EEF2F7', marginLeft: 60 },
 
   infoBox: {
     flexDirection: 'row', backgroundColor: '#F0F9FF', padding: 20, borderRadius: 20, 
@@ -231,5 +251,5 @@ const styles = StyleSheet.create({
   menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 20 },
   menuLeft: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   menuIconWrap: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  menuLabel: { fontSize: 16, fontWeight: '600', color: '#111827' },
+  menuLabel: { fontSize: 16, fontWeight: '700', color: '#111827' },
 });

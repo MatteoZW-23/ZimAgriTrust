@@ -2,28 +2,96 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Button, Input } from '@agritrust/shared';
 import { ShoppingBag, Plus, Trash2, MapPin, X } from 'lucide-react';
 import { getMyRequests, createBuyerRequest, deleteBuyerRequest } from '../api';
+import { getDistrictsForProvince, provinces } from '../locations';
 
 interface BuyerRequest {
   id: string;
   buyer_id: string;
-  crop_type: string;
-  quantity: number;
-  target_price: number | null;
-  location: string;
-  status: 'open' | 'closed' | 'cancelled';
+  sector?: string | null;
+  product_type?: string;
+  crop_type?: string;
+  quantity_required?: number;
+  quantity?: number;
+  quantity_unit?: string;
+  target_price: number;
+  delivery_location?: string | null;
+  location?: string;
+  status: 'open' | 'filled' | 'expired' | 'closed' | 'cancelled';
   created_at: string;
 }
+
+const sectors = [
+  { value: 'CROPS', label: 'Crops' },
+  { value: 'HORTICULTURE', label: 'Horticulture' },
+  { value: 'OLERICULTURE', label: 'Vegetables / Olericulture' },
+  { value: 'POMOLOGY', label: 'Fruit / Pomology' },
+  { value: 'FLORICULTURE', label: 'Flowers / Floriculture' },
+  { value: 'LIVESTOCK', label: 'Livestock' },
+  { value: 'POULTRY', label: 'Poultry' },
+  { value: 'DAIRY', label: 'Dairy' },
+  { value: 'APICULTURE', label: 'Apiculture / Bees' },
+  { value: 'FISHERIES', label: 'Fisheries' },
+  { value: 'AQUACULTURE', label: 'Aquaculture' },
+  { value: 'PISCICULTURE', label: 'Fish Farming / Pisciculture' },
+  { value: 'MARICULTURE', label: 'Mariculture' },
+  { value: 'SERICULTURE', label: 'Sericulture / Silkworms' },
+  { value: 'VITICULTURE', label: 'Grapes / Viticulture' },
+  { value: 'INPUTS', label: 'Inputs and supplies' },
+  { value: 'VALUE_ADDED', label: 'Processed / value added' },
+  { value: 'MIXED_FARMING', label: 'Mixed farming' },
+  { value: 'ARABLE_FARMING', label: 'Arable farming' },
+  { value: 'PASTORAL_FARMING', label: 'Pastoral farming' },
+];
+
+const productSuggestions = [
+  'Raw honey',
+  'Beeswax',
+  'Bee colonies',
+  'Fresh milk',
+  'Yoghurt',
+  'Cheese',
+  'Broiler chickens',
+  'Layer hens',
+  'Eggs',
+  'Beef cattle',
+  'Goats',
+  'Sheep',
+  'Pigs',
+  'Roses',
+  'Cut flowers',
+  'Seedlings',
+  'Tomatoes',
+  'Potatoes',
+  'Maize',
+  'Wheat',
+  'Soybeans',
+  'Groundnuts',
+  'Fertilizer',
+  'Seed',
+  'Animal feed',
+  'Compost',
+  'Irrigation equipment',
+  'Farm machinery',
+  'Tractor hire',
+  'Agrochemicals',
+];
+
+const quantityUnits = ['kg', 'tonnes', 'bags', 'crates', 'litres', 'units', 'head', 'trays', 'bunches', 'hives', 'colonies'];
 
 export const BuyerRequests: React.FC = () => {
   const [requests, setRequests] = useState<BuyerRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [formData, setFormData] = useState({
-    crop_type: '',
+    sector: 'CROPS',
+    product_type: '',
     quantity: '',
+    quantity_unit: 'kg',
     target_price: '',
-    location: '',
+    province: '',
+    district: '',
   });
+  const districts = getDistrictsForProvince(formData.province);
 
   useEffect(() => {
     loadRequests();
@@ -44,13 +112,15 @@ export const BuyerRequests: React.FC = () => {
     e.preventDefault();
     try {
       await createBuyerRequest({
-        crop_type: formData.crop_type,
-        quantity: parseFloat(formData.quantity),
-        target_price: formData.target_price ? parseFloat(formData.target_price) : null,
-        location: formData.location,
+        sector: formData.sector,
+        product_type: formData.product_type.trim(),
+        quantity_required: parseFloat(formData.quantity),
+        quantity_unit: formData.quantity_unit,
+        target_price: formData.target_price ? parseFloat(formData.target_price) : 0,
+        delivery_location: [formData.district, formData.province].filter(Boolean).join(', '),
       });
       setShowCreate(false);
-      setFormData({ crop_type: '', quantity: '', target_price: '', location: '' });
+      setFormData({ sector: 'CROPS', product_type: '', quantity: '', quantity_unit: 'kg', target_price: '', province: '', district: '' });
       loadRequests();
     } catch (error) {
       console.error('Failed to create request:', error);
@@ -73,7 +143,7 @@ export const BuyerRequests: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Buyer Requests</h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">Post what you need and let farmers come to you</p>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">Post any agricultural product you need and let suppliers come to you</p>
             </div>
             <button
               onClick={() => setShowCreate(true)}
@@ -99,34 +169,55 @@ export const BuyerRequests: React.FC = () => {
             <div className="p-6">
               <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Crop Type</label>
+                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Agricultural Sector</label>
                   <select
                     className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    value={formData.crop_type}
-                    onChange={(e) => setFormData({ ...formData, crop_type: e.target.value })}
+                    value={formData.sector}
+                    onChange={(e) => setFormData({ ...formData, sector: e.target.value })}
                     required
                   >
-                    <option value="">Select Crop</option>
-                    <option value="Maize">Maize</option>
-                    <option value="Wheat">Wheat</option>
-                    <option value="Soybeans">Soybeans</option>
-                    <option value="Tobacco">Tobacco</option>
-                    <option value="Groundnuts">Groundnuts</option>
+                    {sectors.map((sector) => <option key={sector.value} value={sector.value}>{sector.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Quantity (kg)</label>
-                  <Input
-                    type="number"
-                    placeholder="0.00"
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Product Needed</label>
+                  <input
+                    list="buyer-request-products"
+                    className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    value={formData.product_type}
+                    onChange={(e) => setFormData({ ...formData, product_type: e.target.value })}
+                    placeholder="e.g. Honey, milk, roses"
                     required
-                    className="w-full"
                   />
+                  <datalist id="buyer-request-products">
+                    {productSuggestions.map((product) => <option key={product} value={product} />)}
+                  </datalist>
+                </div>
+                <div className="grid grid-cols-[1fr_140px] gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Quantity</label>
+                    <Input
+                      type="number"
+                      placeholder="0.00"
+                      value={formData.quantity}
+                      onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                      required
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Unit</label>
+                    <select
+                      className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      value={formData.quantity_unit}
+                      onChange={(e) => setFormData({ ...formData, quantity_unit: e.target.value })}
+                    >
+                      {quantityUnits.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                    </select>
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Target Price per kg (USD) - Optional</label>
+                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Target Price per Unit (USD) - Optional</label>
                   <Input
                     type="number"
                     step="0.01"
@@ -136,15 +227,32 @@ export const BuyerRequests: React.FC = () => {
                     className="w-full"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Location (Province/District)</label>
-                  <Input
-                    placeholder="e.g. Mashonaland East"
-                    value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    required
-                    className="w-full"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Province</label>
+                    <select
+                      className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      value={formData.province}
+                      onChange={(e) => setFormData({ ...formData, province: e.target.value, district: '' })}
+                      required
+                    >
+                      <option value="">Select Province</option>
+                      {provinces.map((province) => <option key={province} value={province}>{province}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">District</label>
+                    <select
+                      className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-60"
+                      value={formData.district}
+                      onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+                      disabled={!formData.province}
+                      required
+                    >
+                      <option value="">{formData.province ? 'Select District' : 'Select Province First'}</option>
+                      {districts.map((district) => <option key={district} value={district}>{district}</option>)}
+                    </select>
+                  </div>
                 </div>
                 <div className="md:col-span-2 flex gap-4">
                   <Button type="submit" fullWidth className="bg-blue-600 hover:bg-blue-700">Create Request</Button>
@@ -170,6 +278,13 @@ export const BuyerRequests: React.FC = () => {
             </div>
           ) : (
             requests.map((req) => (
+              (() => {
+                const productName = req.product_type || req.crop_type || 'Agricultural product';
+                const sectorLabel = sectors.find((sector) => sector.value === req.sector)?.label || req.sector;
+                const quantity = req.quantity_required ?? req.quantity ?? 0;
+                const unit = req.quantity_unit || 'kg';
+                const location = req.delivery_location || req.location || 'Location not specified';
+                return (
               <div key={req.id} className="group rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-all overflow-hidden">
                 <div className="p-6">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -178,9 +293,9 @@ export const BuyerRequests: React.FC = () => {
                         <ShoppingBag size={28} />
                       </div>
                       <div>
-                        <h4 className="text-lg font-bold text-gray-900 dark:text-white">{req.crop_type}</h4>
+                        <h4 className="text-lg font-bold text-gray-900 dark:text-white">{productName}</h4>
                         <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">
-                          Posted {new Date(req.created_at).toLocaleDateString()}
+                          {sectorLabel ? `${sectorLabel} • ` : ''}Posted {new Date(req.created_at).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
@@ -188,12 +303,12 @@ export const BuyerRequests: React.FC = () => {
                     <div className="flex items-center gap-8">
                       <div className="text-center">
                         <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Quantity</p>
-                        <p className="text-xl font-bold text-gray-900 dark:text-white">{req.quantity} kg</p>
+                        <p className="text-xl font-bold text-gray-900 dark:text-white">{quantity} {unit}</p>
                       </div>
-                      {req.target_price && (
+                      {req.target_price > 0 && (
                         <div className="text-center">
                           <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Target Price</p>
-                          <p className="text-xl font-bold text-blue-600">${req.target_price.toFixed(2)}/kg</p>
+                          <p className="text-xl font-bold text-blue-600">${req.target_price.toFixed(2)}/{unit}</p>
                         </div>
                       )}
                       <div className="text-center">
@@ -218,11 +333,13 @@ export const BuyerRequests: React.FC = () => {
 
                   <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center gap-4 text-gray-500 dark:text-gray-400 font-semibold text-sm">
                     <div className="flex items-center gap-2">
-                      <MapPin size={16} /> {req.location}
+                      <MapPin size={16} /> {location}
                     </div>
                   </div>
                 </div>
               </div>
+                );
+              })()
             ))
           )}
         </div>

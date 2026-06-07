@@ -126,7 +126,7 @@ class WhatsAppRecipientQuery(BaseModel):
 
 @router.post("/webhook")
 async def whatsapp_webhook(
-    data: Dict[str, Any] = Body(...),
+    data: Dict[str, Any] = Body(default={}),
     request: Request = None,
     db: Session = Depends(get_db)
 ):

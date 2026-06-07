@@ -1,35 +1,41 @@
 export const theme = {
   colors: {
-    green: '#2E7D32',      // Harvest Green
-    gold: '#FFC107',       // Tobacco Gold
-    brown: '#5D4037',      // Earth Brown
-    sky: '#29B6F6',        // Zimbabwe Sky
-    orange: '#FF7043',     // Sunset Orange
-    red: '#D32F2F',        // Harvest Red
-    white: '#FFFFFF',      // Cloud White
+    green: '#1F6F43',
+    gold: '#D9A441',
+    brown: '#5B4334',
+    sky: '#1677FF',
+    orange: '#F37A45',
+    red: '#C94242',
+    white: '#FFFFFF',
+    cream: '#F8F4EA',
+    ink: '#102033',
+    mist: '#EEF4FF',
+    successTint: '#E6F6EC',
+    warningTint: '#FFF5DF',
+    dangerTint: '#FDECEC',
     gray: {
-      100: '#F5F5F5',
-      200: '#EEEEEE',
-      300: '#E0E0E0',
-      400: '#BDBDBD',
-      500: '#9E9E9E',
-      600: '#757575',
-      700: '#616161',
-      800: '#424242',
-      900: '#212121',
+      100: '#F8FAFC',
+      200: '#EEF2F6',
+      300: '#D7DEE8',
+      400: '#A8B4C3',
+      500: '#7B8898',
+      600: '#5D6978',
+      700: '#455160',
+      800: '#2B3645',
+      900: '#16202C',
     },
-    black: '#212121',      // Rich Black
-    light: '#F6F0DE',
+    black: '#16202C',
+    light: '#F8F4EA',
   },
   typography: {
-    h1: { fontSize: 32, fontWeight: '800', letterSpacing: 0.5, lineHeight: 40 },
-    h2: { fontSize: 28, fontWeight: '800', letterSpacing: 0.5, lineHeight: 36 },
-    h3: { fontSize: 24, fontWeight: '700', letterSpacing: 0.3, lineHeight: 32 },
-    h4: { fontSize: 20, fontWeight: '700', letterSpacing: 0.2, lineHeight: 28 },
+    h1: { fontSize: 34, fontWeight: '800', letterSpacing: -0.6, lineHeight: 40 },
+    h2: { fontSize: 29, fontWeight: '800', letterSpacing: -0.4, lineHeight: 35 },
+    h3: { fontSize: 24, fontWeight: '700', letterSpacing: -0.2, lineHeight: 30 },
+    h4: { fontSize: 20, fontWeight: '700', letterSpacing: -0.1, lineHeight: 26 },
     body: { fontSize: 16, fontWeight: '500', lineHeight: 24 },
     bodyLarge: { fontSize: 18, fontWeight: '500', lineHeight: 28 },
     caption: { fontSize: 14, fontWeight: '500', lineHeight: 20 },
-    small: { fontSize: 12, fontWeight: '500', lineHeight: 16 },
+    small: { fontSize: 12, fontWeight: '600', lineHeight: 16 },
   },
   spacing: {
     xs: 4,
@@ -41,11 +47,11 @@ export const theme = {
   },
   borderRadius: {
     xs: 4,
-    sm: 8,
-    md: 12,
-    lg: 16,
-    xl: 20,
-    xxl: 24,
+    sm: 10,
+    md: 14,
+    lg: 20,
+    xl: 24,
+    xxl: 30,
     round: 9999,
   },
   shadows: {
@@ -59,23 +65,23 @@ export const theme = {
     sm: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.08,
-      shadowRadius: 4,
+      shadowOpacity: 0.06,
+      shadowRadius: 6,
       elevation: 2,
     },
     md: {
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.12,
-      shadowRadius: 8,
-      elevation: 4,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.1,
+      shadowRadius: 14,
+      elevation: 6,
     },
     lg: {
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.16,
-      shadowRadius: 12,
-      elevation: 8,
+      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: 0.14,
+      shadowRadius: 20,
+      elevation: 10,
     },
     xl: {
       shadowColor: '#000',
@@ -90,7 +96,7 @@ export const theme = {
 export const globalStyles = {
   container: {
     flex: 1,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.gray[100],
   },
   header: {
     paddingTop: 60,
@@ -106,22 +112,25 @@ export const globalStyles = {
   card: {
     backgroundColor: theme.colors.white,
     borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.md,
-    ...theme.shadows.sm,
+    padding: theme.spacing.lg,
+    ...theme.shadows.md,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: theme.colors.gray[200],
   },
   primaryBtn: {
     backgroundColor: theme.colors.green,
     borderRadius: theme.borderRadius.xl,
-    paddingVertical: theme.spacing.md,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    ...theme.shadows.md,
   },
   primaryBtnText: {
     color: theme.colors.white,
     fontSize: 16,
     fontWeight: '800',
+    letterSpacing: 0.2,
   },
   badge: {
      paddingHorizontal: 12,

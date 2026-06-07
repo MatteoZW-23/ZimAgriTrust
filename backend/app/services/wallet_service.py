@@ -693,7 +693,7 @@ class WalletService:
             )
 
             provider_code = provider.upper()
-            supported_push_providers = {"ECOCASH", "ONEMONEY", "ZIPIT", "INNBUCKS"}
+            supported_push_providers = {"ECOCASH", "ONEMONEY", "ZIPIT", "INNBUCKS", "OMARI"}
             if provider_code in supported_push_providers:
                 # Provider-agnostic mobile push integration via configured gateway.
                 payload = {

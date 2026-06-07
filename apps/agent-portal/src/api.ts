@@ -122,6 +122,14 @@ export const getMarketPrices = () =>
   request("/market/prices/current").catch(() => request("/market/summary"));
 
 // ── Earnings / Wallet ─────────────────────────────────────────────────────────
+export const chatWithAgentAi = (message: string, context: Record<string, any> = {}) =>
+  request("/ai/assistants/agent/chat", { method: "POST", body: JSON.stringify({ message, context }) });
+export const getAgentAiRecommendations = (context: Record<string, any> = {}) =>
+  request("/ai/recommendations", { method: "POST", body: JSON.stringify({ assistant_role: "agent", context }) });
+export const getAgentAiMarketIntelligence = (product: string | null = null, province: string | null = null) =>
+  request("/ai/market-intelligence", { method: "POST", body: JSON.stringify({ product, province }) });
+export const getAgentDisputeSuggestion = (disputeId: string | number) =>
+  request(`/ai/disputes/${disputeId}/suggest-resolution`);
 export const getWalletBalance = () => request("/payments/balance");
 export const getTransactions = () => request("/transactions");
 export const getAgentEarnings = () => request("/agent/earnings").catch(() => request("/payments/balance"));
@@ -156,20 +164,21 @@ export const getApplicationStatusByPhone = (phone_number) =>
   request(`/recruitment/my-status/${encodeURIComponent(phone_number)}`);
 
 // ── Academy / Classroom ───────────────────────────────────────────────────────
-export const getAcademyCourses = () => request("/academy/my-progress");
-export const getAcademyCourseDetail = (moduleNumber) => request(`/academy/modules/${moduleNumber}/content`);
-export const enrollInAcademyCourse = (moduleNumber) =>
-  request(`/academy/modules/${moduleNumber}/topics/complete`, { method: "POST" });
-export const completeAcademyTopic = (moduleNumber, topicId) =>
-  request(`/academy/modules/${moduleNumber}/topics/${topicId}/complete`, { method: "POST" });
-export const startAcademyQuiz = (moduleNumber) =>
-  request(`/academy/modules/${moduleNumber}/quiz/start`, { method: "POST" });
-export const submitAcademyQuiz = (moduleNumber, answers) =>
-  request(`/academy/modules/${moduleNumber}/quiz/submit`, { method: "POST", body: JSON.stringify({ answers }) });
-export const getAcademyProgress = () => request("/academy/my-progress");
+export const getAcademyCourses = () => request("/agent/classroom/courses");
+export const getAcademyCourseDetail = (courseId) => request(`/agent/classroom/courses/${courseId}`);
+export const enrollInAcademyCourse = (courseId) =>
+  request(`/agent/classroom/courses/${courseId}/enroll`, { method: "POST" });
+export const completeAcademyTopic = (topicId) =>
+  request(`/agent/classroom/topics/${topicId}/complete`, { method: "POST" });
+export const getAcademyResource = (resourceId) => request(`/agent/classroom/resources/${resourceId}`);
+export const startAcademyQuiz = (resourceId) =>
+  request(`/agent/classroom/quizzes/${resourceId}/start`, { method: "POST" });
+export const submitAcademyQuiz = (resourceId, answers) =>
+  request(`/agent/classroom/quizzes/${resourceId}/submit`, { method: "POST", body: JSON.stringify({ answers }) });
+export const getAcademyProgress = () => request("/agent/classroom/progress");
 
 // ── Academy Certification ──────────────────────────────────────────────────────
-export const getAcademyMyProgress = () => request("/academy/my-progress");
+export const getAcademyMyProgress = () => request("/agent/classroom/progress");
 export const submitFinalExam = (answers) =>
   request("/academy/exam/final/submit", { method: "POST", body: JSON.stringify({ answers }) });
 
@@ -181,7 +190,7 @@ export async function getCertificate() {
   }
   const token = storedAuth?.access_token;
   const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
-  const res = await fetch(`${API}/academy/certificate`, {
+  const res = await fetch(`${API}/agent/classroom/certificate`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     credentials: "include",
   });

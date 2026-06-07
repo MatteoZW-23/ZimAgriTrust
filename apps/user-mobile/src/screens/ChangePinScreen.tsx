@@ -53,11 +53,11 @@ function PinInput(props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F6F0DE', justifyContent: 'center', padding: 20 },
-  card: { backgroundColor: '#fff', borderRadius: 28, padding: 24, borderWidth: 1, borderColor: '#e5e7eb' },
-  title: { color: '#111827', fontSize: 28, fontWeight: '900', marginTop: 14 },
+  container: { flex: 1, backgroundColor: theme.colors.gray50, justifyContent: 'center', padding: 20 },
+  card: { backgroundColor: '#fff', borderRadius: 32, padding: 26, borderWidth: 1, borderColor: '#e5e7eb', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 5 },
+  title: { color: '#111827', fontSize: 30, fontWeight: '900', marginTop: 14, letterSpacing: -0.7 },
   subtitle: { color: '#64748b', fontSize: 14, lineHeight: 21, marginTop: 8, marginBottom: 18 },
-  input: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, padding: 15, fontSize: 18, fontWeight: '900', marginBottom: 12, letterSpacing: 4 },
-  button: { backgroundColor: theme.colors.green, borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
+  input: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 18, padding: 15, fontSize: 18, fontWeight: '900', marginBottom: 12, letterSpacing: 4 },
+  button: { backgroundColor: theme.colors.green, borderRadius: 18, paddingVertical: 16, alignItems: 'center', marginTop: 8, shadowColor: '#16A34A', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 6 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '900' },
 });

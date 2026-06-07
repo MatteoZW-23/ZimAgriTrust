@@ -213,8 +213,8 @@ def initiate_mobile_money(
     currency: str = "USD",
     payment_method_id: Optional[uuid.UUID] = None,
 ) -> dict:
-    """EcoCash / OneMoney. Returns intent + push payload for the gateway."""
-    if channel not in (DepositChannel.ECOCASH, DepositChannel.ONEMONEY):
+    """Mobile money deposit. Returns intent + push payload for the gateway."""
+    if channel not in (DepositChannel.ECOCASH, DepositChannel.ONEMONEY, DepositChannel.INNBUCKS, DepositChannel.OMARI):
         raise HTTPException(status_code=400, detail="Unsupported channel for mobile money flow")
     pre = check_deposit_allowed(db, user=user, amount=amount, currency=currency)
 

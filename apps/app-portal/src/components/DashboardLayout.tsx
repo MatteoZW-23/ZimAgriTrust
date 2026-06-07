@@ -3,6 +3,7 @@ import { useAuthStore } from '@agritrust/shared';
 import { useThemeStore } from '../utils/themeStore';
 import {
   Bell,
+  Bot,
   ChevronLeft,
   ChevronRight,
   Crown,
@@ -43,6 +44,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'my-orders', label: 'Orders', icon: Truck, roles: ['farmer', 'buyer'] },
   { id: 'saved-listings', label: 'Saved', icon: Heart, roles: ['buyer'] },
   { id: 'wallet', label: 'Wallet', icon: Wallet, roles: ['farmer', 'buyer'] },
+  { id: 'ai-assistant', label: 'AI Assistant', icon: Bot, roles: ['farmer', 'buyer'] },
   { id: 'subscriptions', label: 'Membership', icon: Crown, roles: ['farmer', 'buyer'] },
   { id: 'profile', label: 'Profile', icon: User, roles: ['farmer', 'buyer'] },
   { id: 'settings', label: 'Settings', icon: Settings, roles: ['farmer', 'buyer'] },

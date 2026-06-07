@@ -67,7 +67,7 @@ services:
       REFRESH_SECRET_KEY: ${REFRESH_SECRET_KEY:-changeme_in_production_use_strong_random_string}
       ADMIN_BOOTSTRAP_TOKEN: ${ADMIN_BOOTSTRAP_TOKEN:-changeme_in_production_use_strong_random_string}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,host.docker.internal,backend,backend:8000,agric-backend-1,agric-backend-1:8000}
       # Security Configuration
       RATE_LIMIT_ENABLED: "true"
       RATE_LIMIT_REQUESTS: "100"
@@ -90,8 +90,8 @@ services:
       REFRESH_TOKEN_EXPIRE_MINUTES: "10080"
       REQUIRE_MFA_ADMIN: "true"
       # Gunicorn tuning
-      GUNICORN_WORKERS: "4"
-      GUNICORN_TIMEOUT: "60"
+      GUNICORN_WORKERS: "1"
+      GUNICORN_TIMEOUT: "180"
       GUNICORN_MAX_REQUESTS: "1000"
       GUNICORN_MAX_REQUESTS_JITTER: "100"
       # DB pool
@@ -103,6 +103,12 @@ services:
     networks:
       - backend-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+      start_period: 180s
     depends_on:
       postgres:
         condition: service_healthy
@@ -215,13 +221,6 @@ services:
     depends_on:
       - backend
 
-  node-gateway:
-    build: ./apps/iot-gateway
-    ports:
-      - "3005:3005"
-    depends_on:
-      - backend
-
   # REMOVED: ussd-simulator - USSD simulator removed (development-only)
 
   whatsapp-bridge:
@@ -237,6 +236,8 @@ services:
       - /app/node_modules
       - wwebjs_auth:/app/.wwebjs_auth
       - wwebjs_cache:/app/.wwebjs_cache
+    networks:
+      - backend-network
     depends_on:
       - backend
     restart: always

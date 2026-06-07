@@ -23,7 +23,8 @@ from app.core.config import settings
 from app.models.security import FraudAlert, FraudSeverity
 from app.models.transaction import Order, OrderStatus, Transaction, TransactionType
 from app.models.user import User
-from app.services.audit_chain_service import verify_chain
+from app.models.ledger import LedgerEntry, LedgerEntryType
+from sqlalchemy import select, case
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +34,38 @@ def run_daily_reconciliation(db: Session) -> dict:
     now = datetime.now(timezone.utc)
     day_start = now - timedelta(days=1)
 
-    total_balance_usd = float(db.query(func.coalesce(func.sum(User.balance_usd), 0.0)).scalar() or 0)
-    total_pending_usd = float(db.query(func.coalesce(func.sum(User.pending_usd), 0.0)).scalar() or 0)
+    # CRITICAL FIX: Use ledger for reconciliation, not deprecated User balance fields
+    from app.services.ledger_service import LedgerService
+    from app.models.ledger import LedgerAccountType
+
+    # Calculate total user balances from ledger entries
+    total_balance_usd = 0.0
+    total_pending_usd = 0.0
+
+    # Sum all USER_BALANCE_USD ledger entries
+    user_balance_result = db.execute(
+        select(func.coalesce(func.sum(
+            case(
+                (LedgerEntry.entry_type == LedgerEntryType.CREDIT, LedgerEntry.amount),
+                else_=-LedgerEntry.amount
+            )
+        ), 0.0))
+        .where(LedgerEntry.account_type == LedgerAccountType.USER_BALANCE_USD)
+    ).scalar()
+    total_balance_usd = float(user_balance_result) if user_balance_result else 0.0
+
+    # Sum all PENDING_ESCROW_USD ledger entries
+    pending_balance_result = db.execute(
+        select(func.coalesce(func.sum(
+            case(
+                (LedgerEntry.entry_type == LedgerEntryType.CREDIT, LedgerEntry.amount),
+                else_=-LedgerEntry.amount
+            )
+        ), 0.0))
+        .where(LedgerEntry.account_type == LedgerAccountType.PENDING_ESCROW_USD)
+    ).scalar()
+    total_pending_usd = float(pending_balance_result) if pending_balance_result else 0.0
+
     liability_usd = round(total_balance_usd + total_pending_usd, 2)
 
     open_escrow_amount = float(

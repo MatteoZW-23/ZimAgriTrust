@@ -16,21 +16,24 @@ function getCsrfCookie(): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-export async function request(path, options = {}) {
+export async function request(path: string, options: RequestInit & { headers?: Record<string, string> } = {}) {
   const saToken = getSAToken();
-  const optionHeaders = options.headers || {};
+  const optionHeaders: Record<string, string> = options.headers || {};
   const explicitAuth = optionHeaders["Authorization"];
   const invalidAuth = !explicitAuth ||
     explicitAuth === "Bearer null" ||
     explicitAuth === "Bearer undefined" ||
     explicitAuth === "Bearer active_session";
   const csrfToken = getCsrfCookie();
-  const headers = {
-    ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-    ...(optionHeaders || {}),
+  const headers: Record<string, string> = {
+    ...optionHeaders,
     ...(saToken && invalidAuth ? { "Authorization": `Bearer ${saToken}` } : {}),
     ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
   };
+
+  if (!(options.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
 
   if (
     headers["Authorization"] === "Bearer null" ||
@@ -59,7 +62,7 @@ export async function request(path, options = {}) {
         message = JSON.stringify(data.detail);
       }
     }
-    const error = new Error(message);
+    const error = new Error(message) as Error & { status?: number };
     error.status = response.status;
     throw error;
   }
@@ -90,7 +93,7 @@ export function createAdminInvitation({ email, role_name, phone, region, branch_
   });
 }
 
-export function listAdminInvitations({ status, role_name, limit = 100 } = {}) {
+export function listAdminInvitations({ status, role_name, limit = 100 }: { status?: string; role_name?: string; limit?: number } = {}) {
   const qs = new URLSearchParams();
   if (status) qs.set("status", status);
   if (role_name) qs.set("role_name", role_name);
@@ -119,10 +122,10 @@ export function fetchBroadcastHistory(limit = 50) {
 }
 
 // AUDIT LOGS
-export function fetchAuditLogs({ limit = 100, offset = 0, action, entity_type, admin_id } = {}) {
+export function fetchAuditLogs({ limit = 100, offset = 0, action, entity_type, admin_id }: { limit?: number; offset?: number; action?: string; entity_type?: string; admin_id?: string } = {}) {
   const qs = new URLSearchParams();
-  qs.set("limit", limit);
-  qs.set("offset", offset);
+  qs.set("limit", String(limit));
+  qs.set("offset", String(offset));
   if (action) qs.set("action", action);
   if (entity_type) qs.set("entity_type", entity_type);
   if (admin_id) qs.set("admin_id", admin_id);
@@ -469,9 +472,43 @@ export function fetchMarketSummary(token) {
   });
 }
 
-export function fetchMarketForecast(token, crop = 'Maize', region = "Harare") {
-  return request(`/ai/forecast/market-intelligence?commodity=${crop}&region=${region}`, {
+export function fetchMarketForecast(token, product = 'Horticulture', region = "Harare") {
+  return request("/ai/predictions/price-demand", {
+    method: "POST",
     headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ product, province: region, days_ahead: 30 }),
+  });
+}
+
+export function chatWithAdminAi(token, message, context = {}) {
+  return request("/ai/assistants/admin/chat", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ message, context }),
+  });
+}
+
+export function fetchAiMarketIntelligence(token, product = null, province = null) {
+  return request("/ai/market-intelligence", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ product, province }),
+  });
+}
+
+export function fetchAiPriceDemandPrediction(token, product = "Horticulture", province = null, daysAhead = 30) {
+  return request("/ai/predictions/price-demand", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ product, province, days_ahead: daysAhead }),
+  });
+}
+
+export function fetchAiRecommendations(token, assistantRole = "admin", context = {}) {
+  return request("/ai/recommendations", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ assistant_role: assistantRole, context }),
   });
 }
 
@@ -627,11 +664,11 @@ export const updateTicket = async (token, ticketId, payload) => {
   });
 };
 
-export const listAdminTransactions = async (token, filters = {}) => {
+export const listAdminTransactions = async (token, filters: Record<string, string | number> = {}) => {
   // Strip undefined/null/empty values so they never reach the backend as "undefined"
   const clean = Object.fromEntries(
     Object.entries(filters).filter(([, v]) => v !== undefined && v !== null && v !== '' && v !== 'undefined')
-  );
+  ) as Record<string, string>;
   const query = new URLSearchParams(clean).toString();
   return request(`/admin/transactions${query ? `?${query}` : ''}`, {
     headers: { Authorization: `Bearer ${token}` }
@@ -1003,9 +1040,9 @@ export function completeTrainingModule(token, appId, moduleId) {
 }
 
 // AGENT POST-EXAM REVIEW (admin) ──────────────────────────────────────────────
-export function listAgents(token, filters = {}) {
+export function listAgents(token, filters: Record<string, string | number> = {}) {
   const qs = new URLSearchParams(
-    Object.entries(filters).filter(([, v]) => v !== undefined && v !== null && v !== '')
+    Object.entries(filters).filter(([, v]) => v !== undefined && v !== null && v !== '') as [string, string][]
   ).toString();
   return request(`/admin/agents${qs ? `?${qs}` : ''}`, {
     headers: { Authorization: `Bearer ${token}` },

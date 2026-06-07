@@ -93,14 +93,14 @@ function Toggle({ label, value, onValueChange }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F6F0DE' },
+  container: { flex: 1, backgroundColor: theme.colors.gray50 },
   content: { padding: 20, paddingTop: 56, paddingBottom: 120 },
-  title: { color: '#111827', fontSize: 32, fontWeight: '900', marginTop: 12 },
+  title: { color: '#111827', fontSize: 34, fontWeight: '900', marginTop: 14, letterSpacing: -0.8 },
   subtitle: { color: '#64748b', fontSize: 14, lineHeight: 21, marginTop: 8, marginBottom: 20 },
-  card: { backgroundColor: '#fff', borderRadius: 22, padding: 18, borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 16 },
-  toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
+  card: { backgroundColor: '#fff', borderRadius: 26, padding: 20, borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 18, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.06, shadowRadius: 18, elevation: 4 },
+  toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
   toggleText: { color: '#334155', fontSize: 15, fontWeight: '800', flex: 1, paddingRight: 12 },
-  button: { backgroundColor: theme.colors.green, borderRadius: 16, paddingVertical: 15, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginBottom: 12 },
+  button: { backgroundColor: theme.colors.green, borderRadius: 18, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginBottom: 12, shadowColor: '#16A34A', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 6 },
   deleteButton: { backgroundColor: theme.colors.red },
   buttonText: { color: '#fff', fontWeight: '900', fontSize: 15 },
 });

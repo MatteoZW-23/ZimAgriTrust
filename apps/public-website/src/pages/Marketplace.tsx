@@ -6,7 +6,7 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 
 type MarketplaceItem = {
   id: string;
-  kind: "crop" | "input" | "machinery";
+  kind: "crop" | "input" | "machinery" | "request";
   name: string;
   description?: string;
   category?: string;
@@ -17,10 +17,11 @@ type MarketplaceItem = {
   supplier_rating?: number;
   supplier_verification?: string;
   location_label?: string;
+  quantity_unit?: string;
 };
 
 export default function Marketplace() {
-  const [activeTab, setActiveTab] = useState<"crops" | "inputs" | "machinery">("crops");
+  const [activeTab, setActiveTab] = useState<"products" | "requests" | "inputs" | "machinery">("products");
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -37,26 +38,51 @@ export default function Marketplace() {
   const fetchItems = async () => {
     setLoading(true);
     try {
-      if (activeTab === "crops") {
+      if (activeTab === "products") {
         const params = new URLSearchParams({ limit: "100" });
         if (searchTerm.trim()) params.set("crop", searchTerm.trim());
         const response = await fetch(`${API}/public/listings?${params.toString()}`);
         const data = await response.json();
-        const cropItems = (Array.isArray(data) ? data : data.data || []).map((item: any) => ({
+        const productItems = (Array.isArray(data) ? data : data.data || []).map((item: any) => ({
           id: item.id,
           kind: "crop" as const,
-          name: item.product_type || item.crop || item.title || "Crop Listing",
+          name: item.product_type || item.crop || item.title || "Agricultural Product",
           description: item.description,
-          category: String(item.product_type || "crop").toLowerCase(),
+          category: String(item.sector || item.product_type || "product").toLowerCase(),
           price: Number(item.price_per_unit || 0),
           currency: item.currency || "USD",
           quantity_available: Number(item.quantity || 0),
+          quantity_unit: item.quantity_unit || "units",
           supplier_name: item.seller_name || "Verified Farmer",
           supplier_rating: Number(item.seller_trust_score || 0) / 20,
           supplier_verification: item.seller_verified ? "approved" : "pending",
           location_label: [item.location_district, item.location_province].filter(Boolean).join(", ") || "Zimbabwe",
         }));
-        setItems(cropItems);
+        setItems(productItems);
+        return;
+      }
+
+      if (activeTab === "requests") {
+        const params = new URLSearchParams({ kind: "requests", limit: "100" });
+        if (searchTerm.trim()) params.set("q", searchTerm.trim());
+        const response = await fetch(`${API}/browse/search?${params.toString()}`);
+        const data = await response.json();
+        const requestItems = (Array.isArray(data) ? data : data.results || []).map((item: any) => ({
+          id: item.id,
+          kind: "request" as const,
+          name: item.name || item.product_type || "Agricultural Request",
+          description: "Buyer is looking for this agricultural product or service.",
+          category: String(item.sector || "buyer_request").toLowerCase(),
+          price: Number(item.price_per_unit || 0),
+          currency: item.currency || "USD",
+          quantity_available: Number(item.quantity || 0),
+          quantity_unit: item.unit || "units",
+          supplier_name: "Buyer request",
+          supplier_rating: 0,
+          supplier_verification: "pending",
+          location_label: item.location || "Zimbabwe",
+        }));
+        setItems(requestItems);
         return;
       }
 
@@ -99,7 +125,8 @@ export default function Marketplace() {
   };
 
   const categories = useMemo(() => {
-    if (activeTab === "crops") return ["maize", "soybeans", "wheat", "groundnuts", "sunflower", "sorghum"];
+    if (activeTab === "products") return ["crops", "horticulture", "dairy", "apiculture", "floriculture", "livestock", "poultry", "value_added"];
+    if (activeTab === "requests") return ["buyer_request", "crops", "horticulture", "dairy", "apiculture", "floriculture", "inputs"];
     if (activeTab === "inputs") return ["seeds", "fertilizer", "pesticides", "herbicides", "fungicides", "animal_feed"];
     return ["tractor", "sprayer", "irrigation", "tiller", "harvester", "tools"];
   }, [activeTab]);
@@ -143,7 +170,16 @@ export default function Marketplace() {
       tiller: "Tillers",
       harvester: "Harvesters",
       tools: "Tools",
-      crop: "Crop",
+      product: "Product",
+      buyer_request: "Buyer Request",
+      crops: "Crops",
+      horticulture: "Horticulture",
+      dairy: "Dairy",
+      apiculture: "Apiculture / Bees",
+      floriculture: "Flowers",
+      livestock: "Livestock",
+      poultry: "Poultry",
+      value_added: "Value Added",
     };
     return labels[category] || category;
   };
@@ -156,7 +192,7 @@ export default function Marketplace() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <h1 className="mb-4 text-4xl font-bold md:text-5xl">Marketplace</h1>
-            <p className="mb-8 text-xl text-green-100">Browse verified crop listings, agricultural inputs, and machinery across Zimbabwe.</p>
+            <p className="mb-8 text-xl text-green-100">Browse verified agricultural products, buyer requests, inputs, and machinery across Zimbabwe.</p>
             <div className="relative max-w-2xl">
               <input
                 type="text"
@@ -174,13 +210,14 @@ export default function Marketplace() {
       <div className="sticky top-16 z-40 border-b border-gray-200 bg-white">
         <div className="mx-auto flex max-w-7xl gap-1 px-4 sm:px-6 lg:px-8">
           {[
-            { id: "crops", label: "Crops" },
+            { id: "products", label: "Products" },
+            { id: "requests", label: "Buyer Requests" },
             { id: "inputs", label: "Inputs" },
             { id: "machinery", label: "Machinery" },
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as "crops" | "inputs" | "machinery")}
+              onClick={() => setActiveTab(tab.id as "products" | "requests" | "inputs" | "machinery")}
               className={`px-6 py-4 font-medium transition-colors ${
                 activeTab === tab.id ? "border-b-2 border-green-600 text-green-600" : "text-gray-600 hover:text-gray-900"
               }`}
@@ -296,11 +333,11 @@ export default function Marketplace() {
                   <p className="mb-4 line-clamp-2 text-sm text-gray-600">{item.description || "Quality agricultural listing"}</p>
                   <div className="mb-4 space-y-2">
                     <div className="flex items-center justify-between text-sm"><span className="text-gray-600">Category:</span><span className="font-medium">{getCategoryLabel(item.category || "crop")}</span></div>
-                    <div className="flex items-center justify-between text-sm"><span className="text-gray-600">Price:</span><span className="font-bold text-green-600">${item.price.toFixed(2)}</span></div>
-                    <div className="flex items-center justify-between text-sm"><span className="text-gray-600">Stock:</span><span className={`font-medium ${(item.quantity_available || 0) > 0 ? "text-green-600" : "text-red-600"}`}>{(item.quantity_available || 0) > 0 ? `${item.quantity_available} units` : "Out of stock"}</span></div>
+                    <div className="flex items-center justify-between text-sm"><span className="text-gray-600">{item.kind === "request" ? "Target:" : "Price:"}</span><span className="font-bold text-green-600">${item.price.toFixed(2)}</span></div>
+                    <div className="flex items-center justify-between text-sm"><span className="text-gray-600">{item.kind === "request" ? "Needed:" : "Stock:"}</span><span className="font-medium text-green-600">{item.quantity_available || 0} {item.quantity_unit || "units"}</span></div>
                   </div>
                   <button className="w-full rounded-lg bg-green-600 px-4 py-2 font-medium text-white transition-colors hover:bg-green-700" onClick={() => (window.location.href = `/products/${item.id}`)}>
-                    {item.kind === "crop" ? "View Crop" : "View Details"}
+                    {item.kind === "request" ? "View Request" : "View Details"}
                   </button>
                 </div>
               </motion.div>
@@ -332,11 +369,11 @@ export default function Marketplace() {
                     <td className="px-6 py-4 text-sm text-gray-600">{item.supplier_name || "Verified Seller"}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{getCategoryLabel(item.category || "crop")}</td>
                     <td className="px-6 py-4 text-sm font-medium text-green-600">${item.price.toFixed(2)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{item.quantity_available || 0}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{item.quantity_available || 0} {item.quantity_unit || "units"}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{(item.supplier_rating || 0) > 0 ? `★ ${(item.supplier_rating || 0).toFixed(1)}` : "N/A"}</td>
                     <td className="px-6 py-4">
                       <button className="text-sm font-medium text-green-600 hover:text-green-700" onClick={() => (window.location.href = `/products/${item.id}`)}>
-                        {item.kind === "crop" ? "View Crop" : "View"}
+                        {item.kind === "request" ? "View Request" : "View"}
                       </button>
                     </td>
                   </motion.tr>

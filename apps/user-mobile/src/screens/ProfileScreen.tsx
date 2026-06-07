@@ -8,7 +8,8 @@ import {
   Settings as IconSettings, Briefcase as IconBriefcase,
   Download as IconDownload, Trash2 as IconTrash2,
   PowerOff as IconPowerOff, ShoppingCart as IconShopping,
-  Sprout as IconSprout, CheckCircle, Clock, TrendingUp, Award
+  Sprout as IconSprout, CheckCircle, Clock, TrendingUp, Award,
+  Bot as IconBot
 } from 'lucide-react-native';
 import { theme } from '../styles';
 import { deactivateAccount, deleteAccount, exportPersonalData, getProfile } from '../api';
@@ -213,6 +214,7 @@ export default function ProfileScreen({ route, navigation }) {
           <MenuItem icon={<IconSettings size={20} color={accent} />} label="Account Settings" onPress={handleEditProfile} />
           <MenuItem icon={<IconShield size={20} color={accent} />} label="Change PIN" onPress={() => navigation.navigate('ChangePin', { token })} />
           <MenuItem icon={<IconBell size={20} color={accent} />} label="Notifications & Language" onPress={() => navigation.navigate('Settings', { token })} />
+          <MenuItem icon={<IconBot size={20} color={accent} />} label="AI Assistant" onPress={() => navigation.navigate('AIAssistant', { token, role, profile })} />
           <MenuItem icon={<IconShield size={20} color={accent} />} label="Verification" onPress={() => navigation.navigate('Verification', { token })} />
           <MenuItem icon={<IconDownload size={20} color={accent} />} label="Export My Data" onPress={handleExportData} />
           <MenuItem icon={<IconFileText size={20} color={accent} />} label="My Disputes" onPress={() => navigation.navigate('Disputes', { token })} />
@@ -273,18 +275,18 @@ function VerificationBadge({ icon, label, verified }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  header: { padding: 24, paddingTop: 16 },
-  headerTitle: { fontSize: 28, fontWeight: '800', color: theme.colors.black },
+  container: { flex: 1, backgroundColor: theme.colors.gray50 },
+  header: { padding: 24, paddingTop: 20 },
+  headerTitle: { fontSize: 30, fontWeight: '900', color: theme.colors.ink, letterSpacing: -0.8 },
   profileCard: {
     marginHorizontal: 20,
     backgroundColor: '#FFF',
-    borderRadius: 24,
+    borderRadius: 30,
     padding: 28,
     alignItems: 'center',
-    ...theme.shadows.sm,
+    ...theme.shadows.md,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: '#E2E8F0',
   },
   avatar: {
     width: 100,
@@ -295,10 +297,10 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     marginBottom: 16,
   },
-  name: { fontSize: 22, fontWeight: '800', color: theme.colors.black },
-  roleLabel: { fontSize: 14, color: '#999', fontWeight: '600', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
+  name: { fontSize: 24, fontWeight: '900', color: theme.colors.ink, letterSpacing: -0.4 },
+  roleLabel: { fontSize: 14, color: '#94A3B8', fontWeight: '700', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
-  infoText: { fontSize: 14, color: '#666', fontWeight: '500' },
+  infoText: { fontSize: 14, color: '#64748B', fontWeight: '600' },
   verificationBadges: { flexDirection: 'row', gap: 8, marginTop: 16, flexWrap: 'wrap', justifyContent: 'center' },
   verificationBadge: {
     flexDirection: 'row',
@@ -323,47 +325,48 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 16,
     backgroundColor: '#FFF',
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 20,
-    ...theme.shadows.xs,
+    ...theme.shadows.sm,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: '#E2E8F0',
   },
   trustHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  trustLabel: { fontSize: 13, color: '#999', fontWeight: '700', textTransform: 'uppercase' },
+  trustLabel: { fontSize: 13, color: '#94A3B8', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
   trustValue: { fontSize: 28, fontWeight: '900', marginTop: 4 },
   trustBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
   trustBadgeText: { fontSize: 13, fontWeight: '700' },
-  progressBar: { height: 8, backgroundColor: '#F0F0F0', borderRadius: 4, marginTop: 16, overflow: 'hidden' },
+  progressBar: { height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, marginTop: 16, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 4 },
   statsRow: { flexDirection: 'row', marginHorizontal: 20, marginTop: 16, gap: 12 },
   statCard: {
     flex: 1,
     backgroundColor: '#FFF',
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 16,
     alignItems: 'center',
-    ...theme.shadows.xs,
+    ...theme.shadows.sm,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: '#E2E8F0',
   },
-  statValue: { fontSize: 20, fontWeight: '900', color: theme.colors.black },
-  statLabel: { fontSize: 12, color: '#999', fontWeight: '600', marginTop: 4 },
+  statValue: { fontSize: 20, fontWeight: '900', color: theme.colors.ink },
+  statLabel: { fontSize: 12, color: '#94A3B8', fontWeight: '700', marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
   menuSection: { marginHorizontal: 20, marginTop: 24 },
-  sectionTitle: { fontSize: 14, fontWeight: '800', color: '#999', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
+  sectionTitle: { fontSize: 14, fontWeight: '900', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
   menuItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#FFF',
     padding: 16,
-    borderRadius: 14,
-    marginBottom: 8,
+    borderRadius: 18,
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#F5F5F5',
+    borderColor: '#E2E8F0',
+    ...theme.shadows.xs,
   },
   menuItemLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  menuItemLabel: { fontSize: 15, fontWeight: '600', color: theme.colors.black },
+  menuItemLabel: { fontSize: 15, fontWeight: '700', color: theme.colors.ink },
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -372,11 +375,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 32,
     paddingVertical: 16,
-    borderRadius: 14,
+    borderRadius: 18,
     backgroundColor: '#FFF5F5',
     borderWidth: 1,
     borderColor: '#FFCDD2',
   },
-  logoutText: { fontSize: 16, fontWeight: '700', color: '#D32F2F' },
-  version: { textAlign: 'center', fontSize: 12, color: '#CCC', marginTop: 20, fontWeight: '600' },
+  logoutText: { fontSize: 16, fontWeight: '800', color: '#D32F2F' },
+  version: { textAlign: 'center', fontSize: 12, color: '#CBD5E1', marginTop: 20, fontWeight: '700' },
 });

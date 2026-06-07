@@ -133,31 +133,31 @@ function PinInput({ label, value, onChangeText, placeholder }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF' },
+  container: { flex: 1, backgroundColor: theme.colors.gray50 },
   content: { flex: 1, padding: 24 },
   
   header: { alignItems: 'center', marginBottom: 40, marginTop: 20 },
   iconCircle: {
     width: 80, height: 80, borderRadius: 40,
     backgroundColor: '#F0F9FF', justifyContent: 'center', alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 16, shadowColor: '#0EA5E9', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 4,
   },
-  title: { fontSize: 24, fontWeight: '900', color: theme.colors.dark },
-  subtitle: { fontSize: 14, color: '#666', marginTop: 8, textAlign: 'center' },
+  title: { fontSize: 26, fontWeight: '900', color: theme.colors.ink, letterSpacing: -0.5 },
+  subtitle: { fontSize: 14, color: '#64748B', marginTop: 8, textAlign: 'center', fontWeight: '600' },
 
   form: { gap: 24 },
   inputGroup: {},
-  label: { fontSize: 13, fontWeight: '800', color: '#BBB', textTransform: 'uppercase', marginBottom: 8 },
+  label: { fontSize: 13, fontWeight: '900', color: '#94A3B8', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.5 },
   inputWrapper: {
     flexDirection: 'row', alignItems: 'center',
-    borderBottomWidth: 2, borderBottomColor: '#F0F0F0', paddingBottom: 8,
+    borderBottomWidth: 2, borderBottomColor: '#E2E8F0', paddingBottom: 10,
   },
-  input: { flex: 1, height: 40, color: theme.colors.dark, fontSize: 18, fontWeight: '700', letterSpacing: 4 },
+  input: { flex: 1, height: 40, color: theme.colors.ink, fontSize: 18, fontWeight: '800', letterSpacing: 4 },
 
   saveBtn: {
     backgroundColor: theme.colors.dark, flexDirection: 'row',
     height: 56, borderRadius: 18, justifyContent: 'center', alignItems: 'center',
-    marginTop: 'auto', marginBottom: 20, gap: 10,
+    marginTop: 'auto', marginBottom: 20, gap: 10, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.16, shadowRadius: 18, elevation: 6,
   },
   saveBtnDisabled: { opacity: 0.7 },
   saveBtnText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
