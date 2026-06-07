@@ -33,6 +33,7 @@ jobs:
       - name: Run tests
         run: |
           cd backend
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
           pytest tests/ -v --cov=app --cov-report=xml --cov-report=html
       
       - name: Upload coverage
