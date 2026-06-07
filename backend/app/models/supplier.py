@@ -141,7 +141,7 @@ class SupplierProfile(Base):
     phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     logo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    product_categories: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)  # ["seeds", "fertilizer", ...]
+    product_categories: Mapped[Optional[List]] = mapped_column(JSON, nullable=True)  # ["seeds", "fertilizer", ...]
 
     # Verification
     verification_status: Mapped[SupplierVerificationStatus] = mapped_column(
@@ -255,7 +255,7 @@ class SupplierProduct(Base):
     manual_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     # Media
-    photo_urls: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)  # Up to 5 images
+    photo_urls: Mapped[Optional[List]] = mapped_column(JSON, nullable=True)  # Up to 5 images
 
     # Status
     status: Mapped[SupplierProductStatus] = mapped_column(
@@ -481,8 +481,8 @@ class SupplierDiscount(Base):
     # Applicability
     min_order_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # Minimum order value to apply discount
     max_discount_amount: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # Maximum discount amount
-    applicable_products: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)  # List of product IDs
-    applicable_categories: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)  # List of categories
+    applicable_products: Mapped[Optional[List]] = mapped_column(JSON, nullable=True)  # List of product IDs
+    applicable_categories: Mapped[Optional[List]] = mapped_column(JSON, nullable=True)  # List of categories
     
     # Usage limits
     max_uses: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # Maximum total uses

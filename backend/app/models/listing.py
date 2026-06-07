@@ -134,7 +134,7 @@ class Listing(Base):
     view_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # F#52 — listing photos (URLs of uploaded images)
-    photo_urls: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    photo_urls: Mapped[Optional[List]] = mapped_column(JSON, nullable=True)
 
     # F#58 — auto-expire support
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

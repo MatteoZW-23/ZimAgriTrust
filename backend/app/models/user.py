@@ -92,7 +92,7 @@ class User(Base):
 
     # Password Security
     password_changed_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    password_history: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)  # list of previous hashes
+    password_history: Mapped[Optional[List]] = mapped_column(JSON, nullable=True)  # list of previous hashes
     must_change_password_reason: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # 'expired', 'breached', 'admin_reset'
     
     # Location Data (Verified via GPS)

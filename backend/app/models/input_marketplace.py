@@ -15,7 +15,7 @@ from __future__ import annotations
 import enum
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from sqlalchemy import (
     Boolean,
@@ -127,8 +127,8 @@ class InputListing(Base):
     location: Mapped[Optional[str]] = mapped_column(String(120))
     province: Mapped[Optional[str]] = mapped_column(String(50), index=True)
 
-    photos: Mapped[Optional[list]] = mapped_column(JSON, default=list)        # list[str]
-    documents: Mapped[Optional[list]] = mapped_column(JSON, default=list)     # registration certs, COA
+    photos: Mapped[Optional[List]] = mapped_column(JSON, default=list)        # list[str]
+    documents: Mapped[Optional[List]] = mapped_column(JSON, default=list)     # registration certs, COA
 
     expiry_date: Mapped[Optional[datetime]] = mapped_column(DateTime, index=True)
     registration_number: Mapped[Optional[str]] = mapped_column(String(80))
@@ -223,7 +223,7 @@ class InputReport(Base):
 
     reason: Mapped[InputReportReason] = mapped_column(Enum(InputReportReason, values_callable=_enum_values), nullable=False)
     details: Mapped[Optional[str]] = mapped_column(Text)
-    evidence_urls: Mapped[Optional[list]] = mapped_column(JSON, default=list)
+    evidence_urls: Mapped[Optional[List]] = mapped_column(JSON, default=list)
 
     status: Mapped[InputReportStatus] = mapped_column(
         Enum(InputReportStatus, values_callable=_enum_values), default=InputReportStatus.open, nullable=False, index=True

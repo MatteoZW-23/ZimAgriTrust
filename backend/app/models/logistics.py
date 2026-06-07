@@ -83,8 +83,8 @@ class OrderDelivery(Base):
     vehicle_reg: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
     # Photo evidence (list of URLs/paths)
-    pickup_photos: Mapped[Optional[list]] = mapped_column(JSON, default=list)
-    delivery_photos: Mapped[Optional[list]] = mapped_column(JSON, default=list)
+    pickup_photos: Mapped[Optional[List]] = mapped_column(JSON, default=list)
+    delivery_photos: Mapped[Optional[List]] = mapped_column(JSON, default=list)
 
     # GPS stamps
     pickup_gps_verified: Mapped[bool] = mapped_column(Boolean, default=False)

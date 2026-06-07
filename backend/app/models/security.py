@@ -16,7 +16,7 @@ from __future__ import annotations
 import enum
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from sqlalchemy import (
     Boolean,
@@ -61,7 +61,7 @@ class SuperAdmin(Base):
     # Public key for digital signature verification (RSA / Ed25519 PEM)
     public_key: Mapped[Optional[str]] = mapped_column(Text)
 
-    ip_whitelist: Mapped[Optional[list]] = mapped_column(JSON, default=list)
+    ip_whitelist: Mapped[Optional[List]] = mapped_column(JSON, default=list)
     phone_number: Mapped[Optional[str]] = mapped_column(String(32))
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
